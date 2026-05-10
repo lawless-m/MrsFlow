@@ -1,0 +1,16 @@
+[package]
+name = "mrsflow-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Core evaluator for the M (Power Query) language — lexer, parser, evaluator, stdlib"
+
+[lints]
+workspace = true
+
+[dependencies]
+unicode-general-category = "1"
+
+[dev-dependencies]
+insta = "1"

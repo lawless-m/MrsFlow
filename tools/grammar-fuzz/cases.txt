@@ -1,0 +1,75 @@
+let x = 1 + 2 in x
+Table.SelectRows
+3.14
+"hello"
+true false null
+let a = 1, b = 2 in a + b * 3
+[Foo, Bar]
+{1, 2, 3}
+foo(bar)
+"he said ""hi"""
+0
+12345
+_underscored
+A.B.C
+let x = 1 in /* block */ x
+// only a comment
+foo&bar
+a < b
+a <= b
+a >= b
+a <> b
+a > b
+(x) => x + 1
+1 .. 10
+foo(1, 2, 3, ...)
+maybe ?? other
+optional?
+@reference
+a!b
+0xff
+0X1A
+0xDeadBeef
+1e3
+2E10
+1e+3
+1.5e-10
+let big = 1.5e10 in big * 0xff
+#"with spaces"
+#"a""b"
+#!"unparseable"
+#date
+#datetime
+#datetimezone
+#duration
+#binary
+#table
+#time
+#sections
+#shared
+#infinity
+#nan
+#date(2024, 1, 1)
+let t = #table({"a","b"}, {{1,2}}) in t
+"hi#(cr)"
+"#(cr,lf)"
+"#(tab)X"
+"#(0041)"
+"#(0000004D)"
+"#(#)("
+"a#b"
+#"x#(cr)y"
+中文
+café αβγ
+Ⅷ
+name١
+let café = 1 in café + 中文
+true and false
+not true
+a or b and c
+x as number
+x is text
+type number
+a meta b
+section foo
+shared bar

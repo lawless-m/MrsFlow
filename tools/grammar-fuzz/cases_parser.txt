@@ -1,0 +1,124 @@
+42
+0xff
+3.14
+"hello"
+true
+false
+null
+foo
+Table.SelectRows
+(42)
+((42))
+-x
++x
+not x
+not not x
+1 + 2
+1 - 2 - 3
+1 + 2 * 3
+2 * 3 + 1
+-2 * 3
+1 < 2
+1 <= 2
+1 > 2
+1 >= 2
+1 = 2
+1 <> 2
+a < b = c
+a or b and c
+true and false or true
+"a" & "b" & "c"
+if x then 1 else 2
+if x > 0 then 1 else -1
+if a then if b then 1 else 2 else 3
+let x = 1 in x
+let x = 1, y = 2 in x + y
+let x = 1 + 2 in if x > 0 then x else -x
+let a = 1, b = 2, c = 3 in a + b * c
+if true then "yes" else "no"
+1 + 2 + 3 + 4 + 5
+((1 + 2) * (3 - 4))
+let x = if a then 1 else 2 in x * 3
+[a = 1, b = 2]
+[]
+{1, 2, 3}
+{}
+{1..10}
+{1, 2..5, 9}
+[#"with space" = 1]
+() => 42
+(x) => x + 1
+(x, y) => x + y
+(x) => (y) => x + y
+(x)
+(1 + 2)
+each x + 1
+each _
+f(1, 2, 3)
+now()
+Table.SelectRows(t, each true)
+r[Name]
+r[Name]?
+r[#"with space"]
+xs{0}
+xs{i + 1}?
+f(x)[name]{0}
+((x) => x * 2)(5)
+let f = (x) => x * 2 in f(21)
+each [a] > 1
+List.Sum({1, 2, 3, 4..10})
+[Name = "x", Age = 30, Tags = {"a", "b"}]
+#nan
+#infinity
+#sections
+#shared
+#date(2024, 1, 1)
+#datetime(2024, 1, 1, 12, 0, 0)
+#duration(0, 1, 30, 0)
+#table({"a", "b"}, {{1, 2}, {3, 4}})
+try foo()
+try foo() otherwise null
+try parse(x) otherwise 0
+error "bad input"
+let x = try parse(s) otherwise 0 in x + 1
+let t = #table({"a", "b"}, {{1, 2}, {3, 4}}), filtered = Table.SelectRows(t, each [a] > 1) in filtered
+x as number
+x is text
+x as a as b
+x as a is b
+(x as number) = 5
+type number
+type text
+Table.AddColumn(t, "x", each [a] * 2, type number)
+x meta y
+a meta b meta c
+a meta b * c
+[Base Line = 100]
+r[Base Line]
+[Base Line]
+each [Base Line] > 0
+let #"with space" = 1 in #"with space"
+[Base Line = 100, Rate = 1.8]
+x as nullable number
+x is nullable text
+(x as number) => x + 1
+(x, optional y) => x
+(x as number, optional y as text) => x
+(x) as number => x
+(x as nullable number) as nullable text => x
+(x as number, y as number) as number => x + y
+let parse = (s as text) as nullable number => null in parse("42")
+type {number}
+type {{text}}
+type [a = number, b = text]
+type [a = number, ...]
+type [...]
+type [a = number, optional b = text]
+type [a, b]
+type table [a = number, b = text]
+type function (x as number) as number
+type function (x as number, optional y as text) as nullable text
+type {[Name = text, Age = number]}
+type {(myType)}
+(t) as table [a = number] => t
+let myType = type number in type {(myType)}
