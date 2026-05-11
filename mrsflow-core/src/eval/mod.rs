@@ -1962,6 +1962,40 @@ mod tests {
     }
 
     #[test]
+    fn list_first_n_count() {
+        match eval_str("List.FirstN({10, 20, 30, 40}, 2)").unwrap() {
+            Value::List(xs) => {
+                let nums: Vec<f64> = xs
+                    .iter()
+                    .map(|v| match v {
+                        Value::Number(n) => *n,
+                        _ => panic!(),
+                    })
+                    .collect();
+                assert_eq!(nums, vec![10.0, 20.0]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn list_skip_count() {
+        match eval_str("List.Skip({10, 20, 30, 40}, 2)").unwrap() {
+            Value::List(xs) => {
+                let nums: Vec<f64> = xs
+                    .iter()
+                    .map(|v| match v {
+                        Value::Number(n) => *n,
+                        _ => panic!(),
+                    })
+                    .collect();
+                assert_eq!(nums, vec![30.0, 40.0]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn list_is_empty_basic() {
         assert!(matches!(eval_str("List.IsEmpty({})").unwrap(), Value::Logical(true)));
         assert!(matches!(eval_str("List.IsEmpty({1})").unwrap(), Value::Logical(false)));

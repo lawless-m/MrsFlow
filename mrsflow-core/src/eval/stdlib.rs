@@ -156,6 +156,8 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
             list_last,
         ),
         ("List.Reverse", one("list"), list_reverse),
+        ("List.FirstN", two("list", "countOrCondition"), list_first_n),
+        ("List.Skip", two("list", "countOrCondition"), list_skip),
         ("Record.Field", two("record", "field"), record_field),
         ("Record.FieldNames", one("record"), record_field_names),
         ("Logical.From", one("value"), logical_from),
@@ -611,6 +613,35 @@ fn list_reverse(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let mut out = list.clone();
     out.reverse();
     Ok(Value::List(out))
+}
+
+fn list_first_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let list = expect_list(&args[0])?;
+    // Power Query also accepts a predicate (take-while) form; not yet supported.
+    let count = match &args[1] {
+        Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
+        Value::Function(_) => {
+            return Err(MError::NotImplemented(
+                "List.FirstN: predicate (take-while) form not yet supported",
+            ));
+        }
+        other => return Err(type_mismatch("non-negative integer", other)),
+    };
+    Ok(Value::List(list.iter().take(count).cloned().collect()))
+}
+
+fn list_skip(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let list = expect_list(&args[0])?;
+    let count = match &args[1] {
+        Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
+        Value::Function(_) => {
+            return Err(MError::NotImplemented(
+                "List.Skip: predicate (skip-while) form not yet supported",
+            ));
+        }
+        other => return Err(type_mismatch("non-negative integer", other)),
+    };
+    Ok(Value::List(list.iter().skip(count).cloned().collect()))
 }
 
 fn list_combine(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
