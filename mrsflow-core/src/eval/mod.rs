@@ -2752,6 +2752,35 @@ mod tests {
     }
 
     #[test]
+    fn list_numbers_default_increment() {
+        match eval_str("List.Numbers(1, 5)").unwrap() {
+            Value::List(xs) => {
+                let nums: Vec<f64> = xs.iter().map(|v| match v {
+                    Value::Number(n) => *n,
+                    _ => panic!(),
+                }).collect();
+                assert_eq!(nums, vec![1.0, 2.0, 3.0, 4.0, 5.0]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn list_numbers_custom_increment() {
+        // start=10, count=4, increment=-3 → 10, 7, 4, 1
+        match eval_str("List.Numbers(10, 4, -3)").unwrap() {
+            Value::List(xs) => {
+                let nums: Vec<f64> = xs.iter().map(|v| match v {
+                    Value::Number(n) => *n,
+                    _ => panic!(),
+                }).collect();
+                assert_eq!(nums, vec![10.0, 7.0, 4.0, 1.0]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn list_combine_flattens() {
         match eval_str(r#"List.Combine({{1, 2}, {}, {3}})"#).unwrap() {
             Value::List(xs) => {

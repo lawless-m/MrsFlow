@@ -197,6 +197,15 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
             list_last,
         ),
         ("List.Reverse", one("list"), list_reverse),
+        (
+            "List.Numbers",
+            vec![
+                Param { name: "start".into(),     optional: false, type_annotation: None },
+                Param { name: "count".into(),     optional: false, type_annotation: None },
+                Param { name: "increment".into(), optional: true,  type_annotation: None },
+            ],
+            list_numbers,
+        ),
         ("List.FirstN", two("list", "countOrCondition"), list_first_n),
         ("List.Skip", two("list", "countOrCondition"), list_skip),
         ("List.Distinct", one("list"), list_distinct),
@@ -666,6 +675,32 @@ fn list_sum(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 fn list_count(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     Ok(Value::Number(list.len() as f64))
+}
+
+fn list_numbers(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let start = match &args[0] {
+        Value::Number(n) => *n,
+        other => return Err(type_mismatch("number", other)),
+    };
+    let count = match &args[1] {
+        Value::Number(n) => {
+            if !n.is_finite() || *n < 0.0 {
+                return Err(MError::Other("List.Numbers: count must be a non-negative integer".into()));
+            }
+            *n as usize
+        }
+        other => return Err(type_mismatch("number", other)),
+    };
+    let increment = match args.get(2) {
+        Some(Value::Number(n)) => *n,
+        Some(Value::Null) | None => 1.0,
+        Some(other) => return Err(type_mismatch("number", other)),
+    };
+    let mut out = Vec::with_capacity(count);
+    for i in 0..count {
+        out.push(Value::Number(start + (i as f64) * increment));
+    }
+    Ok(Value::List(out))
 }
 
 fn list_min(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
