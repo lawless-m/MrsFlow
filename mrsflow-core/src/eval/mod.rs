@@ -1962,6 +1962,53 @@ mod tests {
     }
 
     #[test]
+    fn list_is_empty_basic() {
+        assert!(matches!(eval_str("List.IsEmpty({})").unwrap(), Value::Logical(true)));
+        assert!(matches!(eval_str("List.IsEmpty({1})").unwrap(), Value::Logical(false)));
+    }
+
+    #[test]
+    fn list_first_basic() {
+        match eval_str("List.First({3, 1, 4})").unwrap() {
+            Value::Number(n) => assert_eq!(n, 3.0),
+            other => panic!("expected number, got {:?}", other),
+        }
+        // Empty + default
+        match eval_str(r#"List.First({}, "fallback")"#).unwrap() {
+            Value::Text(s) => assert_eq!(s, "fallback"),
+            other => panic!("expected text, got {:?}", other),
+        }
+        // Empty + no default → null
+        assert!(matches!(eval_str("List.First({})").unwrap(), Value::Null));
+    }
+
+    #[test]
+    fn list_last_basic() {
+        match eval_str("List.Last({3, 1, 4})").unwrap() {
+            Value::Number(n) => assert_eq!(n, 4.0),
+            other => panic!("expected number, got {:?}", other),
+        }
+        assert!(matches!(eval_str("List.Last({})").unwrap(), Value::Null));
+    }
+
+    #[test]
+    fn list_reverse_basic() {
+        match eval_str("List.Reverse({1, 2, 3})").unwrap() {
+            Value::List(xs) => {
+                let nums: Vec<f64> = xs
+                    .iter()
+                    .map(|v| match v {
+                        Value::Number(n) => *n,
+                        _ => panic!(),
+                    })
+                    .collect();
+                assert_eq!(nums, vec![3.0, 2.0, 1.0]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn list_combine_flattens() {
         match eval_str(r#"List.Combine({{1, 2}, {}, {3}})"#).unwrap() {
             Value::List(xs) => {

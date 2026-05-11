@@ -138,6 +138,24 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ("List.Min", one("list"), list_min),
         ("List.Max", one("list"), list_max),
         ("List.Combine", one("lists"), list_combine),
+        ("List.IsEmpty", one("list"), list_is_empty),
+        (
+            "List.First",
+            vec![
+                Param { name: "list".into(),    optional: false, type_annotation: None },
+                Param { name: "default".into(), optional: true,  type_annotation: None },
+            ],
+            list_first,
+        ),
+        (
+            "List.Last",
+            vec![
+                Param { name: "list".into(),    optional: false, type_annotation: None },
+                Param { name: "default".into(), optional: true,  type_annotation: None },
+            ],
+            list_last,
+        ),
+        ("List.Reverse", one("list"), list_reverse),
         ("Record.Field", two("record", "field"), record_field),
         ("Record.FieldNames", one("record"), record_field_names),
         ("Logical.From", one("value"), logical_from),
@@ -563,6 +581,36 @@ fn list_max(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         });
     }
     Ok(Value::Number(best.unwrap()))
+}
+
+fn list_is_empty(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let list = expect_list(&args[0])?;
+    Ok(Value::Logical(list.is_empty()))
+}
+
+fn list_first(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let list = expect_list(&args[0])?;
+    if let Some(first) = list.first() {
+        Ok(first.clone())
+    } else {
+        Ok(args.get(1).cloned().unwrap_or(Value::Null))
+    }
+}
+
+fn list_last(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let list = expect_list(&args[0])?;
+    if let Some(last) = list.last() {
+        Ok(last.clone())
+    } else {
+        Ok(args.get(1).cloned().unwrap_or(Value::Null))
+    }
+}
+
+fn list_reverse(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let list = expect_list(&args[0])?;
+    let mut out = list.clone();
+    out.reverse();
+    Ok(Value::List(out))
 }
 
 fn list_combine(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
