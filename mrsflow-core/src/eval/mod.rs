@@ -2752,6 +2752,46 @@ mod tests {
     }
 
     #[test]
+    fn table_add_index_column_default() {
+        let src = r#"
+            let t = #table({"name"}, {{"a"}, {"b"}, {"c"}})
+            in Table.AddIndexColumn(t, "idx")
+        "#;
+        match eval_str(src).unwrap() {
+            Value::Table(t) => {
+                assert_eq!(t.column_names(), vec!["name", "idx"]);
+                assert_eq!(t.num_rows(), 3);
+                let (_, rows) = super::stdlib::table_to_rows(&t).unwrap();
+                let idxs: Vec<f64> = rows.iter().map(|r| match &r[1] {
+                    Value::Number(n) => *n,
+                    _ => panic!(),
+                }).collect();
+                assert_eq!(idxs, vec![0.0, 1.0, 2.0]);
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_add_index_column_custom() {
+        let src = r#"
+            let t = #table({"name"}, {{"a"}, {"b"}, {"c"}})
+            in Table.AddIndexColumn(t, "idx", 100, 5)
+        "#;
+        match eval_str(src).unwrap() {
+            Value::Table(t) => {
+                let (_, rows) = super::stdlib::table_to_rows(&t).unwrap();
+                let idxs: Vec<f64> = rows.iter().map(|r| match &r[1] {
+                    Value::Number(n) => *n,
+                    _ => panic!(),
+                }).collect();
+                assert_eq!(idxs, vec![100.0, 105.0, 110.0]);
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn number_from_text_integer() {
         match eval_str("Number.FromText(\"42\")").unwrap() {
             Value::Number(n) => assert_eq!(n, 42.0),

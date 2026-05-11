@@ -382,6 +382,16 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
             table_pivot,
         ),
         ("Table.ReorderColumns", two("table", "columnOrder"), table_reorder_columns),
+        (
+            "Table.AddIndexColumn",
+            vec![
+                Param { name: "table".into(),         optional: false, type_annotation: None },
+                Param { name: "newColumnName".into(), optional: false, type_annotation: None },
+                Param { name: "initialValue".into(),  optional: true,  type_annotation: None },
+                Param { name: "increment".into(),     optional: true,  type_annotation: None },
+            ],
+            table_add_index_column,
+        ),
         ("Table.TransformRows", two("table", "transform"), table_transform_rows),
         ("Table.InsertRows", three("table", "offset", "rows"), table_insert_rows),
         ("Date.FromText", one("text"), date_from_text),
@@ -1786,6 +1796,33 @@ fn table_select_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError>
             Ok(Value::Table(Table::from_rows(columns.clone(), new_rows)))
         }
     }
+}
+
+fn table_add_index_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let new_name = expect_text(&args[1])?.to_string();
+    let initial = match args.get(2) {
+        Some(Value::Number(n)) => *n,
+        Some(Value::Null) | None => 0.0,
+        Some(other) => return Err(type_mismatch("number", other)),
+    };
+    let increment = match args.get(3) {
+        Some(Value::Number(n)) => *n,
+        Some(Value::Null) | None => 1.0,
+        Some(other) => return Err(type_mismatch("number", other)),
+    };
+    let (mut names, mut rows) = table_to_rows(table)?;
+    if names.iter().any(|n| n == &new_name) {
+        return Err(MError::Other(format!(
+            "Table.AddIndexColumn: column already exists: {}",
+            new_name
+        )));
+    }
+    names.push(new_name);
+    for (i, row) in rows.iter_mut().enumerate() {
+        row.push(Value::Number(initial + (i as f64) * increment));
+    }
+    Ok(Value::Table(values_to_table(&names, &rows)?))
 }
 
 fn table_add_column(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
