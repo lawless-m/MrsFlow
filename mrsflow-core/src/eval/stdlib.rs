@@ -264,6 +264,16 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ),
         ("Table.Combine", one("tables"), table_combine),
         ("Table.Skip", two("table", "countOrCondition"), table_skip),
+        (
+            "Table.ExpandRecordColumn",
+            vec![
+                Param { name: "table".into(),          optional: false, type_annotation: None },
+                Param { name: "column".into(),         optional: false, type_annotation: None },
+                Param { name: "fieldNames".into(),     optional: false, type_annotation: None },
+                Param { name: "newColumnNames".into(), optional: true,  type_annotation: None },
+            ],
+            table_expand_record_column,
+        ),
         ("Table.ReorderColumns", two("table", "columnOrder"), table_reorder_columns),
         ("Table.TransformRows", two("table", "transform"), table_transform_rows),
         ("Table.InsertRows", three("table", "offset", "rows"), table_insert_rows),
@@ -2101,6 +2111,71 @@ fn table_reorder_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, ME
     }
 
     select_columns_by_index(table, &new_indices, "Table.ReorderColumns")
+}
+
+fn table_expand_record_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let column = expect_text(&args[1])?.to_string();
+    let field_names = expect_text_list(&args[2], "Table.ExpandRecordColumn: fieldNames")?;
+    let new_column_names = match args.get(3) {
+        Some(Value::Null) | None => field_names.clone(),
+        Some(other) => expect_text_list(other, "Table.ExpandRecordColumn: newColumnNames")?,
+    };
+    if new_column_names.len() != field_names.len() {
+        return Err(MError::Other(format!(
+            "Table.ExpandRecordColumn: newColumnNames has {} items, expected {}",
+            new_column_names.len(),
+            field_names.len()
+        )));
+    }
+
+    let (existing, rows) = table_to_rows(table)?;
+    let col_idx = existing.iter().position(|n| n == &column).ok_or_else(|| {
+        MError::Other(format!(
+            "Table.ExpandRecordColumn: column not found: {}",
+            column
+        ))
+    })?;
+
+    // Build new column-name list: replace `column` at col_idx with new_column_names.
+    let mut out_names: Vec<String> = Vec::with_capacity(existing.len() + field_names.len() - 1);
+    out_names.extend_from_slice(&existing[..col_idx]);
+    out_names.extend_from_slice(&new_column_names);
+    out_names.extend_from_slice(&existing[col_idx + 1..]);
+
+    let mut out_rows: Vec<Vec<Value>> = Vec::with_capacity(rows.len());
+    for row in &rows {
+        let mut new_row: Vec<Value> = Vec::with_capacity(out_names.len());
+        new_row.extend_from_slice(&row[..col_idx]);
+        match &row[col_idx] {
+            Value::Record(rec) => {
+                for fname in &field_names {
+                    let v = rec
+                        .fields
+                        .iter()
+                        .find(|(n, _)| n == fname)
+                        .map(|(_, v)| v.clone())
+                        .unwrap_or(Value::Null);
+                    new_row.push(v);
+                }
+            }
+            Value::Null => {
+                for _ in &field_names {
+                    new_row.push(Value::Null);
+                }
+            }
+            other => {
+                return Err(MError::Other(format!(
+                    "Table.ExpandRecordColumn: cell at column {} is not a record (got {})",
+                    column,
+                    super::type_name(other)
+                )));
+            }
+        }
+        new_row.extend_from_slice(&row[col_idx + 1..]);
+        out_rows.push(new_row);
+    }
+    Ok(Value::Table(values_to_table(&out_names, &out_rows)?))
 }
 
 fn table_combine(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {

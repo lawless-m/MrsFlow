@@ -1957,6 +1957,38 @@ mod tests {
         }
     }
 
+    // --- het-cell unlocked: nested-cell expand ops ---
+
+    #[test]
+    fn table_expand_record_column_default_names() {
+        // Each row's `r` is a record [a, b]; expand into two new columns.
+        let src = r#"
+            let t = #table({"id", "r"}, {{1, [a = 10, b = 20]}, {2, [a = 30, b = 40]}})
+            in Table.ExpandRecordColumn(t, "r", {"a", "b"})
+        "#;
+        match eval_str(src).unwrap() {
+            Value::Table(t) => {
+                assert_eq!(t.column_names(), vec!["id", "a", "b"]);
+                assert_eq!(t.num_rows(), 2);
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_expand_record_column_custom_names() {
+        let src = r#"
+            let t = #table({"id", "r"}, {{1, [a = 10, b = 20]}})
+            in Table.ExpandRecordColumn(t, "r", {"a", "b"}, {"x", "y"})
+        "#;
+        match eval_str(src).unwrap() {
+            Value::Table(t) => {
+                assert_eq!(t.column_names(), vec!["id", "x", "y"]);
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
     // --- het-cell slice 3: ops dispatch on TableRepr ---
 
     fn rows_backed_two_col_table() -> &'static str {
