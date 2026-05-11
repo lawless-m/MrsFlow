@@ -1826,6 +1826,22 @@ mod tests {
     }
 
     #[test]
+    fn text_combine_with_separator() {
+        match eval_str(r#"Text.Combine({"a", "b", "c"}, "-")"#).unwrap() {
+            Value::Text(s) => assert_eq!(s, "a-b-c"),
+            other => panic!("expected text, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn text_combine_no_separator() {
+        match eval_str(r#"Text.Combine({"a", "b", "c"})"#).unwrap() {
+            Value::Text(s) => assert_eq!(s, "abc"),
+            other => panic!("expected text, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn list_accumulate_sums() {
         // List.Accumulate is a left-fold: ((seed + 1) + 2) + 3 = 6.
         match eval_str(r#"List.Accumulate({1, 2, 3}, 0, (acc, x) => acc + x)"#).unwrap() {

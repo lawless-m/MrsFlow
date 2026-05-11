@@ -94,6 +94,14 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ("Text.EndsWith", two("text", "suffix"), text_ends_with),
         ("Text.TrimEnd", one("text"), text_trim_end),
         ("Text.Start", two("text", "count"), text_start),
+        (
+            "Text.Combine",
+            vec![
+                Param { name: "texts".into(),     optional: false, type_annotation: None },
+                Param { name: "separator".into(), optional: true,  type_annotation: None },
+            ],
+            text_combine,
+        ),
         ("List.Transform", two("list", "transform"), list_transform),
         ("List.Select", two("list", "selection"), list_select),
         ("List.Sum", one("list"), list_sum),
@@ -260,6 +268,23 @@ fn text_ends_with(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 fn text_trim_end(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     Ok(Value::Text(text.trim_end().to_string()))
+}
+
+fn text_combine(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let texts = expect_list(&args[0])?;
+    let sep = match args.get(1) {
+        Some(Value::Text(s)) => s.as_str(),
+        Some(Value::Null) | None => "",
+        Some(other) => return Err(type_mismatch("text or null", other)),
+    };
+    let parts: Result<Vec<&str>, MError> = texts
+        .iter()
+        .map(|v| match v {
+            Value::Text(s) => Ok(s.as_str()),
+            other => Err(type_mismatch("text (in list)", other)),
+        })
+        .collect();
+    Ok(Value::Text(parts?.join(sep)))
 }
 
 fn text_start(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
