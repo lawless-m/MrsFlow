@@ -93,6 +93,10 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
             ],
             number_round,
         ),
+        ("Number.Abs", one("number"), number_abs),
+        ("Number.Sign", one("number"), number_sign),
+        ("Number.Power", two("base", "exponent"), number_power),
+        ("Number.Sqrt", one("number"), number_sqrt),
         ("Text.From", one("value"), text_from),
         ("Text.Contains", two("text", "substring"), text_contains),
         ("Text.Replace", three("text", "old", "new"), text_replace),
@@ -225,6 +229,50 @@ fn number_from(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             .map(Value::Number)
             .map_err(|_| MError::Other(format!("Number.From: cannot parse {:?}", s))),
         other => Err(type_mismatch("text/number/logical/null", other)),
+    }
+}
+
+fn number_abs(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    match &args[0] {
+        Value::Null => Ok(Value::Null),
+        Value::Number(n) => Ok(Value::Number(n.abs())),
+        other => Err(type_mismatch("number", other)),
+    }
+}
+
+fn number_sign(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    match &args[0] {
+        Value::Null => Ok(Value::Null),
+        Value::Number(n) => Ok(Value::Number(if *n > 0.0 {
+            1.0
+        } else if *n < 0.0 {
+            -1.0
+        } else {
+            0.0
+        })),
+        other => Err(type_mismatch("number", other)),
+    }
+}
+
+fn number_power(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let base = match &args[0] {
+        Value::Null => return Ok(Value::Null),
+        Value::Number(n) => *n,
+        other => return Err(type_mismatch("number", other)),
+    };
+    let exp = match &args[1] {
+        Value::Null => return Ok(Value::Null),
+        Value::Number(n) => *n,
+        other => return Err(type_mismatch("number", other)),
+    };
+    Ok(Value::Number(base.powf(exp)))
+}
+
+fn number_sqrt(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    match &args[0] {
+        Value::Null => Ok(Value::Null),
+        Value::Number(n) => Ok(Value::Number(n.sqrt())),
+        other => Err(type_mismatch("number", other)),
     }
 }
 

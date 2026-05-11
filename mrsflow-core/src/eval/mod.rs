@@ -1919,6 +1919,37 @@ mod tests {
     }
 
     #[test]
+    fn number_abs_basic() {
+        match eval_str("Number.Abs(-3.5)").unwrap() {
+            Value::Number(n) => assert_eq!(n, 3.5),
+            other => panic!("expected number, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn number_sign_basic() {
+        assert!(matches!(eval_str("Number.Sign(-7)").unwrap(), Value::Number(n) if n == -1.0));
+        assert!(matches!(eval_str("Number.Sign(0)").unwrap(), Value::Number(n) if n == 0.0));
+        assert!(matches!(eval_str("Number.Sign(0.1)").unwrap(), Value::Number(n) if n == 1.0));
+    }
+
+    #[test]
+    fn number_power_basic() {
+        match eval_str("Number.Power(2, 10)").unwrap() {
+            Value::Number(n) => assert_eq!(n, 1024.0),
+            other => panic!("expected number, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn number_sqrt_basic() {
+        match eval_str("Number.Sqrt(16)").unwrap() {
+            Value::Number(n) => assert_eq!(n, 4.0),
+            other => panic!("expected number, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn number_round_to_digits() {
         match eval_str("Number.Round(10.503, 2)").unwrap() {
             Value::Number(n) => assert!((n - 10.5).abs() < 1e-9),
