@@ -139,3 +139,10 @@ Logical.FromText("true")
 Logical.FromText("false")
 #nan
 #infinity
+#table({"a", "b"}, {{1, 2}, {3, 4}})
+#table({"x"}, {{42}})
+#table({"a", "b"}, {})
+Table.ColumnNames(#table({"a", "b"}, {}))
+Table.RenameColumns(#table({"a", "b"}, {{1, 2}}), {{"a", "x"}})
+Table.RemoveColumns(#table({"a", "b"}, {{1, 2}}), {"a"})
+#table({"name", "age"}, {{"alice", 30}, {"bob", 25}})

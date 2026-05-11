@@ -11,6 +11,7 @@ workspace = true
 
 [dependencies]
 unicode-general-category = "1"
+arrow = { version = "53", default-features = false }
 
 [dev-dependencies]
 insta = "1"

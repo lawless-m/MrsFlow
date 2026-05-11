@@ -9,10 +9,16 @@
 //! `Number.From`, …). Arrow-backed Table.* and date/datetime/duration land
 //! in eval-7+.
 
+use std::sync::Arc;
+
+use arrow::array::{Array, ArrayRef, BooleanArray, Float64Array, NullArray, StringArray};
+use arrow::datatypes::{DataType, Field, Schema};
+use arrow::record_batch::RecordBatch;
+
 use crate::parser::Param;
 
 use super::env::{Env, EnvNode, EnvOps};
-use super::value::{BuiltinFn, Closure, FnBody, MError, Value};
+use super::value::{BuiltinFn, Closure, FnBody, MError, Table, Value};
 
 /// Build the initial environment containing every stdlib intrinsic plus
 /// the two literal constants `#nan` and `#infinity`. Tests and shells pass
@@ -95,6 +101,10 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ("Record.FieldNames", one("record"), record_field_names),
         ("Logical.From", one("value"), logical_from),
         ("Logical.FromText", one("text"), logical_from_text),
+        ("#table", two("columns", "rows"), table_constructor),
+        ("Table.ColumnNames", one("table"), table_column_names),
+        ("Table.RenameColumns", two("table", "renames"), table_rename_columns),
+        ("Table.RemoveColumns", two("table", "names"), table_remove_columns),
     ]
 }
 
@@ -371,5 +381,334 @@ fn logical_from_text(args: &[Value]) -> Result<Value, MError> {
             "Logical.FromText: not a boolean: {:?}",
             text
         ))),
+    }
+}
+
+
+// --- Table.* (eval-7a) ---
+//
+// #table(columns, rows) and the three top-corpus Table.* operations.
+// Compound type expressions in the columns position aren't supported in
+// this slice — only a list of text column names. Date/Datetime/Duration/
+// Binary cells land in eval-7b alongside chrono.
+
+fn table_constructor(args: &[Value]) -> Result<Value, MError> {
+    let names = expect_text_list(&args[0], "#table: columns")?;
+    let rows = expect_list_of_lists(&args[1], "#table: rows")?;
+    for (i, row) in rows.iter().enumerate() {
+        if row.len() != names.len() {
+            return Err(MError::Other(format!(
+                "#table: row {} has {} cells, expected {}",
+                i,
+                row.len(),
+                names.len()
+            )));
+        }
+    }
+    let batch = values_to_record_batch(&names, &rows)?;
+    Ok(Value::Table(Table { batch }))
+}
+
+fn table_column_names(args: &[Value]) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let names: Vec<Value> = table
+        .batch
+        .schema()
+        .fields()
+        .iter()
+        .map(|f| Value::Text(f.name().clone()))
+        .collect();
+    Ok(Value::List(names))
+}
+
+fn table_rename_columns(args: &[Value]) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let renames = expect_list(&args[1])?;
+    let mut pairs: Vec<(String, String)> = Vec::new();
+    for r in renames {
+        let inner = match r {
+            Value::List(xs) => xs,
+            other => {
+                return Err(type_mismatch(
+                    "list (each rename must be {old, new})",
+                    other,
+                ));
+            }
+        };
+        if inner.len() != 2 {
+            return Err(MError::Other(format!(
+                "Table.RenameColumns: each rename must be a 2-element list, got {}",
+                inner.len()
+            )));
+        }
+        let old = expect_text(&inner[0])?.to_string();
+        let new = expect_text(&inner[1])?.to_string();
+        pairs.push((old, new));
+    }
+    let schema = table.batch.schema();
+    let existing: Vec<String> = schema.fields().iter().map(|f| f.name().clone()).collect();
+    for (old, _new) in &pairs {
+        if !existing.contains(old) {
+            return Err(MError::Other(format!(
+                "Table.RenameColumns: column not found: {}",
+                old
+            )));
+        }
+    }
+    let new_fields: Vec<Field> = schema
+        .fields()
+        .iter()
+        .map(|f| {
+            let mut name = f.name().clone();
+            for (old, new) in &pairs {
+                if &name == old {
+                    name = new.clone();
+                    break;
+                }
+            }
+            Field::new(name, f.data_type().clone(), f.is_nullable())
+        })
+        .collect();
+    let new_schema = Arc::new(Schema::new(new_fields));
+    let columns: Vec<ArrayRef> = table.batch.columns().to_vec();
+    let new_batch = RecordBatch::try_new(new_schema, columns)
+        .map_err(|e| MError::Other(format!("Table.RenameColumns: rebuild failed: {}", e)))?;
+    Ok(Value::Table(Table { batch: new_batch }))
+}
+
+fn table_remove_columns(args: &[Value]) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let names = expect_text_list(&args[1], "Table.RemoveColumns: names")?;
+    let schema = table.batch.schema();
+    let existing: Vec<String> = schema.fields().iter().map(|f| f.name().clone()).collect();
+    for n in &names {
+        if !existing.contains(n) {
+            return Err(MError::Other(format!(
+                "Table.RemoveColumns: column not found: {}",
+                n
+            )));
+        }
+    }
+    let keep_indices: Vec<usize> = (0..existing.len())
+        .filter(|&i| !names.contains(&existing[i]))
+        .collect();
+    let new_fields: Vec<Field> = keep_indices
+        .iter()
+        .map(|&i| schema.field(i).clone())
+        .collect();
+    let new_schema = Arc::new(Schema::new(new_fields));
+    let new_columns: Vec<ArrayRef> = keep_indices
+        .iter()
+        .map(|&i| table.batch.column(i).clone())
+        .collect();
+    let new_batch = RecordBatch::try_new(new_schema, new_columns)
+        .map_err(|e| MError::Other(format!("Table.RemoveColumns: rebuild failed: {}", e)))?;
+    Ok(Value::Table(Table { batch: new_batch }))
+}
+
+// --- Table helpers ---
+
+fn expect_table(v: &Value) -> Result<&Table, MError> {
+    match v {
+        Value::Table(t) => Ok(t),
+        other => Err(type_mismatch("table", other)),
+    }
+}
+
+fn expect_text_list(v: &Value, ctx: &str) -> Result<Vec<String>, MError> {
+    let xs = expect_list(v)?;
+    let mut out = Vec::with_capacity(xs.len());
+    for x in xs {
+        match x {
+            Value::Text(s) => out.push(s.clone()),
+            other => {
+                return Err(MError::Other(format!(
+                    "{}: expected list of text, got {}",
+                    ctx,
+                    super::type_name(other)
+                )));
+            }
+        }
+    }
+    Ok(out)
+}
+
+fn expect_list_of_lists<'a>(v: &'a Value, ctx: &str) -> Result<Vec<Vec<Value>>, MError> {
+    let xs = expect_list(v)?;
+    let mut out = Vec::with_capacity(xs.len());
+    for x in xs {
+        match x {
+            Value::List(inner) => out.push(inner.clone()),
+            other => {
+                return Err(MError::Other(format!(
+                    "{}: expected list of lists, got {}",
+                    ctx,
+                    super::type_name(other)
+                )));
+            }
+        }
+    }
+    Ok(out)
+}
+
+/// Infer a column type by scanning all cells. Supported variants in this
+/// slice: Number → Float64, Text → Utf8, Logical → Boolean, Null. A column
+/// of all-null produces an Arrow NullArray. Mixed primitive kinds within
+/// one column → MError::Other.
+fn values_to_record_batch(
+    column_names: &[String],
+    rows: &[Vec<Value>],
+) -> Result<RecordBatch, MError> {
+    let n_rows = rows.len();
+    let n_cols = column_names.len();
+
+    // Special case: schema with zero columns isn't constructible via the
+    // standard RecordBatch path. Caller still wants a real Table value
+    // back, so build an empty-schema batch with the correct row count.
+    if n_cols == 0 {
+        let schema = Arc::new(Schema::empty());
+        let options =
+            arrow::record_batch::RecordBatchOptions::new().with_row_count(Some(n_rows));
+        return RecordBatch::try_new_with_options(schema, vec![], &options)
+            .map_err(|e| MError::Other(format!("#table: empty-cols rebuild failed: {}", e)));
+    }
+
+    let mut fields: Vec<Field> = Vec::with_capacity(n_cols);
+    let mut columns: Vec<ArrayRef> = Vec::with_capacity(n_cols);
+    for col_idx in 0..n_cols {
+        let (dtype, array) = infer_column(rows, col_idx, n_rows)?;
+        let is_nullable = matches!(dtype, DataType::Null) || column_has_null(rows, col_idx);
+        fields.push(Field::new(column_names[col_idx].clone(), dtype, is_nullable));
+        columns.push(array);
+    }
+    let schema = Arc::new(Schema::new(fields));
+    RecordBatch::try_new(schema, columns)
+        .map_err(|e| MError::Other(format!("#table: build failed: {}", e)))
+}
+
+fn column_has_null(rows: &[Vec<Value>], col: usize) -> bool {
+    rows.iter().any(|r| matches!(r[col], Value::Null))
+}
+
+fn infer_column(
+    rows: &[Vec<Value>],
+    col: usize,
+    n_rows: usize,
+) -> Result<(DataType, ArrayRef), MError> {
+    // Find first non-null cell to determine column kind.
+    let mut kind: Option<&'static str> = None;
+    for r in rows {
+        match &r[col] {
+            Value::Null => {}
+            Value::Number(_) => {
+                kind = Some("number");
+                break;
+            }
+            Value::Text(_) => {
+                kind = Some("text");
+                break;
+            }
+            Value::Logical(_) => {
+                kind = Some("logical");
+                break;
+            }
+            other => {
+                return Err(MError::NotImplemented(match other {
+                    Value::Date(_) | Value::Datetime(_) | Value::Duration(_) => {
+                        "date/datetime/duration cells (deferred to eval-7b)"
+                    }
+                    Value::Binary(_) => "binary cells (deferred)",
+                    _ => "non-primitive cell type (deferred)",
+                }));
+            }
+        }
+    }
+    match kind {
+        None => Ok((
+            DataType::Null,
+            Arc::new(NullArray::new(n_rows)) as ArrayRef,
+        )),
+        Some("number") => {
+            let values: Vec<Option<f64>> = rows
+                .iter()
+                .map(|r| match &r[col] {
+                    Value::Null => Ok(None),
+                    Value::Number(n) => Ok(Some(*n)),
+                    other => Err(MError::Other(format!(
+                        "#table: column {} mixed types: number + {}",
+                        col,
+                        super::type_name(other)
+                    ))),
+                })
+                .collect::<Result<_, _>>()?;
+            Ok((DataType::Float64, Arc::new(Float64Array::from(values))))
+        }
+        Some("text") => {
+            let values: Vec<Option<String>> = rows
+                .iter()
+                .map(|r| match &r[col] {
+                    Value::Null => Ok(None),
+                    Value::Text(s) => Ok(Some(s.clone())),
+                    other => Err(MError::Other(format!(
+                        "#table: column {} mixed types: text + {}",
+                        col,
+                        super::type_name(other)
+                    ))),
+                })
+                .collect::<Result<_, _>>()?;
+            Ok((DataType::Utf8, Arc::new(StringArray::from(values))))
+        }
+        Some("logical") => {
+            let values: Vec<Option<bool>> = rows
+                .iter()
+                .map(|r| match &r[col] {
+                    Value::Null => Ok(None),
+                    Value::Logical(b) => Ok(Some(*b)),
+                    other => Err(MError::Other(format!(
+                        "#table: column {} mixed types: logical + {}",
+                        col,
+                        super::type_name(other)
+                    ))),
+                })
+                .collect::<Result<_, _>>()?;
+            Ok((DataType::Boolean, Arc::new(BooleanArray::from(values))))
+        }
+        _ => unreachable!(),
+    }
+}
+
+/// Convert a single cell of a RecordBatch back to a Value. Used by
+/// value_dump's table printer.
+pub fn cell_to_value(batch: &RecordBatch, col: usize, row: usize) -> Result<Value, MError> {
+    let array = batch.column(col);
+    if array.is_null(row) {
+        return Ok(Value::Null);
+    }
+    match array.data_type() {
+        DataType::Float64 => {
+            let a = array
+                .as_any()
+                .downcast_ref::<Float64Array>()
+                .expect("Float64");
+            Ok(Value::Number(a.value(row)))
+        }
+        DataType::Utf8 => {
+            let a = array.as_any().downcast_ref::<StringArray>().expect("Utf8");
+            Ok(Value::Text(a.value(row).to_string()))
+        }
+        DataType::Boolean => {
+            let a = array
+                .as_any()
+                .downcast_ref::<BooleanArray>()
+                .expect("Boolean");
+            Ok(Value::Logical(a.value(row)))
+        }
+        DataType::Null => Ok(Value::Null),
+        other => Err(MError::NotImplemented(match other {
+            DataType::Date32 | DataType::Date64 | DataType::Timestamp(_, _) => {
+                "date/datetime cell decode (deferred to eval-7b)"
+            }
+            _ => "unsupported cell type",
+        })),
     }
 }

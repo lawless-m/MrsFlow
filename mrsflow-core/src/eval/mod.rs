@@ -16,7 +16,7 @@ mod value;
 
 pub use env::{Env, EnvNode, EnvOps};
 pub use iohost::{IoError, IoHost, NoIoHost};
-pub use stdlib::root_env;
+pub use stdlib::{cell_to_value, root_env};
 pub use value::{BuiltinFn, Closure, FnBody, MError, Record, Table, ThunkState, TypeRep, Value};
 
 use std::rc::Rc;
@@ -1603,6 +1603,110 @@ mod tests {
         // To test nested-error propagation, we need the outer try's body
         // itself to raise. Use: `try error "outer" otherwise 7` = 7.
         assert_eq!(eval_number(r#"try error "outer" otherwise 7"#), 7.0);
+    }
+
+    // --- Tables (eval-7a) ---
+
+    #[test]
+    fn table_constructor_basic() {
+        match eval_str(r#"#table({"a", "b"}, {{1, 2}, {3, 4}})"#).unwrap() {
+            Value::Table(t) => {
+                assert_eq!(t.batch.num_rows(), 2);
+                assert_eq!(t.batch.num_columns(), 2);
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_constructor_empty() {
+        // Empty table with no rows but two columns works.
+        match eval_str(r#"#table({"a", "b"}, {})"#).unwrap() {
+            Value::Table(t) => {
+                assert_eq!(t.batch.num_rows(), 0);
+                assert_eq!(t.batch.num_columns(), 2);
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+        // Empty schema works too (special-cased via try_new_with_options).
+        match eval_str("#table({}, {})").unwrap() {
+            Value::Table(t) => {
+                assert_eq!(t.batch.num_rows(), 0);
+                assert_eq!(t.batch.num_columns(), 0);
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_column_names_basic() {
+        match eval_str(r#"Table.ColumnNames(#table({"a", "b"}, {}))"#).unwrap() {
+            Value::List(xs) => {
+                let names: Vec<&str> = xs
+                    .iter()
+                    .map(|v| match v {
+                        Value::Text(s) => s.as_str(),
+                        other => panic!("expected text, got {:?}", other),
+                    })
+                    .collect();
+                assert_eq!(names, vec!["a", "b"]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_rename_columns_basic() {
+        match eval_str(
+            r#"Table.RenameColumns(#table({"a", "b"}, {{1, 2}}), {{"a", "x"}})"#,
+        )
+        .unwrap()
+        {
+            Value::Table(t) => {
+                let names: Vec<String> = t
+                    .batch
+                    .schema()
+                    .fields()
+                    .iter()
+                    .map(|f| f.name().clone())
+                    .collect();
+                assert_eq!(names, vec!["x".to_string(), "b".to_string()]);
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_remove_columns_basic() {
+        match eval_str(
+            r#"Table.RemoveColumns(#table({"a", "b"}, {{1, 2}}), {"a"})"#,
+        )
+        .unwrap()
+        {
+            Value::Table(t) => {
+                assert_eq!(t.batch.num_columns(), 1);
+                assert_eq!(t.batch.schema().field(0).name(), "b");
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_rename_missing_column_errors() {
+        match eval_str(
+            r#"Table.RenameColumns(#table({"a"}, {}), {{"z", "x"}})"#,
+        ) {
+            Err(MError::Other(msg)) => assert!(msg.contains("column not found"), "got: {}", msg),
+            other => panic!("expected error, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_remove_missing_column_errors() {
+        match eval_str(r#"Table.RemoveColumns(#table({"a"}, {}), {"z"})"#) {
+            Err(MError::Other(msg)) => assert!(msg.contains("column not found"), "got: {}", msg),
+            other => panic!("expected error, got {:?}", other),
+        }
     }
 
     // --- Starter stdlib (eval-6) ---

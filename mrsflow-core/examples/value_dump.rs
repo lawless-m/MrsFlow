@@ -11,7 +11,7 @@
 //!
 //! Usage: value_dump <path>
 
-use mrsflow_core::eval::{deep_force, evaluate, root_env, NoIoHost, TypeRep, Value};
+use mrsflow_core::eval::{cell_to_value, deep_force, evaluate, root_env, NoIoHost, TypeRep, Value};
 use mrsflow_core::lexer::tokenize;
 use mrsflow_core::parser::parse;
 use std::env;
@@ -113,7 +113,34 @@ fn write_value(out: &mut String, v: &Value) {
             }
             out.push_str("))");
         }
-        Value::Table(_) => out.push_str("(table ...)"),
+        Value::Table(t) => {
+            out.push_str("(table ((cols (");
+            let schema = t.batch.schema();
+            for (i, field) in schema.fields().iter().enumerate() {
+                if i > 0 {
+                    out.push(' ');
+                }
+                write_quoted(out, field.name());
+            }
+            out.push_str(")) (rows (");
+            let n_rows = t.batch.num_rows();
+            let n_cols = t.batch.num_columns();
+            for row in 0..n_rows {
+                if row > 0 {
+                    out.push(' ');
+                }
+                out.push('(');
+                for col in 0..n_cols {
+                    if col > 0 {
+                        out.push(' ');
+                    }
+                    let cell = cell_to_value(&t.batch, col, row).unwrap_or(Value::Null);
+                    write_value(out, &cell);
+                }
+                out.push(')');
+            }
+            out.push_str("))))");
+        }
         Value::Function(_) => out.push_str("(function ...)"),
         Value::Type(t) => {
             out.push_str("(type-value ");

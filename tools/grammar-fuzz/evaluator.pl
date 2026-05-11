@@ -457,7 +457,7 @@ type_conforms(duration(_),   type_prim(duration)).
 type_conforms(binary(_),     type_prim(binary)).
 type_conforms(list(_),       type_prim(list)).
 type_conforms(record(_),     type_prim(record)).
-type_conforms(table(_),      type_prim(table)).
+type_conforms(table(_, _),   type_prim(table)).
 type_conforms(closure(_,_,_),type_prim(function)).
 type_conforms(type_value(_), type_prim(type)).
 type_conforms(null,          type_nullable(_))       :- !.
@@ -514,6 +514,17 @@ root_env([frame(Bindings)]) :-
             - closure([param([v], req, none)], builtin('Logical.From'), []),
         ['L','o','g','i','c','a','l','.','F','r','o','m','T','e','x','t']
             - closure([param([t], req, none)], builtin('Logical.FromText'), []),
+        ['#','t','a','b','l','e']
+            - closure([param([c], req, none), param([r], req, none)],
+                       builtin('#table'), []),
+        ['T','a','b','l','e','.','C','o','l','u','m','n','N','a','m','e','s']
+            - closure([param([t], req, none)], builtin('Table.ColumnNames'), []),
+        ['T','a','b','l','e','.','R','e','n','a','m','e','C','o','l','u','m','n','s']
+            - closure([param([t], req, none), param([r], req, none)],
+                       builtin('Table.RenameColumns'), []),
+        ['T','a','b','l','e','.','R','e','m','o','v','e','C','o','l','u','m','n','s']
+            - closure([param([t], req, none), param([n], req, none)],
+                       builtin('Table.RemoveColumns'), []),
         ['#','n','a','n']      - num('NaN'),
         ['#','i','n','f','i','n','i','t','y'] - num(inf)
     ].
@@ -688,6 +699,103 @@ to_lower_char(C, L) :-
     ; L = C
     ).
 
+% --- Table.* (eval-7a) — list-of-records fallback ---
+%
+% Table value shape: table(Cols, Rows) where:
+%   - Cols is a list of chars-list column names
+%   - Rows is a list of row-cell lists (each cell is a value term)
+% Tests using the differential harness keep cases small enough that this
+% representation suffices; the Rust side uses arrow::RecordBatch.
+
+% #table(columns, rows) — build a table value. First arg: list of text
+% values (column names). Second arg: list of lists (rows). Each row must
+% have the same arity as the column list.
+eval_builtin('#table', [list(ColTexts), list(RowLists)], table(Cols, Rows)) :-
+    extract_col_names(ColTexts, Cols),
+    extract_rows(RowLists, Rows),
+    length(Cols, NC),
+    rows_have_arity(Rows, NC).
+
+extract_col_names([], []).
+extract_col_names([text(Cs) | Rest], [Cs | RestCs]) :-
+    extract_col_names(Rest, RestCs).
+
+extract_rows([], []).
+extract_rows([list(R) | Rest], [R | RestRows]) :-
+    extract_rows(Rest, RestRows).
+
+rows_have_arity([], _).
+rows_have_arity([Row | Rest], N) :-
+    length(Row, N),
+    rows_have_arity(Rest, N).
+
+% Table.ColumnNames(table(Cols, _)) — list of text values.
+eval_builtin('Table.ColumnNames', [table(Cols, _)], list(Texts)) :-
+    cols_to_text_list(Cols, Texts).
+
+cols_to_text_list([], []).
+cols_to_text_list([Cs | Rest], [text(Cs) | RestT]) :-
+    cols_to_text_list(Rest, RestT).
+
+% Table.RenameColumns(table(Cols, Rows), Renames) — Renames is a list of
+% 2-element lists each containing two text values.
+eval_builtin('Table.RenameColumns',
+             [table(Cols, Rows), list(Renames)],
+             table(NewCols, Rows)) :-
+    extract_rename_pairs(Renames, Pairs),
+    rename_cols(Cols, Pairs, NewCols),
+    rename_pairs_all_known(Pairs, Cols).
+
+extract_rename_pairs([], []).
+extract_rename_pairs([list([text(O), text(N)]) | Rest], [O-N | RestP]) :-
+    extract_rename_pairs(Rest, RestP).
+
+rename_cols([], _, []).
+rename_cols([C | Rest], Pairs, [NC | RestN]) :-
+    ( member(C-N, Pairs) -> NC = N ; NC = C ),
+    rename_cols(Rest, Pairs, RestN).
+
+rename_pairs_all_known([], _).
+rename_pairs_all_known([Old-_New | Rest], Cols) :-
+    member(Old, Cols),
+    rename_pairs_all_known(Rest, Cols).
+
+% Table.RemoveColumns(table(Cols, Rows), Names) — Names is a list of
+% text values to remove. All listed names must be present (matches Rust).
+eval_builtin('Table.RemoveColumns',
+             [table(Cols, Rows), list(NameTexts)],
+             table(NewCols, NewRows)) :-
+    extract_col_names(NameTexts, Drop),
+    all_columns_present(Drop, Cols),
+    column_keep_indices(Cols, Drop, 0, KeepIndices),
+    filter_by_indices(Cols, KeepIndices, NewCols),
+    filter_rows_by_indices(Rows, KeepIndices, NewRows).
+
+all_columns_present([], _).
+all_columns_present([D | Rest], Cols) :-
+    member(D, Cols),
+    all_columns_present(Rest, Cols).
+
+column_keep_indices([], _, _, []).
+column_keep_indices([C | Rest], Drop, I, [I | RestI]) :-
+    \+ member(C, Drop),
+    !,
+    I1 is I + 1,
+    column_keep_indices(Rest, Drop, I1, RestI).
+column_keep_indices([_ | Rest], Drop, I, RestI) :-
+    I1 is I + 1,
+    column_keep_indices(Rest, Drop, I1, RestI).
+
+filter_by_indices(_, [], []).
+filter_by_indices(List, [I | Rest], [Elt | RestE]) :-
+    nth0(I, List, Elt),
+    filter_by_indices(List, Rest, RestE).
+
+filter_rows_by_indices([], _, []).
+filter_rows_by_indices([Row | Rest], Indices, [NewRow | RestNew]) :-
+    filter_by_indices(Row, Indices, NewRow),
+    filter_rows_by_indices(Rest, Indices, RestNew).
+
 % Helper: invoke a closure value with a forced-args list. Used by
 % List.Transform / List.Select; mirrors the dispatch logic in eval(invoke,...).
 invoke_closure(closure(Params, Body, CEnv), Args, Value) :-
@@ -827,11 +935,39 @@ print_value(record(Pairs)) :-
     format("(record (", []),
     print_record_pairs(Pairs),
     format("))", []).
+% Tables — list-of-records fallback on the Prolog side. The canonical
+% S-expression format must match Rust's value_dump byte-for-byte:
+%   (table ((cols ("a" "b")) (rows (((num 1.0) (num 2.0)) ...))))
+% where each row is its own paren-wrapped cell list.
+print_value(table(Cols, Rows)) :-
+    !,
+    format("(table ((cols (", []),
+    print_col_names(Cols),
+    format(")) (rows (", []),
+    print_table_rows(Rows),
+    format("))))", []).
 print_value(table(_)) :-
-    % Placeholder — real format lands when eval-7 brings in the Arrow-backed
-    % representation on the Rust side; Prolog table comparison is bounded to
-    % small enough cases that a list-of-records form will suffice.
+    % Fallback for the legacy single-arg shape — shouldn't be reached now.
     format("(table ...)", []).
+
+print_col_names([]).
+print_col_names([N]) :- eval_print_quoted(N).
+print_col_names([N1, N2 | Rest]) :-
+    eval_print_quoted(N1),
+    format(" ", []),
+    print_col_names([N2 | Rest]).
+
+print_table_rows([]).
+print_table_rows([Row]) :- print_table_row(Row).
+print_table_rows([R1, R2 | Rest]) :-
+    print_table_row(R1),
+    format(" ", []),
+    print_table_rows([R2 | Rest]).
+
+print_table_row(Cells) :-
+    format("(", []),
+    print_value_list(Cells),
+    format(")", []).
 print_value(closure(_, _, _)) :-
     % Per spec, function equality is reference equality; canonical interior
     % printing isn't well-defined. Both sides emit `(function ...)` as a

@@ -122,13 +122,13 @@ pub enum ThunkState {
     Forced(Value),
 }
 
-/// Placeholder for `Value::Table` until the Arrow dep lands in eval-7.
-/// Stored as row-major plus a column-name list — not the eventual
-/// representation, just enough for early stdlib stubs to compile.
-#[derive(Debug, Clone, Default)]
+/// Arrow-backed table value. The columnar `RecordBatch` is the canonical
+/// representation: every `Table.*` builtin operates on it directly, and
+/// Parquet IO (eval-7b) reads and writes it without an intermediate value
+/// pass. Equality and clone go through `RecordBatch` semantics.
+#[derive(Debug, Clone)]
 pub struct Table {
-    pub column_names: Vec<String>,
-    pub rows: Vec<Vec<Value>>,
+    pub batch: arrow::record_batch::RecordBatch,
 }
 
 /// Errors raised during evaluation. Per design doc §07 §2, errors propagate
