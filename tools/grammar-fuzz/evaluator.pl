@@ -550,6 +550,14 @@ root_env([frame(Bindings)]) :-
                        builtin('Table.FromRows'), []),
         ['T','a','b','l','e','.','P','r','o','m','o','t','e','H','e','a','d','e','r','s']
             - closure([param([t], req, none)], builtin('Table.PromoteHeaders'), []),
+        ['T','a','b','l','e','.','T','r','a','n','s','f','o','r','m','C','o','l','u','m','n','T','y','p','e','s']
+            - closure([param([t], req, none), param([x], req, none)],
+                       builtin('Table.TransformColumnTypes'), []),
+        ['T','a','b','l','e','.','T','r','a','n','s','f','o','r','m','C','o','l','u','m','n','s']
+            - closure([param([t], req, none), param([x], req, none)],
+                       builtin('Table.TransformColumns'), []),
+        ['T','a','b','l','e','.','C','o','m','b','i','n','e']
+            - closure([param([t], req, none)], builtin('Table.Combine'), []),
         ['#','n','a','n']      - num('NaN'),
         ['#','i','n','f','i','n','i','t','y'] - num(inf)
     ].
@@ -901,6 +909,93 @@ eval_builtin('Table.PromoteHeaders',
 promote_header_cells([], []).
 promote_header_cells([text(Cs) | Rest], [Cs | RestCols]) :-
     promote_header_cells(Rest, RestCols).
+
+% --- Table.* eval-7e: type-aware ops + concat ---
+
+% Table.TransformColumnTypes(table, transforms) — transforms is a list of
+% [text(Name), type_value(Type)] pairs. For each, coerce that column's
+% cells through the type-specific helper. Type cell coercion on the
+% Prolog side is intentionally simple — full parity with arrow::compute::cast
+% isn't tractable here, so the differential is limited to cases both
+% sides agree on (e.g., text("1.5") → num(1.5)).
+eval_builtin('Table.TransformColumnTypes',
+             [table(Cols, Rows), list(Transforms)],
+             table(Cols, NewRows)) :-
+    extract_type_transforms(Transforms, Pairs),
+    apply_type_transforms(Rows, Cols, Pairs, NewRows).
+
+extract_type_transforms([], []).
+extract_type_transforms([list([text(N), type_value(T)]) | Rest], [N-T | RestP]) :-
+    extract_type_transforms(Rest, RestP).
+
+apply_type_transforms([], _, _, []).
+apply_type_transforms([Row | RestRows], Cols, Pairs, [NewRow | RestNew]) :-
+    transform_row_cells(Cols, Row, Pairs, NewRow),
+    apply_type_transforms(RestRows, Cols, Pairs, RestNew).
+
+transform_row_cells([], [], _, []).
+transform_row_cells([Col | RestC], [Cell | RestCells], Pairs, [NewCell | RestNew]) :-
+    ( member(Col-T, Pairs)
+    -> coerce_cell(Cell, T, NewCell)
+    ; NewCell = Cell
+    ),
+    transform_row_cells(RestC, RestCells, Pairs, RestNew).
+
+coerce_cell(null, _, null) :- !.
+coerce_cell(num(N), type_prim(number), num(N)) :- !.
+coerce_cell(num(N), type_prim(text), text(Cs)) :- !, number_chars(N, Cs).
+coerce_cell(text(Cs), type_prim(text), text(Cs)) :- !.
+coerce_cell(text(Cs), type_prim(number), num(F)) :- !, chars_to_number(Cs, F).
+coerce_cell(bool(B), type_prim(logical), bool(B)) :- !.
+coerce_cell(bool(true),  type_prim(number), num(1.0)) :- !.
+coerce_cell(bool(false), type_prim(number), num(0.0)) :- !.
+coerce_cell(V, type_nullable(Inner), V) :-
+    V == null,
+    !,
+    Inner = Inner.  % suppress singleton warning
+coerce_cell(V, type_nullable(Inner), NewV) :- coerce_cell(V, Inner, NewV).
+
+% Table.TransformColumns(table, transforms) — transforms is a list of
+% [text(Name), Closure] pairs. For each named column: map the closure
+% over each cell.
+eval_builtin('Table.TransformColumns',
+             [table(Cols, Rows), list(Transforms)],
+             table(Cols, NewRows)) :-
+    extract_fn_transforms(Transforms, Pairs),
+    apply_fn_transforms(Rows, Cols, Pairs, NewRows).
+
+extract_fn_transforms([], []).
+extract_fn_transforms([list([text(N), closure(P, B, E)]) | Rest], [N-closure(P, B, E) | RestP]) :-
+    extract_fn_transforms(Rest, RestP).
+
+apply_fn_transforms([], _, _, []).
+apply_fn_transforms([Row | RestRows], Cols, Pairs, [NewRow | RestNew]) :-
+    transform_row_with_fns(Cols, Row, Pairs, NewRow),
+    apply_fn_transforms(RestRows, Cols, Pairs, RestNew).
+
+transform_row_with_fns([], [], _, []).
+transform_row_with_fns([Col | RestC], [Cell | RestCells], Pairs, [NewCell | RestNew]) :-
+    ( member(Col-Closure, Pairs)
+    -> invoke_closure(Closure, [Cell], NewCell)
+    ; NewCell = Cell
+    ),
+    transform_row_with_fns(RestC, RestCells, Pairs, RestNew).
+
+% Table.Combine(tables) — concatenate identical-schema tables.
+eval_builtin('Table.Combine', [list(Tables)], table(Cols, AllRows)) :-
+    Tables = [table(Cols, _) | _],
+    schemas_all_match(Tables, Cols),
+    collect_rows(Tables, AllRows).
+
+schemas_all_match([], _).
+schemas_all_match([table(C, _) | Rest], Cols) :-
+    C == Cols,
+    schemas_all_match(Rest, Cols).
+
+collect_rows([], []).
+collect_rows([table(_, Rows) | Rest], AllRows) :-
+    collect_rows(Rest, RestAll),
+    append(Rows, RestAll, AllRows).
 
 % --- chrono constructors (eval-7b) ---
 

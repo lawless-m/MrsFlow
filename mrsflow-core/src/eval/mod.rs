@@ -1678,6 +1678,69 @@ mod tests {
         assert_eq!(eval_bool("null is nullable date"), true);
     }
 
+    // --- Table.* type-aware ops + concat (eval-7e) ---
+
+    #[test]
+    fn table_transform_column_types_text_to_number() {
+        match eval_str(
+            r#"Table.TransformColumnTypes(#table({"v"}, {{"1.5"},{"2.5"}}), {{"v", type number}})"#,
+        )
+        .unwrap()
+        {
+            Value::Table(t) => {
+                let dtype = t.batch.schema().field(0).data_type().clone();
+                assert_eq!(format!("{:?}", dtype), "Float64");
+                assert_eq!(t.batch.num_rows(), 2);
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_transform_columns_increment() {
+        match eval_str(
+            r#"Table.TransformColumns(#table({"n"}, {{1},{2},{3}}), {{"n", each _ + 1}})"#,
+        )
+        .unwrap()
+        {
+            Value::Table(t) => {
+                use arrow::array::Float64Array;
+                let col = t
+                    .batch
+                    .column(0)
+                    .as_any()
+                    .downcast_ref::<Float64Array>()
+                    .expect("Float64");
+                let vals: Vec<f64> = (0..col.len()).map(|i| col.value(i)).collect();
+                assert_eq!(vals, vec![2.0, 3.0, 4.0]);
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_combine_identical_schemas() {
+        match eval_str(
+            r#"Table.Combine({#table({"a"}, {{1}}), #table({"a"}, {{2}})})"#,
+        )
+        .unwrap()
+        {
+            Value::Table(t) => {
+                assert_eq!(t.batch.num_rows(), 2);
+                assert_eq!(t.batch.num_columns(), 1);
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_combine_empty_errors() {
+        match eval_str("Table.Combine({})") {
+            Err(MError::Other(msg)) => assert!(msg.contains("empty"), "got: {}", msg),
+            other => panic!("expected error, got {:?}", other),
+        }
+    }
+
     // --- Table.* expansion (eval-7d) ---
 
     #[test]

@@ -143,6 +143,17 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ),
         ("Table.FromRows", two("rows", "columns"), table_from_rows),
         ("Table.PromoteHeaders", one("table"), table_promote_headers),
+        (
+            "Table.TransformColumnTypes",
+            two("table", "transforms"),
+            table_transform_column_types,
+        ),
+        (
+            "Table.TransformColumns",
+            two("table", "transforms"),
+            table_transform_columns,
+        ),
+        ("Table.Combine", one("tables"), table_combine),
     ]
 }
 
@@ -1021,4 +1032,204 @@ fn invoke_callback_with_host(
             super::evaluate(body, &call_env, host)
         }
     }
+}
+
+// --- Table.* eval-7e: type-aware ops + concat ---
+
+fn table_transform_column_types(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let transforms = expect_list(&args[1])?;
+    // Parse the {col_name, type_value} pairs first; error early on bad shapes.
+    let pairs = parse_col_type_pairs(transforms)?;
+
+    let schema = table.batch.schema();
+    let mut new_fields: Vec<Field> = schema.fields().iter().map(|f| (**f).clone()).collect();
+    let mut new_columns: Vec<ArrayRef> = table.batch.columns().to_vec();
+
+    for (name, target_dtype, target_nullable) in &pairs {
+        let idx = schema
+            .index_of(name)
+            .map_err(|_| MError::Other(format!(
+                "Table.TransformColumnTypes: column not found: {}",
+                name
+            )))?;
+        let cast = arrow::compute::cast(&new_columns[idx], target_dtype).map_err(|e| {
+            MError::Other(format!(
+                "Table.TransformColumnTypes: cast {} to {:?} failed: {}",
+                name, target_dtype, e
+            ))
+        })?;
+        new_columns[idx] = cast;
+        new_fields[idx] = Field::new(name, target_dtype.clone(), *target_nullable);
+    }
+
+    let new_schema = Arc::new(Schema::new(new_fields));
+    let new_batch = RecordBatch::try_new(new_schema, new_columns)
+        .map_err(|e| MError::Other(format!("Table.TransformColumnTypes: rebuild failed: {}", e)))?;
+    Ok(Value::Table(Table { batch: new_batch }))
+}
+
+fn parse_col_type_pairs(transforms: &[Value]) -> Result<Vec<(String, DataType, bool)>, MError> {
+    let mut out = Vec::with_capacity(transforms.len());
+    for t in transforms {
+        let inner = match t {
+            Value::List(xs) => xs,
+            other => {
+                return Err(type_mismatch(
+                    "list (each transform must be {name, type})",
+                    other,
+                ));
+            }
+        };
+        if inner.len() != 2 {
+            return Err(MError::Other(format!(
+                "Table.TransformColumnTypes: each transform must be a 2-element list, got {}",
+                inner.len()
+            )));
+        }
+        let name = expect_text(&inner[0])?.to_string();
+        let type_value = match &inner[1] {
+            Value::Type(t) => t.clone(),
+            other => return Err(type_mismatch("type", other)),
+        };
+        let (dtype, nullable) = type_rep_to_datatype(&type_value)?;
+        out.push((name, dtype, nullable));
+    }
+    Ok(out)
+}
+
+/// Map a TypeRep to (DataType, nullable). Compound and non-primitive types
+/// error — eval-7e supports the primitive set only.
+fn type_rep_to_datatype(t: &super::value::TypeRep) -> Result<(DataType, bool), MError> {
+    use super::value::TypeRep;
+    match t {
+        TypeRep::Null => Ok((DataType::Null, true)),
+        TypeRep::Logical => Ok((DataType::Boolean, false)),
+        TypeRep::Number => Ok((DataType::Float64, false)),
+        TypeRep::Text => Ok((DataType::Utf8, false)),
+        TypeRep::Date => Ok((DataType::Date32, false)),
+        TypeRep::Datetime => Ok((
+            DataType::Timestamp(arrow::datatypes::TimeUnit::Microsecond, None),
+            false,
+        )),
+        TypeRep::Duration => Ok((
+            DataType::Duration(arrow::datatypes::TimeUnit::Microsecond),
+            false,
+        )),
+        TypeRep::Nullable(inner) => {
+            let (dt, _) = type_rep_to_datatype(inner)?;
+            Ok((dt, true))
+        }
+        TypeRep::Any | TypeRep::AnyNonNull | TypeRep::List | TypeRep::Record
+        | TypeRep::Table | TypeRep::Function | TypeRep::Type | TypeRep::Binary => {
+            Err(MError::Other(format!(
+                "Table.TransformColumnTypes: type {:?} is not a castable primitive",
+                t
+            )))
+        }
+    }
+}
+
+fn table_transform_columns(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let transforms = expect_list(&args[1])?;
+    // Parse {col_name, function} pairs.
+    let pairs = parse_col_fn_pairs(transforms)?;
+
+    let schema = table.batch.schema();
+    let mut new_fields: Vec<Field> = schema.fields().iter().map(|f| (**f).clone()).collect();
+    let mut new_columns: Vec<ArrayRef> = table.batch.columns().to_vec();
+    let n_rows = table.batch.num_rows();
+
+    for (name, closure) in &pairs {
+        let idx = schema
+            .index_of(name)
+            .map_err(|_| MError::Other(format!(
+                "Table.TransformColumns: column not found: {}",
+                name
+            )))?;
+        let mut new_cells: Vec<Value> = Vec::with_capacity(n_rows);
+        for row in 0..n_rows {
+            let cell = cell_to_value(&table.batch, idx, row)?;
+            let v = invoke_callback_with_host(closure, vec![cell], host)?;
+            new_cells.push(v);
+        }
+        let cell_refs: Vec<&Value> = new_cells.iter().collect();
+        let (dtype, new_array) = infer_cells(&cell_refs)?;
+        new_columns[idx] = new_array;
+        new_fields[idx] = Field::new(
+            name,
+            dtype.clone(),
+            matches!(dtype, DataType::Null) || new_cells.iter().any(|v| matches!(v, Value::Null)),
+        );
+    }
+
+    let new_schema = Arc::new(Schema::new(new_fields));
+    let new_batch = RecordBatch::try_new(new_schema, new_columns)
+        .map_err(|e| MError::Other(format!("Table.TransformColumns: rebuild failed: {}", e)))?;
+    Ok(Value::Table(Table { batch: new_batch }))
+}
+
+fn parse_col_fn_pairs<'a>(
+    transforms: &'a [Value],
+) -> Result<Vec<(String, &'a Closure)>, MError> {
+    let mut out = Vec::with_capacity(transforms.len());
+    for t in transforms {
+        let inner = match t {
+            Value::List(xs) => xs,
+            other => {
+                return Err(type_mismatch(
+                    "list (each transform must be {name, function})",
+                    other,
+                ));
+            }
+        };
+        if inner.len() != 2 {
+            return Err(MError::Other(format!(
+                "Table.TransformColumns: each transform must be a 2-element list, got {}",
+                inner.len()
+            )));
+        }
+        let name = expect_text(&inner[0])?.to_string();
+        let closure = match &inner[1] {
+            Value::Function(c) => c,
+            other => return Err(type_mismatch("function", other)),
+        };
+        out.push((name, closure));
+    }
+    Ok(out)
+}
+
+fn table_combine(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let tables = expect_list(&args[0])?;
+    if tables.is_empty() {
+        return Err(MError::Other("Table.Combine: empty table list".into()));
+    }
+    let batches: Result<Vec<RecordBatch>, MError> = tables
+        .iter()
+        .map(|t| match t {
+            Value::Table(table) => Ok(table.batch.clone()),
+            other => Err(type_mismatch("table (in list)", other)),
+        })
+        .collect();
+    let batches = batches?;
+    if batches.len() == 1 {
+        return Ok(Value::Table(Table {
+            batch: batches.into_iter().next().unwrap(),
+        }));
+    }
+    // First-pass: require identical schemas. arrow::compute::concat_batches
+    // enforces this for us, but the error message is generic — wrap it.
+    let schema = batches[0].schema();
+    for (i, b) in batches.iter().enumerate().skip(1) {
+        if b.schema() != schema {
+            return Err(MError::Other(format!(
+                "Table.Combine: schema of table {} does not match table 0",
+                i
+            )));
+        }
+    }
+    let combined = arrow::compute::concat_batches(&schema, &batches)
+        .map_err(|e| MError::Other(format!("Table.Combine: concat failed: {}", e)))?;
+    Ok(Value::Table(Table { batch: combined }))
 }
