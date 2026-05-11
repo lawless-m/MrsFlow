@@ -1962,6 +1962,46 @@ mod tests {
     }
 
     #[test]
+    fn list_any_true_non_empty() {
+        assert!(matches!(
+            eval_str("List.AnyTrue({false, true, false})").unwrap(),
+            Value::Logical(true)
+        ));
+        assert!(matches!(
+            eval_str("List.AnyTrue({false, false, false})").unwrap(),
+            Value::Logical(false)
+        ));
+    }
+
+    #[test]
+    fn list_any_true_empty() {
+        assert!(matches!(
+            eval_str("List.AnyTrue({})").unwrap(),
+            Value::Logical(false)
+        ));
+    }
+
+    #[test]
+    fn list_all_true_non_empty() {
+        assert!(matches!(
+            eval_str("List.AllTrue({true, true, true})").unwrap(),
+            Value::Logical(true)
+        ));
+        assert!(matches!(
+            eval_str("List.AllTrue({true, false, true})").unwrap(),
+            Value::Logical(false)
+        ));
+    }
+
+    #[test]
+    fn list_all_true_empty_vacuous() {
+        assert!(matches!(
+            eval_str("List.AllTrue({})").unwrap(),
+            Value::Logical(true)
+        ));
+    }
+
+    #[test]
     fn list_remove_matching_items_numbers() {
         match eval_str("List.RemoveMatchingItems({1, 2, 3, 2, 4}, {2, 4})").unwrap() {
             Value::List(xs) => {

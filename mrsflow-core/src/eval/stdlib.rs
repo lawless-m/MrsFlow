@@ -164,6 +164,8 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
             two("list", "items"),
             list_remove_matching_items,
         ),
+        ("List.AnyTrue", one("list"), list_any_true),
+        ("List.AllTrue", one("list"), list_all_true),
         ("Record.Field", two("record", "field"), record_field),
         ("Record.FieldNames", one("record"), record_field_names),
         ("Logical.From", one("value"), logical_from),
@@ -669,6 +671,36 @@ pub(super) fn values_equal_primitive(a: &Value, b: &Value) -> Result<bool, MErro
             "equality on compound values (list/record/table/etc.) deferred",
         )),
     }
+}
+
+fn list_any_true(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let list = expect_list(&args[0])?;
+    for v in list {
+        match v {
+            Value::Logical(b) => {
+                if *b {
+                    return Ok(Value::Logical(true));
+                }
+            }
+            other => return Err(type_mismatch("logical (in list)", other)),
+        }
+    }
+    Ok(Value::Logical(false))
+}
+
+fn list_all_true(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let list = expect_list(&args[0])?;
+    for v in list {
+        match v {
+            Value::Logical(b) => {
+                if !*b {
+                    return Ok(Value::Logical(false));
+                }
+            }
+            other => return Err(type_mismatch("logical (in list)", other)),
+        }
+    }
+    Ok(Value::Logical(true))
 }
 
 fn list_remove_matching_items(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
