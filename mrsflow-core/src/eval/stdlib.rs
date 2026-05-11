@@ -333,6 +333,17 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
             ],
             table_nested_join,
         ),
+        (
+            "Table.Pivot",
+            vec![
+                Param { name: "table".into(),               optional: false, type_annotation: None },
+                Param { name: "pivotValues".into(),         optional: false, type_annotation: None },
+                Param { name: "attributeColumn".into(),     optional: false, type_annotation: None },
+                Param { name: "valueColumn".into(),         optional: false, type_annotation: None },
+                Param { name: "aggregationFunction".into(), optional: true,  type_annotation: None },
+            ],
+            table_pivot,
+        ),
         ("Table.ReorderColumns", two("table", "columnOrder"), table_reorder_columns),
         ("Table.TransformRows", two("table", "transform"), table_transform_rows),
         ("Table.InsertRows", three("table", "offset", "rows"), table_insert_rows),
@@ -2424,6 +2435,112 @@ fn do_unpivot(
             out_rows.push(new_row);
         }
     }
+    Ok(Value::Table(values_to_table(&out_names, &out_rows)?))
+}
+
+/// Table.Pivot — inverse of Unpivot. Group input rows by the row-key columns
+/// (everything except attributeColumn and valueColumn). For each group, emit
+/// one output row whose extra columns (one per pivotValue) hold the
+/// valueColumn cell whose attributeColumn cell matches that pivotValue. When
+/// multiple input rows match the same (group, pivotValue) pair, apply the
+/// optional aggregationFunction; otherwise default to the *last* matching
+/// value (PQ's documented default).
+fn table_pivot(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let pivot_values = expect_text_list(&args[1], "Table.Pivot: pivotValues")?;
+    let attribute_column = expect_text(&args[2])?.to_string();
+    let value_column = expect_text(&args[3])?.to_string();
+    let aggregation: Option<&Closure> = match args.get(4) {
+        Some(Value::Function(c)) => Some(c),
+        Some(Value::Null) | None => None,
+        Some(other) => return Err(type_mismatch("function", other)),
+    };
+
+    let (names, rows) = table_to_rows(table)?;
+    let attr_idx = names
+        .iter()
+        .position(|n| n == &attribute_column)
+        .ok_or_else(|| {
+            MError::Other(format!(
+                "Table.Pivot: attributeColumn not found: {}",
+                attribute_column
+            ))
+        })?;
+    let val_idx = names.iter().position(|n| n == &value_column).ok_or_else(|| {
+        MError::Other(format!(
+            "Table.Pivot: valueColumn not found: {}",
+            value_column
+        ))
+    })?;
+    let key_indices: Vec<usize> = (0..names.len())
+        .filter(|i| *i != attr_idx && *i != val_idx)
+        .collect();
+
+    // Group rows by key tuple (preserving first-seen order).
+    let mut groups: Vec<(Vec<Value>, Vec<usize>)> = Vec::new(); // (key, row indices)
+    for (row_i, row) in rows.iter().enumerate() {
+        let key: Vec<Value> = key_indices.iter().map(|&i| row[i].clone()).collect();
+        let mut placed = false;
+        for (existing_key, idxs) in groups.iter_mut() {
+            let mut all_match = true;
+            for (a, b) in existing_key.iter().zip(key.iter()) {
+                if !values_equal_primitive(a, b)? {
+                    all_match = false;
+                    break;
+                }
+            }
+            if all_match {
+                idxs.push(row_i);
+                placed = true;
+                break;
+            }
+        }
+        if !placed {
+            groups.push((key, vec![row_i]));
+        }
+    }
+
+    // Output: key columns + one column per pivot value.
+    let mut out_names: Vec<String> = key_indices.iter().map(|&i| names[i].clone()).collect();
+    for pv in &pivot_values {
+        out_names.push(pv.clone());
+    }
+
+    let mut out_rows: Vec<Vec<Value>> = Vec::with_capacity(groups.len());
+    for (key, row_idxs) in &groups {
+        let mut out_row = key.clone();
+        for pv in &pivot_values {
+            // Collect all valueColumn cells whose attributeColumn cell equals pv.
+            let mut matches: Vec<Value> = Vec::new();
+            for &ri in row_idxs {
+                let attr_cell = &rows[ri][attr_idx];
+                let attr_text = match attr_cell {
+                    Value::Text(s) => s.as_str(),
+                    Value::Null => continue,
+                    other => {
+                        return Err(MError::Other(format!(
+                            "Table.Pivot: attributeColumn cell is not text (got {})",
+                            super::type_name(other)
+                        )));
+                    }
+                };
+                if attr_text == pv.as_str() {
+                    matches.push(rows[ri][val_idx].clone());
+                }
+            }
+            let cell = match (matches.len(), aggregation) {
+                (0, _) => Value::Null,
+                (_, Some(f)) => {
+                    invoke_callback_with_host(f, vec![Value::List(matches)], host)?
+                }
+                // No aggregator: PQ's default is the last matching value.
+                (_, None) => matches.pop().unwrap(),
+            };
+            out_row.push(cell);
+        }
+        out_rows.push(out_row);
+    }
+
     Ok(Value::Table(values_to_table(&out_names, &out_rows)?))
 }
 

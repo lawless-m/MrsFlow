@@ -2168,6 +2168,59 @@ mod tests {
     }
 
     #[test]
+    fn table_pivot_basic() {
+        // 4 input rows × 2 attrs (q1,q2) → 2 output rows (one per id), with
+        // q1/q2 columns. No aggregation: 1:1 mapping per (id, attr).
+        let src = r#"
+            let t = #table(
+                {"id", "attr", "val"},
+                {{1, "q1", 10}, {1, "q2", 20}, {2, "q1", 30}, {2, "q2", 40}}
+            )
+            in Table.Pivot(t, {"q1", "q2"}, "attr", "val")
+        "#;
+        match eval_str(src).unwrap() {
+            Value::Table(t) => {
+                assert_eq!(t.column_names(), vec!["id", "q1", "q2"]);
+                assert_eq!(t.num_rows(), 2);
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_pivot_with_aggregation() {
+        // Two rows with id=1, attr="q1" → aggregator (List.Sum) collapses.
+        let src = r#"
+            let t = #table(
+                {"id", "attr", "val"},
+                {{1, "q1", 10}, {1, "q1", 5}, {1, "q2", 20}}
+            )
+            in Table.Pivot(t, {"q1", "q2"}, "attr", "val", List.Sum)
+        "#;
+        match eval_str(src).unwrap() {
+            Value::Table(t) => {
+                assert_eq!(t.column_names(), vec!["id", "q1", "q2"]);
+                assert_eq!(t.num_rows(), 1);
+                // q1 cell = 15 (10 + 5).
+                let rows = match &t.repr {
+                    super::TableRepr::Rows { rows, .. } => rows.clone(),
+                    super::TableRepr::Arrow(_) => {
+                        // Allowed too — fetch via row_to_record path is overkill;
+                        // accept either backing as long as the value is right.
+                        let (_, rs) = super::stdlib::table_to_rows(&t).unwrap();
+                        rs
+                    }
+                };
+                match &rows[0][1] {
+                    Value::Number(n) => assert_eq!(*n, 15.0),
+                    other => panic!("expected number for q1, got {:?}", other),
+                }
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn table_unpivot_mixed_value_types() {
         // Pivot columns hold mixed text+number cells — result's "val" column
         // must be heterogeneous (Rows-backed).
