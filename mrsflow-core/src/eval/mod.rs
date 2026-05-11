@@ -1678,6 +1678,89 @@ mod tests {
         assert_eq!(eval_bool("null is nullable date"), true);
     }
 
+    // --- Odbc.Query plumbing via mock host (eval-8) ---
+    //
+    // Real ODBC integration testing requires a driver manager + driver setup
+    // that's environment-specific. This test exercises the binding ⇄ host ⇄
+    // return-value path with a fake host that returns a pre-baked table.
+
+    use super::iohost::IoError;
+
+    struct MockOdbcHost {
+        batch: arrow::record_batch::RecordBatch,
+    }
+
+    impl IoHost for MockOdbcHost {
+        fn parquet_read(&self, _: &str) -> Result<Value, IoError> {
+            Err(IoError::NotSupported)
+        }
+        fn parquet_write(&self, _: &str, _: &Value) -> Result<(), IoError> {
+            Err(IoError::NotSupported)
+        }
+        fn odbc_query(
+            &self,
+            _conn: &str,
+            _sql: &str,
+            _opts: Option<&Value>,
+        ) -> Result<Value, IoError> {
+            Ok(Value::Table(super::Table {
+                batch: self.batch.clone(),
+            }))
+        }
+        fn odbc_data_source(
+            &self,
+            _: &str,
+            _: Option<&Value>,
+        ) -> Result<Value, IoError> {
+            Err(IoError::NotSupported)
+        }
+    }
+
+    #[test]
+    fn odbc_query_returns_host_provided_table() {
+        use std::sync::Arc;
+
+        use arrow::array::{Float64Array, StringArray};
+        use arrow::datatypes::{DataType, Field, Schema};
+        use arrow::record_batch::RecordBatch;
+
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("name", DataType::Utf8, false),
+            Field::new("v", DataType::Float64, false),
+        ]));
+        let batch = RecordBatch::try_new(
+            schema,
+            vec![
+                Arc::new(StringArray::from(vec!["a", "b"])) as arrow::array::ArrayRef,
+                Arc::new(Float64Array::from(vec![1.0, 2.0])),
+            ],
+        )
+        .unwrap();
+        let host = MockOdbcHost { batch };
+
+        let src = r#"Odbc.Query("DSN=mock", "SELECT * FROM t")"#;
+        let toks = tokenize(src).unwrap();
+        let ast = parse(&toks).unwrap();
+        let env = root_env();
+        let v = evaluate(&ast, &env, &host).unwrap();
+        let v = deep_force(v, &host).unwrap();
+        match v {
+            Value::Table(t) => {
+                assert_eq!(t.batch.num_rows(), 2);
+                assert_eq!(t.batch.num_columns(), 2);
+                let names: Vec<String> = t
+                    .batch
+                    .schema()
+                    .fields()
+                    .iter()
+                    .map(|f| f.name().clone())
+                    .collect();
+                assert_eq!(names, vec!["name".to_string(), "v".to_string()]);
+            }
+            other => panic!("expected table from Odbc.Query, got {:?}", other),
+        }
+    }
+
     // --- Table.* type-aware ops + concat (eval-7e) ---
 
     #[test]

@@ -154,6 +154,7 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
             table_transform_columns,
         ),
         ("Table.Combine", one("tables"), table_combine),
+        ("Odbc.Query", two("connection", "sql"), odbc_query),
     ]
 }
 
@@ -1232,4 +1233,18 @@ fn table_combine(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let combined = arrow::compute::concat_batches(&schema, &batches)
         .map_err(|e| MError::Other(format!("Table.Combine: concat failed: {}", e)))?;
     Ok(Value::Table(Table { batch: combined }))
+}
+
+// --- ODBC (eval-8) ---
+//
+// Delegates to the shell's IoHost. CliIoHost (built with `--features odbc`)
+// uses odbc-api against an installed driver; NoIoHost and CliIoHost built
+// without the feature return a NotSupported-style error. WASM shell will
+// likewise return NotSupported when it lands.
+
+fn odbc_query(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+    let conn = expect_text(&args[0])?;
+    let sql = expect_text(&args[1])?;
+    host.odbc_query(conn, sql, None)
+        .map_err(|e| MError::Other(format!("Odbc.Query: {:?}", e)))
 }
