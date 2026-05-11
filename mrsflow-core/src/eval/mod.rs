@@ -1960,6 +1960,36 @@ mod tests {
     // --- het-cell unlocked: nested-cell expand ops ---
 
     #[test]
+    fn table_expand_list_column_basic() {
+        let src = r#"
+            let t = #table({"id", "xs"}, {{1, {10, 20}}, {2, {30}}})
+            in Table.ExpandListColumn(t, "xs")
+        "#;
+        match eval_str(src).unwrap() {
+            Value::Table(t) => {
+                assert_eq!(t.column_names(), vec!["id", "xs"]);
+                assert_eq!(t.num_rows(), 3);
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_expand_list_column_empty_drops_row() {
+        let src = r#"
+            let t = #table({"id", "xs"}, {{1, {10, 20}}, {2, {}}, {3, {30}}})
+            in Table.ExpandListColumn(t, "xs")
+        "#;
+        match eval_str(src).unwrap() {
+            Value::Table(t) => {
+                // Row 2 (empty list) drops; result has 3 rows total (10,20,30).
+                assert_eq!(t.num_rows(), 3);
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn table_expand_record_column_default_names() {
         // Each row's `r` is a record [a, b]; expand into two new columns.
         let src = r#"

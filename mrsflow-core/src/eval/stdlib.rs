@@ -274,6 +274,11 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
             ],
             table_expand_record_column,
         ),
+        (
+            "Table.ExpandListColumn",
+            two("table", "column"),
+            table_expand_list_column,
+        ),
         ("Table.ReorderColumns", two("table", "columnOrder"), table_reorder_columns),
         ("Table.TransformRows", two("table", "transform"), table_transform_rows),
         ("Table.InsertRows", three("table", "offset", "rows"), table_insert_rows),
@@ -2176,6 +2181,44 @@ fn table_expand_record_column(args: &[Value], _host: &dyn IoHost) -> Result<Valu
         out_rows.push(new_row);
     }
     Ok(Value::Table(values_to_table(&out_names, &out_rows)?))
+}
+
+fn table_expand_list_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let column = expect_text(&args[1])?.to_string();
+    let (names, rows) = table_to_rows(table)?;
+    let col_idx = names.iter().position(|n| n == &column).ok_or_else(|| {
+        MError::Other(format!(
+            "Table.ExpandListColumn: column not found: {}",
+            column
+        ))
+    })?;
+
+    let mut out_rows: Vec<Vec<Value>> = Vec::new();
+    for row in &rows {
+        match &row[col_idx] {
+            Value::List(items) => {
+                // One output row per list item; empty list drops the input row.
+                for item in items {
+                    let mut new_row = row.clone();
+                    new_row[col_idx] = item.clone();
+                    out_rows.push(new_row);
+                }
+            }
+            Value::Null => {
+                // Null cell → emit a single row with null in the target column.
+                out_rows.push(row.clone());
+            }
+            other => {
+                return Err(MError::Other(format!(
+                    "Table.ExpandListColumn: cell at column {} is not a list (got {})",
+                    column,
+                    super::type_name(other)
+                )));
+            }
+        }
+    }
+    Ok(Value::Table(values_to_table(&names, &out_rows)?))
 }
 
 fn table_combine(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
