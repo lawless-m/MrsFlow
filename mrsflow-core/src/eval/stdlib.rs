@@ -225,6 +225,7 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
             list_remove_first_n,
         ),
         ("List.RemoveItems", two("list", "list2"), list_remove_items),
+        ("List.Zip", one("lists"), list_zip),
         ("List.FirstN", two("list", "countOrCondition"), list_first_n),
         ("List.Skip", two("list", "countOrCondition"), list_skip),
         ("List.Distinct", one("list"), list_distinct),
@@ -694,6 +695,24 @@ fn list_sum(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 fn list_count(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     Ok(Value::Number(list.len() as f64))
+}
+
+fn list_zip(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let lists = expect_list(&args[0])?;
+    let inner: Vec<&Vec<Value>> = lists
+        .iter()
+        .map(|v| expect_list(v))
+        .collect::<Result<_, _>>()?;
+    let max_len = inner.iter().map(|l| l.len()).max().unwrap_or(0);
+    let mut out: Vec<Value> = Vec::with_capacity(max_len);
+    for i in 0..max_len {
+        let row: Vec<Value> = inner
+            .iter()
+            .map(|l| l.get(i).cloned().unwrap_or(Value::Null))
+            .collect();
+        out.push(Value::List(row));
+    }
+    Ok(Value::List(out))
 }
 
 fn list_remove_first_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {

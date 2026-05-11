@@ -2752,6 +2752,41 @@ mod tests {
     }
 
     #[test]
+    fn list_zip_equal_length() {
+        match eval_str("List.Zip({{1, 2, 3}, {\"a\", \"b\", \"c\"}})").unwrap() {
+            Value::List(rows) => {
+                assert_eq!(rows.len(), 3);
+                match &rows[0] {
+                    Value::List(r) => {
+                        assert!(matches!(r[0], Value::Number(n) if n == 1.0));
+                        assert!(matches!(&r[1], Value::Text(s) if s == "a"));
+                    }
+                    _ => panic!("expected inner list"),
+                }
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn list_zip_ragged_pads_with_null() {
+        match eval_str("List.Zip({{1, 2, 3}, {\"a\"}})").unwrap() {
+            Value::List(rows) => {
+                assert_eq!(rows.len(), 3);
+                // Row 1: [2, null]; row 2: [3, null]
+                match &rows[1] {
+                    Value::List(r) => {
+                        assert!(matches!(r[0], Value::Number(n) if n == 2.0));
+                        assert!(matches!(r[1], Value::Null));
+                    }
+                    _ => panic!("expected inner list"),
+                }
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn list_remove_first_n_default() {
         match eval_str("List.RemoveFirstN({1, 2, 3, 4})").unwrap() {
             Value::List(xs) => {
