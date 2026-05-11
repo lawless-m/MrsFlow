@@ -2752,6 +2752,42 @@ mod tests {
     }
 
     #[test]
+    fn table_join_inner_basic() {
+        let src = r#"
+            let
+                customers = #table({"id", "name"}, {{1, "alice"}, {2, "bob"}}),
+                orders    = #table({"cid", "amt"}, {{1, 10}, {1, 20}, {2, 5}})
+            in Table.Join(customers, "id", orders, "cid", JoinKind.Inner)
+        "#;
+        match eval_str(src).unwrap() {
+            Value::Table(t) => {
+                // 3 matches; right-side "cid" dropped: cols = id, name, amt.
+                assert_eq!(t.column_names(), vec!["id", "name", "amt"]);
+                assert_eq!(t.num_rows(), 3);
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_join_left_outer_no_match() {
+        let src = r#"
+            let
+                customers = #table({"id", "name"}, {{1, "alice"}, {99, "ghost"}}),
+                orders    = #table({"cid", "amt"}, {{1, 10}})
+            in Table.Join(customers, "id", orders, "cid", JoinKind.LeftOuter)
+        "#;
+        match eval_str(src).unwrap() {
+            Value::Table(t) => {
+                assert_eq!(t.column_names(), vec!["id", "name", "amt"]);
+                // alice → 1 row; ghost → 1 row with null amt; total 2.
+                assert_eq!(t.num_rows(), 2);
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn table_from_records_basic() {
         let src = r#"
             Table.FromRecords({

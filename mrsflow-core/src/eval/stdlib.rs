@@ -396,6 +396,19 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ("Table.FromRecords", one("records"), table_from_records),
         ("Table.ToRecords", one("table"), table_to_records),
         (
+            "Table.Join",
+            vec![
+                Param { name: "table1".into(),                optional: false, type_annotation: None },
+                Param { name: "key1".into(),                  optional: false, type_annotation: None },
+                Param { name: "table2".into(),                optional: false, type_annotation: None },
+                Param { name: "key2".into(),                  optional: false, type_annotation: None },
+                Param { name: "joinKind".into(),              optional: true,  type_annotation: None },
+                Param { name: "joinAlgorithm".into(),         optional: true,  type_annotation: None },
+                Param { name: "keyEqualityComparers".into(),  optional: true,  type_annotation: None },
+            ],
+            table_join,
+        ),
+        (
             "Table.AddIndexColumn",
             vec![
                 Param { name: "table".into(),         optional: false, type_annotation: None },
@@ -2863,6 +2876,85 @@ fn table_pivot(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
             out_row.push(cell);
         }
         out_rows.push(out_row);
+    }
+
+    Ok(Value::Table(values_to_table(&out_names, &out_rows)?))
+}
+
+/// Table.Join — flat join. Like NestedJoin but matched rows merge into a
+/// single output row whose columns are the union of both tables'. The
+/// right-side key column is dropped.
+fn table_join(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table1 = expect_table(&args[0])?;
+    let key1 = match &args[1] {
+        Value::Text(s) => s.clone(),
+        Value::List(_) => {
+            return Err(MError::NotImplemented(
+                "Table.Join: composite keys (text-list form) not yet supported",
+            ));
+        }
+        other => return Err(type_mismatch("text", other)),
+    };
+    let table2 = expect_table(&args[2])?;
+    let key2 = match &args[3] {
+        Value::Text(s) => s.clone(),
+        Value::List(_) => {
+            return Err(MError::NotImplemented(
+                "Table.Join: composite keys (text-list form) not yet supported",
+            ));
+        }
+        other => return Err(type_mismatch("text", other)),
+    };
+    // joinKind default for Table.Join is Inner (0); cf. NestedJoin which
+    // defaults to LeftOuter.
+    let join_kind = match args.get(4) {
+        Some(Value::Number(n)) if n.fract() == 0.0 => *n as i32,
+        Some(Value::Null) | None => 0,
+        Some(other) => return Err(type_mismatch("number (JoinKind)", other)),
+    };
+    if !matches!(join_kind, 0 | 1) {
+        return Err(MError::NotImplemented(
+            "Table.Join: only Inner (0) and LeftOuter (1) join kinds supported",
+        ));
+    }
+
+    let (left_names, left_rows) = table_to_rows(table1)?;
+    let (right_names, right_rows) = table_to_rows(table2)?;
+
+    let key1_idx = left_names.iter().position(|n| n == &key1).ok_or_else(|| {
+        MError::Other(format!("Table.Join: key1 column not found: {}", key1))
+    })?;
+    let key2_idx = right_names.iter().position(|n| n == &key2).ok_or_else(|| {
+        MError::Other(format!("Table.Join: key2 column not found: {}", key2))
+    })?;
+    let right_keep: Vec<usize> = (0..right_names.len()).filter(|i| *i != key2_idx).collect();
+
+    let mut out_names: Vec<String> = left_names.clone();
+    for &i in &right_keep {
+        out_names.push(right_names[i].clone());
+    }
+
+    let mut out_rows: Vec<Vec<Value>> = Vec::new();
+    for left_row in &left_rows {
+        let lkey = &left_row[key1_idx];
+        let mut any_match = false;
+        for right_row in &right_rows {
+            if values_equal_primitive(lkey, &right_row[key2_idx])? {
+                let mut new_row = left_row.clone();
+                for &i in &right_keep {
+                    new_row.push(right_row[i].clone());
+                }
+                out_rows.push(new_row);
+                any_match = true;
+            }
+        }
+        if !any_match && join_kind == 1 {
+            let mut new_row = left_row.clone();
+            for _ in &right_keep {
+                new_row.push(Value::Null);
+            }
+            out_rows.push(new_row);
+        }
     }
 
     Ok(Value::Table(values_to_table(&out_names, &out_rows)?))
