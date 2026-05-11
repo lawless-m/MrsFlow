@@ -130,6 +130,14 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
     vec![
         ("Number.From", one("value"), number_from),
         (
+            "Number.FromText",
+            vec![
+                Param { name: "text".into(),    optional: false, type_annotation: None },
+                Param { name: "culture".into(), optional: true,  type_annotation: None },
+            ],
+            number_from_text,
+        ),
+        (
             "Number.Round",
             vec![
                 Param { name: "number".into(), optional: false, type_annotation: None },
@@ -414,6 +422,18 @@ fn number_from(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             .map(Value::Number)
             .map_err(|_| MError::Other(format!("Number.From: cannot parse {:?}", s))),
         other => Err(type_mismatch("text/number/logical/null", other)),
+    }
+}
+
+fn number_from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    match &args[0] {
+        Value::Null => Ok(Value::Null),
+        Value::Text(s) => s
+            .trim()
+            .parse::<f64>()
+            .map(Value::Number)
+            .map_err(|_| MError::Other(format!("Number.FromText: cannot parse {:?}", s))),
+        other => Err(type_mismatch("text", other)),
     }
 }
 

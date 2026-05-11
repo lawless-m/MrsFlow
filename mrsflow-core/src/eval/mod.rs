@@ -2752,6 +2752,27 @@ mod tests {
     }
 
     #[test]
+    fn number_from_text_integer() {
+        match eval_str("Number.FromText(\"42\")").unwrap() {
+            Value::Number(n) => assert_eq!(n, 42.0),
+            other => panic!("expected number, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn number_from_text_decimal() {
+        match eval_str("Number.FromText(\"3.14\")").unwrap() {
+            Value::Number(n) => assert!((n - 3.14).abs() < 1e-9),
+            other => panic!("expected number, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn number_from_text_malformed_errors() {
+        assert!(eval_str("Number.FromText(\"not a number\")").is_err());
+    }
+
+    #[test]
     fn list_zip_equal_length() {
         match eval_str("List.Zip({{1, 2, 3}, {\"a\", \"b\", \"c\"}})").unwrap() {
             Value::List(rows) => {
