@@ -11,7 +11,7 @@
 
 use std::sync::Arc;
 
-use arrow::array::{Array, ArrayRef, BooleanArray, Float64Array, NullArray, StringArray};
+use arrow::array::{Array, ArrayRef, BooleanArray, Date32Array, Float64Array, NullArray, StringArray};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
 
@@ -85,6 +85,14 @@ fn three(a: &str, b: &str, c: &str) -> Vec<Param> {
 fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
     vec![
         ("Number.From", one("value"), number_from),
+        (
+            "Number.Round",
+            vec![
+                Param { name: "number".into(), optional: false, type_annotation: None },
+                Param { name: "digits".into(), optional: true,  type_annotation: None },
+            ],
+            number_round,
+        ),
         ("Text.From", one("value"), text_from),
         ("Text.Contains", two("text", "substring"), text_contains),
         ("Text.Replace", three("text", "old", "new"), text_replace),
@@ -92,6 +100,7 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ("Text.Length", one("text"), text_length),
         ("Text.PositionOf", two("text", "substring"), text_position_of),
         ("Text.EndsWith", two("text", "suffix"), text_ends_with),
+        ("Text.StartsWith", two("text", "prefix"), text_starts_with),
         ("Text.TrimEnd", one("text"), text_trim_end),
         ("Text.Start", two("text", "count"), text_start),
         (
@@ -108,6 +117,7 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ("List.Count", one("list"), list_count),
         ("List.Min", one("list"), list_min),
         ("List.Max", one("list"), list_max),
+        ("List.Combine", one("lists"), list_combine),
         ("Record.Field", two("record", "field"), record_field),
         ("Record.FieldNames", one("record"), record_field_names),
         ("Logical.From", one("value"), logical_from),
@@ -174,6 +184,9 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
             table_transform_columns,
         ),
         ("Table.Combine", one("tables"), table_combine),
+        ("Table.TransformRows", two("table", "transform"), table_transform_rows),
+        ("Table.InsertRows", three("table", "offset", "rows"), table_insert_rows),
+        ("Date.FromText", one("text"), date_from_text),
         ("Odbc.Query", two("connection", "sql"), odbc_query),
     ]
 }
@@ -200,6 +213,23 @@ fn number_from(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             .map_err(|_| MError::Other(format!("Number.From: cannot parse {:?}", s))),
         other => Err(type_mismatch("text/number/logical/null", other)),
     }
+}
+
+fn number_round(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let n = match &args[0] {
+        Value::Null => return Ok(Value::Null),
+        Value::Number(n) => *n,
+        other => return Err(type_mismatch("number", other)),
+    };
+    let digits = match args.get(1) {
+        Some(Value::Number(d)) => *d as i32,
+        Some(Value::Null) | None => 0,
+        Some(other) => return Err(type_mismatch("number or null", other)),
+    };
+    // Simple half-away-from-zero. M's default is banker's, but the corpus
+    // only relies on basic rounding for display.
+    let factor = 10f64.powi(digits);
+    Ok(Value::Number((n * factor).round() / factor))
 }
 
 // --- Text.* ---
@@ -263,6 +293,12 @@ fn text_ends_with(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     let suffix = expect_text(&args[1])?;
     Ok(Value::Logical(text.ends_with(suffix)))
+}
+
+fn text_starts_with(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let text = expect_text(&args[0])?;
+    let prefix = expect_text(&args[1])?;
+    Ok(Value::Logical(text.starts_with(prefix)))
 }
 
 fn text_trim_end(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
@@ -390,6 +426,18 @@ fn list_max(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         });
     }
     Ok(Value::Number(best.unwrap()))
+}
+
+fn list_combine(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let lists = expect_list(&args[0])?;
+    let mut out: Vec<Value> = Vec::new();
+    for v in lists {
+        match v {
+            Value::List(xs) => out.extend(xs.iter().cloned()),
+            other => return Err(type_mismatch("list (in list)", other)),
+        }
+    }
+    Ok(Value::List(out))
 }
 
 fn list_accumulate(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
@@ -729,10 +777,14 @@ pub(crate) fn infer_cells(cells: &[&Value]) -> Result<(DataType, ArrayRef), MErr
                 kind = Some("logical");
                 break;
             }
+            Value::Date(_) => {
+                kind = Some("date");
+                break;
+            }
             other => {
                 return Err(MError::NotImplemented(match other {
-                    Value::Date(_) | Value::Datetime(_) | Value::Duration(_) => {
-                        "date/datetime/duration cells (deferred to eval-7b)"
+                    Value::Datetime(_) | Value::Duration(_) => {
+                        "datetime/duration cells (deferred)"
                     }
                     Value::Binary(_) => "binary cells (deferred)",
                     _ => "non-primitive cell type (deferred)",
@@ -787,6 +839,24 @@ pub(crate) fn infer_cells(cells: &[&Value]) -> Result<(DataType, ArrayRef), MErr
                 .collect::<Result<_, _>>()?;
             Ok((DataType::Boolean, Arc::new(BooleanArray::from(values))))
         }
+        Some("date") => {
+            // Date32 stores days since 1970-01-01.
+            let epoch = chrono::NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
+            let values: Vec<Option<i32>> = cells
+                .iter()
+                .map(|v| match v {
+                    Value::Null => Ok(None),
+                    Value::Date(d) => Ok(Some(
+                        d.signed_duration_since(epoch).num_days() as i32,
+                    )),
+                    other => Err(MError::Other(format!(
+                        "column: mixed types: date + {}",
+                        super::type_name(other)
+                    ))),
+                })
+                .collect::<Result<_, _>>()?;
+            Ok((DataType::Date32, Arc::new(Date32Array::from(values))))
+        }
         _ => unreachable!(),
     }
 }
@@ -818,9 +888,21 @@ pub fn cell_to_value(batch: &RecordBatch, col: usize, row: usize) -> Result<Valu
             Ok(Value::Logical(a.value(row)))
         }
         DataType::Null => Ok(Value::Null),
+        DataType::Date32 => {
+            let a = array
+                .as_any()
+                .downcast_ref::<Date32Array>()
+                .expect("Date32");
+            let days = a.value(row);
+            let epoch = chrono::NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
+            let d = epoch
+                .checked_add_signed(chrono::Duration::days(days as i64))
+                .ok_or_else(|| MError::Other(format!("Date32 out of range: {} days", days)))?;
+            Ok(Value::Date(d))
+        }
         other => Err(MError::NotImplemented(match other {
-            DataType::Date32 | DataType::Date64 | DataType::Timestamp(_, _) => {
-                "date/datetime cell decode (deferred to eval-7b)"
+            DataType::Date64 | DataType::Timestamp(_, _) => {
+                "datetime cell decode (deferred)"
             }
             _ => "unsupported cell type",
         })),
@@ -978,10 +1060,11 @@ fn table_add_column(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> 
     let cell_refs: Vec<&Value> = new_cells.iter().collect();
     let (inferred_dtype, inferred_array) = infer_cells(&cell_refs)?;
 
-    // Optional 4th arg: target column type. If supplied, cast and use its
-    // dtype/nullability for the new field; otherwise use the inferred shape.
+    // Optional 4th arg: target column type. If supplied (and not `type any`),
+    // cast and use its dtype/nullability for the new field; otherwise use the
+    // inferred shape.
     let (dtype, new_array, nullable) = match args.get(3) {
-        Some(Value::Type(t)) => {
+        Some(Value::Type(t)) if !matches!(t, super::value::TypeRep::Any) => {
             let (target_dtype, target_nullable) = type_rep_to_datatype(t)?;
             let cast = arrow::compute::cast(&inferred_array, &target_dtype).map_err(|e| {
                 MError::Other(format!(
@@ -991,7 +1074,7 @@ fn table_add_column(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> 
             })?;
             (target_dtype, cast, target_nullable)
         }
-        Some(Value::Null) | None => {
+        Some(Value::Type(_)) | Some(Value::Null) | None => {
             let nullable = matches!(inferred_dtype, DataType::Null)
                 || new_cells.iter().any(|v| matches!(v, Value::Null));
             (inferred_dtype, inferred_array, nullable)
@@ -1074,7 +1157,7 @@ fn table_promote_headers(args: &[Value], _host: &dyn IoHost) -> Result<Value, ME
 }
 
 /// Build a record Value from one row of a RecordBatch — column name → cell.
-fn row_to_record(batch: &RecordBatch, row: usize) -> Result<Value, MError> {
+pub(super) fn row_to_record(batch: &RecordBatch, row: usize) -> Result<Value, MError> {
     let schema = batch.schema();
     let mut fields: Vec<(String, Value)> = Vec::with_capacity(batch.num_columns());
     for col in 0..batch.num_columns() {
@@ -1136,13 +1219,18 @@ fn table_transform_column_types(args: &[Value], _host: &dyn IoHost) -> Result<Va
     let mut new_fields: Vec<Field> = schema.fields().iter().map(|f| (**f).clone()).collect();
     let mut new_columns: Vec<ArrayRef> = table.batch.columns().to_vec();
 
-    for (name, target_dtype, target_nullable) in &pairs {
+    for (name, target) in &pairs {
         let idx = schema
             .index_of(name)
             .map_err(|_| MError::Other(format!(
                 "Table.TransformColumnTypes: column not found: {}",
                 name
             )))?;
+        // `type any` → keep current shape (no cast). Power Query's `any` is
+        // the no-constraint type; the corpus uses it for mixed-shape columns.
+        let Some((target_dtype, target_nullable)) = target else {
+            continue;
+        };
         let cast = arrow::compute::cast(&new_columns[idx], target_dtype).map_err(|e| {
             MError::Other(format!(
                 "Table.TransformColumnTypes: cast {} to {:?} failed: {}",
@@ -1159,7 +1247,9 @@ fn table_transform_column_types(args: &[Value], _host: &dyn IoHost) -> Result<Va
     Ok(Value::Table(Table { batch: new_batch }))
 }
 
-fn parse_col_type_pairs(transforms: &[Value]) -> Result<Vec<(String, DataType, bool)>, MError> {
+fn parse_col_type_pairs(
+    transforms: &[Value],
+) -> Result<Vec<(String, Option<(DataType, bool)>)>, MError> {
     let mut out = Vec::with_capacity(transforms.len());
     for t in transforms {
         let inner = match t {
@@ -1182,8 +1272,13 @@ fn parse_col_type_pairs(transforms: &[Value]) -> Result<Vec<(String, DataType, b
             Value::Type(t) => t.clone(),
             other => return Err(type_mismatch("type", other)),
         };
-        let (dtype, nullable) = type_rep_to_datatype(&type_value)?;
-        out.push((name, dtype, nullable));
+        // `type any` → None (no-cast). Anything else must be castable.
+        let mapped = if matches!(type_value, super::value::TypeRep::Any) {
+            None
+        } else {
+            Some(type_rep_to_datatype(&type_value)?)
+        };
+        out.push((name, mapped));
     }
     Ok(out)
 }
@@ -1239,7 +1334,7 @@ fn table_transform_columns(args: &[Value], host: &dyn IoHost) -> Result<Value, M
     let mut new_columns: Vec<ArrayRef> = table.batch.columns().to_vec();
     let n_rows = table.batch.num_rows();
 
-    for (name, closure) in &pairs {
+    for (name, closure, type_opt) in &pairs {
         let idx = schema
             .index_of(name)
             .map_err(|_| MError::Other(format!(
@@ -1253,13 +1348,26 @@ fn table_transform_columns(args: &[Value], host: &dyn IoHost) -> Result<Value, M
             new_cells.push(v);
         }
         let cell_refs: Vec<&Value> = new_cells.iter().collect();
-        let (dtype, new_array) = infer_cells(&cell_refs)?;
+        let (inferred_dtype, inferred_array) = infer_cells(&cell_refs)?;
+        let (dtype, new_array, nullable) = match type_opt {
+            Some(t) if !matches!(t, super::value::TypeRep::Any) => {
+                let (target_dtype, target_nullable) = type_rep_to_datatype(t)?;
+                let cast = arrow::compute::cast(&inferred_array, &target_dtype).map_err(|e| {
+                    MError::Other(format!(
+                        "Table.TransformColumns: cast {} to {:?} failed: {}",
+                        name, target_dtype, e
+                    ))
+                })?;
+                (target_dtype, cast, target_nullable)
+            }
+            _ => {
+                let nullable = matches!(inferred_dtype, DataType::Null)
+                    || new_cells.iter().any(|v| matches!(v, Value::Null));
+                (inferred_dtype, inferred_array, nullable)
+            }
+        };
         new_columns[idx] = new_array;
-        new_fields[idx] = Field::new(
-            name,
-            dtype.clone(),
-            matches!(dtype, DataType::Null) || new_cells.iter().any(|v| matches!(v, Value::Null)),
-        );
+        new_fields[idx] = Field::new(name, dtype, nullable);
     }
 
     let new_schema = Arc::new(Schema::new(new_fields));
@@ -1269,7 +1377,15 @@ fn table_transform_columns(args: &[Value], host: &dyn IoHost) -> Result<Value, M
 }
 
 fn is_single_col_fn_pair(xs: &[Value]) -> bool {
-    xs.len() == 2 && matches!(xs[0], Value::Text(_)) && matches!(xs[1], Value::Function(_))
+    // Either `{name, fn}` or `{name, fn, type}` as a single transform.
+    let head_ok = !xs.is_empty()
+        && matches!(xs.first(), Some(Value::Text(_)))
+        && matches!(xs.get(1), Some(Value::Function(_)));
+    match xs.len() {
+        2 => head_ok,
+        3 => head_ok && matches!(xs[2], Value::Type(_) | Value::Null),
+        _ => false,
+    }
 }
 
 fn is_single_col_type_pair(xs: &[Value]) -> bool {
@@ -1278,21 +1394,21 @@ fn is_single_col_type_pair(xs: &[Value]) -> bool {
 
 fn parse_col_fn_pairs<'a>(
     transforms: &'a [Value],
-) -> Result<Vec<(String, &'a Closure)>, MError> {
+) -> Result<Vec<(String, &'a Closure, Option<super::value::TypeRep>)>, MError> {
     let mut out = Vec::with_capacity(transforms.len());
     for t in transforms {
         let inner = match t {
             Value::List(xs) => xs,
             other => {
                 return Err(type_mismatch(
-                    "list (each transform must be {name, function})",
+                    "list (each transform must be {name, function} or {name, function, type})",
                     other,
                 ));
             }
         };
-        if inner.len() != 2 {
+        if inner.len() != 2 && inner.len() != 3 {
             return Err(MError::Other(format!(
-                "Table.TransformColumns: each transform must be a 2-element list, got {}",
+                "Table.TransformColumns: each transform must be 2 or 3 elements, got {}",
                 inner.len()
             )));
         }
@@ -1301,7 +1417,16 @@ fn parse_col_fn_pairs<'a>(
             Value::Function(c) => c,
             other => return Err(type_mismatch("function", other)),
         };
-        out.push((name, closure));
+        let type_opt = if inner.len() == 3 {
+            match &inner[2] {
+                Value::Type(t) => Some(t.clone()),
+                Value::Null => None,
+                other => return Err(type_mismatch("type or null", other)),
+            }
+        } else {
+            None
+        };
+        out.push((name, closure, type_opt));
     }
     Ok(out)
 }
@@ -1338,6 +1463,99 @@ fn table_combine(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let combined = arrow::compute::concat_batches(&schema, &batches)
         .map_err(|e| MError::Other(format!("Table.Combine: concat failed: {}", e)))?;
     Ok(Value::Table(Table { batch: combined }))
+}
+
+fn table_transform_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let transform = expect_function(&args[1])?;
+    let n_rows = table.batch.num_rows();
+    let mut out: Vec<Value> = Vec::with_capacity(n_rows);
+    for row in 0..n_rows {
+        let record = row_to_record(&table.batch, row)?;
+        out.push(invoke_callback_with_host(transform, vec![record], host)?);
+    }
+    Ok(Value::List(out))
+}
+
+fn table_insert_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let offset = match &args[1] {
+        Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
+        other => return Err(type_mismatch("non-negative integer", other)),
+    };
+    let new_records = expect_list(&args[2])?;
+    let n_existing = table.batch.num_rows();
+    if offset > n_existing {
+        return Err(MError::Other(format!(
+            "Table.InsertRows: offset {} exceeds row count {}",
+            offset, n_existing
+        )));
+    }
+
+    // Column names come from the original schema.
+    let names: Vec<String> = table
+        .batch
+        .schema()
+        .fields()
+        .iter()
+        .map(|f| f.name().clone())
+        .collect();
+
+    // Build the merged row list: existing[..offset], new, existing[offset..].
+    let mut rows: Vec<Vec<Value>> = Vec::with_capacity(n_existing + new_records.len());
+    for row in 0..offset {
+        let mut cells = Vec::with_capacity(names.len());
+        for col in 0..names.len() {
+            cells.push(cell_to_value(&table.batch, col, row)?);
+        }
+        rows.push(cells);
+    }
+    for r in new_records {
+        let record = match r {
+            Value::Record(rec) => rec,
+            other => return Err(type_mismatch("record (in rows)", other)),
+        };
+        let mut cells = Vec::with_capacity(names.len());
+        for name in &names {
+            let v = record
+                .fields
+                .iter()
+                .find(|(n, _)| n == name)
+                .map(|(_, v)| v.clone())
+                .unwrap_or(Value::Null);
+            // Record literal fields are thunks per the spec — force before
+            // pushing to the Arrow batch builder.
+            let v = super::force(v, &mut |e, env| super::evaluate(e, env, host))?;
+            cells.push(v);
+        }
+        rows.push(cells);
+    }
+    for row in offset..n_existing {
+        let mut cells = Vec::with_capacity(names.len());
+        for col in 0..names.len() {
+            cells.push(cell_to_value(&table.batch, col, row)?);
+        }
+        rows.push(cells);
+    }
+
+    let batch = values_to_record_batch(&names, &rows)?;
+    Ok(Value::Table(Table { batch }))
+}
+
+fn date_from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let text = expect_text(&args[0])?;
+    // Power Query's Date.FromText is locale-aware. Try ISO first, then a
+    // couple of common UK/US forms. Not the full spec — just enough for the
+    // corpus.
+    for fmt in &["%Y-%m-%d", "%d-%m-%Y", "%m-%d-%Y", "%Y/%m/%d", "%d/%m/%Y"] {
+        if let Ok(d) = chrono::NaiveDate::parse_from_str(text, fmt) {
+            return Ok(Value::Date(d));
+        }
+    }
+    Err(MError::Other(format!(
+        "Date.FromText: cannot parse {:?}",
+        text
+    )))
 }
 
 // --- ODBC (eval-8) ---

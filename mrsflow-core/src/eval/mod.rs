@@ -368,8 +368,31 @@ pub fn evaluate(ast: &Expr, env: &Env, host: &dyn IoHost) -> Result<Value, MErro
                         force(items[idx].clone(), &mut |e, env| evaluate(e, env, host))
                     }
                 }
-                Value::Record(_) | Value::Table(_) => Err(MError::NotImplemented(
-                    "record/table item access deferred to a later slice",
+                Value::Table(t) => {
+                    let i = expect_number(&idx_v)?;
+                    if i.fract() != 0.0 || i < 0.0 {
+                        return Err(MError::Other(format!(
+                            "table row index must be non-negative integer, got {}",
+                            i
+                        )));
+                    }
+                    let idx = i as usize;
+                    let n_rows = t.batch.num_rows();
+                    if idx >= n_rows {
+                        if *optional {
+                            Ok(Value::Null)
+                        } else {
+                            Err(MError::Other(format!(
+                                "table row index out of bounds: {} (rows {})",
+                                idx, n_rows
+                            )))
+                        }
+                    } else {
+                        stdlib::row_to_record(&t.batch, idx)
+                    }
+                }
+                Value::Record(_) => Err(MError::NotImplemented(
+                    "record item access deferred to a later slice",
                 )),
                 other => Err(MError::TypeMismatch {
                     expected: "list",
@@ -1822,6 +1845,114 @@ mod tests {
                 assert_eq!(vals, vec![11.0, 12.0]);
             }
             other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn text_starts_with_basic() {
+        assert!(matches!(
+            eval_str(r#"Text.StartsWith("hello", "he")"#).unwrap(),
+            Value::Logical(true)
+        ));
+        assert!(matches!(
+            eval_str(r#"Text.StartsWith("hello", "xx")"#).unwrap(),
+            Value::Logical(false)
+        ));
+    }
+
+    #[test]
+    fn number_round_to_digits() {
+        match eval_str("Number.Round(10.503, 2)").unwrap() {
+            Value::Number(n) => assert!((n - 10.5).abs() < 1e-9),
+            other => panic!("expected number, got {:?}", other),
+        }
+        match eval_str("Number.Round(2.7)").unwrap() {
+            Value::Number(n) => assert_eq!(n, 3.0),
+            other => panic!("expected number, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn list_combine_flattens() {
+        match eval_str(r#"List.Combine({{1, 2}, {}, {3}})"#).unwrap() {
+            Value::List(xs) => {
+                let nums: Vec<f64> = xs
+                    .iter()
+                    .map(|v| match v {
+                        Value::Number(n) => *n,
+                        _ => panic!(),
+                    })
+                    .collect();
+                assert_eq!(nums, vec![1.0, 2.0, 3.0]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn date_from_text_iso_and_uk() {
+        match eval_str(r#"Date.FromText("2024-01-15")"#).unwrap() {
+            Value::Date(d) => assert_eq!(d.to_string(), "2024-01-15"),
+            other => panic!("expected date, got {:?}", other),
+        }
+        // DD-MM-YYYY fallback (corpus pattern after Text.Replace).
+        match eval_str(r#"Date.FromText("15-01-2024")"#).unwrap() {
+            Value::Date(d) => assert_eq!(d.to_string(), "2024-01-15"),
+            other => panic!("expected date, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_transform_rows_returns_list() {
+        match eval_str(
+            r#"Table.TransformRows(#table({"n"}, {{1}, {2}, {3}}), each [doubled = [n] * 2])"#,
+        )
+        .unwrap()
+        {
+            Value::List(xs) => assert_eq!(xs.len(), 3),
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_insert_rows_basic() {
+        match eval_str(
+            r#"Table.InsertRows(#table({"a","b"}, {{1,2}}), 1, {[a = 3, b = 4]})"#,
+        )
+        .unwrap()
+        {
+            Value::Table(t) => assert_eq!(t.batch.num_rows(), 2),
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_row_index_returns_record() {
+        match eval_str(r#"#table({"a","b"}, {{1,2},{3,4}}){0}"#).unwrap() {
+            Value::Record(r) => {
+                assert_eq!(r.fields.len(), 2);
+                match &r.fields[0] {
+                    (n, Value::Number(v)) => {
+                        assert_eq!(n, "a");
+                        assert_eq!(*v, 1.0);
+                    }
+                    other => panic!("unexpected: {:?}", other),
+                }
+            }
+            other => panic!("expected record, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_with_date_column_roundtrip() {
+        // #table with Date cells → Date32 column → row_to_record gets Date back.
+        match eval_str(
+            r#"let t = #table({"d"}, {{#date(2024, 1, 15)}}) in t{0}[d]"#,
+        )
+        .unwrap()
+        {
+            Value::Date(d) => assert_eq!(d.to_string(), "2024-01-15"),
+            other => panic!("expected date, got {:?}", other),
         }
     }
 
