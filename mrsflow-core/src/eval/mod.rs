@@ -2752,6 +2752,48 @@ mod tests {
     }
 
     #[test]
+    fn list_remove_first_n_default() {
+        match eval_str("List.RemoveFirstN({1, 2, 3, 4})").unwrap() {
+            Value::List(xs) => {
+                let nums: Vec<f64> = xs.iter().map(|v| match v {
+                    Value::Number(n) => *n,
+                    _ => panic!(),
+                }).collect();
+                assert_eq!(nums, vec![2.0, 3.0, 4.0]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn list_remove_first_n_with_count() {
+        match eval_str("List.RemoveFirstN({1, 2, 3, 4}, 3)").unwrap() {
+            Value::List(xs) => {
+                let nums: Vec<f64> = xs.iter().map(|v| match v {
+                    Value::Number(n) => *n,
+                    _ => panic!(),
+                }).collect();
+                assert_eq!(nums, vec![4.0]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn list_remove_items_basic() {
+        match eval_str("List.RemoveItems({1, 2, 3, 2, 4}, {2, 4})").unwrap() {
+            Value::List(xs) => {
+                let nums: Vec<f64> = xs.iter().map(|v| match v {
+                    Value::Number(n) => *n,
+                    _ => panic!(),
+                }).collect();
+                assert_eq!(nums, vec![1.0, 3.0]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn list_position_of_found() {
         match eval_str("List.PositionOf({\"a\", \"b\", \"c\"}, \"b\")").unwrap() {
             Value::Number(n) => assert_eq!(n, 1.0),

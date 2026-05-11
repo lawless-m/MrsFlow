@@ -216,6 +216,15 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
             ],
             list_position_of,
         ),
+        (
+            "List.RemoveFirstN",
+            vec![
+                Param { name: "list".into(),             optional: false, type_annotation: None },
+                Param { name: "countOrCondition".into(), optional: true,  type_annotation: None },
+            ],
+            list_remove_first_n,
+        ),
+        ("List.RemoveItems", two("list", "list2"), list_remove_items),
         ("List.FirstN", two("list", "countOrCondition"), list_first_n),
         ("List.Skip", two("list", "countOrCondition"), list_skip),
         ("List.Distinct", one("list"), list_distinct),
@@ -685,6 +694,47 @@ fn list_sum(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 fn list_count(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     Ok(Value::Number(list.len() as f64))
+}
+
+fn list_remove_first_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let list = expect_list(&args[0])?;
+    let n = match args.get(1) {
+        Some(Value::Number(n)) => {
+            if !n.is_finite() || *n < 0.0 {
+                return Err(MError::Other(
+                    "List.RemoveFirstN: count must be a non-negative integer".into(),
+                ));
+            }
+            *n as usize
+        }
+        Some(Value::Function(_)) => {
+            return Err(MError::NotImplemented(
+                "List.RemoveFirstN: predicate (skip-while) form not yet supported",
+            ));
+        }
+        Some(Value::Null) | None => 1,
+        Some(other) => return Err(type_mismatch("number or function", other)),
+    };
+    Ok(Value::List(list.iter().skip(n).cloned().collect()))
+}
+
+fn list_remove_items(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let list = expect_list(&args[0])?;
+    let drop = expect_list(&args[1])?;
+    let mut out: Vec<Value> = Vec::with_capacity(list.len());
+    for v in list {
+        let mut keep = true;
+        for d in drop {
+            if values_equal_primitive(v, d)? {
+                keep = false;
+                break;
+            }
+        }
+        if keep {
+            out.push(v.clone());
+        }
+    }
+    Ok(Value::List(out))
 }
 
 fn list_position_of(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
