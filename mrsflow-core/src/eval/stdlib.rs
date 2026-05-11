@@ -168,6 +168,8 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ("List.AllTrue", one("list"), list_all_true),
         ("Record.Field", two("record", "field"), record_field),
         ("Record.FieldNames", one("record"), record_field_names),
+        ("Record.FieldValues", one("record"), record_field_values),
+        ("Record.HasFields", two("record", "fields"), record_has_fields),
         ("Logical.From", one("value"), logical_from),
         ("Logical.FromText", one("text"), logical_from_text),
         ("#table", two("columns", "rows"), table_constructor),
@@ -850,6 +852,41 @@ fn record_field_names(args: &[Value], _host: &dyn IoHost) -> Result<Value, MErro
         .map(|(n, _)| Value::Text(n.clone()))
         .collect();
     Ok(Value::List(names))
+}
+
+fn record_field_values(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+    let record = match &args[0] {
+        Value::Record(r) => r,
+        other => return Err(type_mismatch("record", other)),
+    };
+    let values: Result<Vec<Value>, MError> = record
+        .fields
+        .iter()
+        .map(|(_, v)| super::force(v.clone(), &mut |e, env| super::evaluate(e, env, host)))
+        .collect();
+    Ok(Value::List(values?))
+}
+
+fn record_has_fields(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let record = match &args[0] {
+        Value::Record(r) => r,
+        other => return Err(type_mismatch("record", other)),
+    };
+    let names: Vec<String> = match &args[1] {
+        Value::Text(s) => vec![s.clone()],
+        Value::List(xs) => xs
+            .iter()
+            .map(|v| match v {
+                Value::Text(s) => Ok(s.clone()),
+                other => Err(type_mismatch("text (in list)", other)),
+            })
+            .collect::<Result<_, _>>()?,
+        other => return Err(type_mismatch("text or list of text", other)),
+    };
+    let has_all = names
+        .iter()
+        .all(|n| record.fields.iter().any(|(fname, _)| fname == n));
+    Ok(Value::Logical(has_all))
 }
 
 // --- Logical.* ---

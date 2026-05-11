@@ -1962,6 +1962,43 @@ mod tests {
     }
 
     #[test]
+    fn record_field_values_basic() {
+        match eval_str(r#"Record.FieldValues([a = 1, b = "two", c = true])"#).unwrap() {
+            Value::List(xs) => {
+                assert_eq!(xs.len(), 3);
+                assert!(matches!(xs[0], Value::Number(n) if n == 1.0));
+                assert!(matches!(&xs[1], Value::Text(s) if s == "two"));
+                assert!(matches!(xs[2], Value::Logical(true)));
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn record_has_fields_text_arg() {
+        assert!(matches!(
+            eval_str(r#"Record.HasFields([a = 1, b = 2], "a")"#).unwrap(),
+            Value::Logical(true)
+        ));
+        assert!(matches!(
+            eval_str(r#"Record.HasFields([a = 1], "missing")"#).unwrap(),
+            Value::Logical(false)
+        ));
+    }
+
+    #[test]
+    fn record_has_fields_list_arg_requires_all() {
+        assert!(matches!(
+            eval_str(r#"Record.HasFields([a = 1, b = 2], {"a", "b"})"#).unwrap(),
+            Value::Logical(true)
+        ));
+        assert!(matches!(
+            eval_str(r#"Record.HasFields([a = 1], {"a", "missing"})"#).unwrap(),
+            Value::Logical(false)
+        ));
+    }
+
+    #[test]
     fn list_any_true_non_empty() {
         assert!(matches!(
             eval_str("List.AnyTrue({false, true, false})").unwrap(),
