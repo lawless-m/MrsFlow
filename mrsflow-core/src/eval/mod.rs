@@ -1802,6 +1802,46 @@ mod tests {
     }
 
     #[test]
+    fn table_transform_columns_accepts_single_pair() {
+        // Power Query accepts `{name, fn}` (single pair) AND `{{name, fn}, ...}`.
+        // Corpus dogfood found us only accepting the wrapped form.
+        match eval_str(
+            r#"Table.TransformColumns(#table({"n"}, {{1},{2}}), {"n", each _ + 10})"#,
+        )
+        .unwrap()
+        {
+            Value::Table(t) => {
+                use arrow::array::Float64Array;
+                let col = t
+                    .batch
+                    .column(0)
+                    .as_any()
+                    .downcast_ref::<Float64Array>()
+                    .expect("Float64");
+                let vals: Vec<f64> = (0..col.len()).map(|i| col.value(i)).collect();
+                assert_eq!(vals, vec![11.0, 12.0]);
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn text_trim_end_and_start() {
+        assert!(matches!(
+            eval_str(r#"Text.TrimEnd("hello  ")"#).unwrap(),
+            Value::Text(ref s) if s == "hello"
+        ));
+        assert!(matches!(
+            eval_str(r#"Text.Start("abcdef", 3)"#).unwrap(),
+            Value::Text(ref s) if s == "abc"
+        ));
+        assert!(matches!(
+            eval_str(r#"Text.Start("ab", 10)"#).unwrap(),
+            Value::Text(ref s) if s == "ab"
+        ));
+    }
+
+    #[test]
     fn table_combine_identical_schemas() {
         match eval_str(
             r#"Table.Combine({#table({"a"}, {{1}}), #table({"a"}, {{2}})})"#,

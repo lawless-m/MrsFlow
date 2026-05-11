@@ -92,6 +92,8 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ("Text.Length", one("text"), text_length),
         ("Text.PositionOf", two("text", "substring"), text_position_of),
         ("Text.EndsWith", two("text", "suffix"), text_ends_with),
+        ("Text.TrimEnd", one("text"), text_trim_end),
+        ("Text.Start", two("text", "count"), text_start),
         ("List.Transform", two("list", "transform"), list_transform),
         ("List.Select", two("list", "selection"), list_select),
         ("List.Sum", one("list"), list_sum),
@@ -243,6 +245,23 @@ fn text_ends_with(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     let suffix = expect_text(&args[1])?;
     Ok(Value::Logical(text.ends_with(suffix)))
+}
+
+fn text_trim_end(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let text = expect_text(&args[0])?;
+    Ok(Value::Text(text.trim_end().to_string()))
+}
+
+fn text_start(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let text = expect_text(&args[0])?;
+    let count = match &args[1] {
+        Value::Number(n) => *n as isize,
+        other => return Err(type_mismatch("number", other)),
+    };
+    if count <= 0 {
+        return Ok(Value::Text(String::new()));
+    }
+    Ok(Value::Text(text.chars().take(count as usize).collect()))
 }
 
 fn expect_text(v: &Value) -> Result<&str, MError> {
@@ -1040,6 +1059,14 @@ fn invoke_callback_with_host(
 fn table_transform_column_types(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let transforms = expect_list(&args[1])?;
+    // Auto-wrap single `{name, type}` pair to match Power Query leniency.
+    let owned: Vec<Value>;
+    let transforms: &[Value] = if is_single_col_type_pair(transforms) {
+        owned = vec![Value::List(transforms.to_vec())];
+        &owned
+    } else {
+        transforms
+    };
     // Parse the {col_name, type_value} pairs first; error early on bad shapes.
     let pairs = parse_col_type_pairs(transforms)?;
 
@@ -1134,7 +1161,15 @@ fn type_rep_to_datatype(t: &super::value::TypeRep) -> Result<(DataType, bool), M
 fn table_transform_columns(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let transforms = expect_list(&args[1])?;
-    // Parse {col_name, function} pairs.
+    // Real Power Query accepts both `{name, fn}` (single pair) and
+    // `{{name, fn}, ...}` (list of pairs). Auto-wrap the single-pair form.
+    let owned: Vec<Value>;
+    let transforms: &[Value] = if is_single_col_fn_pair(transforms) {
+        owned = vec![Value::List(transforms.to_vec())];
+        &owned
+    } else {
+        transforms
+    };
     let pairs = parse_col_fn_pairs(transforms)?;
 
     let schema = table.batch.schema();
@@ -1169,6 +1204,14 @@ fn table_transform_columns(args: &[Value], host: &dyn IoHost) -> Result<Value, M
     let new_batch = RecordBatch::try_new(new_schema, new_columns)
         .map_err(|e| MError::Other(format!("Table.TransformColumns: rebuild failed: {}", e)))?;
     Ok(Value::Table(Table { batch: new_batch }))
+}
+
+fn is_single_col_fn_pair(xs: &[Value]) -> bool {
+    xs.len() == 2 && matches!(xs[0], Value::Text(_)) && matches!(xs[1], Value::Function(_))
+}
+
+fn is_single_col_type_pair(xs: &[Value]) -> bool {
+    xs.len() == 2 && matches!(xs[0], Value::Text(_)) && matches!(xs[1], Value::Type(_))
 }
 
 fn parse_col_fn_pairs<'a>(
