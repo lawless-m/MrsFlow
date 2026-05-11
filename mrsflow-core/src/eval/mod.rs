@@ -2940,6 +2940,22 @@ mod tests {
     }
 
     #[test]
+    fn list_average_basic() {
+        match eval_str("List.Average({1, 2, 3, 4})").unwrap() {
+            Value::Number(n) => assert_eq!(n, 2.5),
+            other => panic!("expected number, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn list_average_ignores_nulls() {
+        match eval_str("List.Average({1, null, 3, null, 5})").unwrap() {
+            Value::Number(n) => assert_eq!(n, 3.0),
+            other => panic!("expected number, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn list_zip_equal_length() {
         match eval_str("List.Zip({{1, 2, 3}, {\"a\", \"b\", \"c\"}})").unwrap() {
             Value::List(rows) => {

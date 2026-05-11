@@ -183,6 +183,14 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ("List.Transform", two("list", "transform"), list_transform),
         ("List.Select", two("list", "selection"), list_select),
         ("List.Sum", one("list"), list_sum),
+        (
+            "List.Average",
+            vec![
+                Param { name: "list".into(),      optional: false, type_annotation: None },
+                Param { name: "precision".into(), optional: true,  type_annotation: None },
+            ],
+            list_average,
+        ),
         ("List.Count", one("list"), list_count),
         ("List.Min", one("list"), list_min),
         ("List.Max", one("list"), list_max),
@@ -746,6 +754,27 @@ fn list_sum(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         };
     }
     Ok(Value::Number(total))
+}
+
+fn list_average(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let list = expect_list(&args[0])?;
+    let mut total = 0.0f64;
+    let mut n = 0usize;
+    for v in list {
+        match v {
+            Value::Null => continue,
+            Value::Number(x) => {
+                total += x;
+                n += 1;
+            }
+            other => return Err(type_mismatch("number (in list)", other)),
+        }
+    }
+    if n == 0 {
+        Ok(Value::Null)
+    } else {
+        Ok(Value::Number(total / n as f64))
+    }
 }
 
 fn list_count(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
