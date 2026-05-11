@@ -1605,6 +1605,77 @@ mod tests {
         assert_eq!(eval_number(r#"try error "outer" otherwise 7"#), 7.0);
     }
 
+    // --- chrono / date / datetime / duration (eval-7b) ---
+
+    #[test]
+    fn date_constructor_basic() {
+        match eval_str("#date(2024, 1, 15)").unwrap() {
+            Value::Date(d) => {
+                use chrono::Datelike;
+                assert_eq!((d.year(), d.month(), d.day()), (2024, 1, 15));
+            }
+            other => panic!("expected date, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn date_invalid_errors() {
+        match eval_str("#date(2024, 13, 1)") {
+            Err(MError::Other(msg)) => assert!(msg.contains("invalid date"), "got: {}", msg),
+            other => panic!("expected error, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn datetime_constructor_basic() {
+        match eval_str("#datetime(2024, 1, 15, 12, 30, 0)").unwrap() {
+            Value::Datetime(dt) => {
+                use chrono::{Datelike, Timelike};
+                assert_eq!((dt.year(), dt.month(), dt.day()), (2024, 1, 15));
+                assert_eq!((dt.hour(), dt.minute(), dt.second()), (12, 30, 0));
+            }
+            other => panic!("expected datetime, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn duration_constructor_basic() {
+        match eval_str("#duration(1, 0, 0, 0)").unwrap() {
+            Value::Duration(d) => assert_eq!(d.num_seconds(), 86400),
+            other => panic!("expected duration, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn duration_mixed_units() {
+        match eval_str("#duration(0, 1, 30, 0)").unwrap() {
+            Value::Duration(d) => assert_eq!(d.num_seconds(), 3600 + 1800),
+            other => panic!("expected duration, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn date_is_date_type() {
+        assert_eq!(eval_bool("#date(2024, 1, 15) is date"), true);
+        assert_eq!(eval_bool("#date(2024, 1, 15) is datetime"), false);
+    }
+
+    #[test]
+    fn datetime_is_datetime_type() {
+        assert_eq!(eval_bool("#datetime(2024, 1, 15, 0, 0, 0) is datetime"), true);
+        assert_eq!(eval_bool("#datetime(2024, 1, 15, 0, 0, 0) is date"), false);
+    }
+
+    #[test]
+    fn duration_is_duration_type() {
+        assert_eq!(eval_bool("#duration(1, 0, 0, 0) is duration"), true);
+    }
+
+    #[test]
+    fn null_is_nullable_date() {
+        assert_eq!(eval_bool("null is nullable date"), true);
+    }
+
     // --- Tables (eval-7a) ---
 
     #[test]

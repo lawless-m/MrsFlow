@@ -105,6 +105,33 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ("Table.ColumnNames", one("table"), table_column_names),
         ("Table.RenameColumns", two("table", "renames"), table_rename_columns),
         ("Table.RemoveColumns", two("table", "names"), table_remove_columns),
+        (
+            "#date",
+            three("year", "month", "day"),
+            date_constructor,
+        ),
+        (
+            "#datetime",
+            vec![
+                Param { name: "year".into(),   optional: false, type_annotation: None },
+                Param { name: "month".into(),  optional: false, type_annotation: None },
+                Param { name: "day".into(),    optional: false, type_annotation: None },
+                Param { name: "hour".into(),   optional: false, type_annotation: None },
+                Param { name: "minute".into(), optional: false, type_annotation: None },
+                Param { name: "second".into(), optional: false, type_annotation: None },
+            ],
+            datetime_constructor,
+        ),
+        (
+            "#duration",
+            vec![
+                Param { name: "days".into(),    optional: false, type_annotation: None },
+                Param { name: "hours".into(),   optional: false, type_annotation: None },
+                Param { name: "minutes".into(), optional: false, type_annotation: None },
+                Param { name: "seconds".into(), optional: false, type_annotation: None },
+            ],
+            duration_constructor,
+        ),
     ]
 }
 
@@ -710,5 +737,59 @@ pub fn cell_to_value(batch: &RecordBatch, col: usize, row: usize) -> Result<Valu
             }
             _ => "unsupported cell type",
         })),
+    }
+}
+
+// --- chrono constructors (eval-7b) ---
+//
+// #date(y,m,d), #datetime(y,m,d,h,m,s), #duration(d,h,m,s). All operands
+// must be whole-numbered f64s; non-integer or out-of-range values error.
+
+fn date_constructor(args: &[Value]) -> Result<Value, MError> {
+    let y = expect_int(&args[0], "#date: year")?;
+    let mo = expect_int(&args[1], "#date: month")?;
+    let d = expect_int(&args[2], "#date: day")?;
+    chrono::NaiveDate::from_ymd_opt(y as i32, mo as u32, d as u32)
+        .map(Value::Date)
+        .ok_or_else(|| MError::Other(format!("#date: invalid date {}-{:02}-{:02}", y, mo, d)))
+}
+
+fn datetime_constructor(args: &[Value]) -> Result<Value, MError> {
+    let y = expect_int(&args[0], "#datetime: year")?;
+    let mo = expect_int(&args[1], "#datetime: month")?;
+    let d = expect_int(&args[2], "#datetime: day")?;
+    let h = expect_int(&args[3], "#datetime: hour")?;
+    let mn = expect_int(&args[4], "#datetime: minute")?;
+    let s = expect_int(&args[5], "#datetime: second")?;
+    let date = chrono::NaiveDate::from_ymd_opt(y as i32, mo as u32, d as u32)
+        .ok_or_else(|| MError::Other(format!("#datetime: invalid date {}-{:02}-{:02}", y, mo, d)))?;
+    let time = chrono::NaiveTime::from_hms_opt(h as u32, mn as u32, s as u32)
+        .ok_or_else(|| MError::Other(format!("#datetime: invalid time {:02}:{:02}:{:02}", h, mn, s)))?;
+    Ok(Value::Datetime(chrono::NaiveDateTime::new(date, time)))
+}
+
+fn duration_constructor(args: &[Value]) -> Result<Value, MError> {
+    let d = expect_int(&args[0], "#duration: days")?;
+    let h = expect_int(&args[1], "#duration: hours")?;
+    let mn = expect_int(&args[2], "#duration: minutes")?;
+    let s = expect_int(&args[3], "#duration: seconds")?;
+    let total = d
+        .checked_mul(86400)
+        .and_then(|x| x.checked_add(h.checked_mul(3600)?))
+        .and_then(|x| x.checked_add(mn.checked_mul(60)?))
+        .and_then(|x| x.checked_add(s))
+        .ok_or_else(|| MError::Other("#duration: overflow".into()))?;
+    Ok(Value::Duration(chrono::Duration::seconds(total)))
+}
+
+fn expect_int(v: &Value, ctx: &str) -> Result<i64, MError> {
+    match v {
+        Value::Number(n) => {
+            if n.fract() != 0.0 {
+                return Err(MError::Other(format!("{}: not an integer: {}", ctx, n)));
+            }
+            Ok(*n as i64)
+        }
+        other => Err(type_mismatch("number", other)),
     }
 }

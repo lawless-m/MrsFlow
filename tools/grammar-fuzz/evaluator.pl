@@ -451,9 +451,9 @@ type_conforms(null,          type_prim(null))        :- !.
 type_conforms(bool(_),       type_prim(logical)).
 type_conforms(num(_),        type_prim(number)).
 type_conforms(text(_),       type_prim(text)).
-type_conforms(date(_),       type_prim(date)).
-type_conforms(datetime(_),   type_prim(datetime)).
-type_conforms(duration(_),   type_prim(duration)).
+type_conforms(date(_,_,_),         type_prim(date)).
+type_conforms(datetime(_,_,_,_,_,_), type_prim(datetime)).
+type_conforms(duration(_),         type_prim(duration)).
 type_conforms(binary(_),     type_prim(binary)).
 type_conforms(list(_),       type_prim(list)).
 type_conforms(record(_),     type_prim(record)).
@@ -525,6 +525,17 @@ root_env([frame(Bindings)]) :-
         ['T','a','b','l','e','.','R','e','m','o','v','e','C','o','l','u','m','n','s']
             - closure([param([t], req, none), param([n], req, none)],
                        builtin('Table.RemoveColumns'), []),
+        ['#','d','a','t','e']
+            - closure([param([y], req, none), param([m], req, none), param([d], req, none)],
+                       builtin('#date'), []),
+        ['#','d','a','t','e','t','i','m','e']
+            - closure([param([y], req, none), param([mo], req, none), param([d], req, none),
+                       param([h], req, none), param([mi], req, none), param([s], req, none)],
+                       builtin('#datetime'), []),
+        ['#','d','u','r','a','t','i','o','n']
+            - closure([param([d], req, none), param([h], req, none),
+                       param([mi], req, none), param([s], req, none)],
+                       builtin('#duration'), []),
         ['#','n','a','n']      - num('NaN'),
         ['#','i','n','f','i','n','i','t','y'] - num(inf)
     ].
@@ -796,6 +807,42 @@ filter_rows_by_indices([Row | Rest], Indices, [NewRow | RestNew]) :-
     filter_by_indices(Row, Indices, NewRow),
     filter_rows_by_indices(Rest, Indices, RestNew).
 
+% --- chrono constructors (eval-7b) ---
+
+% #date(year, month, day) — basic validation; full leap-year logic isn't
+% needed since the differential cases only use valid dates.
+eval_builtin('#date', [num(Y), num(M), num(D)], date(YI, MI, DI)) :-
+    YI is truncate(Y), Y =:= YI,
+    MI is truncate(M), M =:= MI,
+    DI is truncate(D), D =:= DI,
+    MI >= 1, MI =< 12,
+    DI >= 1, DI =< 31.
+
+eval_builtin('#datetime',
+             [num(Y), num(Mo), num(D), num(H), num(Mi), num(S)],
+             datetime(YI, MoI, DI, HI, MiI, SI)) :-
+    YI  is truncate(Y),  Y  =:= YI,
+    MoI is truncate(Mo), Mo =:= MoI,
+    DI  is truncate(D),  D  =:= DI,
+    HI  is truncate(H),  H  =:= HI,
+    MiI is truncate(Mi), Mi =:= MiI,
+    SI  is truncate(S),  S  =:= SI,
+    MoI >= 1, MoI =< 12,
+    DI  >= 1, DI  =< 31,
+    HI  >= 0, HI  =< 23,
+    MiI >= 0, MiI =< 59,
+    SI  >= 0, SI  =< 59.
+
+eval_builtin('#duration',
+             [num(D), num(H), num(Mi), num(S)],
+             duration(F)) :-
+    DI  is truncate(D),  D  =:= DI,
+    HI  is truncate(H),  H  =:= HI,
+    MiI is truncate(Mi), Mi =:= MiI,
+    SI  is truncate(S),  S  =:= SI,
+    Total is DI * 86400 + HI * 3600 + MiI * 60 + SI,
+    F is float(Total).
+
 % Helper: invoke a closure value with a forced-args list. Used by
 % List.Transform / List.Select; mirrors the dispatch logic in eval(invoke,...).
 invoke_closure(closure(Params, Body, CEnv), Args, Value) :-
@@ -912,18 +959,15 @@ print_value(text(Cs)) :-
     format("(text ", []),
     eval_print_quoted(Cs),
     format(")", []).
-print_value(date(Cs)) :-
-    format("(date ", []),
-    eval_print_quoted(Cs),
-    format(")", []).
-print_value(datetime(Cs)) :-
-    format("(datetime ", []),
-    eval_print_quoted(Cs),
-    format(")", []).
-print_value(duration(Cs)) :-
-    format("(duration ", []),
-    eval_print_quoted(Cs),
-    format(")", []).
+% Date/datetime/duration — bare-number canonical forms matching Rust's
+% value_dump output exactly. Year/month/etc. unpadded, duration as a
+% total-seconds float (same {:?}-style formatting as Value::Number).
+print_value(date(Y, M, D)) :-
+    format("(date ~w ~w ~w)", [Y, M, D]).
+print_value(datetime(Y, M, D, H, Mn, S)) :-
+    format("(datetime ~w ~w ~w ~w ~w ~w)", [Y, M, D, H, Mn, S]).
+print_value(duration(S)) :-
+    format("(duration ~w)", [S]).
 print_value(binary(_Bytes)) :-
     % Slice-when-needed will define a canonical hex form.
     format("(binary ...)", []).

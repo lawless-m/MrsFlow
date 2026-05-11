@@ -12,6 +12,7 @@ workspace = true
 [dependencies]
 unicode-general-category = "1"
 arrow = { version = "53", default-features = false }
+chrono = { version = "0.4", default-features = false, features = ["alloc"] }
 
 [dev-dependencies]
 insta = "1"

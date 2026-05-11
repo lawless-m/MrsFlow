@@ -73,20 +73,33 @@ fn write_value(out: &mut String, v: &Value) {
             write_quoted(out, s);
             out.push(')');
         }
-        Value::Date(s) => {
-            out.push_str("(date ");
-            write_quoted(out, s);
-            out.push(')');
+        Value::Date(d) => {
+            // Bare-number form so the Prolog mirror can match cheaply.
+            // Months/days unpadded.
+            use chrono::Datelike;
+            out.push_str(&format!(
+                "(date {} {} {})",
+                d.year(),
+                d.month(),
+                d.day()
+            ));
         }
-        Value::Datetime(s) => {
-            out.push_str("(datetime ");
-            write_quoted(out, s);
-            out.push(')');
+        Value::Datetime(dt) => {
+            use chrono::{Datelike, Timelike};
+            out.push_str(&format!(
+                "(datetime {} {} {} {} {} {})",
+                dt.year(),
+                dt.month(),
+                dt.day(),
+                dt.hour(),
+                dt.minute(),
+                dt.second()
+            ));
         }
-        Value::Duration(s) => {
-            out.push_str("(duration ");
-            write_quoted(out, s);
-            out.push(')');
+        Value::Duration(dur) => {
+            // Total seconds as f64 to match the num-formatting convention.
+            let s = dur.num_seconds() as f64;
+            out.push_str(&format!("(duration {:?})", s));
         }
         Value::Binary(_) => out.push_str("(binary ...)"),
         Value::List(items) => {

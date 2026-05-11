@@ -146,3 +146,12 @@ Table.ColumnNames(#table({"a", "b"}, {}))
 Table.RenameColumns(#table({"a", "b"}, {{1, 2}}), {{"a", "x"}})
 Table.RemoveColumns(#table({"a", "b"}, {{1, 2}}), {"a"})
 #table({"name", "age"}, {{"alice", 30}, {"bob", 25}})
+#date(2024, 1, 15)
+#datetime(2024, 1, 15, 12, 30, 0)
+#duration(1, 0, 0, 0)
+#duration(0, 1, 30, 0)
+#date(2024, 1, 15) is date
+#datetime(2024, 1, 15, 12, 0, 0) is datetime
+#duration(1, 0, 0, 0) is duration
+#date(2024, 1, 15) is datetime
+null is nullable date

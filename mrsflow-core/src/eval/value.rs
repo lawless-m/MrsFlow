@@ -20,12 +20,11 @@ pub enum Value {
     Logical(bool),
     Number(f64),
     Text(String),
-    /// Placeholder — `chrono::NaiveDate` when the date slice lands.
-    Date(String),
-    /// Placeholder — `chrono::NaiveDateTime` (and a tz variant) when the date slice lands.
-    Datetime(String),
-    /// Placeholder — `chrono::Duration` when the date slice lands.
-    Duration(String),
+    Date(chrono::NaiveDate),
+    /// Naive (timezone-less) datetime. A tz-bearing `Datetimezone` variant
+    /// can land later if the corpus calls for it.
+    Datetime(chrono::NaiveDateTime),
+    Duration(chrono::Duration),
     Binary(Vec<u8>),
     List(Vec<Value>),
     /// Records preserve insertion order per spec — `Vec` not `HashMap`.
