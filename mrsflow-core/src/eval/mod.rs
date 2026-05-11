@@ -1962,6 +1962,40 @@ mod tests {
     }
 
     #[test]
+    fn list_distinct_numbers() {
+        match eval_str("List.Distinct({1, 2, 2, 3, 1, 4})").unwrap() {
+            Value::List(xs) => {
+                let nums: Vec<f64> = xs
+                    .iter()
+                    .map(|v| match v {
+                        Value::Number(n) => *n,
+                        _ => panic!(),
+                    })
+                    .collect();
+                assert_eq!(nums, vec![1.0, 2.0, 3.0, 4.0]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn list_distinct_text() {
+        match eval_str(r#"List.Distinct({"a", "b", "a", "c", "b"})"#).unwrap() {
+            Value::List(xs) => {
+                let strs: Vec<String> = xs
+                    .iter()
+                    .map(|v| match v {
+                        Value::Text(s) => s.clone(),
+                        _ => panic!(),
+                    })
+                    .collect();
+                assert_eq!(strs, vec!["a", "b", "c"]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn list_first_n_count() {
         match eval_str("List.FirstN({10, 20, 30, 40}, 2)").unwrap() {
             Value::List(xs) => {

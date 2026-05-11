@@ -158,6 +158,7 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ("List.Reverse", one("list"), list_reverse),
         ("List.FirstN", two("list", "countOrCondition"), list_first_n),
         ("List.Skip", two("list", "countOrCondition"), list_skip),
+        ("List.Distinct", one("list"), list_distinct),
         ("Record.Field", two("record", "field"), record_field),
         ("Record.FieldNames", one("record"), record_field_names),
         ("Logical.From", one("value"), logical_from),
@@ -628,6 +629,59 @@ fn list_first_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         other => return Err(type_mismatch("non-negative integer", other)),
     };
     Ok(Value::List(list.iter().take(count).cloned().collect()))
+}
+
+/// Structural equality for primitive cell types only — number, text, logical,
+/// null, date, datetime, duration. Compound values (list/record/table/function/
+/// type/thunk/binary) error out; the caller wraps the error.
+pub(super) fn values_equal_primitive(a: &Value, b: &Value) -> Result<bool, MError> {
+    match (a, b) {
+        (Value::Null, Value::Null) => Ok(true),
+        (Value::Logical(x), Value::Logical(y)) => Ok(x == y),
+        (Value::Number(x), Value::Number(y)) => Ok(x == y),
+        (Value::Text(x), Value::Text(y)) => Ok(x == y),
+        (Value::Date(x), Value::Date(y)) => Ok(x == y),
+        (Value::Datetime(x), Value::Datetime(y)) => Ok(x == y),
+        (Value::Duration(x), Value::Duration(y)) => Ok(x == y),
+        // Different primitive variants are not equal — null vs non-null included.
+        (
+            Value::Null
+            | Value::Logical(_)
+            | Value::Number(_)
+            | Value::Text(_)
+            | Value::Date(_)
+            | Value::Datetime(_)
+            | Value::Duration(_),
+            Value::Null
+            | Value::Logical(_)
+            | Value::Number(_)
+            | Value::Text(_)
+            | Value::Date(_)
+            | Value::Datetime(_)
+            | Value::Duration(_),
+        ) => Ok(false),
+        _ => Err(MError::NotImplemented(
+            "equality on compound values (list/record/table/etc.) deferred",
+        )),
+    }
+}
+
+fn list_distinct(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let list = expect_list(&args[0])?;
+    let mut out: Vec<Value> = Vec::with_capacity(list.len());
+    for v in list {
+        let mut seen = false;
+        for kept in &out {
+            if values_equal_primitive(kept, v)? {
+                seen = true;
+                break;
+            }
+        }
+        if !seen {
+            out.push(v.clone());
+        }
+    }
+    Ok(Value::List(out))
 }
 
 fn list_skip(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
