@@ -1960,6 +1960,87 @@ mod tests {
     // --- het-cell unlocked: nested-cell expand ops ---
 
     #[test]
+    fn table_nested_join_inner() {
+        let src = r#"
+            let
+                customers = #table({"id", "name"}, {{1, "Alice"}, {2, "Bob"}, {3, "Carol"}}),
+                orders = #table({"cid", "amt"}, {{1, 100}, {1, 50}, {2, 200}})
+            in Table.NestedJoin(customers, "id", orders, "cid", "Orders", JoinKind.Inner)
+        "#;
+        match eval_str(src).unwrap() {
+            Value::Table(t) => {
+                // Carol (no matching orders) drops out → 2 rows.
+                assert_eq!(t.num_rows(), 2);
+                assert_eq!(t.column_names(), vec!["id", "name", "Orders"]);
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_nested_join_left_outer_with_match() {
+        let src = r#"
+            let
+                customers = #table({"id"}, {{1}, {2}}),
+                orders = #table({"cid", "amt"}, {{1, 100}})
+            in Table.NestedJoin(customers, "id", orders, "cid", "Orders", JoinKind.LeftOuter)
+        "#;
+        match eval_str(src).unwrap() {
+            Value::Table(t) => {
+                assert_eq!(t.num_rows(), 2);
+                // Row 0 (id=1) has nested orders with 1 row.
+                let r0 = match super::stdlib::row_to_record(&t, 0).unwrap() {
+                    Value::Record(r) => r,
+                    other => panic!("expected record, got {:?}", other),
+                };
+                let orders_cell = &r0
+                    .fields
+                    .iter()
+                    .find(|(n, _)| n == "Orders")
+                    .unwrap()
+                    .1;
+                match orders_cell {
+                    Value::Table(inner) => assert_eq!(inner.num_rows(), 1),
+                    other => panic!("expected table cell, got {:?}", other),
+                }
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_nested_join_left_outer_no_match() {
+        // Default joinKind is LeftOuter; left rows without matches keep an
+        // empty nested table.
+        let src = r#"
+            let
+                customers = #table({"id"}, {{1}, {2}}),
+                orders = #table({"cid", "amt"}, {{99, 100}})
+            in Table.NestedJoin(customers, "id", orders, "cid", "Orders")
+        "#;
+        match eval_str(src).unwrap() {
+            Value::Table(t) => {
+                assert_eq!(t.num_rows(), 2);
+                let r0 = match super::stdlib::row_to_record(&t, 0).unwrap() {
+                    Value::Record(r) => r,
+                    other => panic!("expected record, got {:?}", other),
+                };
+                let orders_cell = &r0
+                    .fields
+                    .iter()
+                    .find(|(n, _)| n == "Orders")
+                    .unwrap()
+                    .1;
+                match orders_cell {
+                    Value::Table(inner) => assert_eq!(inner.num_rows(), 0),
+                    other => panic!("expected table cell, got {:?}", other),
+                }
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn table_expand_table_column_basic() {
         let src = r#"
             let

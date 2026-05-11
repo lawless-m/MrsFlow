@@ -68,6 +68,18 @@ pub fn root_env() -> Env {
     ] {
         env = env.extend(name.to_string(), Value::Type(tr));
     }
+
+    // JoinKind enum constants — numeric per Power Query M spec.
+    for (name, n) in [
+        ("JoinKind.Inner",      0.0),
+        ("JoinKind.LeftOuter",  1.0),
+        ("JoinKind.RightOuter", 2.0),
+        ("JoinKind.FullOuter",  3.0),
+        ("JoinKind.LeftAnti",   4.0),
+        ("JoinKind.RightAnti",  5.0),
+    ] {
+        env = env.extend(name.to_string(), Value::Number(n));
+    }
     env
 }
 
@@ -288,6 +300,18 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "newColumnNames".into(), optional: true,  type_annotation: None },
             ],
             table_expand_table_column,
+        ),
+        (
+            "Table.NestedJoin",
+            vec![
+                Param { name: "table1".into(),        optional: false, type_annotation: None },
+                Param { name: "key1".into(),          optional: false, type_annotation: None },
+                Param { name: "table2".into(),        optional: false, type_annotation: None },
+                Param { name: "key2".into(),          optional: false, type_annotation: None },
+                Param { name: "newColumnName".into(), optional: false, type_annotation: None },
+                Param { name: "joinKind".into(),      optional: true,  type_annotation: None },
+            ],
+            table_nested_join,
         ),
         ("Table.ReorderColumns", two("table", "columnOrder"), table_reorder_columns),
         ("Table.TransformRows", two("table", "transform"), table_transform_rows),
@@ -2310,6 +2334,95 @@ fn table_expand_table_column(args: &[Value], _host: &dyn IoHost) -> Result<Value
             }
         }
     }
+    Ok(Value::Table(values_to_table(&out_names, &out_rows)?))
+}
+
+fn table_nested_join(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table1 = expect_table(&args[0])?;
+    let key1 = match &args[1] {
+        Value::Text(s) => s.clone(),
+        Value::List(_) => {
+            return Err(MError::NotImplemented(
+                "Table.NestedJoin: composite keys (text-list form) not yet supported",
+            ));
+        }
+        other => return Err(type_mismatch("text", other)),
+    };
+    let table2 = expect_table(&args[2])?;
+    let key2 = match &args[3] {
+        Value::Text(s) => s.clone(),
+        Value::List(_) => {
+            return Err(MError::NotImplemented(
+                "Table.NestedJoin: composite keys (text-list form) not yet supported",
+            ));
+        }
+        other => return Err(type_mismatch("text", other)),
+    };
+    let new_column_name = expect_text(&args[4])?.to_string();
+    // joinKind: 0=Inner, 1=LeftOuter, 2=RightOuter, 3=FullOuter, 4=LeftAnti, 5=RightAnti
+    let join_kind = match args.get(5) {
+        Some(Value::Number(n)) if n.fract() == 0.0 => *n as i32,
+        Some(Value::Null) | None => 1, // default: LeftOuter
+        Some(other) => return Err(type_mismatch("number (JoinKind)", other)),
+    };
+    if !matches!(join_kind, 0 | 1) {
+        return Err(MError::NotImplemented(
+            "Table.NestedJoin: only Inner (0) and LeftOuter (1) join kinds supported",
+        ));
+    }
+
+    let (left_names, left_rows) = table_to_rows(table1)?;
+    let (right_names, right_rows) = table_to_rows(table2)?;
+
+    let key1_idx = left_names.iter().position(|n| n == &key1).ok_or_else(|| {
+        MError::Other(format!(
+            "Table.NestedJoin: key1 column not found: {}",
+            key1
+        ))
+    })?;
+    let key2_idx = right_names.iter().position(|n| n == &key2).ok_or_else(|| {
+        MError::Other(format!(
+            "Table.NestedJoin: key2 column not found: {}",
+            key2
+        ))
+    })?;
+
+    // Linear-scan match (O(n*m), fine for corpus-scale tables — no Hash on
+    // Value yet, and primitive-only equality keeps the code simple).
+    let mut out_names: Vec<String> = left_names.clone();
+    out_names.push(new_column_name);
+    let mut out_rows: Vec<Vec<Value>> = Vec::with_capacity(left_rows.len());
+
+    for left_row in &left_rows {
+        let lkey = &left_row[key1_idx];
+        let mut matched: Vec<Vec<Value>> = Vec::new();
+        for right_row in &right_rows {
+            if values_equal_primitive(lkey, &right_row[key2_idx])? {
+                matched.push(right_row.clone());
+            }
+        }
+        let inner_table =
+            Table::from_rows(right_names.clone(), matched.clone());
+        match join_kind {
+            0 => {
+                // Inner: drop left rows with no matches.
+                if matched.is_empty() {
+                    continue;
+                }
+                let mut new_row = left_row.clone();
+                new_row.push(Value::Table(inner_table));
+                out_rows.push(new_row);
+            }
+            1 => {
+                // LeftOuter: keep every left row, even with empty nested table.
+                let mut new_row = left_row.clone();
+                new_row.push(Value::Table(inner_table));
+                out_rows.push(new_row);
+            }
+            _ => unreachable!(),
+        }
+    }
+
     Ok(Value::Table(values_to_table(&out_names, &out_rows)?))
 }
 
