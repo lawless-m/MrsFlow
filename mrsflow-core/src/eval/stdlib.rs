@@ -159,6 +159,11 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ("List.FirstN", two("list", "countOrCondition"), list_first_n),
         ("List.Skip", two("list", "countOrCondition"), list_skip),
         ("List.Distinct", one("list"), list_distinct),
+        (
+            "List.RemoveMatchingItems",
+            two("list", "items"),
+            list_remove_matching_items,
+        ),
         ("Record.Field", two("record", "field"), record_field),
         ("Record.FieldNames", one("record"), record_field_names),
         ("Logical.From", one("value"), logical_from),
@@ -664,6 +669,25 @@ pub(super) fn values_equal_primitive(a: &Value, b: &Value) -> Result<bool, MErro
             "equality on compound values (list/record/table/etc.) deferred",
         )),
     }
+}
+
+fn list_remove_matching_items(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let list = expect_list(&args[0])?;
+    let items = expect_list(&args[1])?;
+    let mut out: Vec<Value> = Vec::with_capacity(list.len());
+    for v in list {
+        let mut drop = false;
+        for x in items {
+            if values_equal_primitive(v, x)? {
+                drop = true;
+                break;
+            }
+        }
+        if !drop {
+            out.push(v.clone());
+        }
+    }
+    Ok(Value::List(out))
 }
 
 fn list_distinct(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {

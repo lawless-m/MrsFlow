@@ -1962,6 +1962,43 @@ mod tests {
     }
 
     #[test]
+    fn list_remove_matching_items_numbers() {
+        match eval_str("List.RemoveMatchingItems({1, 2, 3, 2, 4}, {2, 4})").unwrap() {
+            Value::List(xs) => {
+                let nums: Vec<f64> = xs
+                    .iter()
+                    .map(|v| match v {
+                        Value::Number(n) => *n,
+                        _ => panic!(),
+                    })
+                    .collect();
+                assert_eq!(nums, vec![1.0, 3.0]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn list_remove_matching_items_blanks() {
+        // Corpus pattern from Reforecast: drop "" and null entries.
+        match eval_str(r#"List.RemoveMatchingItems({"a", "", "b", null, "c"}, {"", null})"#)
+            .unwrap()
+        {
+            Value::List(xs) => {
+                let strs: Vec<String> = xs
+                    .iter()
+                    .map(|v| match v {
+                        Value::Text(s) => s.clone(),
+                        _ => panic!(),
+                    })
+                    .collect();
+                assert_eq!(strs, vec!["a", "b", "c"]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn list_distinct_numbers() {
         match eval_str("List.Distinct({1, 2, 2, 3, 1, 4})").unwrap() {
             Value::List(xs) => {
