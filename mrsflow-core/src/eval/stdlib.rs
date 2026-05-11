@@ -12,8 +12,8 @@
 use std::sync::Arc;
 
 use arrow::array::{
-    Array, ArrayRef, BooleanArray, Date32Array, Float64Array, NullArray, StringArray,
-    TimestampMicrosecondArray,
+    Array, ArrayRef, BooleanArray, Date32Array, DurationMicrosecondArray, Float64Array,
+    NullArray, StringArray, TimestampMicrosecondArray,
 };
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
@@ -922,9 +922,12 @@ pub(crate) fn infer_cells(cells: &[&Value]) -> Result<(DataType, ArrayRef), MErr
                 kind = Some("datetime");
                 break;
             }
+            Value::Duration(_) => {
+                kind = Some("duration");
+                break;
+            }
             other => {
                 return Err(MError::NotImplemented(match other {
-                    Value::Duration(_) => "duration cells (deferred)",
                     Value::Binary(_) => "binary cells (deferred)",
                     _ => "non-primitive cell type (deferred)",
                 }));
@@ -1014,6 +1017,26 @@ pub(crate) fn infer_cells(cells: &[&Value]) -> Result<(DataType, ArrayRef), MErr
                 Arc::new(TimestampMicrosecondArray::from(values)),
             ))
         }
+        Some("duration") => {
+            // Duration(Microsecond): i64 microseconds.
+            let values: Vec<Option<i64>> = cells
+                .iter()
+                .map(|v| match v {
+                    Value::Null => Ok(None),
+                    Value::Duration(d) => d.num_microseconds().map(Some).ok_or_else(|| {
+                        MError::Other(format!("duration overflows i64 microseconds: {:?}", d))
+                    }),
+                    other => Err(MError::Other(format!(
+                        "column: mixed types: duration + {}",
+                        super::type_name(other)
+                    ))),
+                })
+                .collect::<Result<_, _>>()?;
+            Ok((
+                DataType::Duration(arrow::datatypes::TimeUnit::Microsecond),
+                Arc::new(DurationMicrosecondArray::from(values)),
+            ))
+        }
         _ => unreachable!(),
     }
 }
@@ -1067,6 +1090,14 @@ pub fn cell_to_value(batch: &RecordBatch, col: usize, row: usize) -> Result<Valu
                 .ok_or_else(|| MError::Other(format!("Timestamp out of range: {} us", micros)))?
                 .naive_utc();
             Ok(Value::Datetime(dt))
+        }
+        DataType::Duration(arrow::datatypes::TimeUnit::Microsecond) => {
+            let a = array
+                .as_any()
+                .downcast_ref::<DurationMicrosecondArray>()
+                .expect("DurationMicrosecond");
+            let micros = a.value(row);
+            Ok(Value::Duration(chrono::Duration::microseconds(micros)))
         }
         other => Err(MError::NotImplemented(match other {
             DataType::Date64 | DataType::Timestamp(_, _) => {

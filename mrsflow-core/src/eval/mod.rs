@@ -2093,6 +2093,21 @@ mod tests {
     }
 
     #[test]
+    fn table_with_duration_column_roundtrip() {
+        // #duration(1, 2, 3, 4) = 1d 2h 3m 4s = 93784 seconds = 93784000000 us
+        match eval_str(
+            r#"let t = #table({"d"}, {{#duration(1, 2, 3, 4)}}) in t{0}[d]"#,
+        )
+        .unwrap()
+        {
+            Value::Duration(d) => {
+                assert_eq!(d.num_microseconds(), Some(93_784_000_000));
+            }
+            other => panic!("expected duration, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn table_with_datetime_column_roundtrip() {
         // #table with Datetime cells → Timestamp(us) column → row_to_record gets Datetime back.
         match eval_str(
