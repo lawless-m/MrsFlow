@@ -1957,6 +1957,151 @@ mod tests {
         }
     }
 
+    // --- het-cell slice 3: ops dispatch on TableRepr ---
+
+    fn rows_backed_two_col_table() -> &'static str {
+        // Helper M expression: a Rows-backed table (mixed text+number column).
+        r#"#table({"name", "val"}, {{"a", 1}, {"b", "x"}, {"c", 3}})"#
+    }
+
+    #[test]
+    fn rows_backed_select_columns() {
+        let src = format!("Table.SelectColumns({}, {{\"val\"}})", rows_backed_two_col_table());
+        match eval_str(&src).unwrap() {
+            Value::Table(t) => {
+                assert!(matches!(t.repr, super::TableRepr::Rows { .. }));
+                assert_eq!(t.column_names(), vec!["val".to_string()]);
+                assert_eq!(t.num_rows(), 3);
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn rows_backed_remove_columns() {
+        let src = format!(
+            "Table.RemoveColumns({}, {{\"name\"}})",
+            rows_backed_two_col_table()
+        );
+        match eval_str(&src).unwrap() {
+            Value::Table(t) => {
+                assert_eq!(t.column_names(), vec!["val".to_string()]);
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn rows_backed_rename_columns() {
+        let src = format!(
+            "Table.RenameColumns({}, {{{{\"name\", \"k\"}}, {{\"val\", \"v\"}}}})",
+            rows_backed_two_col_table()
+        );
+        match eval_str(&src).unwrap() {
+            Value::Table(t) => {
+                assert_eq!(t.column_names(), vec!["k".to_string(), "v".to_string()]);
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn rows_backed_select_rows_predicate() {
+        let src = format!(
+            "Table.SelectRows({}, each [name] = \"b\")",
+            rows_backed_two_col_table()
+        );
+        match eval_str(&src).unwrap() {
+            Value::Table(t) => {
+                assert_eq!(t.num_rows(), 1);
+                assert!(matches!(t.repr, super::TableRepr::Rows { .. }));
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn rows_backed_add_column() {
+        let src = format!(
+            "Table.AddColumn({}, \"len\", each Text.From([val]))",
+            rows_backed_two_col_table()
+        );
+        match eval_str(&src).unwrap() {
+            Value::Table(t) => {
+                assert_eq!(t.column_names(), vec!["name", "val", "len"]);
+                assert_eq!(t.num_rows(), 3);
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn combine_arrow_arrow_same_schema_stays_arrow() {
+        match eval_str(
+            r#"Table.Combine({#table({"a"}, {{1}}), #table({"a"}, {{2}})})"#,
+        )
+        .unwrap()
+        {
+            Value::Table(t) => {
+                assert!(matches!(t.repr, super::TableRepr::Arrow(_)));
+                assert_eq!(t.num_rows(), 2);
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn combine_with_rows_input_returns_rows() {
+        // First table is Arrow; second is Rows-backed (mixed column).
+        // Same column names → Combine concatenates and result is Rows.
+        let src = r#"
+            Table.Combine({
+                #table({"x"}, {{1}, {2}}),
+                #table({"x"}, {{"a"}, {3}})
+            })
+        "#;
+        match eval_str(src).unwrap() {
+            Value::Table(t) => {
+                assert!(matches!(t.repr, super::TableRepr::Rows { .. }));
+                assert_eq!(t.num_rows(), 4);
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn transform_column_types_mixed_column_errors() {
+        // Casting a heterogeneous (text + number) column to a specific type
+        // errors cleanly — matches PQ's typed-cast-on-mixed behaviour.
+        let src = format!(
+            "Table.TransformColumnTypes({}, {{{{\"val\", type text}}}})",
+            rows_backed_two_col_table()
+        );
+        match eval_str(&src) {
+            Err(MError::Other(msg)) => assert!(
+                msg.contains("heterogeneous") || msg.contains("cast"),
+                "expected cast error, got: {}",
+                msg
+            ),
+            other => panic!("expected error, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn transform_column_types_type_any_on_mixed_passes() {
+        // `type any` is the escape hatch: leave the column untouched.
+        let src = format!(
+            "Table.TransformColumnTypes({}, {{{{\"val\", type any}}}})",
+            rows_backed_two_col_table()
+        );
+        match eval_str(&src).unwrap() {
+            Value::Table(t) => {
+                assert_eq!(t.num_rows(), 3);
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
     #[test]
     fn table_mixed_primitive_column_falls_back_to_rows() {
         // text + number in one column was previously an error; now produces

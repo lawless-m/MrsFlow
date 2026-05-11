@@ -1003,8 +1003,7 @@ fn table_rename_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MEr
         let new = expect_text(&inner[1])?.to_string();
         pairs.push((old, new));
     }
-    let schema = table.as_arrow()?.schema();
-    let existing: Vec<String> = schema.fields().iter().map(|f| f.name().clone()).collect();
+    let existing = table.column_names();
     for (old, _new) in &pairs {
         if !existing.contains(old) {
             return Err(MError::Other(format!(
@@ -1013,32 +1012,44 @@ fn table_rename_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MEr
             )));
         }
     }
-    let new_fields: Vec<Field> = schema
-        .fields()
+    let renamed: Vec<String> = existing
         .iter()
-        .map(|f| {
-            let mut name = f.name().clone();
+        .map(|n| {
+            let mut name = n.clone();
             for (old, new) in &pairs {
                 if &name == old {
                     name = new.clone();
                     break;
                 }
             }
-            Field::new(name, f.data_type().clone(), f.is_nullable())
+            name
         })
         .collect();
-    let new_schema = Arc::new(Schema::new(new_fields));
-    let columns: Vec<ArrayRef> = table.as_arrow()?.columns().to_vec();
-    let new_batch = RecordBatch::try_new(new_schema, columns)
-        .map_err(|e| MError::Other(format!("Table.RenameColumns: rebuild failed: {}", e)))?;
-    Ok(Value::Table(Table::from_arrow(new_batch)))
+    match &table.repr {
+        super::value::TableRepr::Arrow(batch) => {
+            let schema = batch.schema();
+            let new_fields: Vec<Field> = schema
+                .fields()
+                .iter()
+                .zip(renamed.iter())
+                .map(|(f, n)| Field::new(n, f.data_type().clone(), f.is_nullable()))
+                .collect();
+            let new_schema = Arc::new(Schema::new(new_fields));
+            let columns: Vec<ArrayRef> = batch.columns().to_vec();
+            let new_batch = RecordBatch::try_new(new_schema, columns)
+                .map_err(|e| MError::Other(format!("Table.RenameColumns: rebuild failed: {}", e)))?;
+            Ok(Value::Table(Table::from_arrow(new_batch)))
+        }
+        super::value::TableRepr::Rows { rows, .. } => {
+            Ok(Value::Table(Table::from_rows(renamed, rows.clone())))
+        }
+    }
 }
 
 fn table_remove_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let names = expect_text_list(&args[1], "Table.RemoveColumns: names")?;
-    let schema = table.as_arrow()?.schema();
-    let existing: Vec<String> = schema.fields().iter().map(|f| f.name().clone()).collect();
+    let existing = table.column_names();
     for n in &names {
         if !existing.contains(n) {
             return Err(MError::Other(format!(
@@ -1050,21 +1061,44 @@ fn table_remove_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MEr
     let keep_indices: Vec<usize> = (0..existing.len())
         .filter(|&i| !names.contains(&existing[i]))
         .collect();
-    let new_fields: Vec<Field> = keep_indices
-        .iter()
-        .map(|&i| schema.field(i).clone())
-        .collect();
-    let new_schema = Arc::new(Schema::new(new_fields));
-    let new_columns: Vec<ArrayRef> = keep_indices
-        .iter()
-        .map(|&i| table.as_arrow().unwrap().column(i).clone())
-        .collect();
-    let new_batch = RecordBatch::try_new(new_schema, new_columns)
-        .map_err(|e| MError::Other(format!("Table.RemoveColumns: rebuild failed: {}", e)))?;
-    Ok(Value::Table(Table::from_arrow(new_batch)))
+    select_columns_by_index(table, &keep_indices, "Table.RemoveColumns")
 }
 
 // --- Table helpers ---
+
+/// Project a table to the columns named by `keep_indices` (in order). Works
+/// for both Arrow- and Rows-backed inputs; preserves the input backing.
+/// Used by Table.RemoveColumns, Table.SelectColumns, Table.ReorderColumns.
+fn select_columns_by_index(
+    table: &Table,
+    keep_indices: &[usize],
+    ctx: &str,
+) -> Result<Value, MError> {
+    let existing = table.column_names();
+    let new_names: Vec<String> = keep_indices.iter().map(|&i| existing[i].clone()).collect();
+    match &table.repr {
+        super::value::TableRepr::Arrow(batch) => {
+            let schema = batch.schema();
+            let new_fields: Vec<Field> = keep_indices
+                .iter()
+                .map(|&i| schema.field(i).clone())
+                .collect();
+            let new_schema = Arc::new(Schema::new(new_fields));
+            let new_columns: Vec<ArrayRef> =
+                keep_indices.iter().map(|&i| batch.column(i).clone()).collect();
+            let new_batch = RecordBatch::try_new(new_schema, new_columns)
+                .map_err(|e| MError::Other(format!("{}: rebuild failed: {}", ctx, e)))?;
+            Ok(Value::Table(Table::from_arrow(new_batch)))
+        }
+        super::value::TableRepr::Rows { rows, .. } => {
+            let new_rows: Vec<Vec<Value>> = rows
+                .iter()
+                .map(|row| keep_indices.iter().map(|&i| row[i].clone()).collect())
+                .collect();
+            Ok(Value::Table(Table::from_rows(new_names, new_rows)))
+        }
+    }
+}
 
 fn expect_table(v: &Value) -> Result<&Table, MError> {
     match v {
@@ -1291,6 +1325,24 @@ pub(crate) fn infer_cells(
     }
 }
 
+/// Materialise a table as row-major Value cells. Works for both backings:
+/// Arrow variant decodes via cell_to_value; Rows variant clones. Used by
+/// Table.* ops that need to land their result in the Rows representation.
+pub(crate) fn table_to_rows(table: &Table) -> Result<(Vec<String>, Vec<Vec<Value>>), MError> {
+    let names = table.column_names();
+    let n_rows = table.num_rows();
+    let n_cols = names.len();
+    let mut rows: Vec<Vec<Value>> = Vec::with_capacity(n_rows);
+    for r in 0..n_rows {
+        let mut row = Vec::with_capacity(n_cols);
+        for c in 0..n_cols {
+            row.push(cell_to_value(table, c, r)?);
+        }
+        rows.push(row);
+    }
+    Ok((names, rows))
+}
+
 /// Convert a single cell of a table back to a Value. Dispatches on the
 /// table's `TableRepr`: Arrow-backed reads via Array downcast (existing
 /// path); Rows-backed just clones the stored cell value.
@@ -1442,9 +1494,7 @@ fn parquet_document(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> 
 fn table_select_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let names = expect_text_list(&args[1], "Table.SelectColumns: names")?;
-    let schema = table.as_arrow()?.schema();
-    let existing: Vec<String> = schema.fields().iter().map(|f| f.name().clone()).collect();
-    // Look up each requested name; preserve the requested order.
+    let existing = table.column_names();
     let mut indices: Vec<usize> = Vec::with_capacity(names.len());
     for n in &names {
         match existing.iter().position(|e| e == n) {
@@ -1457,15 +1507,7 @@ fn table_select_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MEr
             }
         }
     }
-    let new_fields: Vec<Field> = indices.iter().map(|&i| schema.field(i).clone()).collect();
-    let new_schema = Arc::new(Schema::new(new_fields));
-    let new_columns: Vec<ArrayRef> = indices
-        .iter()
-        .map(|&i| table.as_arrow().unwrap().column(i).clone())
-        .collect();
-    let new_batch = RecordBatch::try_new(new_schema, new_columns)
-        .map_err(|e| MError::Other(format!("Table.SelectColumns: rebuild failed: {}", e)))?;
-    Ok(Value::Table(Table::from_arrow(new_batch)))
+    select_columns_by_index(table, &indices, "Table.SelectColumns")
 }
 
 fn table_select_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
@@ -1487,19 +1529,28 @@ fn table_select_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError>
             }
         }
     }
-    let indices = arrow::array::UInt32Array::from(keep);
-    let new_columns: Vec<ArrayRef> = table
-        .as_arrow()?
-        .columns()
-        .iter()
-        .map(|c| {
-            arrow::compute::take(c.as_ref(), &indices, None)
-                .map_err(|e| MError::Other(format!("Table.SelectRows: take failed: {}", e)))
-        })
-        .collect::<Result<_, _>>()?;
-    let new_batch = RecordBatch::try_new(table.as_arrow()?.schema(), new_columns)
-        .map_err(|e| MError::Other(format!("Table.SelectRows: rebuild failed: {}", e)))?;
-    Ok(Value::Table(Table::from_arrow(new_batch)))
+    match &table.repr {
+        super::value::TableRepr::Arrow(batch) => {
+            let indices = arrow::array::UInt32Array::from(keep);
+            let new_columns: Vec<ArrayRef> = batch
+                .columns()
+                .iter()
+                .map(|c| {
+                    arrow::compute::take(c.as_ref(), &indices, None).map_err(|e| {
+                        MError::Other(format!("Table.SelectRows: take failed: {}", e))
+                    })
+                })
+                .collect::<Result<_, _>>()?;
+            let new_batch = RecordBatch::try_new(batch.schema(), new_columns)
+                .map_err(|e| MError::Other(format!("Table.SelectRows: rebuild failed: {}", e)))?;
+            Ok(Value::Table(Table::from_arrow(new_batch)))
+        }
+        super::value::TableRepr::Rows { columns, rows } => {
+            let new_rows: Vec<Vec<Value>> =
+                keep.into_iter().map(|i| rows[i as usize].clone()).collect();
+            Ok(Value::Table(Table::from_rows(columns.clone(), new_rows)))
+        }
+    }
 }
 
 fn table_add_column(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
@@ -1513,44 +1564,63 @@ fn table_add_column(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> 
         let v = invoke_callback_with_host(transform, vec![record], host)?;
         new_cells.push(v);
     }
+    // Try to encode the new column as Arrow. Three result shapes:
+    //   - Some + input Arrow + no type-any cast: Arrow result (fast path)
+    //   - Some + input Rows: Rows result (the new column joins the row list)
+    //   - None (heterogeneous result column): Rows result (decode input + append)
     let cell_refs: Vec<&Value> = new_cells.iter().collect();
-    let (inferred_dtype, inferred_array) = infer_cells(&cell_refs)?.ok_or(
-        MError::NotImplemented(
-            "Table.AddColumn: heterogeneous result column needs Rows-backed dispatch (slice 3)",
-        ),
-    )?;
+    let inferred = infer_cells(&cell_refs)?;
+    let target_type = args.get(3).cloned();
 
-    // Optional 4th arg: target column type. If supplied (and not `type any`),
-    // cast and use its dtype/nullability for the new field; otherwise use the
-    // inferred shape.
-    let (dtype, new_array, nullable) = match args.get(3) {
-        Some(Value::Type(t)) if !matches!(t, super::value::TypeRep::Any) => {
-            let (target_dtype, target_nullable) = type_rep_to_datatype(t)?;
-            let cast = arrow::compute::cast(&inferred_array, &target_dtype).map_err(|e| {
-                MError::Other(format!(
-                    "Table.AddColumn: cast {} to {:?} failed: {}",
-                    new_name, target_dtype, e
-                ))
-            })?;
-            (target_dtype, cast, target_nullable)
-        }
-        Some(Value::Type(_)) | Some(Value::Null) | None => {
-            let nullable = matches!(inferred_dtype, DataType::Null)
-                || new_cells.iter().any(|v| matches!(v, Value::Null));
-            (inferred_dtype, inferred_array, nullable)
-        }
-        Some(other) => return Err(type_mismatch("type or null", other)),
-    };
+    if let (super::value::TableRepr::Arrow(batch), Some((inferred_dtype, inferred_array))) =
+        (&table.repr, &inferred)
+    {
+        // Fast path: Arrow input + Arrow-encodable new column.
+        let (dtype, new_array, nullable) = match &target_type {
+            Some(Value::Type(t)) if !matches!(t, super::value::TypeRep::Any) => {
+                let (target_dtype, target_nullable) = type_rep_to_datatype(t)?;
+                let cast = arrow::compute::cast(inferred_array, &target_dtype).map_err(|e| {
+                    MError::Other(format!(
+                        "Table.AddColumn: cast {} to {:?} failed: {}",
+                        new_name, target_dtype, e
+                    ))
+                })?;
+                (target_dtype, cast, target_nullable)
+            }
+            Some(Value::Type(_)) | Some(Value::Null) | None => {
+                let nullable = matches!(inferred_dtype, DataType::Null)
+                    || new_cells.iter().any(|v| matches!(v, Value::Null));
+                (inferred_dtype.clone(), inferred_array.clone(), nullable)
+            }
+            Some(other) => return Err(type_mismatch("type or null", other)),
+        };
+        let schema = batch.schema();
+        let mut fields: Vec<Field> = schema.fields().iter().map(|f| (**f).clone()).collect();
+        fields.push(Field::new(new_name, dtype, nullable));
+        let new_schema = Arc::new(Schema::new(fields));
+        let mut new_columns: Vec<ArrayRef> = batch.columns().to_vec();
+        new_columns.push(new_array);
+        let new_batch = RecordBatch::try_new(new_schema, new_columns)
+            .map_err(|e| MError::Other(format!("Table.AddColumn: rebuild failed: {}", e)))?;
+        return Ok(Value::Table(Table::from_arrow(new_batch)));
+    }
 
-    let schema = table.as_arrow()?.schema();
-    let mut fields: Vec<Field> = schema.fields().iter().map(|f| (**f).clone()).collect();
-    fields.push(Field::new(new_name, dtype, nullable));
-    let new_schema = Arc::new(Schema::new(fields));
-    let mut new_columns: Vec<ArrayRef> = table.as_arrow()?.columns().to_vec();
-    new_columns.push(new_array);
-    let new_batch = RecordBatch::try_new(new_schema, new_columns)
-        .map_err(|e| MError::Other(format!("Table.AddColumn: rebuild failed: {}", e)))?;
-    Ok(Value::Table(Table::from_arrow(new_batch)))
+    // Slow path: produce a Rows-backed result. Decode the input if needed,
+    // then append the new column per row.
+    let (mut names, mut rows) = table_to_rows(table)?;
+    if rows.len() != new_cells.len() {
+        return Err(MError::Other(
+            "Table.AddColumn: row count mismatch (internal)".into(),
+        ));
+    }
+    names.push(new_name);
+    for (row, cell) in rows.iter_mut().zip(new_cells.into_iter()) {
+        row.push(cell);
+    }
+    // If the caller supplied a typed cast and our new column happens to be
+    // uniformly that type, the values_to_table normalisation will pick Arrow
+    // for it once all columns fit. For mixed cases we stay Rows.
+    Ok(Value::Table(values_to_table(&names, &rows)?))
 }
 
 fn table_from_rows(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
@@ -1591,28 +1661,31 @@ fn table_promote_headers(args: &[Value], _host: &dyn IoHost) -> Result<Value, ME
             }
         }
     }
-    // Slice every column from row 1 to end. The column types are preserved
-    // as-is from the existing schema — we are NOT re-inferring from data
-    // rows. If users want different types after promotion, they call
-    // Table.TransformColumnTypes (eval-7e).
+    // Drop row 0 from every column, keeping the existing column types.
+    // Users who want a different type after promotion call TransformColumnTypes.
     let n_remaining = table.num_rows() - 1;
-    let new_columns: Vec<ArrayRef> = table
-        .as_arrow()?
-        .columns()
-        .iter()
-        .map(|c| c.slice(1, n_remaining))
-        .collect();
-    let schema = table.as_arrow()?.schema();
-    let new_fields: Vec<Field> = schema
-        .fields()
-        .iter()
-        .zip(new_names.iter())
-        .map(|(f, n)| Field::new(n.clone(), f.data_type().clone(), f.is_nullable()))
-        .collect();
-    let new_schema = Arc::new(Schema::new(new_fields));
-    let new_batch = RecordBatch::try_new(new_schema, new_columns)
-        .map_err(|e| MError::Other(format!("Table.PromoteHeaders: rebuild failed: {}", e)))?;
-    Ok(Value::Table(Table::from_arrow(new_batch)))
+    match &table.repr {
+        super::value::TableRepr::Arrow(batch) => {
+            let new_columns: Vec<ArrayRef> =
+                batch.columns().iter().map(|c| c.slice(1, n_remaining)).collect();
+            let new_fields: Vec<Field> = batch
+                .schema()
+                .fields()
+                .iter()
+                .zip(new_names.iter())
+                .map(|(f, n)| Field::new(n.clone(), f.data_type().clone(), f.is_nullable()))
+                .collect();
+            let new_schema = Arc::new(Schema::new(new_fields));
+            let new_batch = RecordBatch::try_new(new_schema, new_columns).map_err(|e| {
+                MError::Other(format!("Table.PromoteHeaders: rebuild failed: {}", e))
+            })?;
+            Ok(Value::Table(Table::from_arrow(new_batch)))
+        }
+        super::value::TableRepr::Rows { rows, .. } => {
+            let new_rows: Vec<Vec<Value>> = rows.iter().skip(1).cloned().collect();
+            Ok(Value::Table(Table::from_rows(new_names, new_rows)))
+        }
+    }
 }
 
 /// Build a record Value from one row of a table — column name → cell.
@@ -1671,39 +1744,98 @@ fn table_transform_column_types(args: &[Value], _host: &dyn IoHost) -> Result<Va
     } else {
         transforms
     };
-    // Parse the {col_name, type_value} pairs first; error early on bad shapes.
     let pairs = parse_col_type_pairs(transforms)?;
 
-    let schema = table.as_arrow()?.schema();
-    let mut new_fields: Vec<Field> = schema.fields().iter().map(|f| (**f).clone()).collect();
-    let mut new_columns: Vec<ArrayRef> = table.as_arrow()?.columns().to_vec();
-
-    for (name, target) in &pairs {
-        let idx = schema
-            .index_of(name)
-            .map_err(|_| MError::Other(format!(
-                "Table.TransformColumnTypes: column not found: {}",
-                name
-            )))?;
-        // `type any` → keep current shape (no cast). Power Query's `any` is
-        // the no-constraint type; the corpus uses it for mixed-shape columns.
-        let Some((target_dtype, target_nullable)) = target else {
-            continue;
-        };
-        let cast = arrow::compute::cast(&new_columns[idx], target_dtype).map_err(|e| {
-            MError::Other(format!(
-                "Table.TransformColumnTypes: cast {} to {:?} failed: {}",
-                name, target_dtype, e
-            ))
-        })?;
-        new_columns[idx] = cast;
-        new_fields[idx] = Field::new(name, target_dtype.clone(), *target_nullable);
+    match &table.repr {
+        super::value::TableRepr::Arrow(batch) => {
+            let schema = batch.schema();
+            let mut new_fields: Vec<Field> =
+                schema.fields().iter().map(|f| (**f).clone()).collect();
+            let mut new_columns: Vec<ArrayRef> = batch.columns().to_vec();
+            for (name, target) in &pairs {
+                let idx = schema.index_of(name).map_err(|_| {
+                    MError::Other(format!(
+                        "Table.TransformColumnTypes: column not found: {}",
+                        name
+                    ))
+                })?;
+                let Some((target_dtype, target_nullable)) = target else {
+                    continue; // type any → no cast
+                };
+                let cast = arrow::compute::cast(&new_columns[idx], target_dtype).map_err(|e| {
+                    MError::Other(format!(
+                        "Table.TransformColumnTypes: cast {} to {:?} failed: {}",
+                        name, target_dtype, e
+                    ))
+                })?;
+                new_columns[idx] = cast;
+                new_fields[idx] = Field::new(name, target_dtype.clone(), *target_nullable);
+            }
+            let new_schema = Arc::new(Schema::new(new_fields));
+            let new_batch = RecordBatch::try_new(new_schema, new_columns).map_err(|e| {
+                MError::Other(format!("Table.TransformColumnTypes: rebuild failed: {}", e))
+            })?;
+            Ok(Value::Table(Table::from_arrow(new_batch)))
+        }
+        super::value::TableRepr::Rows { columns, rows } => {
+            // Rows-backed path: per-column type-cast via Arrow round-trip for
+            // typed targets; type-any columns pass through unchanged. If a
+            // typed column is heterogeneous (cells don't share an Arrow
+            // dtype), this errors — matching PQ's "typed cast on mixed
+            // column = error" behaviour. The escape hatch is `type any`.
+            let mut new_rows = rows.clone();
+            for (name, target) in &pairs {
+                let idx = columns.iter().position(|c| c == name).ok_or_else(|| {
+                    MError::Other(format!(
+                        "Table.TransformColumnTypes: column not found: {}",
+                        name
+                    ))
+                })?;
+                let Some(_) = target else {
+                    continue; // type any → pass through
+                };
+                // Reconstruct the column's Value cells, cast them, write back.
+                let cells: Vec<Value> = new_rows.iter().map(|r| r[idx].clone()).collect();
+                // Re-look up the TypeRep from the original transform list so we
+                // can call cast_cells_to_type.
+                let trep = find_typerep_for_name(transforms, name)?;
+                let cast = cast_cells_to_type(
+                    &cells,
+                    &trep,
+                    name,
+                    "Table.TransformColumnTypes",
+                )?;
+                for (row, c) in new_rows.iter_mut().zip(cast.into_iter()) {
+                    row[idx] = c;
+                }
+            }
+            Ok(Value::Table(values_to_table(columns, &new_rows)?))
+        }
     }
+}
 
-    let new_schema = Arc::new(Schema::new(new_fields));
-    let new_batch = RecordBatch::try_new(new_schema, new_columns)
-        .map_err(|e| MError::Other(format!("Table.TransformColumnTypes: rebuild failed: {}", e)))?;
-    Ok(Value::Table(Table::from_arrow(new_batch)))
+/// Helper: pull the TypeRep for `name` out of the original (un-parsed)
+/// transforms list. Only used on the Rows-path of TransformColumnTypes
+/// to recover a TypeRep we already validated.
+fn find_typerep_for_name(
+    transforms: &[Value],
+    name: &str,
+) -> Result<super::value::TypeRep, MError> {
+    for t in transforms {
+        if let Value::List(xs) = t {
+            if xs.len() == 2 {
+                if let (Value::Text(n), Value::Type(tr)) = (&xs[0], &xs[1]) {
+                    if n == name {
+                        return Ok(tr.clone());
+                    }
+                }
+            }
+        }
+    }
+    Err(MError::Other(format!(
+        "Table.TransformColumnTypes: lost track of type for column {}",
+        name
+    )))
 }
 
 fn parse_col_type_pairs(
@@ -1788,55 +1920,74 @@ fn table_transform_columns(args: &[Value], host: &dyn IoHost) -> Result<Value, M
     };
     let pairs = parse_col_fn_pairs(transforms)?;
 
-    let schema = table.as_arrow()?.schema();
-    let mut new_fields: Vec<Field> = schema.fields().iter().map(|f| (**f).clone()).collect();
-    let mut new_columns: Vec<ArrayRef> = table.as_arrow()?.columns().to_vec();
-    let n_rows = table.num_rows();
+    // Row-major fallback: works for both Arrow- and Rows-backed inputs.
+    // Each transform runs cell-by-cell; the result lands in values_to_table
+    // which picks Arrow if the resulting columns are all uniform-typed, or
+    // Rows if any column ends up heterogeneous after the transform.
+    let (names, mut rows) = table_to_rows(table)?;
+    let n_rows = rows.len();
 
     for (name, closure, type_opt) in &pairs {
-        let idx = schema
-            .index_of(name)
-            .map_err(|_| MError::Other(format!(
-                "Table.TransformColumns: column not found: {}",
-                name
-            )))?;
+        let idx = names.iter().position(|n| n == name).ok_or_else(|| {
+            MError::Other(format!("Table.TransformColumns: column not found: {}", name))
+        })?;
         let mut new_cells: Vec<Value> = Vec::with_capacity(n_rows);
-        for row in 0..n_rows {
-            let cell = cell_to_value(table, idx, row)?;
+        for row in &rows {
+            let cell = row[idx].clone();
             let v = invoke_callback_with_host(closure, vec![cell], host)?;
             new_cells.push(v);
         }
-        let cell_refs: Vec<&Value> = new_cells.iter().collect();
-        let (inferred_dtype, inferred_array) = infer_cells(&cell_refs)?.ok_or(
-            MError::NotImplemented(
-                "Table.TransformColumns: heterogeneous result column needs Rows-backed dispatch (slice 3)",
-            ),
-        )?;
-        let (dtype, new_array, nullable) = match type_opt {
+        // Optional 3rd transform element: target type for the new column.
+        // For `type any` or no spec, the cells pass through unchanged. For a
+        // specific type, cast via Arrow's cast (errors if a cell doesn't
+        // fit — matches PQ's typed-cast semantics).
+        let final_cells: Vec<Value> = match type_opt {
             Some(t) if !matches!(t, super::value::TypeRep::Any) => {
-                let (target_dtype, target_nullable) = type_rep_to_datatype(t)?;
-                let cast = arrow::compute::cast(&inferred_array, &target_dtype).map_err(|e| {
-                    MError::Other(format!(
-                        "Table.TransformColumns: cast {} to {:?} failed: {}",
-                        name, target_dtype, e
-                    ))
-                })?;
-                (target_dtype, cast, target_nullable)
+                cast_cells_to_type(&new_cells, t, name, "Table.TransformColumns")?
             }
-            _ => {
-                let nullable = matches!(inferred_dtype, DataType::Null)
-                    || new_cells.iter().any(|v| matches!(v, Value::Null));
-                (inferred_dtype, inferred_array, nullable)
-            }
+            _ => new_cells,
         };
-        new_columns[idx] = new_array;
-        new_fields[idx] = Field::new(name, dtype, nullable);
+        for (row, cell) in rows.iter_mut().zip(final_cells.into_iter()) {
+            row[idx] = cell;
+        }
     }
 
-    let new_schema = Arc::new(Schema::new(new_fields));
-    let new_batch = RecordBatch::try_new(new_schema, new_columns)
-        .map_err(|e| MError::Other(format!("Table.TransformColumns: rebuild failed: {}", e)))?;
-    Ok(Value::Table(Table::from_arrow(new_batch)))
+    Ok(Value::Table(values_to_table(&names, &rows)?))
+}
+
+/// Cast a column of Values to a target M type by round-tripping through
+/// Arrow's `cast`. Errors when the column is heterogeneous (no uniform
+/// Arrow dtype) or when the cast itself fails (cells don't fit the type).
+fn cast_cells_to_type(
+    cells: &[Value],
+    t: &super::value::TypeRep,
+    col_name: &str,
+    ctx: &str,
+) -> Result<Vec<Value>, MError> {
+    let (target_dtype, target_nullable) = type_rep_to_datatype(t)?;
+    let cell_refs: Vec<&Value> = cells.iter().collect();
+    let (_, inferred_array) = infer_cells(&cell_refs)?.ok_or_else(|| {
+        MError::Other(format!(
+            "{}: cast {} to {:?} failed: column has heterogeneous cells",
+            ctx, col_name, target_dtype
+        ))
+    })?;
+    let cast = arrow::compute::cast(&inferred_array, &target_dtype).map_err(|e| {
+        MError::Other(format!(
+            "{}: cast {} to {:?} failed: {}",
+            ctx, col_name, target_dtype, e
+        ))
+    })?;
+    // Decode the cast result back to Values via a temporary single-column table.
+    let field = Field::new(col_name, target_dtype, target_nullable);
+    let temp_batch = RecordBatch::try_new(Arc::new(Schema::new(vec![field])), vec![cast])
+        .map_err(|e| MError::Other(format!("{}: temp batch failed: {}", ctx, e)))?;
+    let temp_table = Table::from_arrow(temp_batch);
+    let mut decoded = Vec::with_capacity(cells.len());
+    for r in 0..cells.len() {
+        decoded.push(cell_to_value(&temp_table, 0, r)?);
+    }
+    Ok(decoded)
 }
 
 fn is_single_col_fn_pair(xs: &[Value]) -> bool {
@@ -1907,29 +2058,33 @@ fn table_skip(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     };
     let n_rows = table.num_rows();
     let skip = count.min(n_rows);
-    let remaining = n_rows - skip;
-    let new_columns: Vec<ArrayRef> = table
-        .as_arrow()?
-        .columns()
-        .iter()
-        .map(|c| c.slice(skip, remaining))
-        .collect();
-    let new_batch = RecordBatch::try_new(table.as_arrow()?.schema(), new_columns)
-        .map_err(|e| MError::Other(format!("Table.Skip: rebuild failed: {}", e)))?;
-    Ok(Value::Table(Table::from_arrow(new_batch)))
+    match &table.repr {
+        super::value::TableRepr::Arrow(batch) => {
+            let remaining = n_rows - skip;
+            let new_columns: Vec<ArrayRef> =
+                batch.columns().iter().map(|c| c.slice(skip, remaining)).collect();
+            let new_batch = RecordBatch::try_new(batch.schema(), new_columns)
+                .map_err(|e| MError::Other(format!("Table.Skip: rebuild failed: {}", e)))?;
+            Ok(Value::Table(Table::from_arrow(new_batch)))
+        }
+        super::value::TableRepr::Rows { columns, rows } => {
+            let new_rows: Vec<Vec<Value>> = rows.iter().skip(skip).cloned().collect();
+            Ok(Value::Table(Table::from_rows(columns.clone(), new_rows)))
+        }
+    }
 }
 
 fn table_reorder_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let order = expect_text_list(&args[1], "Table.ReorderColumns: columnOrder")?;
-    let schema = table.as_arrow()?.schema();
+    let existing = table.column_names();
 
-    let mut new_indices: Vec<usize> = Vec::with_capacity(schema.fields().len());
-    let mut used = vec![false; schema.fields().len()];
+    let mut new_indices: Vec<usize> = Vec::with_capacity(existing.len());
+    let mut used = vec![false; existing.len()];
 
     // First: the explicitly named columns in the requested order.
     for name in &order {
-        let idx = schema.index_of(name).map_err(|_| {
+        let idx = existing.iter().position(|e| e == name).ok_or_else(|| {
             MError::Other(format!(
                 "Table.ReorderColumns: column not found: {}",
                 name
@@ -1945,52 +2100,65 @@ fn table_reorder_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, ME
         }
     }
 
-    let new_fields: Vec<Field> = new_indices
-        .iter()
-        .map(|&i| (*schema.field(i)).clone())
-        .collect();
-    let new_columns: Vec<ArrayRef> = new_indices
-        .iter()
-        .map(|&i| table.as_arrow().unwrap().column(i).clone())
-        .collect();
-    let new_schema = Arc::new(Schema::new(new_fields));
-    let new_batch = RecordBatch::try_new(new_schema, new_columns)
-        .map_err(|e| MError::Other(format!("Table.ReorderColumns: rebuild failed: {}", e)))?;
-    Ok(Value::Table(Table::from_arrow(new_batch)))
+    select_columns_by_index(table, &new_indices, "Table.ReorderColumns")
 }
 
 fn table_combine(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    let tables = expect_list(&args[0])?;
-    if tables.is_empty() {
+    let tables_list = expect_list(&args[0])?;
+    if tables_list.is_empty() {
         return Err(MError::Other("Table.Combine: empty table list".into()));
     }
-    let batches: Result<Vec<RecordBatch>, MError> = tables
+    // Collect input tables.
+    let tables: Vec<&Table> = tables_list
         .iter()
         .map(|t| match t {
-            Value::Table(table) => table.try_to_arrow(),
+            Value::Table(table) => Ok(table),
             other => Err(type_mismatch("table (in list)", other)),
         })
-        .collect();
-    let batches = batches?;
-    if batches.len() == 1 {
-        return Ok(Value::Table(Table::from_arrow(
-            batches.into_iter().next().unwrap(),
-        )));
+        .collect::<Result<_, _>>()?;
+
+    // Fast path: all Arrow + identical schemas → arrow concat.
+    let all_arrow = tables
+        .iter()
+        .all(|t| matches!(&t.repr, super::value::TableRepr::Arrow(_)));
+    if all_arrow {
+        let batches: Vec<RecordBatch> = tables
+            .iter()
+            .map(|t| t.try_to_arrow())
+            .collect::<Result<_, _>>()?;
+        if batches.len() == 1 {
+            return Ok(Value::Table(Table::from_arrow(
+                batches.into_iter().next().unwrap(),
+            )));
+        }
+        let schema = batches[0].schema();
+        let schemas_match = batches.iter().skip(1).all(|b| b.schema() == schema);
+        if schemas_match {
+            let combined = arrow::compute::concat_batches(&schema, &batches)
+                .map_err(|e| MError::Other(format!("Table.Combine: concat failed: {}", e)))?;
+            return Ok(Value::Table(Table::from_arrow(combined)));
+        }
+        // Schemas mismatch — fall through to Rows path which unions columns.
     }
-    // First-pass: require identical schemas. arrow::compute::concat_batches
-    // enforces this for us, but the error message is generic — wrap it.
-    let schema = batches[0].schema();
-    for (i, b) in batches.iter().enumerate().skip(1) {
-        if b.schema() != schema {
+
+    // Row-major fallback: take column names from the first table; verify
+    // subsequent tables have the same names in the same order (PQ's Combine
+    // requires aligned column sets); concatenate rows.
+    let names = tables[0].column_names();
+    for (i, t) in tables.iter().enumerate().skip(1) {
+        if t.column_names() != names {
             return Err(MError::Other(format!(
-                "Table.Combine: schema of table {} does not match table 0",
+                "Table.Combine: column set of table {} does not match table 0",
                 i
             )));
         }
     }
-    let combined = arrow::compute::concat_batches(&schema, &batches)
-        .map_err(|e| MError::Other(format!("Table.Combine: concat failed: {}", e)))?;
-    Ok(Value::Table(Table::from_arrow(combined)))
+    let mut all_rows: Vec<Vec<Value>> = Vec::new();
+    for t in &tables {
+        let (_, rows) = table_to_rows(t)?;
+        all_rows.extend(rows);
+    }
+    Ok(Value::Table(values_to_table(&names, &all_rows)?))
 }
 
 fn table_transform_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {

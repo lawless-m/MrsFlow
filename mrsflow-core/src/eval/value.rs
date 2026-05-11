@@ -189,10 +189,18 @@ impl Table {
     }
 
     /// Owned `RecordBatch` (for sinks that take ownership, e.g. Parquet writer).
-    /// Arrow variant: cheap Arc-based clone. Rows variant: future slice will
-    /// attempt to encode primitive columns; for slice 1 it just errors.
+    /// Arrow variant: cheap Arc-based clone. Rows variant errors with a clear
+    /// message — the Parquet writer (the main sink that calls this) can't
+    /// encode heterogeneous cells.
     pub fn try_to_arrow(&self) -> Result<arrow::record_batch::RecordBatch, MError> {
-        self.as_arrow().cloned()
+        match &self.repr {
+            TableRepr::Arrow(b) => Ok(b.clone()),
+            TableRepr::Rows { .. } => Err(MError::Other(
+                "table has heterogeneous cells; Arrow encoding requires uniform columns \
+                 (coerce mixed cells with Text.From or Table.TransformColumnTypes first)"
+                    .into(),
+            )),
+        }
     }
 }
 
