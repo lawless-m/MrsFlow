@@ -185,6 +185,50 @@ eval(item_access(Target, Index, Opt), Env, Value) :-
     IInt >= 0,
     list_index_opt(Items, IInt, Opt, Value).
 
+% --- eval-4: try / otherwise / error ---
+%
+% Errors flow as thrown `mrsflow_error(ErrorRec)` terms. `try` catches
+% them (and predicate failures) and surfaces them as records. `error E`
+% evaluates E, builds the error record, throws.
+
+eval(error(E), Env, _) :-
+    eval(E, Env, V0),
+    force(V0, V),
+    build_error_record(V, ErrRec),
+    throw(mrsflow_error(ErrRec)).
+
+% try without otherwise — always succeeds, returning the success record on
+% normal eval and the failure record on either a thrown mrsflow_error or
+% a predicate failure inside the body.
+eval(try(Body, none), Env, Result) :-
+    catch(
+        ( eval(Body, Env, V0), force(V0, V), try_success_record(V, Result) ),
+        mrsflow_error(ErrRec),
+        try_failure_record(ErrRec, Result)
+    ),
+    !.
+eval(try(Body, none), _Env, Result) :-
+    default_error_record(DefRec),
+    try_failure_record(DefRec, Result),
+    % Suppress singleton-warning by binding Body in description; not actually used.
+    Body = Body.
+
+% try with otherwise — succeeds with body's value on success, with
+% fallback's value on either thrown error or predicate failure.
+eval(try(Body, some(Fallback)), Env, Value) :-
+    catch(
+        ( eval(Body, Env, V0), force(V0, Value) ),
+        mrsflow_error(_),
+        ( eval(Fallback, Env, F0), force(F0, Value) )
+    ),
+    !.
+eval(try(Body, some(Fallback)), Env, Value) :-
+    % Predicate-failure path — first clause's catch only fires on thrown
+    % mrsflow_error, not on bare failure. This handles missing-name etc.
+    eval(Fallback, Env, F0),
+    force(F0, Value),
+    Body = Body.
+
 % --- force/2: thunk → forced value ---
 %
 % Slice-1 recomputes; memoisation TBD when a real workload shows it matters.
@@ -297,6 +341,38 @@ list_index_opt(Items, Idx, _Opt, Forced) :-
     !,
     force(V, Forced).
 list_index_opt(_, _, opt, null).
+
+% --- eval-4 helpers ---
+
+% Build the error record from `error E`'s operand. Text → standard
+% [Reason, Message, Detail] shape; record → use as-is.
+build_error_record(text(Cs), record([
+    pair("Reason",  text("Expression.Error")),
+    pair("Message", text(Cs)),
+    pair("Detail",  null)
+])).
+build_error_record(record(Pairs), record(Pairs)).
+
+% Default error record when a predicate failure (not a thrown error) is
+% caught by `try`. Mirrors the lifted form Rust uses for internal MError
+% variants — Reason = "Expression.Error", Message = a synthesised string.
+default_error_record(record([
+    pair("Reason",  text("Expression.Error")),
+    pair("Message", text("evaluation failed")),
+    pair("Detail",  null)
+])).
+
+% `try` success-record builder.
+try_success_record(V, record([
+    pair("HasError", bool(false)),
+    pair("Value",    V)
+])).
+
+% `try` failure-record builder.
+try_failure_record(ErrRec, record([
+    pair("HasError", bool(true)),
+    pair("Error",    ErrRec)
+])).
 
 % Deep force — recursively forces thunks inside lists/records. The harness
 % calls this on the top-level result before printing, mirroring the Rust

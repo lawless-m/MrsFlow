@@ -84,3 +84,12 @@ let r = [a = 1, b = a + 10] in r[b]
 {{1, 2}, {3, 4}}{0}
 [xs = {1, 2, 3}][xs]
 [bad = missing_name, good = 1][good]
+try 42
+try 42 otherwise 0
+try missing_name otherwise 99
+try error "boom" otherwise 99
+try error "boom"
+try error [Reason = "X", Message = "Y", Detail = null]
+try (let bad = missing_name in 1) otherwise 99
+try (error "x" + 1) otherwise 99
+try error "outer" otherwise 7

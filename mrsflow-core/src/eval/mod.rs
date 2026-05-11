@@ -334,15 +334,119 @@ pub fn evaluate(ast: &Expr, env: &Env, host: &dyn IoHost) -> Result<Value, MErro
             }
         }
 
+        // --- `error <expr>` — build an error record (or use a record
+        //     operand directly) and raise it. Text operands are lifted to
+        //     the standard [Reason, Message, Detail] shape per spec. ---
+        Expr::Error(inner) => {
+            let v = evaluate(inner, env, host)?;
+            let v = force(v, &mut |e, env| evaluate(e, env, host))?;
+            let record = match v {
+                Value::Text(msg) => build_standard_error_record(
+                    "Expression.Error".to_string(),
+                    msg,
+                ),
+                Value::Record(r) => Value::Record(r),
+                other => {
+                    return Err(MError::TypeMismatch {
+                        expected: "text or record",
+                        found: type_name(&other),
+                    });
+                }
+            };
+            Err(MError::Raised(record))
+        }
+
+        // --- `try body` / `try body otherwise fallback` ---
+        Expr::Try { body, otherwise } => {
+            let result = evaluate(body, env, host);
+            match (result, otherwise) {
+                // No otherwise: success → wrap with HasError=false, Value=v.
+                (Ok(v), None) => {
+                    let v = force(v, &mut |e, env| evaluate(e, env, host))?;
+                    Ok(try_success_record(v))
+                }
+                // No otherwise: failure → wrap with HasError=true, Error=<rec>.
+                (Err(err), None) => Ok(try_failure_record(error_to_record(err))),
+                // With otherwise: success → unwrap value, no record wrap.
+                (Ok(v), Some(_)) => force(v, &mut |e, env| evaluate(e, env, host)),
+                // With otherwise: failure → evaluate fallback.
+                (Err(_), Some(fb)) => {
+                    let v = evaluate(fb, env, host)?;
+                    force(v, &mut |e, env| evaluate(e, env, host))
+                }
+            }
+        }
+
         // --- Forms not yet implemented ---
-        Expr::Try { .. }
-        | Expr::Error(_)
-        | Expr::ListType(_)
+        Expr::ListType(_)
         | Expr::RecordType { .. }
         | Expr::TableType(_)
         | Expr::FunctionType { .. } => Err(MError::NotImplemented(
             "expression form deferred to a later eval slice",
         )),
+    }
+}
+
+/// Build the standard `[Reason, Message, Detail]` error record used when
+/// `error <text>` is invoked, and when internal MError variants are lifted
+/// for `try` callers.
+fn build_standard_error_record(reason: String, message: String) -> Value {
+    let env = EnvNode::empty();
+    Value::Record(Record {
+        fields: vec![
+            ("Reason".to_string(), Value::Text(reason)),
+            ("Message".to_string(), Value::Text(message)),
+            ("Detail".to_string(), Value::Null),
+        ],
+        env,
+    })
+}
+
+/// `try` success-record builder: `[HasError = false, Value = v]`.
+fn try_success_record(v: Value) -> Value {
+    let env = EnvNode::empty();
+    Value::Record(Record {
+        fields: vec![
+            ("HasError".to_string(), Value::Logical(false)),
+            ("Value".to_string(), v),
+        ],
+        env,
+    })
+}
+
+/// `try` failure-record builder: `[HasError = true, Error = <error-rec>]`.
+fn try_failure_record(error_record: Value) -> Value {
+    let env = EnvNode::empty();
+    Value::Record(Record {
+        fields: vec![
+            ("HasError".to_string(), Value::Logical(true)),
+            ("Error".to_string(), error_record),
+        ],
+        env,
+    })
+}
+
+/// Lift an internal MError into a user-visible M error record so `try` can
+/// surface it as a Value. User-raised errors pass through their inner record.
+fn error_to_record(err: MError) -> Value {
+    match err {
+        MError::Raised(v) => v,
+        MError::NameNotInScope(name) => build_standard_error_record(
+            "Expression.Error".to_string(),
+            format!("the name '{}' wasn't recognized", name),
+        ),
+        MError::TypeMismatch { expected, found } => build_standard_error_record(
+            "Expression.Error".to_string(),
+            format!("expected {}, found {}", expected, found),
+        ),
+        MError::NotImplemented(what) => build_standard_error_record(
+            "Expression.Error".to_string(),
+            format!("not implemented: {}", what),
+        ),
+        MError::Other(msg) => build_standard_error_record(
+            "Expression.Error".to_string(),
+            msg,
+        ),
     }
 }
 
@@ -866,8 +970,13 @@ mod tests {
 
     #[test]
     fn deferred_form_returns_not_implemented() {
-        // `try` isn't in slices 1-3 — should error with NotImplemented, not panic.
-        match eval_str("try 1") {
+        // Type-expression forms aren't in slices 1-4 — eval-5 lands them.
+        // Build the AST directly because they only appear inside `type X`
+        // contexts that aren't ergonomically reachable from source.
+        use crate::parser::Expr;
+        let ast = Expr::ListType(Box::new(Expr::NumberLit("1".into())));
+        let env = EnvNode::empty();
+        match evaluate(&ast, &env, &NoIoHost) {
             Err(MError::NotImplemented(_)) => {}
             other => panic!("expected NotImplemented, got {:?}", other),
         }
@@ -1224,6 +1333,133 @@ mod tests {
     #[test]
     fn nested_list_access() {
         assert_eq!(eval_number("{{1, 2}, {3, 4}}{0}{1}"), 2.0);
+    }
+
+    // --- try / otherwise / error (eval-4) ---
+
+    fn record_field(v: &Value, name: &str) -> Value {
+        match v {
+            Value::Record(r) => r
+                .fields
+                .iter()
+                .find(|(n, _)| n == name)
+                .map(|(_, v)| v.clone())
+                .unwrap_or_else(|| panic!("field {} not found in {:?}", name, v)),
+            other => panic!("expected record, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn try_success_no_otherwise_wraps() {
+        let v = eval_str("try 42").unwrap();
+        let v = deep_force(v, &NoIoHost).unwrap();
+        match &record_field(&v, "HasError") {
+            Value::Logical(false) => {}
+            other => panic!("expected HasError=false, got {:?}", other),
+        }
+        match &record_field(&v, "Value") {
+            Value::Number(n) => assert_eq!(*n, 42.0),
+            other => panic!("expected Value=42, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn try_failure_no_otherwise_wraps() {
+        let v = eval_str("try missing_name").unwrap();
+        let v = deep_force(v, &NoIoHost).unwrap();
+        match &record_field(&v, "HasError") {
+            Value::Logical(true) => {}
+            other => panic!("expected HasError=true, got {:?}", other),
+        }
+        let err = record_field(&v, "Error");
+        // Error.Message should mention the missing name
+        match record_field(&err, "Message") {
+            Value::Text(s) => assert!(s.contains("missing_name"), "got: {}", s),
+            other => panic!("expected text Message, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn try_otherwise_success_returns_value() {
+        assert_eq!(eval_number("try 42 otherwise 0"), 42.0);
+    }
+
+    #[test]
+    fn try_otherwise_failure_returns_fallback() {
+        assert_eq!(eval_number("try missing_name otherwise 99"), 99.0);
+    }
+
+    #[test]
+    fn error_text_propagates_as_raised() {
+        match eval_str(r#"error "boom""#) {
+            Err(MError::Raised(_)) => {}
+            other => panic!("expected MError::Raised, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn try_catches_user_error_text() {
+        let v = eval_str(r#"try error "boom""#).unwrap();
+        let v = deep_force(v, &NoIoHost).unwrap();
+        match &record_field(&v, "HasError") {
+            Value::Logical(true) => {}
+            other => panic!("expected HasError=true, got {:?}", other),
+        }
+        let err = record_field(&v, "Error");
+        match record_field(&err, "Message") {
+            Value::Text(s) => assert_eq!(s, "boom"),
+            other => panic!("expected Message=boom, got {:?}", other),
+        }
+        match record_field(&err, "Reason") {
+            Value::Text(s) => assert_eq!(s, "Expression.Error"),
+            other => panic!("expected Reason=Expression.Error, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn try_catches_user_error_record() {
+        let v = eval_str(
+            r#"try error [Reason = "X", Message = "Y", Detail = null]"#,
+        )
+        .unwrap();
+        let v = deep_force(v, &NoIoHost).unwrap();
+        let err = record_field(&v, "Error");
+        match record_field(&err, "Reason") {
+            Value::Text(s) => assert_eq!(s, "X"),
+            other => panic!("expected Reason=X, got {:?}", other),
+        }
+        match record_field(&err, "Message") {
+            Value::Text(s) => assert_eq!(s, "Y"),
+            other => panic!("expected Message=Y, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn error_propagates_through_arithmetic() {
+        // error "x" + 1: the error fires when the left operand is evaluated.
+        // The right operand is never reached; the whole expression errors.
+        assert_eq!(eval_number(r#"try (error "x" + 1) otherwise 99"#), 99.0);
+    }
+
+    #[test]
+    fn try_preserves_lazy_unforced_bindings() {
+        // The let body returns 1; `bad` is never forced. The try should see
+        // no error.
+        assert_eq!(
+            eval_number("try (let bad = missing_name in 1) otherwise 99"),
+            1.0
+        );
+    }
+
+    #[test]
+    fn nested_try() {
+        // Inner try catches "inner", returns a HasError record. Outer try
+        // sees that as a successful (record-valued) result, so it returns
+        // the record. With outer "otherwise 7", we get the record back as
+        // the value, not 7 — because the inner try CAUGHT the error.
+        // To test nested-error propagation, we need the outer try's body
+        // itself to raise. Use: `try error "outer" otherwise 7` = 7.
+        assert_eq!(eval_number(r#"try error "outer" otherwise 7"#), 7.0);
     }
 
     #[test]

@@ -102,6 +102,9 @@ pub enum MError {
         expected: &'static str,
         found: &'static str,
     },
+    /// User-constructed error value, raised by `error <expr>`. The inner
+    /// value is the error record (or pre-lifted record from a text operand).
+    Raised(Value),
     /// Generic catch-all replaced by more specific variants as slices surface
     /// real categories.
     Other(String),
