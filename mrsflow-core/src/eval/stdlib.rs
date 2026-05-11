@@ -106,6 +106,17 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ("Text.TrimEnd", one("text"), text_trim_end),
         ("Text.Start", two("text", "count"), text_start),
         (
+            "Text.Middle",
+            vec![
+                Param { name: "text".into(),   optional: false, type_annotation: None },
+                Param { name: "offset".into(), optional: false, type_annotation: None },
+                Param { name: "count".into(),  optional: true,  type_annotation: None },
+            ],
+            text_middle,
+        ),
+        ("Text.End", two("text", "count"), text_end),
+        ("Text.Split", two("text", "separator"), text_split),
+        (
             "Text.Combine",
             vec![
                 Param { name: "texts".into(),     optional: false, type_annotation: None },
@@ -345,6 +356,57 @@ fn text_start(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         return Ok(Value::Text(String::new()));
     }
     Ok(Value::Text(text.chars().take(count as usize).collect()))
+}
+
+fn text_end(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let text = expect_text(&args[0])?;
+    let count = match &args[1] {
+        Value::Number(n) => *n as isize,
+        other => return Err(type_mismatch("number", other)),
+    };
+    if count <= 0 {
+        return Ok(Value::Text(String::new()));
+    }
+    let total = text.chars().count();
+    let skip = total.saturating_sub(count as usize);
+    Ok(Value::Text(text.chars().skip(skip).collect()))
+}
+
+fn text_middle(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let text = expect_text(&args[0])?;
+    let offset = match &args[1] {
+        Value::Number(n) => *n as isize,
+        other => return Err(type_mismatch("number", other)),
+    };
+    if offset < 0 {
+        return Ok(Value::Text(String::new()));
+    }
+    // Optional 3rd arg: count. Null/missing → take rest of string.
+    let count = match args.get(2) {
+        Some(Value::Number(n)) => Some(*n as isize),
+        Some(Value::Null) | None => None,
+        Some(other) => return Err(type_mismatch("number or null", other)),
+    };
+    let mut iter = text.chars().skip(offset as usize);
+    let result: String = match count {
+        Some(c) if c <= 0 => String::new(),
+        Some(c) => iter.by_ref().take(c as usize).collect(),
+        None => iter.collect(),
+    };
+    Ok(Value::Text(result))
+}
+
+fn text_split(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let text = expect_text(&args[0])?;
+    let sep = expect_text(&args[1])?;
+    // Power Query Text.Split on empty separator returns a list of single-char
+    // texts; we emulate that to be on the safe side.
+    let parts: Vec<Value> = if sep.is_empty() {
+        text.chars().map(|c| Value::Text(c.to_string())).collect()
+    } else {
+        text.split(sep).map(|s| Value::Text(s.to_string())).collect()
+    };
+    Ok(Value::List(parts))
 }
 
 fn expect_text(v: &Value) -> Result<&str, MError> {

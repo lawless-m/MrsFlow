@@ -1849,6 +1849,48 @@ mod tests {
     }
 
     #[test]
+    fn text_end_basic() {
+        match eval_str(r#"Text.End("abcdef", 3)"#).unwrap() {
+            Value::Text(s) => assert_eq!(s, "def"),
+            other => panic!("expected text, got {:?}", other),
+        }
+        match eval_str(r#"Text.End("ab", 10)"#).unwrap() {
+            Value::Text(s) => assert_eq!(s, "ab"),
+            other => panic!("expected text, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn text_middle_with_and_without_count() {
+        match eval_str(r#"Text.Middle("abcdef", 2, 3)"#).unwrap() {
+            Value::Text(s) => assert_eq!(s, "cde"),
+            other => panic!("expected text, got {:?}", other),
+        }
+        // No count → rest of string.
+        match eval_str(r#"Text.Middle("abcdef", 2)"#).unwrap() {
+            Value::Text(s) => assert_eq!(s, "cdef"),
+            other => panic!("expected text, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn text_split_basic() {
+        match eval_str(r#"Text.Split("a,b,c", ",")"#).unwrap() {
+            Value::List(xs) => {
+                let strs: Vec<String> = xs
+                    .iter()
+                    .map(|v| match v {
+                        Value::Text(s) => s.clone(),
+                        _ => panic!(),
+                    })
+                    .collect();
+                assert_eq!(strs, vec!["a", "b", "c"]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn text_lower_basic() {
         match eval_str(r#"Text.Lower("Hello WORLD")"#).unwrap() {
             Value::Text(s) => assert_eq!(s, "hello world"),
