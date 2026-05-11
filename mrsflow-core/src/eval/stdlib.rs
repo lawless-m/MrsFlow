@@ -243,6 +243,14 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ("List.RemoveItems", two("list", "list2"), list_remove_items),
         ("List.Zip", one("lists"), list_zip),
         ("List.FirstN", two("list", "countOrCondition"), list_first_n),
+        (
+            "List.LastN",
+            vec![
+                Param { name: "list".into(),             optional: false, type_annotation: None },
+                Param { name: "countOrCondition".into(), optional: true,  type_annotation: None },
+            ],
+            list_last_n,
+        ),
         ("List.Skip", two("list", "countOrCondition"), list_skip),
         ("List.Distinct", one("list"), list_distinct),
         (
@@ -969,6 +977,23 @@ fn list_first_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         other => return Err(type_mismatch("non-negative integer", other)),
     };
     Ok(Value::List(list.iter().take(count).cloned().collect()))
+}
+
+fn list_last_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let list = expect_list(&args[0])?;
+    let count = match args.get(1) {
+        Some(Value::Number(n)) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
+        Some(Value::Function(_)) => {
+            return Err(MError::NotImplemented(
+                "List.LastN: predicate form not yet supported",
+            ));
+        }
+        Some(Value::Null) | None => 1,
+        Some(other) => return Err(type_mismatch("non-negative integer", other)),
+    };
+    let n = list.len();
+    let start = n.saturating_sub(count);
+    Ok(Value::List(list[start..].to_vec()))
 }
 
 /// Structural equality for primitive cell types only — number, text, logical,

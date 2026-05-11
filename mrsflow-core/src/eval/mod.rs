@@ -2940,6 +2940,34 @@ mod tests {
     }
 
     #[test]
+    fn list_last_n_default() {
+        match eval_str("List.LastN({10, 20, 30, 40})").unwrap() {
+            Value::List(xs) => {
+                let nums: Vec<f64> = xs.iter().map(|v| match v {
+                    Value::Number(n) => *n,
+                    _ => panic!(),
+                }).collect();
+                assert_eq!(nums, vec![40.0]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn list_last_n_custom() {
+        match eval_str("List.LastN({10, 20, 30, 40}, 2)").unwrap() {
+            Value::List(xs) => {
+                let nums: Vec<f64> = xs.iter().map(|v| match v {
+                    Value::Number(n) => *n,
+                    _ => panic!(),
+                }).collect();
+                assert_eq!(nums, vec![30.0, 40.0]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn list_average_basic() {
         match eval_str("List.Average({1, 2, 3, 4})").unwrap() {
             Value::Number(n) => assert_eq!(n, 2.5),
