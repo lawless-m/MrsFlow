@@ -97,6 +97,8 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ("Text.Contains", two("text", "substring"), text_contains),
         ("Text.Replace", three("text", "old", "new"), text_replace),
         ("Text.Trim", one("text"), text_trim),
+        ("Text.Lower", one("text"), text_lower),
+        ("Text.Upper", one("text"), text_upper),
         ("Text.Length", one("text"), text_length),
         ("Text.PositionOf", two("text", "substring"), text_position_of),
         ("Text.EndsWith", two("text", "suffix"), text_ends_with),
@@ -266,6 +268,16 @@ fn text_replace(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 fn text_trim(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     Ok(Value::Text(text.trim().to_string()))
+}
+
+fn text_lower(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let text = expect_text(&args[0])?;
+    Ok(Value::Text(text.to_lowercase()))
+}
+
+fn text_upper(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let text = expect_text(&args[0])?;
+    Ok(Value::Text(text.to_uppercase()))
 }
 
 fn text_length(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {

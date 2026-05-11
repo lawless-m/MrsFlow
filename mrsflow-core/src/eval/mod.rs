@@ -1849,6 +1849,22 @@ mod tests {
     }
 
     #[test]
+    fn text_lower_basic() {
+        match eval_str(r#"Text.Lower("Hello WORLD")"#).unwrap() {
+            Value::Text(s) => assert_eq!(s, "hello world"),
+            other => panic!("expected text, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn text_upper_basic() {
+        match eval_str(r#"Text.Upper("Hello world")"#).unwrap() {
+            Value::Text(s) => assert_eq!(s, "HELLO WORLD"),
+            other => panic!("expected text, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn text_starts_with_basic() {
         assert!(matches!(
             eval_str(r#"Text.StartsWith("hello", "he")"#).unwrap(),
