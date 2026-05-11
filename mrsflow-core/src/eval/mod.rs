@@ -19,7 +19,7 @@ pub use value::{Closure, MError, Table, ThunkState, TypeRep, Value};
 
 use std::rc::Rc;
 
-use crate::parser::{BinaryOp, Expr, UnaryOp};
+use crate::parser::{BinaryOp, Expr, Param, UnaryOp};
 
 /// Evaluate an M AST against the given environment, using `host` for any
 /// IO-doing stdlib calls. Returns the resulting Value or an `MError`.
@@ -122,11 +122,79 @@ pub fn evaluate(ast: &Expr, env: &Env, host: &dyn IoHost) -> Result<Value, MErro
             evaluate(body, &new_env, host)
         }
 
-        // --- Forms not in slice 1 ---
-        Expr::Function { .. }
-        | Expr::Each(_)
-        | Expr::Invoke { .. }
-        | Expr::FieldAccess { .. }
+        // --- Function literal: capture current env in a closure. Type
+        //     annotations on params and the return-type annotation are
+        //     parsed but ignored at runtime (eval-5 enforces). ---
+        Expr::Function {
+            params,
+            return_type: _,
+            body,
+        } => Ok(Value::Function(Closure {
+            params: params.clone(),
+            body: body.clone(),
+            env: Rc::clone(env),
+        })),
+
+        // --- `each E` is sugar for `(_) => E`. Build the closure directly. ---
+        Expr::Each(body) => Ok(Value::Function(Closure {
+            params: vec![Param {
+                name: "_".to_string(),
+                optional: false,
+                type_annotation: None,
+            }],
+            body: body.clone(),
+            env: Rc::clone(env),
+        })),
+
+        // --- Function invocation: eager arg evaluation, env extension, body eval. ---
+        Expr::Invoke { target, args } => {
+            let target_v = evaluate(target, env, host)?;
+            let target_v = force(target_v, &mut |e, env| evaluate(e, env, host))?;
+            let closure = match target_v {
+                Value::Function(c) => c,
+                other => {
+                    return Err(MError::TypeMismatch {
+                        expected: "function",
+                        found: type_name(&other),
+                    });
+                }
+            };
+
+            let required_count = closure.params.iter().filter(|p| !p.optional).count();
+            let max_count = closure.params.len();
+            if args.len() < required_count || args.len() > max_count {
+                return Err(MError::Other(format!(
+                    "invoke: arity mismatch: expected {} required (up to {} total), got {}",
+                    required_count,
+                    max_count,
+                    args.len()
+                )));
+            }
+
+            // Eagerly evaluate each arg, forcing thunks before binding
+            // (M is not call-by-name; design doc §1).
+            let mut arg_values = Vec::with_capacity(max_count);
+            for arg in args.iter() {
+                let v = evaluate(arg, env, host)?;
+                let v = force(v, &mut |e, env| evaluate(e, env, host))?;
+                arg_values.push(v);
+            }
+            // Optional params with no supplied arg → null per spec.
+            while arg_values.len() < max_count {
+                arg_values.push(Value::Null);
+            }
+
+            // Extend the closure's captured env with the bound params.
+            let mut call_env = Rc::clone(&closure.env);
+            for (param, value) in closure.params.iter().zip(arg_values.into_iter()) {
+                call_env = call_env.extend(param.name.clone(), value);
+            }
+
+            evaluate(&closure.body, &call_env, host)
+        }
+
+        // --- Forms not in slice 1 or 2 ---
+        Expr::FieldAccess { .. }
         | Expr::ItemAccess { .. }
         | Expr::Try { .. }
         | Expr::Error(_)
@@ -743,6 +811,109 @@ mod tests {
         let v2 = env.lookup("x").unwrap();
         force(v2, &mut eval).unwrap();
         assert_eq!(counter.get(), 1, "second force should hit memoised cache");
+    }
+
+    // --- Functions, invocation, each, @ self-reference (eval-2) ---
+
+    #[test]
+    fn invoke_identity_function() {
+        assert_eq!(eval_number("((x) => x)(42)"), 42.0);
+    }
+
+    #[test]
+    fn invoke_multi_arg() {
+        assert_eq!(eval_number("((x, y) => x + y)(3, 4)"), 7.0);
+    }
+
+    #[test]
+    fn invoke_optional_missing_is_null() {
+        assert_eq!(
+            eval_number("((x, optional y) => if y = null then x else x + y)(5)"),
+            5.0
+        );
+    }
+
+    #[test]
+    fn invoke_optional_supplied() {
+        assert_eq!(
+            eval_number("((x, optional y) => if y = null then x else x + y)(5, 10)"),
+            15.0
+        );
+    }
+
+    #[test]
+    fn invoke_arity_too_few() {
+        match eval_str("((x, y) => x + y)(1)") {
+            Err(MError::Other(msg)) => assert!(msg.contains("arity"), "got: {}", msg),
+            other => panic!("expected arity error, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn invoke_arity_too_many() {
+        match eval_str("((x) => x)(1, 2)") {
+            Err(MError::Other(msg)) => assert!(msg.contains("arity"), "got: {}", msg),
+            other => panic!("expected arity error, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn invoke_non_function() {
+        match eval_str("(42)(1)") {
+            Err(MError::TypeMismatch {
+                expected: "function",
+                found: "number",
+            }) => {}
+            other => panic!("expected TypeMismatch on non-function, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn each_desugars_to_underscore_lambda() {
+        assert_eq!(eval_number("(each _ + 1)(5)"), 6.0);
+    }
+
+    #[test]
+    fn closure_captures_outer_let_binding() {
+        assert_eq!(eval_number("let n = 10 in ((x) => x + n)(5)"), 15.0);
+    }
+
+    #[test]
+    fn nested_closure_currying() {
+        assert_eq!(eval_number("((x) => (y) => x + y)(3)(4)"), 7.0);
+    }
+
+    #[test]
+    fn recursive_function_via_at_self_reference() {
+        // Killer test: the @fact reference inside the function body resolves
+        // against the let env that contains the function's own binding.
+        // Thunk-in-same-env design means @ is just regular lookup.
+        assert_eq!(
+            eval_number(
+                "let fact = (n) => if n <= 1 then 1 else n * @fact(n - 1) in fact(5)"
+            ),
+            120.0
+        );
+    }
+
+    #[test]
+    fn mutually_recursive_functions_via_at() {
+        assert_eq!(
+            eval_bool(
+                "let even = (n) => if n = 0 then true else @odd(n - 1), \
+                     odd = (n) => if n = 0 then false else @even(n - 1) \
+                 in even(4)"
+            ),
+            true
+        );
+    }
+
+    #[test]
+    fn function_literal_evaluates_to_function_value() {
+        match eval_str("(x) => x + 1") {
+            Ok(Value::Function(_)) => {}
+            other => panic!("expected Function value, got {:?}", other),
+        }
     }
 
     #[test]

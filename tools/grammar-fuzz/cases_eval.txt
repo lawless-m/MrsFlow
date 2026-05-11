@@ -56,3 +56,13 @@ let x = "hello" in x & " world"
 let x = 1, y = x + 1, z = y + 1 in z
 if (let x = 1 in x = 1) then "ok" else "no"
 let x = false in if x then 1 else 2
+((x) => x)(42)
+((x, y) => x + y)(3, 4)
+((x, optional y) => if y = null then x else x + y)(5)
+((x, optional y) => if y = null then x else x + y)(5, 10)
+(each _ + 1)(5)
+let n = 10 in ((x) => x + n)(5)
+let fact = (n) => if n <= 1 then 1 else n * @fact(n - 1) in fact(5)
+let even = (n) => if n = 0 then true else @odd(n - 1), odd = (n) => if n = 0 then false else @even(n - 1) in even(4)
+((x) => x * x)(7)
+((x) => (y) => x + y)(3)(4)

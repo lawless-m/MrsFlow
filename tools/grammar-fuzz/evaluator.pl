@@ -137,6 +137,23 @@ eval(let(Bindings, Body), Env, Value) :-
     extend_lazy_bindings(Bindings, Env, NewEnv),
     eval(Body, NewEnv, Value).
 
+% Function literal — capture current env in a closure. Return type and
+% per-param type annotations are parsed but ignored at runtime (eval-5
+% enforces them).
+eval(fn(Params, _Ret, Body), Env, closure(Params, Body, Env)).
+
+% `each E` is sugar for `(_) => E` — build the closure directly with a
+% single required param named "_".
+eval(each(Body), Env, closure([param(['_'], req, none)], Body, Env)).
+
+% Function invocation — eager arg evaluation (force each), arity check,
+% bind to params (missing optional → null), eval body in extended env.
+eval(invoke(Target, Args), Env, Value) :-
+    eval(Target, Env, TargetV0),
+    force(TargetV0, closure(Params, Body, CEnv)),
+    bind_args(Params, Args, Env, Bindings),
+    eval(Body, [frame(Bindings) | CEnv], Value).
+
 % --- force/2: thunk → forced value ---
 %
 % Slice-1 recomputes; memoisation TBD when a real workload shows it matters.
@@ -168,6 +185,36 @@ build_lazy_frame([], _, []).
 build_lazy_frame([binding(Name, Expr) | Rest], Env,
                  [Name-thunk(Expr, Env) | RestFrame]) :-
     build_lazy_frame(Rest, Env, RestFrame).
+
+% Bind invocation arguments to a closure's params. Args are evaluated in the
+% *caller's* env (CallerEnv), then forced eagerly — M is not call-by-name.
+% Optional params with no matching arg default to null. If there are fewer
+% args than required params (or more args than total params), bind_args fails
+% — which matches Rust's "arity mismatch" error: both sides produce empty
+% stdout on the differential, agreeing structurally.
+bind_args(Params, Args, CallerEnv, Bindings) :-
+    bind_args_(Params, Args, CallerEnv, Bindings).
+
+bind_args_([], [], _, []).
+% Required param + supplied arg: eval and force, then bind.
+bind_args_([param(Name, req, _) | PRest], [Arg | ARest], CallerEnv,
+           [Name-Value | BRest]) :-
+    eval(Arg, CallerEnv, V0),
+    force(V0, Value),
+    bind_args_(PRest, ARest, CallerEnv, BRest).
+% Optional param + supplied arg: same as required.
+bind_args_([param(Name, opt, _) | PRest], [Arg | ARest], CallerEnv,
+           [Name-Value | BRest]) :-
+    eval(Arg, CallerEnv, V0),
+    force(V0, Value),
+    bind_args_(PRest, ARest, CallerEnv, BRest).
+% Optional param + no more args: bind to null and recurse with [] args.
+bind_args_([param(Name, opt, _) | PRest], [], CallerEnv,
+           [Name-null | BRest]) :-
+    bind_args_(PRest, [], CallerEnv, BRest).
+% Required param + no more args fails (arity mismatch).
+% Extra args (more args than params) also fails — the base case ([], [], ...)
+% doesn't match and no other clause does.
 
 % --- helpers ---
 
