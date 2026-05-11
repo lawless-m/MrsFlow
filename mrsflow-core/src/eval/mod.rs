@@ -19,7 +19,9 @@ pub use env::{Env, EnvNode, EnvOps};
 pub use iohost::{IoError, IoHost, NoIoHost};
 pub use sexpr::{value_to_sexpr, write_value as write_sexpr};
 pub use stdlib::{cell_to_value, root_env};
-pub use value::{BuiltinFn, Closure, FnBody, MError, Record, Table, ThunkState, TypeRep, Value};
+pub use value::{
+    BuiltinFn, Closure, FnBody, MError, Record, Table, TableRepr, ThunkState, TypeRep, Value,
+};
 
 use std::rc::Rc;
 
@@ -377,7 +379,7 @@ pub fn evaluate(ast: &Expr, env: &Env, host: &dyn IoHost) -> Result<Value, MErro
                         )));
                     }
                     let idx = i as usize;
-                    let n_rows = t.batch.num_rows();
+                    let n_rows = t.num_rows();
                     if idx >= n_rows {
                         if *optional {
                             Ok(Value::Null)
@@ -388,7 +390,7 @@ pub fn evaluate(ast: &Expr, env: &Env, host: &dyn IoHost) -> Result<Value, MErro
                             )))
                         }
                     } else {
-                        stdlib::row_to_record(&t.batch, idx)
+                        stdlib::row_to_record(&t, idx)
                     }
                 }
                 Value::Record(_) => Err(MError::NotImplemented(
@@ -1726,9 +1728,7 @@ mod tests {
             _sql: &str,
             _opts: Option<&Value>,
         ) -> Result<Value, IoError> {
-            Ok(Value::Table(super::Table {
-                batch: self.batch.clone(),
-            }))
+            Ok(Value::Table(super::Table::from_arrow(self.batch.clone())))
         }
         fn odbc_data_source(
             &self,
@@ -1769,15 +1769,9 @@ mod tests {
         let v = deep_force(v, &host).unwrap();
         match v {
             Value::Table(t) => {
-                assert_eq!(t.batch.num_rows(), 2);
-                assert_eq!(t.batch.num_columns(), 2);
-                let names: Vec<String> = t
-                    .batch
-                    .schema()
-                    .fields()
-                    .iter()
-                    .map(|f| f.name().clone())
-                    .collect();
+                assert_eq!(t.num_rows(), 2);
+                assert_eq!(t.num_columns(), 2);
+                let names: Vec<String> = t.column_names();
                 assert_eq!(names, vec!["name".to_string(), "v".to_string()]);
             }
             other => panic!("expected table from Odbc.Query, got {:?}", other),
@@ -1794,9 +1788,9 @@ mod tests {
         .unwrap()
         {
             Value::Table(t) => {
-                let dtype = t.batch.schema().field(0).data_type().clone();
+                let dtype = t.as_arrow().unwrap().schema().field(0).data_type().clone();
                 assert_eq!(format!("{:?}", dtype), "Float64");
-                assert_eq!(t.batch.num_rows(), 2);
+                assert_eq!(t.num_rows(), 2);
             }
             other => panic!("expected table, got {:?}", other),
         }
@@ -1812,7 +1806,8 @@ mod tests {
             Value::Table(t) => {
                 use arrow::array::Float64Array;
                 let col = t
-                    .batch
+                    .as_arrow()
+                    .unwrap()
                     .column(0)
                     .as_any()
                     .downcast_ref::<Float64Array>()
@@ -1836,7 +1831,8 @@ mod tests {
             Value::Table(t) => {
                 use arrow::array::Float64Array;
                 let col = t
-                    .batch
+                    .as_arrow()
+                    .unwrap()
                     .column(0)
                     .as_any()
                     .downcast_ref::<Float64Array>()
@@ -1972,7 +1968,7 @@ mod tests {
         {
             Value::Table(t) => {
                 use arrow::datatypes::DataType;
-                assert_eq!(t.batch.schema().field(1).data_type(), &DataType::Float64);
+                assert_eq!(t.as_arrow().unwrap().schema().field(1).data_type(), &DataType::Float64);
             }
             other => panic!("expected table, got {:?}", other),
         }
@@ -1987,9 +1983,10 @@ mod tests {
         {
             Value::Table(t) => {
                 use arrow::array::Float64Array;
-                assert_eq!(t.batch.num_rows(), 2);
+                assert_eq!(t.num_rows(), 2);
                 let col = t
-                    .batch
+                    .as_arrow()
+                    .unwrap()
                     .column(0)
                     .as_any()
                     .downcast_ref::<Float64Array>()
@@ -2010,13 +2007,7 @@ mod tests {
         .unwrap()
         {
             Value::Table(t) => {
-                let names: Vec<String> = t
-                    .batch
-                    .schema()
-                    .fields()
-                    .iter()
-                    .map(|f| f.name().clone())
-                    .collect();
+                let names: Vec<String> = t.column_names();
                 assert_eq!(names, vec!["c", "a", "b"]);
             }
             other => panic!("expected table, got {:?}", other),
@@ -2371,7 +2362,7 @@ mod tests {
         )
         .unwrap()
         {
-            Value::Table(t) => assert_eq!(t.batch.num_rows(), 2),
+            Value::Table(t) => assert_eq!(t.num_rows(), 2),
             other => panic!("expected table, got {:?}", other),
         }
     }
@@ -2478,7 +2469,7 @@ mod tests {
         {
             Value::Table(t) => {
                 use arrow::datatypes::DataType;
-                assert_eq!(t.batch.schema().field(1).data_type(), &DataType::Utf8);
+                assert_eq!(t.as_arrow().unwrap().schema().field(1).data_type(), &DataType::Utf8);
             }
             other => panic!("expected table, got {:?}", other),
         }
@@ -2508,8 +2499,8 @@ mod tests {
         .unwrap()
         {
             Value::Table(t) => {
-                assert_eq!(t.batch.num_rows(), 2);
-                assert_eq!(t.batch.num_columns(), 1);
+                assert_eq!(t.num_rows(), 2);
+                assert_eq!(t.num_columns(), 1);
             }
             other => panic!("expected table, got {:?}", other),
         }
@@ -2533,13 +2524,7 @@ mod tests {
         .unwrap()
         {
             Value::Table(t) => {
-                let names: Vec<String> = t
-                    .batch
-                    .schema()
-                    .fields()
-                    .iter()
-                    .map(|f| f.name().clone())
-                    .collect();
+                let names: Vec<String> = t.column_names();
                 assert_eq!(names, vec!["b".to_string(), "a".to_string()]);
             }
             other => panic!("expected table, got {:?}", other),
@@ -2553,7 +2538,7 @@ mod tests {
         )
         .unwrap()
         {
-            Value::Table(t) => assert_eq!(t.batch.num_rows(), 2),
+            Value::Table(t) => assert_eq!(t.num_rows(), 2),
             other => panic!("expected table, got {:?}", other),
         }
     }
@@ -2566,8 +2551,8 @@ mod tests {
         .unwrap()
         {
             Value::Table(t) => {
-                assert_eq!(t.batch.num_columns(), 2);
-                assert_eq!(t.batch.schema().field(1).name(), "doubled");
+                assert_eq!(t.num_columns(), 2);
+                assert_eq!(t.as_arrow().unwrap().schema().field(1).name(), "doubled");
             }
             other => panic!("expected table, got {:?}", other),
         }
@@ -2577,8 +2562,8 @@ mod tests {
     fn table_from_rows_basic() {
         match eval_str(r#"Table.FromRows({{1,2},{3,4}}, {"a","b"})"#).unwrap() {
             Value::Table(t) => {
-                assert_eq!(t.batch.num_rows(), 2);
-                assert_eq!(t.batch.num_columns(), 2);
+                assert_eq!(t.num_rows(), 2);
+                assert_eq!(t.num_columns(), 2);
             }
             other => panic!("expected table, got {:?}", other),
         }
@@ -2593,15 +2578,9 @@ mod tests {
         .unwrap()
         {
             Value::Table(t) => {
-                let names: Vec<String> = t
-                    .batch
-                    .schema()
-                    .fields()
-                    .iter()
-                    .map(|f| f.name().clone())
-                    .collect();
+                let names: Vec<String> = t.column_names();
                 assert_eq!(names, vec!["a".to_string(), "b".to_string()]);
-                assert_eq!(t.batch.num_rows(), 1);
+                assert_eq!(t.num_rows(), 1);
             }
             other => panic!("expected table, got {:?}", other),
         }
@@ -2613,8 +2592,8 @@ mod tests {
     fn table_constructor_basic() {
         match eval_str(r#"#table({"a", "b"}, {{1, 2}, {3, 4}})"#).unwrap() {
             Value::Table(t) => {
-                assert_eq!(t.batch.num_rows(), 2);
-                assert_eq!(t.batch.num_columns(), 2);
+                assert_eq!(t.num_rows(), 2);
+                assert_eq!(t.num_columns(), 2);
             }
             other => panic!("expected table, got {:?}", other),
         }
@@ -2625,16 +2604,16 @@ mod tests {
         // Empty table with no rows but two columns works.
         match eval_str(r#"#table({"a", "b"}, {})"#).unwrap() {
             Value::Table(t) => {
-                assert_eq!(t.batch.num_rows(), 0);
-                assert_eq!(t.batch.num_columns(), 2);
+                assert_eq!(t.num_rows(), 0);
+                assert_eq!(t.num_columns(), 2);
             }
             other => panic!("expected table, got {:?}", other),
         }
         // Empty schema works too (special-cased via try_new_with_options).
         match eval_str("#table({}, {})").unwrap() {
             Value::Table(t) => {
-                assert_eq!(t.batch.num_rows(), 0);
-                assert_eq!(t.batch.num_columns(), 0);
+                assert_eq!(t.num_rows(), 0);
+                assert_eq!(t.num_columns(), 0);
             }
             other => panic!("expected table, got {:?}", other),
         }
@@ -2665,13 +2644,7 @@ mod tests {
         .unwrap()
         {
             Value::Table(t) => {
-                let names: Vec<String> = t
-                    .batch
-                    .schema()
-                    .fields()
-                    .iter()
-                    .map(|f| f.name().clone())
-                    .collect();
+                let names: Vec<String> = t.column_names();
                 assert_eq!(names, vec!["x".to_string(), "b".to_string()]);
             }
             other => panic!("expected table, got {:?}", other),
@@ -2686,8 +2659,8 @@ mod tests {
         .unwrap()
         {
             Value::Table(t) => {
-                assert_eq!(t.batch.num_columns(), 1);
-                assert_eq!(t.batch.schema().field(0).name(), "b");
+                assert_eq!(t.num_columns(), 1);
+                assert_eq!(t.as_arrow().unwrap().schema().field(0).name(), "b");
             }
             other => panic!("expected table, got {:?}", other),
         }

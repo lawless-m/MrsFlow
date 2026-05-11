@@ -122,13 +122,78 @@ pub enum ThunkState {
     Forced(Value),
 }
 
-/// Arrow-backed table value. The columnar `RecordBatch` is the canonical
-/// representation: every `Table.*` builtin operates on it directly, and
-/// Parquet IO (eval-7b) reads and writes it without an intermediate value
-/// pass. Equality and clone go through `RecordBatch` semantics.
+/// Table representation. Two backings: Arrow `RecordBatch` (typed, uniform
+/// columns — what we use for Parquet pipelines and typed-cast operations),
+/// or a row-list with per-cell `Value` (heterogeneous: mixed-primitive
+/// columns, nested Record/Table/List cells — the M-shaped fallback).
+///
+/// Slice 1 of the het-cell refactor: the enum exists but only Arrow is
+/// constructed; Rows is wired into the type system for later slices to
+/// populate. Existing behaviour is preserved.
+#[derive(Debug, Clone)]
+pub enum TableRepr {
+    Arrow(arrow::record_batch::RecordBatch),
+    Rows {
+        columns: Vec<String>,
+        rows: Vec<Vec<Value>>,
+    },
+}
+
+/// Table value — wraps a [`TableRepr`]. Use the inherent helpers
+/// (`column_names`, `num_rows`, `as_arrow`, `try_to_arrow`) instead of
+/// reaching into the variant directly.
 #[derive(Debug, Clone)]
 pub struct Table {
-    pub batch: arrow::record_batch::RecordBatch,
+    pub repr: TableRepr,
+}
+
+impl Table {
+    pub fn from_arrow(batch: arrow::record_batch::RecordBatch) -> Self {
+        Self { repr: TableRepr::Arrow(batch) }
+    }
+
+    pub fn from_rows(columns: Vec<String>, rows: Vec<Vec<Value>>) -> Self {
+        Self { repr: TableRepr::Rows { columns, rows } }
+    }
+
+    pub fn column_names(&self) -> Vec<String> {
+        match &self.repr {
+            TableRepr::Arrow(b) => b.schema().fields().iter().map(|f| f.name().clone()).collect(),
+            TableRepr::Rows { columns, .. } => columns.clone(),
+        }
+    }
+
+    pub fn num_rows(&self) -> usize {
+        match &self.repr {
+            TableRepr::Arrow(b) => b.num_rows(),
+            TableRepr::Rows { rows, .. } => rows.len(),
+        }
+    }
+
+    pub fn num_columns(&self) -> usize {
+        match &self.repr {
+            TableRepr::Arrow(b) => b.num_columns(),
+            TableRepr::Rows { columns, .. } => columns.len(),
+        }
+    }
+
+    /// Borrow as a `RecordBatch`. Errors if this is a Rows-backed table.
+    /// Slice 1 always succeeds since Rows is not yet constructed.
+    pub fn as_arrow(&self) -> Result<&arrow::record_batch::RecordBatch, MError> {
+        match &self.repr {
+            TableRepr::Arrow(b) => Ok(b),
+            TableRepr::Rows { .. } => Err(MError::NotImplemented(
+                "operation requires Arrow-backed table (Rows-backed support pending)",
+            )),
+        }
+    }
+
+    /// Owned `RecordBatch` (for sinks that take ownership, e.g. Parquet writer).
+    /// Arrow variant: cheap Arc-based clone. Rows variant: future slice will
+    /// attempt to encode primitive columns; for slice 1 it just errors.
+    pub fn try_to_arrow(&self) -> Result<arrow::record_batch::RecordBatch, MError> {
+        self.as_arrow().cloned()
+    }
 }
 
 /// Errors raised during evaluation. Per design doc §07 §2, errors propagate

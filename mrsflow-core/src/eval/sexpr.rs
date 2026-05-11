@@ -79,16 +79,16 @@ pub fn write_value(out: &mut String, v: &Value) {
         }
         Value::Table(t) => {
             out.push_str("(table ((cols (");
-            let schema = t.batch.schema();
-            for (i, field) in schema.fields().iter().enumerate() {
+            let names = t.column_names();
+            for (i, name) in names.iter().enumerate() {
                 if i > 0 {
                     out.push(' ');
                 }
-                write_quoted(out, field.name());
+                write_quoted(out, name);
             }
             out.push_str(")) (rows (");
-            let n_rows = t.batch.num_rows();
-            let n_cols = t.batch.num_columns();
+            let n_rows = t.num_rows();
+            let n_cols = t.num_columns();
             for row in 0..n_rows {
                 if row > 0 {
                     out.push(' ');
@@ -98,7 +98,7 @@ pub fn write_value(out: &mut String, v: &Value) {
                     if col > 0 {
                         out.push(' ');
                     }
-                    let cell = cell_to_value(&t.batch, col, row).unwrap_or(Value::Null);
+                    let cell = cell_to_value(t, col, row).unwrap_or(Value::Null);
                     write_value(out, &cell);
                 }
                 out.push(')');

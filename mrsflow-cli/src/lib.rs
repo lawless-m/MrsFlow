@@ -40,18 +40,21 @@ impl IoHost for CliIoHost {
         }
         let combined = concatenate_batches(&batches)
             .map_err(|e| IoError::Other(format!("parquet read {}: {}", path, e)))?;
-        Ok(Value::Table(Table { batch: combined }))
+        Ok(Value::Table(Table::from_arrow(combined)))
     }
 
     fn parquet_write(&self, path: &str, value: &Value) -> Result<(), IoError> {
-        let batch = match value {
-            Value::Table(t) => &t.batch,
+        let batch_owned = match value {
+            Value::Table(t) => t
+                .try_to_arrow()
+                .map_err(|e| IoError::Other(format!("parquet_write: {:?}", e)))?,
             _ => {
                 return Err(IoError::Other(
                     "parquet_write: value must be a table".into(),
                 ));
             }
         };
+        let batch = &batch_owned;
         let parent = Path::new(path).parent();
         if let Some(p) = parent {
             if !p.as_os_str().is_empty() {
