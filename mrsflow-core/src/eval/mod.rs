@@ -1960,6 +1960,41 @@ mod tests {
     // --- het-cell unlocked: nested-cell expand ops ---
 
     #[test]
+    fn table_expand_table_column_basic() {
+        let src = r#"
+            let
+                inner1 = #table({"a", "b"}, {{10, "x"}, {20, "y"}}),
+                inner2 = #table({"a", "b"}, {{30, "z"}}),
+                t = #table({"id", "sub"}, {{1, inner1}, {2, inner2}})
+            in Table.ExpandTableColumn(t, "sub", {"a", "b"})
+        "#;
+        match eval_str(src).unwrap() {
+            Value::Table(t) => {
+                // Original "sub" removed; "a", "b" inserted in its place.
+                assert_eq!(t.column_names(), vec!["id", "a", "b"]);
+                assert_eq!(t.num_rows(), 3); // 2 + 1
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_expand_table_column_custom_names() {
+        let src = r#"
+            let
+                inner = #table({"a"}, {{42}}),
+                t = #table({"id", "sub"}, {{1, inner}})
+            in Table.ExpandTableColumn(t, "sub", {"a"}, {"renamed"})
+        "#;
+        match eval_str(src).unwrap() {
+            Value::Table(t) => {
+                assert_eq!(t.column_names(), vec!["id", "renamed"]);
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn table_expand_list_column_basic() {
         let src = r#"
             let t = #table({"id", "xs"}, {{1, {10, 20}}, {2, {30}}})

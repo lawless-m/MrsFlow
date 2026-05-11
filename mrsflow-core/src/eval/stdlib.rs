@@ -279,6 +279,16 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
             two("table", "column"),
             table_expand_list_column,
         ),
+        (
+            "Table.ExpandTableColumn",
+            vec![
+                Param { name: "table".into(),          optional: false, type_annotation: None },
+                Param { name: "column".into(),         optional: false, type_annotation: None },
+                Param { name: "columnNames".into(),    optional: false, type_annotation: None },
+                Param { name: "newColumnNames".into(), optional: true,  type_annotation: None },
+            ],
+            table_expand_table_column,
+        ),
         ("Table.ReorderColumns", two("table", "columnOrder"), table_reorder_columns),
         ("Table.TransformRows", two("table", "transform"), table_transform_rows),
         ("Table.InsertRows", three("table", "offset", "rows"), table_insert_rows),
@@ -2219,6 +2229,88 @@ fn table_expand_list_column(args: &[Value], _host: &dyn IoHost) -> Result<Value,
         }
     }
     Ok(Value::Table(values_to_table(&names, &out_rows)?))
+}
+
+fn table_expand_table_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let column = expect_text(&args[1])?.to_string();
+    let column_names = expect_text_list(&args[2], "Table.ExpandTableColumn: columnNames")?;
+    let new_column_names = match args.get(3) {
+        Some(Value::Null) | None => column_names.clone(),
+        Some(other) => expect_text_list(other, "Table.ExpandTableColumn: newColumnNames")?,
+    };
+    if new_column_names.len() != column_names.len() {
+        return Err(MError::Other(format!(
+            "Table.ExpandTableColumn: newColumnNames has {} items, expected {}",
+            new_column_names.len(),
+            column_names.len()
+        )));
+    }
+
+    let (outer_names, outer_rows) = table_to_rows(table)?;
+    let col_idx = outer_names.iter().position(|n| n == &column).ok_or_else(|| {
+        MError::Other(format!(
+            "Table.ExpandTableColumn: column not found: {}",
+            column
+        ))
+    })?;
+
+    // Output column order: outer columns up to col_idx, then lifted columns,
+    // then outer columns after col_idx (the target column is removed).
+    let mut out_names: Vec<String> = Vec::with_capacity(outer_names.len() + new_column_names.len() - 1);
+    out_names.extend_from_slice(&outer_names[..col_idx]);
+    out_names.extend_from_slice(&new_column_names);
+    out_names.extend_from_slice(&outer_names[col_idx + 1..]);
+
+    let mut out_rows: Vec<Vec<Value>> = Vec::new();
+    for row in &outer_rows {
+        match &row[col_idx] {
+            Value::Table(inner) => {
+                let (inner_names, inner_rows) = table_to_rows(inner)?;
+                // Resolve indices once per outer row.
+                let lifted_indices: Result<Vec<usize>, MError> = column_names
+                    .iter()
+                    .map(|n| {
+                        inner_names.iter().position(|x| x == n).ok_or_else(|| {
+                            MError::Other(format!(
+                                "Table.ExpandTableColumn: inner column not found: {}",
+                                n
+                            ))
+                        })
+                    })
+                    .collect();
+                let lifted_indices = lifted_indices?;
+                // Empty inner table → outer row drops (matches PQ).
+                for inner_row in &inner_rows {
+                    let mut new_row = Vec::with_capacity(out_names.len());
+                    new_row.extend_from_slice(&row[..col_idx]);
+                    for &i in &lifted_indices {
+                        new_row.push(inner_row[i].clone());
+                    }
+                    new_row.extend_from_slice(&row[col_idx + 1..]);
+                    out_rows.push(new_row);
+                }
+            }
+            Value::Null => {
+                // Null cell → emit one row with all lifted columns null.
+                let mut new_row = Vec::with_capacity(out_names.len());
+                new_row.extend_from_slice(&row[..col_idx]);
+                for _ in &column_names {
+                    new_row.push(Value::Null);
+                }
+                new_row.extend_from_slice(&row[col_idx + 1..]);
+                out_rows.push(new_row);
+            }
+            other => {
+                return Err(MError::Other(format!(
+                    "Table.ExpandTableColumn: cell at column {} is not a table (got {})",
+                    column,
+                    super::type_name(other)
+                )));
+            }
+        }
+    }
+    Ok(Value::Table(values_to_table(&out_names, &out_rows)?))
 }
 
 fn table_combine(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
