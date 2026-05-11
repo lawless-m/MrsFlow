@@ -204,6 +204,14 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ("Table.TransformRows", two("table", "transform"), table_transform_rows),
         ("Table.InsertRows", three("table", "offset", "rows"), table_insert_rows),
         ("Date.FromText", one("text"), date_from_text),
+        (
+            "Date.ToText",
+            vec![
+                Param { name: "date".into(),   optional: false, type_annotation: None },
+                Param { name: "format".into(), optional: true,  type_annotation: None },
+            ],
+            date_to_text,
+        ),
         ("Odbc.Query", two("connection", "sql"), odbc_query),
     ]
 }
@@ -1662,6 +1670,32 @@ fn table_insert_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError>
 
     let batch = values_to_record_batch(&names, &rows)?;
     Ok(Value::Table(Table { batch }))
+}
+
+fn date_to_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let d = match &args[0] {
+        Value::Null => return Ok(Value::Null),
+        Value::Date(d) => *d,
+        other => return Err(type_mismatch("date", other)),
+    };
+    let chrono_fmt = match args.get(1) {
+        Some(Value::Null) | None => "%Y-%m-%d",
+        Some(Value::Text(s)) => match s.as_str() {
+            "yyyy-MM-dd" => "%Y-%m-%d",
+            "dd/MM/yyyy" => "%d/%m/%Y",
+            "dd-MM-yyyy" => "%d-%m-%Y",
+            "MM/dd/yyyy" => "%m/%d/%Y",
+            "yyyy/MM/dd" => "%Y/%m/%d",
+            other => {
+                return Err(MError::Other(format!(
+                    "Date.ToText: unsupported format {:?}; supported: yyyy-MM-dd, dd/MM/yyyy, dd-MM-yyyy, MM/dd/yyyy, yyyy/MM/dd",
+                    other
+                )));
+            }
+        },
+        Some(other) => return Err(type_mismatch("text or null", other)),
+    };
+    Ok(Value::Text(d.format(chrono_fmt).to_string()))
 }
 
 fn date_from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {

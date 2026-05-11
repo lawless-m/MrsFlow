@@ -1979,6 +1979,30 @@ mod tests {
     }
 
     #[test]
+    fn date_to_text_iso_default() {
+        match eval_str("Date.ToText(#date(2024, 1, 15))").unwrap() {
+            Value::Text(s) => assert_eq!(s, "2024-01-15"),
+            other => panic!("expected text, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn date_to_text_uk_format() {
+        match eval_str(r#"Date.ToText(#date(2024, 1, 15), "dd/MM/yyyy")"#).unwrap() {
+            Value::Text(s) => assert_eq!(s, "15/01/2024"),
+            other => panic!("expected text, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn date_to_text_unknown_format_errors() {
+        match eval_str(r#"Date.ToText(#date(2024, 1, 15), "yyyy.MM.dd")"#) {
+            Err(MError::Other(msg)) => assert!(msg.contains("unsupported format"), "got: {}", msg),
+            other => panic!("expected error, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn date_from_text_iso_and_uk() {
         match eval_str(r#"Date.FromText("2024-01-15")"#).unwrap() {
             Value::Date(d) => assert_eq!(d.to_string(), "2024-01-15"),
