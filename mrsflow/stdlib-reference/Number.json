@@ -1,0 +1,507 @@
+[
+  {
+    "name": "Number.Abs",
+    "signature": "Number.Abs(number as nullable number) as nullable number",
+    "description": "Returns the absolute value of `number`. If `number` is null, `Number.Abs` returns null. * `number`: A `number` for which the absolute value is to be calculated.",
+    "examples": [
+      {
+        "usage": "Number.Abs(-3)",
+        "output": "3"
+      }
+    ]
+  },
+  {
+    "name": "Number.Acos",
+    "signature": "Number.Acos(number as nullable number) as nullable number",
+    "description": "Returns the arccosine of `number`.",
+    "examples": []
+  },
+  {
+    "name": "Number.Asin",
+    "signature": "Number.Asin(number as nullable number) as nullable number",
+    "description": "Returns the arcsine of `number`.",
+    "examples": []
+  },
+  {
+    "name": "Number.Atan",
+    "signature": "Number.Atan(number as nullable number) as nullable number",
+    "description": "Returns the arctangent of `number`.",
+    "examples": []
+  },
+  {
+    "name": "Number.Atan2",
+    "signature": "Number.Atan2(y as nullable number, x as nullable number) as nullable number",
+    "description": "Returns the angle, in radians, whose tangent is the quotient `y`/`x` of the two numbers `y` and `x`.",
+    "examples": []
+  },
+  {
+    "name": "Number.BitwiseAnd",
+    "signature": "Number.BitwiseAnd(number1 as nullable number, number2 as nullable number) as nullable number",
+    "description": "Returns the result of performing a bitwise \"And\" operation between `number1` and `number2`.",
+    "examples": []
+  },
+  {
+    "name": "Number.BitwiseNot",
+    "signature": "Number.BitwiseNot(number as any) as any",
+    "description": "Returns the result of performing a bitwise \"Not\" operation on `number`.",
+    "examples": []
+  },
+  {
+    "name": "Number.BitwiseOr",
+    "signature": "Number.BitwiseOr(number1 as nullable number, number2 as nullable number) as nullable number",
+    "description": "Returns the result of performing a bitwise \"Or\" between `number1` and `number2`.",
+    "examples": []
+  },
+  {
+    "name": "Number.BitwiseShiftLeft",
+    "signature": "Number.BitwiseShiftLeft(number1 as nullable number, number2 as nullable number) as nullable number",
+    "description": "Returns the result of performing a bitwise shift to the left on `number1`, by the specified number of bits `number2`.",
+    "examples": []
+  },
+  {
+    "name": "Number.BitwiseShiftRight",
+    "signature": "Number.BitwiseShiftRight(number1 as nullable number, number2 as nullable number) as nullable number",
+    "description": "Returns the result of performing a bitwise shift to the right on `number1`, by the specified number of bits `number2`.",
+    "examples": []
+  },
+  {
+    "name": "Number.BitwiseXor",
+    "signature": "Number.BitwiseXor(number1 as nullable number, number2 as nullable number) as nullable number",
+    "description": "Returns the result of performing a bitwise \"XOR\" (Exclusive-OR) between `number1` and `number2`.",
+    "examples": []
+  },
+  {
+    "name": "Number.Combinations",
+    "signature": "Number.Combinations(setSize as nullable number, combinationSize as nullable number) as nullable number",
+    "description": "Returns the number of unique combinations from a list of items, `setSize` with specified combination size, `combinationSize`. * `setSize`: The number of items in the list. * `combinationSize`: The number of items in each combination.",
+    "examples": [
+      {
+        "usage": "Number.Combinations(5, 3)",
+        "output": "10"
+      }
+    ]
+  },
+  {
+    "name": "Number.Cos",
+    "signature": "Number.Cos(number as nullable number) as nullable number",
+    "description": "Returns the cosine of the specified angle. * `number`: An angle, measured in radians.",
+    "examples": [
+      {
+        "usage": "Number.Cos(0)",
+        "output": "1"
+      },
+      {
+        "usage": "Number.Cos(Number.PI)",
+        "output": "-1"
+      }
+    ]
+  },
+  {
+    "name": "Number.Cosh",
+    "signature": "Number.Cosh(number as nullable number) as nullable number",
+    "description": "Returns the hyperbolic cosine of `number`.",
+    "examples": []
+  },
+  {
+    "name": "Number.Exp",
+    "signature": "Number.Exp(number as nullable number) as nullable number",
+    "description": "Returns the result of raising e to the power of `number` (exponential function). * `number`: A `number` for which the exponential function is to be calculated. If `number` is null, `Number.Exp` returns null.",
+    "examples": [
+      {
+        "usage": "Number.Exp(3)",
+        "output": "20.085536923187668"
+      }
+    ]
+  },
+  {
+    "name": "Number.Factorial",
+    "signature": "Number.Factorial(number as nullable number) as nullable number",
+    "description": "Returns the factorial of the number `number`.",
+    "examples": [
+      {
+        "usage": "Number.Factorial(10)",
+        "output": "3628800"
+      }
+    ]
+  },
+  {
+    "name": "Number.From",
+    "signature": "Number.From(value as any, optional culture as nullable text) as nullable number",
+    "description": "Returns a `number` value from the given `value`. An optional `culture` may also be provided (for example, \"en-US\"). If the given `value` is `null`, `Number.From` returns `null`. If the given `value` is `number`, `value` is returned. Values of the following types can be converted to a `number` value: * `text`: A `number` value from textual representation. Common text formats are handled (\"15\", \"3,423.10\", \"5.0E-10\"). Refer to [`Number.FromText`](number-fromtext.md) for details. * `logical`: 1 for `true`, 0 for `false`. * `datetime`: A double-precision floating-point number that contains an OLE Automation date equivalent. * `datetimezone`: A double-precision floating-point number that contains an OLE Automation date equivalent of the local date and time of `value`. * `date`: A double-precision floating-point number that contains an OLE Automation date equivalent. * `time`: Expressed in fractional days. * `duration`: Expressed in whole and fractional days. If `value` is of any other type, an error is returned.",
+    "examples": [
+      {
+        "usage": "Number.From(\"4\")",
+        "output": "4"
+      },
+      {
+        "usage": "Number.From(#datetime(2020, 3, 20, 6, 0, 0))",
+        "output": "43910.25"
+      },
+      {
+        "usage": "Number.From(\"12.3%\")",
+        "output": "0.123"
+      }
+    ]
+  },
+  {
+    "name": "Number.FromText",
+    "signature": "Number.FromText(text as nullable text, optional culture as nullable text) as nullable number",
+    "description": "Returns a `number` value from the given text value, `text`. * `text`: The textual representation of a number value. The representation must be in a common number format, such as \"15\", \"3,423.10\", or \"5.0E-10\". * `culture`: An optional culture that controls how `text` is interpreted (for example, \"en-US\").",
+    "examples": [
+      {
+        "usage": "Number.FromText(\"4\")",
+        "output": "4"
+      },
+      {
+        "usage": "Number.FromText(\"5.0e-10\")",
+        "output": "5E-10"
+      }
+    ]
+  },
+  {
+    "name": "Number.IntegerDivide",
+    "signature": "Number.IntegerDivide( number1 as nullable number, number2 as nullable number, optional precision as nullable number ) as nullable number",
+    "description": "Returns the integer portion of the result from dividing a number, `number1`, by another number, `number2`. If `number1` or `number2` are null, `Number.IntegerDivide` returns null. * `number1`: The dividend. * `number2`: The divisor.",
+    "examples": [
+      {
+        "usage": "Number.IntegerDivide(6, 4)",
+        "output": "1"
+      },
+      {
+        "usage": "Number.IntegerDivide(8.3, 3)",
+        "output": "2"
+      }
+    ]
+  },
+  {
+    "name": "Number.IsEven",
+    "signature": "Number.IsEven(number as number) as logical",
+    "description": "Indicates if the value, `number`, is even by returning `true` if it is even, `false` otherwise.",
+    "examples": [
+      {
+        "usage": "Number.IsEven(625)",
+        "output": "false"
+      },
+      {
+        "usage": "Number.IsEven(82)",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "Number.IsNaN",
+    "signature": "Number.IsNaN(number as number) as logical",
+    "description": "Indicates if the value is NaN (Not a number). Returns `true` if `number` is equivalent to [`Number.NaN`](number-nan.md), `false` otherwise.",
+    "examples": [
+      {
+        "usage": "Number.IsNaN(0/0)",
+        "output": "true"
+      },
+      {
+        "usage": "Number.IsNaN(1/0)",
+        "output": "false"
+      }
+    ]
+  },
+  {
+    "name": "Number.IsOdd",
+    "signature": "Number.IsOdd(number as number) as logical",
+    "description": "Indicates if the value is odd. Returns `true` if `number` is an odd number, `false` otherwise.",
+    "examples": [
+      {
+        "usage": "Number.IsOdd(625)",
+        "output": "true"
+      },
+      {
+        "usage": "Number.IsOdd(82)",
+        "output": "false"
+      }
+    ]
+  },
+  {
+    "name": "Number.Ln",
+    "signature": "Number.Ln(number as nullable number) as nullable number",
+    "description": "Returns the natural logarithm of a number, `number`. If `number` is null `Number.Ln` returns null.",
+    "examples": [
+      {
+        "usage": "Number.Ln(15)",
+        "output": "2.70805020110221"
+      }
+    ]
+  },
+  {
+    "name": "Number.Log",
+    "signature": "Number.Log(number as nullable number, optional base as nullable number) as nullable number",
+    "description": "Returns the logarithm of a number, `number`, to the specified `base` base. If `base` is not specified, the default value is [`Number.E`](number-e.md). If `number` is null `Number.Log` returns null.",
+    "examples": [
+      {
+        "usage": "Number.Log(2, 10)",
+        "output": "0.3010299956639812"
+      },
+      {
+        "usage": "Number.Log(2)",
+        "output": "0.69314718055994529"
+      }
+    ]
+  },
+  {
+    "name": "Number.Log10",
+    "signature": "Number.Log10(number as nullable number) as nullable number",
+    "description": "Returns the base 10 logarithm of a number, `number`. If `number` is null `Number.Log10` returns null.",
+    "examples": [
+      {
+        "usage": "Number.Log10(2)",
+        "output": "0.3010299956639812"
+      }
+    ]
+  },
+  {
+    "name": "Number.Mod",
+    "signature": "Number.Mod( number as nullable number, divisor as nullable number, optional precision as nullable number ) as nullable number",
+    "description": "Returns the remainder resulting from the integer division of `number` by `divisor`. If `number` or `divisor` are `null`, this function returns `null`. * `number`: The dividend. * `divisor`: The divisor. * `precision`: (Optional) The precision of the integer division. This parameter can be either [`Precision.Double`](precision-type.md) for `Double` precision or [`Precision.Decimal`](precision-type.md) for `Decimal` precision. The default value is [`Precision.Double`](precision-type.md).",
+    "examples": [
+      {
+        "usage": "Number.Mod(5, 3)",
+        "output": "2"
+      },
+      {
+        "usage": "let\n    Dividend = 10.5,\n    Divisor = 0.2,\n\n    #\"Use Double Precision\" = Number.Mod(Dividend, Divisor, Precision.Double),\n    #\"Use Decimal Precision\" = Number.Mod(Dividend, Divisor, Precision.Decimal),\n\n    // Convert to text to inspect precision\n    #\"Double To Text\" = Number.ToText(#\"Use Double Precision\", \"G\"),\n    #\"Decimal To Text\" = Number.ToText(#\"Use Decimal Precision\", \"G\"),\n\n    #\"Display Result\" = [\n        DoublePrecision = #\"Double To Text\",\n        DecimalPrecision = #\"Decimal To Text\"\n    ]\nin\n    #\"Display Result\"",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Number.Permutations",
+    "signature": "Number.Permutations(setSize as nullable number, permutationSize as nullable number) as nullable number",
+    "description": "Returns the number of permutations that can be generated from a number of items, `setSize`, with a specified permutation size, `permutationSize`.",
+    "examples": [
+      {
+        "usage": "Number.Permutations(5, 3)",
+        "output": "60"
+      }
+    ]
+  },
+  {
+    "name": "Number.Power",
+    "signature": "Number.Power(number as nullable number, power as nullable number) as nullable number",
+    "description": "Returns the result of raising `number` to the power of `power`. If `number` or `power` are null, `Number.Power` returns null. * `number`: The base. * `power`: The exponent.",
+    "examples": [
+      {
+        "usage": "Number.Power(5, 3)",
+        "output": "125"
+      }
+    ]
+  },
+  {
+    "name": "Number.Random",
+    "signature": "Number.Random() as number",
+    "description": "Returns a random number between 0 and 1.",
+    "examples": [
+      {
+        "usage": "Number.Random()",
+        "output": "0.919303"
+      }
+    ]
+  },
+  {
+    "name": "Number.RandomBetween",
+    "signature": "Number.RandomBetween(bottom as number, top as number) as number",
+    "description": "Returns a random number between `bottom` and `top`.",
+    "examples": [
+      {
+        "usage": "Number.RandomBetween(1, 5)",
+        "output": "2.546797"
+      }
+    ]
+  },
+  {
+    "name": "Number.Round",
+    "signature": "Number.Round( number as nullable number, optional digits as nullable number, optional roundingMode as nullable number ) as nullable number",
+    "description": "Returns the result of rounding `number` to the nearest number. If `number` is null, `Number.Round` returns null. By default, `number` is rounded to the nearest integer, and ties are broken by rounding to the nearest even number (using [`RoundingMode.ToEven`](roundingmode-type.md), also known as \"banker's rounding\"). However, these defaults can be overridden via the following optional parameters. * `digits`: Causes `number` to be rounded to the specified number of decimal digits. * `roundingMode`: Overrides the default tie-breaking behavior when `number` is at the midpoint between two potential rounded values (refer to [`RoundingMode.Type`](roundingmode-type.md) for possible values).",
+    "examples": [
+      {
+        "usage": "Number.Round(1.234)",
+        "output": "1"
+      },
+      {
+        "usage": "Number.Round(1.56)",
+        "output": "2"
+      },
+      {
+        "usage": "Number.Round(1.2345, 2)",
+        "output": "1.23"
+      },
+      {
+        "usage": "Number.Round(1.2345, 3, RoundingMode.Up)",
+        "output": "1.235"
+      },
+      {
+        "usage": "Number.Round(1.2345, 3, RoundingMode.Down)",
+        "output": "1.234"
+      }
+    ]
+  },
+  {
+    "name": "Number.RoundAwayFromZero",
+    "signature": "Number.RoundAwayFromZero(number as nullable number, optional digits as nullable number) as nullable number",
+    "description": "Returns the result of rounding `number` based on the sign of the number. This function will round positive numbers up and negative numbers down. If `digits` is specified, `number` is rounded to the `digits` number of decimal digits.",
+    "examples": [
+      {
+        "usage": "Number.RoundAwayFromZero(-1.2)",
+        "output": "-2"
+      },
+      {
+        "usage": "Number.RoundAwayFromZero(1.2)",
+        "output": "2"
+      },
+      {
+        "usage": "Number.RoundAwayFromZero(-1.234, 2)",
+        "output": "-1.24"
+      }
+    ]
+  },
+  {
+    "name": "Number.RoundDown",
+    "signature": "Number.RoundDown(number as nullable number, optional digits as nullable number) as nullable number",
+    "description": "Returns the result of rounding `number` down to the previous highest integer. If `number` is null, this function returns null. If `digits` is provided, `number` is rounded to the specified number of decimal digits.",
+    "examples": [
+      {
+        "usage": "Number.RoundDown(1.234)",
+        "output": "1"
+      },
+      {
+        "usage": "Number.RoundDown(1.999)",
+        "output": "1"
+      },
+      {
+        "usage": "Number.RoundDown(1.999, 2)",
+        "output": "1.99"
+      }
+    ]
+  },
+  {
+    "name": "Number.RoundTowardZero",
+    "signature": "Number.RoundTowardZero(number as nullable number, optional digits as nullable number) as nullable number",
+    "description": "Returns the result of rounding `number` based on the sign of the number. This function will round positive numbers down and negative numbers up. If `digits` is specified, `number` is rounded to the `digits` number of decimal digits.",
+    "examples": [
+      {
+        "usage": "Number.RoundTowardZero(-1.2)",
+        "output": "-1"
+      },
+      {
+        "usage": "Number.RoundTowardZero(1.2)",
+        "output": "1"
+      },
+      {
+        "usage": "Number.RoundTowardZero(-1.234, 2)",
+        "output": "-1.23"
+      }
+    ]
+  },
+  {
+    "name": "Number.RoundUp",
+    "signature": "Number.RoundUp(number as nullable number, optional digits as nullable number) as nullable number",
+    "description": "Returns the result of rounding `number` up to the next highest integer. If `number` is null, this function returns null. If `digits` is provided, `number` is rounded to the specified number of decimal digits.",
+    "examples": [
+      {
+        "usage": "Number.RoundUp(1.234)",
+        "output": "2"
+      },
+      {
+        "usage": "Number.RoundUp(1.999)",
+        "output": "2"
+      },
+      {
+        "usage": "Number.RoundUp(1.234, 2)",
+        "output": "1.24"
+      }
+    ]
+  },
+  {
+    "name": "Number.Sign",
+    "signature": "Number.Sign(number as nullable number) as nullable number",
+    "description": "Returns 1 for if `number` is a positive number, -1 if it is a negative number, and 0 if it is zero. If `number` is null, `Number.Sign` returns null.",
+    "examples": [
+      {
+        "usage": "Number.Sign(182)",
+        "output": "1"
+      },
+      {
+        "usage": "Number.Sign(-182)",
+        "output": "-1"
+      },
+      {
+        "usage": "Number.Sign(0)",
+        "output": "0"
+      }
+    ]
+  },
+  {
+    "name": "Number.Sin",
+    "signature": "Number.Sin(number as nullable number) as nullable number",
+    "description": "Returns the sine of `number`.",
+    "examples": [
+      {
+        "usage": "Number.Sin(0)",
+        "output": "0"
+      }
+    ]
+  },
+  {
+    "name": "Number.Sinh",
+    "signature": "Number.Sinh(number as nullable number) as nullable number",
+    "description": "Returns the hyperbolic sine of `number`.",
+    "examples": []
+  },
+  {
+    "name": "Number.Sqrt",
+    "signature": "Number.Sqrt(number as nullable number) as nullable number",
+    "description": "Returns the square root of `number`. If `number` is null, `Number.Sqrt` returns null. If it is a negative value, [`Number.NaN`](number-nan.md) is returned (Not a number).",
+    "examples": [
+      {
+        "usage": "Number.Sqrt(625)",
+        "output": "25"
+      },
+      {
+        "usage": "Number.Sqrt(85)",
+        "output": "9.2195444572928871"
+      }
+    ]
+  },
+  {
+    "name": "Number.Tan",
+    "signature": "Number.Tan(number as nullable number) as nullable number",
+    "description": "Returns the tangent of `number`.",
+    "examples": [
+      {
+        "usage": "Number.Tan(1)",
+        "output": "1.5574077246549023"
+      }
+    ]
+  },
+  {
+    "name": "Number.Tanh",
+    "signature": "Number.Tanh(number as nullable number) as nullable number",
+    "description": "Returns the hyperbolic tangent of `number`.",
+    "examples": []
+  },
+  {
+    "name": "Number.ToText",
+    "signature": "Number.ToText( number as nullable number, optional format as nullable text, optional culture as nullable text ) as nullable text",
+    "description": "Converts the numeric value `number` to a text value according to the format specified by `format`. The format is a text value indicating how the number should be converted. For more details on the supported format values, go to [Standard numeric format strings](standard-numeric-format-strings.md) and [Custom numeric format strings](custom-numeric-format-strings.md). An optional `culture` may also be provided (for example, \"en-US\") to control the culture-dependent behavior of `format`.",
+    "examples": [
+      {
+        "usage": "Number.ToText(4)",
+        "output": "\"4\""
+      },
+      {
+        "usage": "Number.ToText(4, \"e\")",
+        "output": "\"4.000000e+000\""
+      },
+      {
+        "usage": "Number.ToText(-0.1234, \"P1\")",
+        "output": "\"-12.3 %\""
+      }
+    ]
+  }
+]

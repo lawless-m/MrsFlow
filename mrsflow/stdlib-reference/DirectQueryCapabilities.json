@@ -1,0 +1,8 @@
+[
+  {
+    "name": "DirectQueryCapabilities.From",
+    "signature": "DirectQueryCapabilities.From(value as any) as table",
+    "description": "This function is intended for internal use only.",
+    "examples": []
+  }
+]

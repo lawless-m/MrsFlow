@@ -1,0 +1,45 @@
+[
+  {
+    "name": "Uri.BuildQueryString",
+    "signature": "Uri.BuildQueryString(query as record) as text",
+    "description": "Assemble the record `query` into a URI query string, escaping characters as necessary.",
+    "examples": [
+      {
+        "usage": "Uri.BuildQueryString([a = \"1\", b = \"+$\"])",
+        "output": "\"a=1&b=%2B%24\""
+      }
+    ]
+  },
+  {
+    "name": "Uri.Combine",
+    "signature": "Uri.Combine(baseUri as text, relativeUri as text) as text",
+    "description": "Returns an absolute URI that is the combination of the input `baseUri` and `relativeUri`.",
+    "examples": []
+  },
+  {
+    "name": "Uri.EscapeDataString",
+    "signature": "Uri.EscapeDataString(data as text) as text",
+    "description": "Encodes special characters in the input `data` according to the rules of RFC 3986.",
+    "examples": [
+      {
+        "usage": "Uri.EscapeDataString(\"+money$\")",
+        "output": "\"%2Bmoney%24\""
+      }
+    ]
+  },
+  {
+    "name": "Uri.Parts",
+    "signature": "Uri.Parts(absoluteUri as text) as record",
+    "description": "Returns the parts of the input `absoluteUri` as a record, containing values such as Scheme, Host, Port, Path, Query, Fragment, UserName and Password.",
+    "examples": [
+      {
+        "usage": "Uri.Parts(\"www.adventure-works.com\")",
+        "output": "`"
+      },
+      {
+        "usage": "let\n    UriUnescapeDataString = (data as text) as text => Uri.Parts(\"http://contoso?a=\" & data)[Query][a]\nin\n    UriUnescapeDataString(\"%2Bmoney%24\")",
+        "output": "\"+money$\""
+      }
+    ]
+  }
+]

@@ -1,0 +1,8 @@
+[
+  {
+    "name": "IdentityProvider.Default",
+    "signature": "IdentityProvider.Default() as any",
+    "description": "The default identity provider for the current host.",
+    "examples": []
+  }
+]

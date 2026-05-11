@@ -1,0 +1,138 @@
+[
+  {
+    "name": "Duration.Days",
+    "signature": "Duration.Days(duration as nullable duration) as nullable number",
+    "description": "Returns the days portion of `duration`.",
+    "examples": [
+      {
+        "usage": "Duration.Days(#date(2022, 3, 4) - #date(2022, 2, 25))",
+        "output": "7"
+      }
+    ]
+  },
+  {
+    "name": "Duration.From",
+    "signature": "Duration.From(value as any) as nullable duration",
+    "description": "Returns a duration value from the given value. * `value`: The value from which the duration is derived. If the given `value` is `null`, this function returns `null`. If the given `value` is a `duration`, `value` is returned. Values of the following types can be converted to a `duration` value: * `text`: A `duration` value from textual elapsed time forms (d.h:m:s). Refer to [`Duration.FromText`](duration-fromtext.md) for details. * `number`: A `duration` equivalent to the number of whole and fractional days expressed by `value`. If `value` is of any other type, an error is returned.",
+    "examples": [
+      {
+        "usage": "Duration.From(2.525)",
+        "output": "#duration(2, 12, 36, 0)"
+      },
+      {
+        "usage": "Duration.From(\"2.05:55:20.34567\")",
+        "output": "#duration(2, 5, 55, 20.3456700)"
+      }
+    ]
+  },
+  {
+    "name": "Duration.FromText",
+    "signature": "Duration.FromText(text as nullable text) as nullable duration",
+    "description": "Returns a duration value from the specified text, `text`. The following formats can be parsed by this function: * (-)hh:mm(:ss(.ff)) * (-)ddd(.hh:mm(:ss(.ff))) (All ranges are inclusive) * ddd: Number of days. * hh: Number of hours, between 0 and 23. * mm: Number of minutes, between 0 and 59. * ss: Number of seconds, between 0 and 59. * ff: Fraction of seconds, between 0 and 9999999.",
+    "examples": [
+      {
+        "usage": "Duration.FromText(\"2.05:55:20\")",
+        "output": "#duration(2, 5, 55, 20)"
+      }
+    ]
+  },
+  {
+    "name": "Duration.Hours",
+    "signature": "Duration.Hours(duration as nullable duration) as nullable number",
+    "description": "Returns the hours portion of `duration`.",
+    "examples": [
+      {
+        "usage": "Duration.Hours(#duration(5, 4, 3, 2))",
+        "output": "4"
+      }
+    ]
+  },
+  {
+    "name": "Duration.Minutes",
+    "signature": "Duration.Minutes(duration as nullable duration) as nullable number",
+    "description": "Returns the minutes portion of `duration`.",
+    "examples": [
+      {
+        "usage": "Duration.Minutes(#duration(5, 4, 3, 2))",
+        "output": "3"
+      }
+    ]
+  },
+  {
+    "name": "Duration.Seconds",
+    "signature": "Duration.Seconds(duration as nullable duration) as nullable number",
+    "description": "Returns the seconds portion of `duration`.",
+    "examples": [
+      {
+        "usage": "Duration.Seconds(#duration(5, 4, 3, 2))",
+        "output": "2"
+      }
+    ]
+  },
+  {
+    "name": "Duration.ToRecord",
+    "signature": "Duration.ToRecord(duration as duration) as record",
+    "description": "Returns a record containing the parts the duration value, `duration`. * `duration`: A `duration` from which the record is created.",
+    "examples": [
+      {
+        "usage": "Duration.ToRecord(#duration(2, 5, 55, 20))",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Duration.ToText",
+    "signature": "Duration.ToText(duration as nullable duration, optional format as nullable text) as nullable text",
+    "description": "Returns a textual representation in the form \"day.hour:mins:sec\" of the given duration value, `duration`. * `duration`: A `duration` from which the textual representation is calculated. * `format`: *(Optional)* Deprecated, will raise an error if not null.",
+    "examples": [
+      {
+        "usage": "Duration.ToText(#duration(2, 5, 55, 20))",
+        "output": "\"2.05:55:20\""
+      }
+    ]
+  },
+  {
+    "name": "Duration.TotalDays",
+    "signature": "Duration.TotalDays(duration as nullable duration) as nullable number",
+    "description": "Returns the total days spanned by `duration`.",
+    "examples": [
+      {
+        "usage": "Duration.TotalDays(#duration(5, 4, 3, 2))",
+        "output": "5.1687731481481478"
+      }
+    ]
+  },
+  {
+    "name": "Duration.TotalHours",
+    "signature": "Duration.TotalHours(duration as nullable duration) as nullable number",
+    "description": "Returns the total hours spanned by `duration`.",
+    "examples": [
+      {
+        "usage": "Duration.TotalHours(#duration(5, 4, 3, 2))",
+        "output": "124.05055555555555"
+      }
+    ]
+  },
+  {
+    "name": "Duration.TotalMinutes",
+    "signature": "Duration.TotalMinutes(duration as nullable duration) as nullable number",
+    "description": "Returns the total minutes spanned by `duration`.",
+    "examples": [
+      {
+        "usage": "Duration.TotalMinutes(#duration(5, 4, 3, 2))",
+        "output": "7443.0333333333338"
+      }
+    ]
+  },
+  {
+    "name": "Duration.TotalSeconds",
+    "signature": "Duration.TotalSeconds(duration as nullable duration) as nullable number",
+    "description": "Returns the total seconds spanned by `duration`.",
+    "examples": [
+      {
+        "usage": "Duration.TotalSeconds(#duration(5, 4, 3, 2))",
+        "output": "446582"
+      }
+    ]
+  }
+]

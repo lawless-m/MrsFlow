@@ -1,0 +1,8 @@
+[
+  {
+    "name": "Cdm.Contents",
+    "signature": "Cdm.Contents(table as table) as table",
+    "description": "This function is unavailable in the current context.",
+    "examples": []
+  }
+]

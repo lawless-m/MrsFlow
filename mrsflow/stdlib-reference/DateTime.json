@@ -1,0 +1,300 @@
+[
+  {
+    "name": "DateTime.AddZone",
+    "signature": "DateTime.AddZone( dateTime as nullable datetime, timezoneHours as number, optional timezoneMinutes as nullable number ) as nullable datetimezone",
+    "description": "Adds timezone information to the `dateTime` value. The timezone information includes `timezoneHours` and optionally `timezoneMinutes`, which specify the desired offset from UTC time.",
+    "examples": [
+      {
+        "usage": "DateTime.AddZone(#datetime(2010, 12, 31, 11, 56, 02), 7, 30)",
+        "output": "#datetimezone(2010, 12, 31, 11, 56, 2, 7, 30)"
+      }
+    ]
+  },
+  {
+    "name": "DateTime.Date",
+    "signature": "DateTime.Date(dateTime as any) as nullable date",
+    "description": "Returns the date component of the `dateTime` parameter if the parameter is a `date`, `datetime`, or `datetimezone` value, or `null` if the parameter is `null`.",
+    "examples": [
+      {
+        "usage": "DateTime.Date(#datetime(2010, 12, 31, 11, 56, 02))",
+        "output": "#date(2010, 12, 31)"
+      }
+    ]
+  },
+  {
+    "name": "DateTime.FixedLocalNow",
+    "signature": "DateTime.FixedLocalNow() as datetime",
+    "description": "Returns a `datetime` value set to the current date and time on the system. This value is fixed and will not change with successive calls, unlike [`DateTime.LocalNow`](datetime-localnow.md), which may return different values over the course of execution of an expression.",
+    "examples": []
+  },
+  {
+    "name": "DateTime.From",
+    "signature": "DateTime.From(value as any, optional culture as nullable text) as nullable datetime",
+    "description": "Returns a `datetime` value from the given `value`. An optional `culture` may also be provided (for example, \"en-US\"). If the given `value` is `null`, `DateTime.From` returns `null`. If the given `value` is `datetime`, `value` is returned. Values of the following types can be converted to a `datetime` value: * `text`: A `datetime` value from textual representation. Refer to [`DateTime.FromText`](datetime-fromtext.md) for details. * `date`: A `datetime` with `value` as the date component and `12:00:00 AM` as the time component. * `datetimezone`: The local `datetime` equivalent of `value`. * `time`: A `datetime` with the date equivalent of the OLE Automation Date of `0` as the date component and `value` as the time component. * `number`: A `datetime` equivalent of the OLE Automation Date expressed by `value`. If `value` is of any other type, an error is returned.",
+    "examples": [
+      {
+        "usage": "DateTime.From(#time(06, 45, 12))",
+        "output": "#datetime(1899, 12, 30, 06, 45, 12)"
+      },
+      {
+        "usage": "DateTime.From(#date(1975, 4, 4))",
+        "output": "#datetime(1975, 4, 4, 0, 0, 0)"
+      }
+    ]
+  },
+  {
+    "name": "DateTime.FromFileTime",
+    "signature": "DateTime.FromFileTime(fileTime as nullable number) as nullable datetime",
+    "description": "Creates a `datetime` value from the `fileTime` value and converts it to the local time zone. The filetime is a Windows file time value that represents the number of 100-nanosecond intervals that have elapsed since 12:00 midnight, January 1, 1601 A.D. (C.E.) Coordinated Universal Time (UTC).",
+    "examples": [
+      {
+        "usage": "DateTime.FromFileTime(129876402529842245)",
+        "output": "#datetime(2012, 7, 24, 14, 50, 52.9842245)"
+      }
+    ]
+  },
+  {
+    "name": "DateTime.FromText",
+    "signature": "DateTime.FromText(text as nullable text, optional options as any) as nullable datetime",
+    "description": "Creates a `datetime` value from a textual representation, `text`. An optional `record` parameter, `options`, may be provided to specify additional properties. The `record` can contain the following fields: * `Format`: A `text` value indicating the format to use. For more details, go to [Standard date and time format strings](standard-date-and-time-format-strings.md) and [Custom date and time format strings](custom-date-and-time-format-strings.md). Omitting this field or providing `null` will result in parsing the date using a best effort. * `Culture`: When `Format` is not null, `Culture` controls some format specifiers. For example, in `\"en-US\"` `\"MMM\"` is `\"Jan\", \"Feb\", \"Mar\", ...`, while in `\"ru-RU\"` `\"MMM\"` is `\"янв\", \"фев\", \"мар\", ...`. When `Format` is `null`, `Culture` controls the default format to use. When `Culture` is `null` or omitted, [`Culture.Current`](culture-current.md) is used. To support legacy workflows, `options` may also be a text value. This has the same behavior as if `options = [Format = null, Culture = options]`.",
+    "examples": [
+      {
+        "usage": "DateTime.FromText(\"2010-12-31T01:30:25\")",
+        "output": "#datetime(2010, 12, 31, 1, 30, 25)"
+      },
+      {
+        "usage": "DateTime.FromText(\"30 Dez 2010 02:04:50.369730\", [Format=\"dd MMM yyyy HH:mm:ss.ffffff\", Culture=\"de-DE\"])",
+        "output": "#datetime(2010, 12, 30, 2, 4, 50.36973)"
+      },
+      {
+        "usage": "DateTime.FromText(\"2000-02-08T03:45:12Z\", [Format=\"yyyy-MM-dd'T'HH:mm:ss'Z'\", Culture=\"en-US\"])",
+        "output": "#datetime(2000, 2, 8, 3, 45, 12)"
+      },
+      {
+        "usage": "DateTime.FromText(\"20101231T013000\", [Format=\"yyyyMMdd'T'HHmmss\", Culture=\"en-US\"])",
+        "output": "#datetime(2010, 12, 31, 1, 30, 0)"
+      }
+    ]
+  },
+  {
+    "name": "DateTime.IsInCurrentHour",
+    "signature": "DateTime.IsInCurrentHour(dateTime as any) as nullable logical",
+    "description": "Indicates whether the given datetime value `dateTime` occurs during the current hour, as determined by the current date and time on the system. * `dateTime`: A `datetime`, or `datetimezone` value to be evaluated.",
+    "examples": [
+      {
+        "usage": "DateTime.IsInCurrentHour(DateTime.FixedLocalNow())",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "DateTime.IsInCurrentMinute",
+    "signature": "DateTime.IsInCurrentMinute(dateTime as any) as nullable logical",
+    "description": "Indicates whether the given datetime value `dateTime` occurs during the current minute, as determined by the current date and time on the system. * `dateTime`: A `datetime`, or `datetimezone` value to be evaluated.",
+    "examples": [
+      {
+        "usage": "DateTime.IsInCurrentMinute(DateTime.FixedLocalNow())",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "DateTime.IsInCurrentSecond",
+    "signature": "DateTime.IsInCurrentSecond(dateTime as any) as nullable logical",
+    "description": "Indicates whether the given datetime value `dateTime` occurs during the current second, as determined by the current date and time on the system. * `dateTime`: A `datetime`, or `datetimezone` value to be evaluated.",
+    "examples": [
+      {
+        "usage": "DateTime.IsInCurrentSecond(DateTime.FixedLocalNow())",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "DateTime.IsInNextHour",
+    "signature": "DateTime.IsInNextHour(dateTime as any) as nullable logical",
+    "description": "Indicates whether the given datetime value `dateTime` occurs during the next hour, as determined by the current date and time on the system. Note that this function will return false when passed a value that occurs within the current hour. * `dateTime`: A `datetime`, or `datetimezone` value to be evaluated.",
+    "examples": [
+      {
+        "usage": "DateTime.IsInNextHour(DateTime.FixedLocalNow() + #duration(0, 1, 0, 0))",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "DateTime.IsInNextMinute",
+    "signature": "DateTime.IsInNextMinute(dateTime as any) as nullable logical",
+    "description": "Indicates whether the given datetime value `dateTime` occurs during the next minute, as determined by the current date and time on the system. Note that this function will return false when passed a value that occurs within the current minute. * `dateTime`: A `datetime`, or `datetimezone` value to be evaluated.",
+    "examples": [
+      {
+        "usage": "DateTime.IsInNextMinute(DateTime.FixedLocalNow() + #duration(0, 0, 1, 0))",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "DateTime.IsInNextNHours",
+    "signature": "DateTime.IsInNextNHours(dateTime as any, hours as number) as nullable logical",
+    "description": "Indicates whether the given datetime value `dateTime` occurs during the next number of hours, as determined by the current date and time on the system. Note that this function will return false when passed a value that occurs within the current hour. * `dateTime`: A `datetime`, or `datetimezone` value to be evaluated. * `hours`: The number of hours.",
+    "examples": [
+      {
+        "usage": "DateTime.IsInNextNHours(DateTime.FixedLocalNow() + #duration(0, 2, 0, 0), 2)",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "DateTime.IsInNextNMinutes",
+    "signature": "DateTime.IsInNextNMinutes(dateTime as any, minutes as number) as nullable logical",
+    "description": "Indicates whether the given datetime value `dateTime` occurs during the next number of minutes, as determined by the current date and time on the system. Note that this function will return false when passed a value that occurs within the current minute. * `dateTime`: A `datetime`, or `datetimezone` value to be evaluated. * `minutes`: The number of minutes.",
+    "examples": [
+      {
+        "usage": "DateTime.IsInNextNMinutes(DateTime.FixedLocalNow() + #duration(0, 0, 2, 0), 2)",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "DateTime.IsInNextNSeconds",
+    "signature": "DateTime.IsInNextNSeconds(dateTime as any, seconds as number) as nullable logical",
+    "description": "Indicates whether the given datetime value `dateTime` occurs during the next number of seconds, as determined by the current date and time on the system. Note that this function will return false when passed a value that occurs within the current second. * `dateTime`: A `datetime`, or `datetimezone` value to be evaluated. * `seconds`: The number of seconds.",
+    "examples": [
+      {
+        "usage": "DateTime.IsInNextNSeconds(DateTime.FixedLocalNow() + #duration(0, 0, 0, 2), 2)",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "DateTime.IsInNextSecond",
+    "signature": "DateTime.IsInNextSecond(dateTime as any) as nullable logical",
+    "description": "Indicates whether the given datetime value `dateTime` occurs during the next second, as determined by the current date and time on the system. Note that this function will return false when passed a value that occurs within the current second. * `dateTime`: A `datetime`, or `datetimezone` value to be evaluated.",
+    "examples": [
+      {
+        "usage": "DateTime.IsInNextSecond(DateTime.FixedLocalNow() + #duration(0, 0, 0, 1))",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "DateTime.IsInPreviousHour",
+    "signature": "DateTime.IsInPreviousHour(dateTime as any) as nullable logical",
+    "description": "Indicates whether the given datetime value `dateTime` occurs during the previous hour, as determined by the current date and time on the system. Note that this function will return false when passed a value that occurs within the current hour. * `dateTime`: A `datetime`, or `datetimezone` value to be evaluated.",
+    "examples": [
+      {
+        "usage": "DateTime.IsInPreviousHour(DateTime.FixedLocalNow() - #duration(0, 1, 0, 0))",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "DateTime.IsInPreviousMinute",
+    "signature": "DateTime.IsInPreviousMinute(dateTime as any) as nullable logical",
+    "description": "Indicates whether the given datetime value `dateTime` occurs during the previous minute, as determined by the current date and time on the system. Note that this function will return false when passed a value that occurs within the current minute. * `dateTime`: A `datetime`, or `datetimezone` value to be evaluated.",
+    "examples": [
+      {
+        "usage": "DateTime.IsInPreviousMinute(DateTime.FixedLocalNow() - #duration(0, 0, 1, 0))",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "DateTime.IsInPreviousNHours",
+    "signature": "DateTime.IsInPreviousNHours(dateTime as any, hours as number) as nullable logical",
+    "description": "Indicates whether the given datetime value `dateTime` occurs during the previous number of hours, as determined by the current date and time on the system. Note that this function will return false when passed a value that occurs within the current hour. * `dateTime`: A `datetime`, or `datetimezone` value to be evaluated. * `hours`: The number of hours.",
+    "examples": [
+      {
+        "usage": "DateTime.IsInPreviousNHours(DateTime.FixedLocalNow() - #duration(0, 2, 0, 0), 2)",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "DateTime.IsInPreviousNMinutes",
+    "signature": "DateTime.IsInPreviousNMinutes(dateTime as any, minutes as number) as nullable logical",
+    "description": "Indicates whether the given datetime value `dateTime` occurs during the previous number of minutes, as determined by the current date and time on the system. Note that this function will return false when passed a value that occurs within the current minute. * `dateTime`: A `datetime`, or `datetimezone` value to be evaluated. * `minutes`: The number of minutes.",
+    "examples": [
+      {
+        "usage": "DateTime.IsInPreviousNMinutes(DateTime.FixedLocalNow() - #duration(0, 0, 2, 0), 2)",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "DateTime.IsInPreviousNSeconds",
+    "signature": "DateTime.IsInPreviousNSeconds(dateTime as any, seconds as number) as nullable logical",
+    "description": "Indicates whether the given datetime value `dateTime` occurs during the previous number of seconds, as determined by the current date and time on the system. Note that this function will return false when passed a value that occurs within the current second. * `dateTime`: A `datetime`, or `datetimezone` value to be evaluated. * `seconds`: The number of seconds.",
+    "examples": [
+      {
+        "usage": "DateTime.IsInPreviousNSeconds(DateTime.FixedLocalNow() - #duration(0, 0, 0, 2), 2)",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "DateTime.IsInPreviousSecond",
+    "signature": "DateTime.IsInPreviousSecond(dateTime as any) as nullable logical",
+    "description": "Indicates whether the given datetime value `dateTime` occurs during the previous second, as determined by the current date and time on the system. Note that this function will return false when passed a value that occurs within the current second. * `dateTime`: A `datetime`, or `datetimezone` value to be evaluated.",
+    "examples": [
+      {
+        "usage": "DateTime.IsInPreviousSecond(DateTime.FixedLocalNow() - #duration(0, 0, 0, 1))",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "DateTime.LocalNow",
+    "signature": "DateTime.LocalNow() as datetime",
+    "description": "Returns a `datetime` value set to the current date and time on the system. The value returned by this function depends on whether you're running your query on a local machine or online. For example, if you run your query on a system located in the U.S. Pacific Time zone, Power Query Desktop returns the date and time set on your local machine. However, if you run your query on the cloud, Power Query Online returns UTC time because it's reading the time set on the cloud virtual machines, which are all set to UTC.",
+    "examples": [
+      {
+        "usage": "DateTime.LocalNow()",
+        "output": "The current local date and time."
+      },
+      {
+        "usage": "DateTime.LocalNow()",
+        "output": "The current online (UTC) date and time."
+      }
+    ]
+  },
+  {
+    "name": "DateTime.Time",
+    "signature": "DateTime.Time(dateTime as any) as nullable time",
+    "description": "Returns the time part of the given datetime value, `dateTime`.",
+    "examples": [
+      {
+        "usage": "DateTime.Time(#datetime(2010, 12, 31, 11, 56, 02))",
+        "output": "#time(11, 56, 2)"
+      }
+    ]
+  },
+  {
+    "name": "DateTime.ToRecord",
+    "signature": "DateTime.ToRecord(dateTime as datetime) as record",
+    "description": "Returns a record containing the parts of the given datetime value, `dateTime`. * `dateTime`: A `datetime` value for from which the record of its parts is to be calculated.",
+    "examples": [
+      {
+        "usage": "DateTime.ToRecord(#datetime(2011, 12, 31, 11, 56, 2))",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "DateTime.ToText",
+    "signature": "DateTime.ToText( dateTime as nullable datetime, optional options as any, optional culture as nullable text ) as nullable text",
+    "description": "Returns a textual representation of `dateTime`. An optional `record` parameter, `options`, may be provided to specify additional properties. `culture` is only used for legacy workflows. The `record` can contain the following fields: * `Format`: A `text` value indicating the format to use. For more details, go to [Standard date and time format strings](standard-date-and-time-format-strings.md) and [Custom date and time format strings](custom-date-and-time-format-strings.md). Omitting this field or providing `null` will result in formatting the date using the default defined by `Culture`. * `Culture`: When `Format` is not null, `Culture` controls some format specifiers. For example, in `\"en-US\"` `\"MMM\"` is `\"Jan\", \"Feb\", \"Mar\", ...`, while in `\"ru-RU\"` `\"MMM\"` is `\"янв\", \"фев\", \"мар\", ...`. When `Format` is `null`, `Culture` controls the default format to use. When `Culture` is `null` or omitted, [`Culture.Current`](culture-current.md) is used. To support legacy workflows, `options` and `culture` may also be text values. This has the same behavior as if `options = [Format = options, Culture = culture]`.",
+    "examples": [
+      {
+        "usage": "DateTime.ToText(#datetime(2010, 12, 31, 01, 30, 25))",
+        "output": "\"12/31/2010 1:30:25 AM\""
+      },
+      {
+        "usage": "DateTime.ToText(#datetime(2010, 12, 30, 2, 4, 50.36973), [Format=\"dd MMM yyyy HH:mm:ss.ffffff\", Culture=\"de-DE\"])",
+        "output": "\"30 Dez 2010 02:04:50.369730\""
+      },
+      {
+        "usage": "DateTime.ToText(#datetime(2000, 2, 8, 3, 45, 12),[Format=\"yyyy-MM-dd'T'HH:mm:ss'Z'\", Culture=\"en-US\"])",
+        "output": "\"2000-02-08T03:45:12Z\""
+      }
+    ]
+  }
+]

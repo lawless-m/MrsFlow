@@ -1,0 +1,13 @@
+[
+  {
+    "name": "Double.From",
+    "signature": "Double.From(value as any, optional culture as nullable text) as nullable number",
+    "description": "Returns a Double `number` value from the given `value`. If the given `value` is `null`, `Double.From` returns `null`. If the given `value` is `number` within the range of Double, `value` is returned, otherwise an error is returned. If `value` is of any other type, it will first be converted to a `number` using [`Number.FromText`](number-fromtext.md). An optional `culture` may also be provided (for example, \"en-US\").",
+    "examples": [
+      {
+        "usage": "Double.From(\"4.5\")",
+        "output": "4.5"
+      }
+    ]
+  }
+]

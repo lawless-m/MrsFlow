@@ -1,0 +1,197 @@
+[
+  {
+    "name": "BinaryFormat.7BitEncodedSignedInteger",
+    "signature": "BinaryFormat.7BitEncodedSignedInteger(binary as binary) as any",
+    "description": "A binary format that reads a 64-bit signed integer that was encoded using a 7-bit variable-length encoding.",
+    "examples": []
+  },
+  {
+    "name": "BinaryFormat.7BitEncodedUnsignedInteger",
+    "signature": "BinaryFormat.7BitEncodedUnsignedInteger(binary as binary) as any",
+    "description": "A binary format that reads a 64-bit unsigned integer that was encoded using a 7-bit variable-length encoding.",
+    "examples": []
+  },
+  {
+    "name": "BinaryFormat.Binary",
+    "signature": "BinaryFormat.Binary(optional length as any) as function",
+    "description": "Returns a binary format that reads a binary value. If `length` is specified, the binary value will contain that many bytes. If `length` is not specified, the binary value will contain the remaining bytes. The `length` can be specified either as a number, or as a binary format of the length that precedes the binary data.",
+    "examples": []
+  },
+  {
+    "name": "BinaryFormat.Byte",
+    "signature": "BinaryFormat.Byte(binary as binary) as any",
+    "description": "A binary format that reads an 8-bit unsigned integer.",
+    "examples": []
+  },
+  {
+    "name": "BinaryFormat.ByteOrder",
+    "signature": "BinaryFormat.ByteOrder(binaryFormat as function, byteOrder as number) as function",
+    "description": "Returns a binary format with the byte order specified by `binaryFormat`. The default byte order is [`ByteOrder.BigEndian`](byteorder-type.md).",
+    "examples": []
+  },
+  {
+    "name": "BinaryFormat.Choice",
+    "signature": "BinaryFormat.Choice( binaryFormat as function, chooseFunction as function, optional type as nullable type, optional combineFunction as nullable function ) as function",
+    "description": "Returns a binary format that chooses the next binary format based on a value that has already been read. The binary format value produced by this function works in stages: * The binary format specified by the `binaryFormat` parameter is used to read a value. * The value is passed to the choice function specified by the `chooseFunction` parameter. * The choice function inspects the value and returns a second binary format. * The second binary format is used to read a second value. * If the combine function is specified, then the first and second values are passed to the combine function, and the resulting value is returned. * If the combine function is not specified, the second value is returned. * The second value is returned. The optional `type` parameter indicates the type of binary format that will be returned by the choice function. Either `type any`, `type list`, or `type binary` may be specified. If the `type` parameter is not specified, then `type any` is used. If `type list` or `type binary` is used, then the system may be able to return a streaming `binary` or `list` value instead of a buffered one, which may reduce the amount of memory necessary to read the format.",
+    "examples": [
+      {
+        "usage": "let\n    binaryData = #binary({2, 3, 4, 5}),\n    listFormat = BinaryFormat.Choice(\n        BinaryFormat.Byte,\n        (length) => BinaryFormat.List(BinaryFormat.Byte, length)\n    )\nin\n    listFormat(binaryData)",
+        "output": "{3, 4}"
+      },
+      {
+        "usage": "let\n    binaryData = #binary({2, 3, 4, 5}),\n    listFormat = BinaryFormat.Choice(\n        BinaryFormat.Byte,\n        (length) => BinaryFormat.Record([\n            length = length,\n            list = BinaryFormat.List(BinaryFormat.Byte, length)\n        ])\n    )\nin\n    listFormat(binaryData)",
+        "output": "[length = 2, list = {3, 4}]"
+      },
+      {
+        "usage": "let\n    binaryData = #binary({2, 3, 4, 5}),\n    listFormat = BinaryFormat.Choice(\n        BinaryFormat.Byte,\n        (length) => BinaryFormat.List(BinaryFormat.Byte, length),\n        type list\n    )\nin\n    listFormat(binaryData)",
+        "output": "{3, 4}"
+      }
+    ]
+  },
+  {
+    "name": "BinaryFormat.Decimal",
+    "signature": "BinaryFormat.Decimal(binary as binary) as any",
+    "description": "A binary format that reads a .NET 16-byte decimal value.",
+    "examples": []
+  },
+  {
+    "name": "BinaryFormat.Double",
+    "signature": "BinaryFormat.Double(binary as binary) as any",
+    "description": "A binary format that reads an 8-byte IEEE double-precision floating point value.",
+    "examples": []
+  },
+  {
+    "name": "BinaryFormat.Group",
+    "signature": "BinaryFormat.Group( binaryFormat as function, group as list, optional extra as nullable function, optional lastKey as any ) as function",
+    "description": "The parameters are as follows: * The `binaryFormat` parameter specifies the binary format of the key value. * The `group` parameter provides information about the group of known items. * The optional `extra` parameter can be used to specify a function that will return a binary format value for the value following any key that was unexpected. If the `extra` parameter is not specified, then an error will be raised if there are unexpected key values. The `group` parameter specifies a list of item definitions. Each item definition is a list, containing 3-5 values, as follows: * Key value. The value of the key that corresponds to the item. This must be unique within the set of items. * Item format. The binary format corresponding to the value of the item. This allows each item to have a different format. * Item occurrence. The [`BinaryOccurrence.Type`](binaryoccurrence-type.md) value for how many times the item is expected to appear in the group. Required items that are not present cause an error. Required or optional duplicate items are handled like unexpected key values. * Default item value (optional). If the default item value appears in the item definition list and is not null, then it will be used instead of the default. The default for repeating or optional items is null, and the default for repeating values is an empty list { }. * Item value transform (optional). If the item value transform function is present in the item definition list and is not null, then it will be called to transform the item value before it is returned. The transform function is only called if the item appears in the input (it will never be called with the default value).",
+    "examples": [
+      {
+        "usage": "let\n    b = #binary({\n        1, 11,\n        2, 22,\n        2, 22,\n        5, 55,\n        1, 11\n    }),\n    f = BinaryFormat.Group(\n        BinaryFormat.Byte,\n        {\n            {1, BinaryFormat.Byte, BinaryOccurrence.Required},\n            {2, BinaryFormat.Byte, BinaryOccurrence.Repeating},\n            {3, BinaryFormat.Byte, BinaryOccurrence.Optional},\n            {4, BinaryFormat.Byte, BinaryOccurrence.Repeating}\n        },\n        (extra) => BinaryFormat.Byte\n    )\nin\n    f(b)",
+        "output": "{11, {22, 22}, null, {}}"
+      },
+      {
+        "usage": "let\n    b = #binary({\n        1, 101,\n        1, 102\n    }),\n    f = BinaryFormat.Group(\n        BinaryFormat.Byte,\n        {\n            {1, BinaryFormat.Byte, BinaryOccurrence.Repeating,\n              0, (list) => List.Sum(list)},\n            {2, BinaryFormat.Byte, BinaryOccurrence.Optional, 123}\n        }\n    )\nin\n    f(b)",
+        "output": "{203, 123}"
+      }
+    ]
+  },
+  {
+    "name": "BinaryFormat.Length",
+    "signature": "BinaryFormat.Length(binaryFormat as function, length as any) as function",
+    "description": "Returns a binary format that limits the amount of data that can be read. Both [`BinaryFormat.List`](binaryformat-list.md) and [`BinaryFormat.Binary`](binaryformat-binary.md) can be used to read until end of the data. `BinaryFormat.Length` can be used to limit the number of bytes that are read. The `binaryFormat` parameter specifies the binary format to limit. The `length` parameter specifies the number of bytes to read. The `length` parameter may either be a number value, or a binary format value that specifies the format of the length value that appears that precedes the value being read.",
+    "examples": [
+      {
+        "usage": "let\n    binaryData = #binary({1, 2, 3}),\n    listFormat = BinaryFormat.Length(\n        BinaryFormat.List(BinaryFormat.Byte),\n        2\n    )\nin\n    listFormat(binaryData)",
+        "output": "{1, 2}"
+      },
+      {
+        "usage": "let\n    binaryData = #binary({1, 2, 3}),\n    listFormat = BinaryFormat.Length(\n        BinaryFormat.List(BinaryFormat.Byte),\n        BinaryFormat.Byte\n    )\nin\n    listFormat(binaryData)",
+        "output": "{2}"
+      }
+    ]
+  },
+  {
+    "name": "BinaryFormat.List",
+    "signature": "BinaryFormat.List(binaryFormat as function, optional countOrCondition as any) as function",
+    "description": "Returns a binary format that reads a sequence of items and returns a `list`. The `binaryFormat` parameter specifies the binary format of each item. There are three ways to determine the number of items read: * If the `countOrCondition` is not specified, then the binary format will read until there are no more items. * If the `countOrCondition` is a number, then the binary format will read that many items. * If the `countOrCondition` is a function, then that function will be invoked for each item read. The function returns true to continue, and false to stop reading items. The final item is included in the list. * If the `countOrCondition` is a binary format, then the count of items is expected to precede the list, and the specified format is used to read the count.",
+    "examples": [
+      {
+        "usage": "let\n    binaryData = #binary({1, 2, 3}),\n    listFormat = BinaryFormat.List(BinaryFormat.Byte)\nin\n    listFormat(binaryData)",
+        "output": "{1, 2, 3}"
+      },
+      {
+        "usage": "let\n    binaryData = #binary({1, 2, 3}),\n    listFormat = BinaryFormat.List(BinaryFormat.Byte, 2)\nin\n    listFormat(binaryData)",
+        "output": "{1, 2}"
+      },
+      {
+        "usage": "let\n    binaryData = #binary({1, 2, 3}),\n    listFormat = BinaryFormat.List(BinaryFormat.Byte, (x) => x < 2)\nin\n    listFormat(binaryData)",
+        "output": "{1, 2}"
+      }
+    ]
+  },
+  {
+    "name": "BinaryFormat.Null",
+    "signature": "BinaryFormat.Null(binary as binary) as any",
+    "description": "A binary format that reads zero bytes and returns null.",
+    "examples": []
+  },
+  {
+    "name": "BinaryFormat.Record",
+    "signature": "BinaryFormat.Record(record as record) as function",
+    "description": "Returns a binary format that reads a record. The `record` parameter specifies the format of the record. Each field in the record can have a different binary format. If a field contains a value that is not a binary format value, then no data is read for that field, and the field value is echoed to the result.",
+    "examples": [
+      {
+        "usage": "let\n    binaryData = #binary({\n        0x00, 0x01,\n        0x00, 0x00, 0x00, 0x02\n    }),\n    recordFormat = BinaryFormat.Record([\n        A = BinaryFormat.UnsignedInteger16,\n        B = BinaryFormat.UnsignedInteger32\n    ])\nin\n    recordFormat(binaryData)",
+        "output": "[A = 1, B = 2]"
+      }
+    ]
+  },
+  {
+    "name": "BinaryFormat.SignedInteger16",
+    "signature": "BinaryFormat.SignedInteger16(binary as binary) as any",
+    "description": "A binary format that reads a 16-bit signed integer.",
+    "examples": []
+  },
+  {
+    "name": "BinaryFormat.SignedInteger32",
+    "signature": "BinaryFormat.SignedInteger32(binary as binary) as any",
+    "description": "A binary format that reads a 32-bit signed integer.",
+    "examples": []
+  },
+  {
+    "name": "BinaryFormat.SignedInteger64",
+    "signature": "BinaryFormat.SignedInteger64(binary as binary) as any",
+    "description": "A binary format that reads a 64-bit signed integer.",
+    "examples": []
+  },
+  {
+    "name": "BinaryFormat.Single",
+    "signature": "BinaryFormat.Single(binary as binary) as any",
+    "description": "A binary format that reads a 4-byte IEEE single-precision floating point value.",
+    "examples": []
+  },
+  {
+    "name": "BinaryFormat.Text",
+    "signature": "BinaryFormat.Text(length as any, optional encoding as nullable number) as function",
+    "description": "Returns a binary format that reads a text value. The `length` specifies the number of bytes to decode, or the binary format of the length that precedes the text. The optional `encoding` value specifies the encoding of the text. If the `encoding` is not specified, then the encoding is determined from the Unicode byte order marks. If no byte order marks are present, then [`TextEncoding.Utf8`](textencoding-type.md) is used.",
+    "examples": [
+      {
+        "usage": "let\n    binaryData = #binary({65, 66, 67}),\n    textFormat = BinaryFormat.Text(2, TextEncoding.Ascii)\nin\n    textFormat(binaryData)",
+        "output": "\"AB\""
+      },
+      {
+        "usage": "let\n    binaryData = #binary({2, 65, 66}),\n    textFormat = BinaryFormat.Text(\n        BinaryFormat.Byte,\n        TextEncoding.Ascii\n    )\nin\n    textFormat(binaryData)",
+        "output": "\"AB\""
+      }
+    ]
+  },
+  {
+    "name": "BinaryFormat.Transform",
+    "signature": "BinaryFormat.Transform(binaryFormat as function, function as function) as function",
+    "description": "Returns a binary format that will transform the values read by another binary format. The `binaryFormat` parameter specifies the binary format that will be used to read the value. The `function` is invoked with the value read, and returns the transformed value.",
+    "examples": [
+      {
+        "usage": "let\n    binaryData = #binary({1}),\n    transformFormat = BinaryFormat.Transform(\n        BinaryFormat.Byte,\n        (x) => x + 1\n    )\nin\n    transformFormat(binaryData)",
+        "output": "2"
+      }
+    ]
+  },
+  {
+    "name": "BinaryFormat.UnsignedInteger16",
+    "signature": "BinaryFormat.UnsignedInteger16(binary as binary) as any",
+    "description": "A binary format that reads a 16-bit unsigned integer.",
+    "examples": []
+  },
+  {
+    "name": "BinaryFormat.UnsignedInteger32",
+    "signature": "BinaryFormat.UnsignedInteger32(binary as binary) as any",
+    "description": "A binary format that reads a 32-bit unsigned integer.",
+    "examples": []
+  },
+  {
+    "name": "BinaryFormat.UnsignedInteger64",
+    "signature": "BinaryFormat.UnsignedInteger64(binary as binary) as any",
+    "description": "A binary format that reads a 64-bit unsigned integer.",
+    "examples": []
+  }
+]

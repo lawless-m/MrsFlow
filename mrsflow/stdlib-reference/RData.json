@@ -1,0 +1,8 @@
+[
+  {
+    "name": "RData.FromBinary",
+    "signature": "RData.FromBinary(stream as binary) as any",
+    "description": "Returns a record of data frames from the RData file.",
+    "examples": []
+  }
+]

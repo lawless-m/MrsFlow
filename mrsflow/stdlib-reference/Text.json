@@ -1,0 +1,603 @@
+[
+  {
+    "name": "Text.AfterDelimiter",
+    "signature": "Text.AfterDelimiter( text as nullable text, delimiter as text, optional index as any ) as any",
+    "description": "Returns the portion of `text` after the specified `delimiter`. An optional numeric `index` indicates which occurrence of the `delimiter` should be considered. An optional list `index` indicates which occurrence of the `delimiter` should be considered, as well as whether indexing should be done from the start or end of the input.",
+    "examples": [
+      {
+        "usage": "Text.AfterDelimiter(\"111-222-333\", \"-\")",
+        "output": "\"222-333\""
+      },
+      {
+        "usage": "Text.AfterDelimiter(\"111-222-333\", \"-\", 1)",
+        "output": "\"333\""
+      },
+      {
+        "usage": "Text.AfterDelimiter(\"111-222-333\", \"-\", {1, RelativePosition.FromEnd})",
+        "output": "\"222-333\""
+      }
+    ]
+  },
+  {
+    "name": "Text.At",
+    "signature": "Text.At(text as nullable text, index as number) as nullable text",
+    "description": "Returns the character in the text value, `text` at position `index`. The first character in the text is at position 0.",
+    "examples": [
+      {
+        "usage": "Text.At(\"Hello, World\", 4)",
+        "output": "\"o\""
+      }
+    ]
+  },
+  {
+    "name": "Text.BeforeDelimiter",
+    "signature": "Text.BeforeDelimiter( text as nullable text, delimiter as text, optional index as any ) as any",
+    "description": "Returns the portion of `text` before the specified `delimiter`. An optional numeric `index` indicates which occurrence of the `delimiter` should be considered. An optional list `index` indicates which occurrence of the `delimiter` should be considered, as well as whether indexing should be done from the start or end of the input.",
+    "examples": [
+      {
+        "usage": "Text.BeforeDelimiter(\"111-222-333\", \"-\")",
+        "output": "\"111\""
+      },
+      {
+        "usage": "Text.BeforeDelimiter(\"111-222-333\", \"-\", 1)",
+        "output": "\"111-222\""
+      },
+      {
+        "usage": "Text.BeforeDelimiter(\"111-222-333\", \"-\", {1, RelativePosition.FromEnd})",
+        "output": "\"111\""
+      }
+    ]
+  },
+  {
+    "name": "Text.BetweenDelimiters",
+    "signature": "Text.BetweenDelimiters( text as nullable text, startDelimiter as text, endDelimiter as text, optional startIndex as any, optional endIndex as any ) as any",
+    "description": "Returns the portion of `text` between the specified `startDelimiter` and `endDelimiter`. An optional numeric `startIndex` indicates which occurrence of the `startDelimiter` should be considered. An optional list `startIndex` indicates which occurrence of the `startDelimiter` should be considered, as well as whether indexing should be done from the start or end of the input. The `endIndex` is similar, except that indexing is done relative to the `startIndex`.",
+    "examples": [
+      {
+        "usage": "Text.BetweenDelimiters(\"111 (222) 333 (444)\", \"(\", \")\")",
+        "output": "\"222\""
+      },
+      {
+        "usage": "Text.BetweenDelimiters(\"111 (222) 333 (444)\", \"(\", \")\", 1, 0)",
+        "output": "\"444\""
+      },
+      {
+        "usage": "Text.BetweenDelimiters(\"111 (222) 333 (444)\", \"(\", \")\", {1, RelativePosition.FromEnd}, {1, RelativePosition.FromStart})",
+        "output": "\"222) 333 (444\""
+      }
+    ]
+  },
+  {
+    "name": "Text.Clean",
+    "signature": "Text.Clean(text as nullable text) as nullable text",
+    "description": "Returns a text value with all control characters of `text` removed.",
+    "examples": [
+      {
+        "usage": "Text.Clean(\"ABC#(lf)D\")",
+        "output": "\"ABCD\""
+      }
+    ]
+  },
+  {
+    "name": "Text.Combine",
+    "signature": "Text.Combine(texts as list, optional separator as nullable text) as text",
+    "description": "Returns the result of combining the list of text values, `texts`, into a single text value. Any `null` values present in `texts` are ignored. An optional `separator` used in the final combined text can be specified.",
+    "examples": [
+      {
+        "usage": "Text.Combine({\"Seattle\", \"WA\"})",
+        "output": "\"SeattleWA\""
+      },
+      {
+        "usage": "Text.Combine({\"Seattle\", \"WA\"}, \", \")",
+        "output": "\"Seattle, WA\""
+      },
+      {
+        "usage": "Text.Combine({\"Seattle\", null, \"WA\"}, \", \")",
+        "output": "\"Seattle, WA\""
+      },
+      {
+        "usage": "let\n    Source = Table.FromRecords({\n        [First Name = \"Doug\", Middle Initial = \"J\", Last Name = \"Elis\"],\n        [First Name = \"Anna\", Middle Initial = \"M\", Last Name = \"Jorayew\"],\n        [First Name = \"Rada\", Middle Initial = null, Last Name = \"Mihaylova\"]\n    }),\n    FullName = Table.AddColumn(Source, \"Full Name\", each Text.Combine({[First Name], [Middle Initial], [Last Name]}, \" \"))\nin\n    FullName",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Text.Contains",
+    "signature": "Text.Contains( text as nullable text, substring as text, optional comparer as nullable function ) as nullable logical",
+    "description": "Detects whether `text` contains the value `substring`. Returns true if the value is found. This function doesn't support wildcards or regular expressions. The optional argument `comparer` can be used to specify case-insensitive or culture and locale-aware comparisons. The following built-in comparers are available in the formula language: * [`Comparer.Ordinal`](comparer-ordinal.md): Used to perform a case-sensitive ordinal comparison * [`Comparer.OrdinalIgnoreCase`](comparer-ordinalignorecase.md): Used to perform a case-insensitive ordinal comparison * [`Comparer.FromCulture`](comparer-fromculture.md): Used to perform a culture-aware comparison If the first argument is null, this function returns null. All characters are treated literally. For example, \"DR\", \" DR\", \"DR \", and \" DR \" aren't considered equal to each other.",
+    "examples": [
+      {
+        "usage": "Text.Contains(\"Hello World\", \"Hello\")",
+        "output": "true"
+      },
+      {
+        "usage": "Text.Contains(\"Hello World\", \"hello\")",
+        "output": "false"
+      },
+      {
+        "usage": "Text.Contains(\"Hello World\", \"hello\", Comparer.OrdinalIgnoreCase)",
+        "output": "true"
+      },
+      {
+        "usage": "let\n    Source = #table(type table [Account Code = text, Posted Date = date, Sales = number],\n    {\n        {\"US-2004\", #date(2023,1,20), 580},\n        {\"CA-8843\", #date(2023,7,18), 280},\n        {\"PA-1274\", #date(2022,1,12), 90},\n        {\"PA-4323\", #date(2023,4,14), 187},\n        {\"US-1200\", #date(2022,12,14), 350},\n        {\"PTY-507\", #date(2023,6,4), 110}\n    }),\n    #\"Filtered rows\" = Table.SelectRows(\n        Source,\n        each Text.Contains([Account Code], \"A-\") or\n            Text.Contains([Account Code], \"7\"))\nin\n    #\"Filtered rows\"",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Text.End",
+    "signature": "Text.End(text as nullable text, count as number) as nullable text",
+    "description": "Returns a `text` value that is the last `count` characters of the `text` value `text`.",
+    "examples": [
+      {
+        "usage": "Text.End(\"Hello, World\", 5)",
+        "output": "\"World\""
+      }
+    ]
+  },
+  {
+    "name": "Text.EndsWith",
+    "signature": "Text.EndsWith( text as nullable text, substring as text, optional comparer as nullable function ) as nullable logical",
+    "description": "Indicates whether the given text, `text`, ends with the specified value, `substring`. The indication is case sensitive. `comparer` is a `Comparer` which is used to control the comparison. Comparers can be used to provide case-insensitive or culture and locale-aware comparisons. The following built-in comparers are available in the formula language: * [`Comparer.Ordinal`](comparer-ordinal.md): Used to perform an exact ordinal comparison * [`Comparer.OrdinalIgnoreCase`](comparer-ordinalignorecase.md): Used to perform an exact ordinal case-insensitive comparison * [`Comparer.FromCulture`](comparer-fromculture.md): Used to perform a culture-aware comparison",
+    "examples": [
+      {
+        "usage": "Text.EndsWith(\"Hello, World\", \"world\")",
+        "output": "false"
+      },
+      {
+        "usage": "Text.EndsWith(\"Hello, World\", \"World\")",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "Text.Format",
+    "signature": "Text.Format( formatString as text, arguments as any, optional culture as nullable text ) as text",
+    "description": "Returns formatted text that is created by applying `arguments` from a list or record to a format string `formatString`. An optional `culture` may also be provided (for example, \"en-US\").",
+    "examples": [
+      {
+        "usage": "Text.Format(\"#{0}, #{1}, and #{2}.\", {17, 7, 22})",
+        "output": "\"17, 7, and 22.\""
+      },
+      {
+        "usage": "Text.Format(\n    \"The time for the #[distance] km run held in #[city] on #[date] was #[duration].\",\n    [\n        city = \"Seattle\",\n        date = #date(2015, 3, 10),\n        duration = #duration(0, 0, 54, 40),\n        distance = 10\n    ],\n    \"en-US\"\n)",
+        "output": "\"The time for the 10 km run held in Seattle on 3/10/2015 was 00:54:40.\""
+      }
+    ]
+  },
+  {
+    "name": "Text.From",
+    "signature": "Text.From(value as any, optional culture as nullable text) as nullable text",
+    "description": "Returns the text representation of a specified value. * `value`: The value to convert to text. The value can be a `number`, `date`, `time`, `datetime`, `datetimezone`, `logical`, `duration`, or `binary` value. If the given value is `null`, this function returns `null`. * `culture`: (Optional) The culture to use when converting the value to text (for example, \"en-US\").",
+    "examples": [
+      {
+        "usage": "Text.From(3)",
+        "output": "\"3\""
+      },
+      {
+        "usage": "Text.From(#datetime(2024, 6, 24, 14, 32, 22))",
+        "output": "\"6/24/2024 2:32:22 PM\""
+      },
+      {
+        "usage": "Text.From(#datetime(2024, 6, 24, 14, 32, 22), \"de-DE\")",
+        "output": "\"24.06.2024 14:32:22\""
+      },
+      {
+        "usage": "Text.From(Binary.FromText(\"10FF\", BinaryEncoding.Hex))",
+        "output": "\"EP8=\""
+      },
+      {
+        "usage": "let\n    Source = #table(type table [Company ID = text, Country = text, Date = date],\n    {\n        {\"JS-464\", \"USA\", #date(2024, 3, 24)},\n        {\"LT-331\", \"France\", #date(2024, 10, 5)},\n        {\"XE-100\", \"USA\", #date(2024, 5, 21)},\n        {\"RT-430\", \"Germany\", #date(2024, 1,18)},\n        {\"LS-005\", \"France\", #date(2023, 12, 31)},\n        {\"UW-220\", \"Germany\", #date(2024, 2, 25)}\n    }),\n    #\"Convert Dates\" = Table.TransformColumns(\n        Table.SelectRows(Source, each [Country] = \"France\"),\n        {\"Date\", each Text.From(_, \"fr-FR\")}\n    )\nin\n    #\"Convert Dates\"",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Text.FromBinary",
+    "signature": "Text.FromBinary(binary as nullable binary, optional encoding as nullable number) as nullable text",
+    "description": "Decodes data from a binary value to a text value using the specified encoding type. * `binary`: The binary data to be decoded. * `encoding`: (Optional) The encoding used to convert the binary to text. Use [`BinaryEncoding.Type`](binaryencoding-type.md) to specify the type of encoding. If this value isn't specified, the default value is `BinaryEncoding.Utf8`.",
+    "examples": [
+      {
+        "usage": "let\n    originalText = \"Testing 1-2-3\",\n\n    // Default UTF-8 binary\n    binaryData = Text.ToBinary(originalText),\n\n    // Convert binary to viewable Base64 string\n    encodedText = Binary.ToText(binaryData, BinaryEncoding.Base64),\n\n    // Decode back to text\n    decodedText = Text.FromBinary(binaryData),\n\n    result = [\n        OriginalText = originalText,\n        BinaryBase64 = encodedText,\n        DecodedText = decodedText\n    ]\nin\n    result",
+        "output": "`"
+      },
+      {
+        "usage": "let\n    originalText = \"Testing 1-2-3\",\n\n    // Convert to binary with BOM\n    binaryData = Text.ToBinary(originalText, TextEncoding.Utf16, true),\n\n    // Show binary as hex to demonstrate presence of BOM (fffe)\n    binaryAsHex = Binary.ToText(binaryData, BinaryEncoding.Hex),\n\n    // Decode back to text\n    decodedText = Text.FromBinary(binaryData, TextEncoding.Utf16),\n\n    // Compare original text and decoded text\n    isIdentical = originalText = decodedText,\n\n    result = [\n        OriginalText = originalText,\n        BinaryHex = binaryAsHex,\n        DecodedText = decodedText,\n        IsIdentical = isIdentical\n    ]\nin\n    result",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Text.InferNumberType",
+    "signature": "Text.InferNumberType(text as text, optional culture as nullable text) as type",
+    "description": "Infers the granular number type (Int64.Type, Double.Type, and so on) of `text`. An error is raised if `text` is not a number. An optional `culture` may also be provided (for example, \"en-US\").",
+    "examples": []
+  },
+  {
+    "name": "Text.Insert",
+    "signature": "Text.Insert( text as nullable text, offset as number, newText as text ) as nullable text",
+    "description": "Returns the result of inserting text value `newText` into the text value `text` at position `offset`. Positions start at number 0.",
+    "examples": [
+      {
+        "usage": "Text.Insert(\"ABD\", 2, \"C\")",
+        "output": "\"ABCD\""
+      }
+    ]
+  },
+  {
+    "name": "Text.Length",
+    "signature": "Text.Length(text as nullable text) as nullable number",
+    "description": "Returns the number of characters in the text `text`.",
+    "examples": [
+      {
+        "usage": "Text.Length(\"Hello World\")",
+        "output": "11"
+      }
+    ]
+  },
+  {
+    "name": "Text.Lower",
+    "signature": "Text.Lower(text as nullable text, optional culture as nullable text) as nullable text",
+    "description": "Returns the result of converting all characters in `text` to lowercase. An optional `culture` may also be provided (for example, \"en-US\").",
+    "examples": [
+      {
+        "usage": "Text.Lower(\"AbCd\")",
+        "output": "\"abcd\""
+      }
+    ]
+  },
+  {
+    "name": "Text.Middle",
+    "signature": "Text.Middle( text as nullable text, start as number, optional count as nullable number ) as nullable text",
+    "description": "Returns `count` characters, or through the end of `text`; at the offset `start`.",
+    "examples": [
+      {
+        "usage": "Text.Middle(\"Hello World\", 6, 5)",
+        "output": "\"World\""
+      },
+      {
+        "usage": "Text.Middle(\"Hello World\", 6, 20)",
+        "output": "\"World\""
+      },
+      {
+        "usage": "Text.Middle(\"Hello World\", 0, 2)",
+        "output": "\"He\""
+      }
+    ]
+  },
+  {
+    "name": "Text.NewGuid",
+    "signature": "Text.NewGuid() as text",
+    "description": "Returns a new, random globally unique identifier (GUID).",
+    "examples": []
+  },
+  {
+    "name": "Text.PadEnd",
+    "signature": "Text.PadEnd( text as nullable text, count as number, optional character as nullable text ) as nullable text",
+    "description": "Returns a `text` value padded to length `count` by inserting spaces at the end of the text value `text`. An optional character `character` can be used to specify the character used for padding. The default pad character is a space.",
+    "examples": [
+      {
+        "usage": "Text.PadEnd(\"Name\", 10)",
+        "output": "\"Name      \""
+      },
+      {
+        "usage": "Text.PadEnd(\"Name\", 10, \"|\")",
+        "output": "\"Name||||||\""
+      }
+    ]
+  },
+  {
+    "name": "Text.PadStart",
+    "signature": "Text.PadStart( text as nullable text, count as number, optional character as nullable text ) as nullable text",
+    "description": "Returns a `text` value padded to length `count` by inserting spaces at the start of the text value `text`. An optional character `character` can be used to specify the character used for padding. The default pad character is a space.",
+    "examples": [
+      {
+        "usage": "Text.PadStart(\"Name\", 10)",
+        "output": "\"      Name\""
+      },
+      {
+        "usage": "Text.PadStart(\"Name\", 10, \"|\")",
+        "output": "\"||||||Name\""
+      }
+    ]
+  },
+  {
+    "name": "Text.PositionOf",
+    "signature": "Text.PositionOf( text as text, substring as text, optional occurrence as nullable number, optional comparer as nullable function ) as any",
+    "description": "Returns the position of the specified occurrence of the text value `substring` found in `text`. An optional parameter `occurrence` may be used to specify which occurrence position to return (first occurrence by default). Returns -1 if `substring` was not found. `comparer` is a `Comparer` which is used to control the comparison. Comparers can be used to provide case-insensitive or culture and locale-aware comparisons. The following built-in comparers are available in the formula language: * [`Comparer.Ordinal`](comparer-ordinal.md): Used to perform an exact ordinal comparison * [`Comparer.OrdinalIgnoreCase`](comparer-ordinalignorecase.md): Used to perform an exact ordinal case-insensitive comparison * [`Comparer.FromCulture`](comparer-fromculture.md): Used to perform a culture-aware comparison",
+    "examples": [
+      {
+        "usage": "Text.PositionOf(\"Hello, World! Hello, World!\", \"World\")",
+        "output": "7"
+      },
+      {
+        "usage": "Text.PositionOf(\"Hello, World! Hello, World!\", \"World\", Occurrence.Last)",
+        "output": "21"
+      }
+    ]
+  },
+  {
+    "name": "Text.PositionOfAny",
+    "signature": "Text.PositionOfAny( text as text, characters as list, optional occurrence as nullable number ) as any",
+    "description": "Returns the first position of any character in the list `characters` that is found in `text`. An optional parameter `occurrence` may be used to specify which occurrence position to return.",
+    "examples": [
+      {
+        "usage": "Text.PositionOfAny(\"Hello, World!\", {\"H\", \"W\"})",
+        "output": "0"
+      },
+      {
+        "usage": "Text.PositionOfAny(\"Hello, World!\", {\"H\", \"W\"}, Occurrence.All)",
+        "output": "{0, 7}"
+      }
+    ]
+  },
+  {
+    "name": "Text.Proper",
+    "signature": "Text.Proper(text as nullable text, optional culture as nullable text) as nullable text",
+    "description": "Returns the result of capitalizing only the first letter of each word in text value `text`. All other letters are returned in lowercase. An optional `culture` may also be provided (for example, \"en-US\").",
+    "examples": [
+      {
+        "usage": "Text.Proper(\"the QUICK BrOWn fOx jUmPs oVER tHe LAzy DoG\")",
+        "output": "\"The Quick Brown Fox Jumps Over The Lazy Dog\""
+      }
+    ]
+  },
+  {
+    "name": "Text.Range",
+    "signature": "Text.Range( text as nullable text, offset as number, optional count as nullable number ) as nullable text",
+    "description": "Returns the substring from the text `text` found at the offset `offset`. An optional parameter, `count`, can be included to specify how many characters to return. Raises an error if there aren't enough characters.",
+    "examples": [
+      {
+        "usage": "Text.Range(\"Hello World\", 6)",
+        "output": "\"World\""
+      },
+      {
+        "usage": "Text.Range(\"Hello World Hello\", 6, 5)",
+        "output": "\"World\""
+      }
+    ]
+  },
+  {
+    "name": "Text.Remove",
+    "signature": "Text.Remove(text as nullable text, removeChars as any) as nullable text",
+    "description": "Returns a copy of the text value `text` with all the characters from `removeChars` removed.",
+    "examples": [
+      {
+        "usage": "Text.Remove(\"a,b;c\", {\",\",\";\"})",
+        "output": "\"abc\""
+      }
+    ]
+  },
+  {
+    "name": "Text.RemoveRange",
+    "signature": "Text.RemoveRange( text as nullable text, offset as number, optional count as nullable number ) as nullable text",
+    "description": "Returns a copy of the text value `text` with all the characters from position `offset` removed. An optional parameter, `count` can by used to specify the number of characters to remove. The default value of `count` is 1. Position values start at 0.",
+    "examples": [
+      {
+        "usage": "Text.RemoveRange(\"ABEFC\", 2)",
+        "output": "\"ABFC\""
+      },
+      {
+        "usage": "Text.RemoveRange(\"ABEFC\", 2, 2)",
+        "output": "\"ABC\""
+      }
+    ]
+  },
+  {
+    "name": "Text.Repeat",
+    "signature": "Text.Repeat(text as nullable text, count as number) as nullable text",
+    "description": "Returns a text value composed of the input text `text` repeated `count` times.",
+    "examples": [
+      {
+        "usage": "Text.Repeat(\"a\", 5)",
+        "output": "\"aaaaa\""
+      },
+      {
+        "usage": "Text.Repeat(\"helloworld.\", 3)",
+        "output": "\"helloworld.helloworld.helloworld.\""
+      }
+    ]
+  },
+  {
+    "name": "Text.Replace",
+    "signature": "Text.Replace( text as nullable text, old as text, new as text ) as nullable text",
+    "description": "Returns the result of replacing all occurrences of text value `old` in text value `text` with text value `new`. This function is case sensitive.",
+    "examples": [
+      {
+        "usage": "Text.Replace(\"the quick brown fox jumps over the lazy dog\", \"the\", \"a\")",
+        "output": "\"a quick brown fox jumps over a lazy dog\""
+      }
+    ]
+  },
+  {
+    "name": "Text.ReplaceRange",
+    "signature": "Text.ReplaceRange( text as nullable text, offset as number, count as number, newText as text ) as nullable text",
+    "description": "Returns the result of removing a number of characters, `count`, from text value `text` beginning at position `offset` and then inserting the text value `newText` at the same position in `text`.",
+    "examples": [
+      {
+        "usage": "Text.ReplaceRange(\"ABGF\", 2, 1, \"CDE\")",
+        "output": "\"ABCDEF\""
+      }
+    ]
+  },
+  {
+    "name": "Text.Reverse",
+    "signature": "Text.Reverse(text as nullable text) as nullable text",
+    "description": "Reverses the provided `text`.",
+    "examples": [
+      {
+        "usage": "Text.Reverse(\"123\")",
+        "output": "\"321\""
+      }
+    ]
+  },
+  {
+    "name": "Text.Select",
+    "signature": "Text.Select(text as nullable text, selectChars as any) as nullable text",
+    "description": "Returns a copy of the text value `text` with all the characters not in `selectChars` removed.",
+    "examples": [
+      {
+        "usage": "Text.Select(\"a,b;c\", {\"a\"..\"z\"})",
+        "output": "\"abc\""
+      }
+    ]
+  },
+  {
+    "name": "Text.Split",
+    "signature": "Text.Split(text as text, separator as text) as list",
+    "description": "Returns a list of text values resulting from the splitting of a text value based on the specified delimiter. * `text`: The text value to split. * `separator`: The delimiter used to split the text. The delimiter can be either a single character or a sequence of characters. If a sequence of characters is used, the text is split only at instances where the exact sequence occurs.",
+    "examples": [
+      {
+        "usage": "Text.Split(\"Name|Address|PhoneNumber\", \"|\")",
+        "output": "`"
+      },
+      {
+        "usage": "Text.Split(\"Name, the Customer, the Purchase Date\", \", the \")",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Text.SplitAny",
+    "signature": "Text.SplitAny(text as text, separators as text) as list",
+    "description": "Returns a list of text values resulting from the splitting of a text value based on any character specified in the delimiter. * `text`: The text value to split. * `separators`: The delimiter characters used to split the text.",
+    "examples": [
+      {
+        "usage": "Text.SplitAny(\"Name|Customer ID|Purchase|Month-Day-Year\", \"|-\")",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Text.Start",
+    "signature": "Text.Start(text as nullable text, count as number) as nullable text",
+    "description": "Returns the first `count` characters of `text` as a text value.",
+    "examples": [
+      {
+        "usage": "Text.Start(\"Hello, World\", 5)",
+        "output": "\"Hello\""
+      },
+      {
+        "usage": "let\n    Source = #table(type table [First Name = text, Last Name = text],\n    {\n        {\"Douglas\", \"Elis\"},\n        {\"Ana\", \"Jorayew\"},\n        {\"Rada\", \"Mihaylova\"}\n    }),\n    EmailAddress = Table.AddColumn(\n        Source,\n        \"Email Address\",\n        each Text.Combine({\n            Text.Start([First Name], 4),\n            Text.Start([Last Name], 3),\n            \"@contoso.com\"\n        })\n    )\nin\n    EmailAddress",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Text.StartsWith",
+    "signature": "Text.StartsWith( text as nullable text, substring as text, optional comparer as nullable function ) as nullable logical",
+    "description": "Returns true if text value `text` starts with text value `substring`. * `text`: A `text` value which is to be searched. * `substring`: A `text` value which is the substring to be searched for in `text`. * `comparer`: *(Optional)* A `Comparer` used for controlling the comparison. For example, [`Comparer.OrdinalIgnoreCase`](comparer-ordinalignorecase.md) may be used to perform case-insensitive searches. `comparer` is a `Comparer` which is used to control the comparison. Comparers can be used to provide case-insensitive or culture and locale-aware comparisons. The following built-in comparers are available in the formula language: * [`Comparer.Ordinal`](comparer-ordinal.md): Used to perform an exact ordinal comparison. * [`Comparer.OrdinalIgnoreCase`](comparer-ordinalignorecase.md): Used to perform an exact ordinal case-insensitive comparison. * [`Comparer.FromCulture`](comparer-fromculture.md): Used to perform a culture-aware comparison.",
+    "examples": [
+      {
+        "usage": "Text.StartsWith(\"Hello, World\", \"hello\")",
+        "output": "false"
+      },
+      {
+        "usage": "Text.StartsWith(\"Hello, World\", \"Hello\")",
+        "output": "true"
+      },
+      {
+        "usage": "Text.StartsWith(\"Hello, World\", \"hello\", Comparer.OrdinalIgnoreCase)",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "Text.ToBinary",
+    "signature": "Text.ToBinary( text as nullable text, optional encoding as nullable number, optional includeByteOrderMark as nullable logical ) as nullable binary",
+    "description": "Encodes a text value into a binary value using the specified encoding. * `text`: The text to be encoded. * `encoding`: (Optional) The encoding used to convert the text to binary. Use [`BinaryEncoding.Type`](binaryencoding-type.md) to specify the type of encoding. If this value isn't specified, the default value is `BinaryEncoding.Utf8`. * `includeByteOrderMark`: (Optional) Determines if a Byte Order Mark (BOM) should be included at the beginning of the binary output. Set to `true` to automatically include the BOM, otherwise `false`. If this value isn't specified, the default value is `false`.",
+    "examples": [
+      {
+        "usage": "let\n    originalText = \"Testing 1-2-3\",\n\n    // Default UTF-8 binary\n    binaryData = Text.ToBinary(originalText),\n\n    // Convert binary to viewable Base64 string\n    encodedText = Binary.ToText(binaryData, BinaryEncoding.Base64),\n\n    // Decode back to text\n    decodedText = Text.FromBinary(binaryData),\n\n    result = [\n        OriginalText = originalText,\n        BinaryBase64 = encodedText,\n        DecodedText = decodedText\n    ]\nin\n    result",
+        "output": "`"
+      },
+      {
+        "usage": "let\n    originalText = \"Testing 1-2-3\",\n\n    // Convert to binary with BOM\n    binaryData = Text.ToBinary(originalText, TextEncoding.Utf16, true),\n\n    // Show binary as hex to demonstrate presence of BOM (fffe)\n    binaryAsHex = Binary.ToText(binaryData, BinaryEncoding.Hex),\n\n    // Decode back to text\n    decodedText = Text.FromBinary(binaryData, TextEncoding.Utf16),\n\n    // Compare original text and decoded text\n    isIdentical = originalText = decodedText,\n\n    result = [\n        OriginalText = originalText,\n        BinaryHex = binaryAsHex,\n        DecodedText = decodedText,\n        IsIdentical = isIdentical\n    ]\nin\n    result",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Text.ToList",
+    "signature": "Text.ToList(text as text) as list",
+    "description": "Returns a list of character values from the given text value `text`.",
+    "examples": [
+      {
+        "usage": "Text.ToList(\"Hello World\")",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Text.Trim",
+    "signature": "Text.Trim(text as nullable text, optional trim as any) as nullable text",
+    "description": "Returns the result of removing all leading and trailing characters from the specified `text`. By default, all the leading and trailing whitespace characters are removed. * `text`: The text from which the leading and trailing characters are to be removed. * `trim`: Overrides the whitespace characters that are trimmed by default. This parameter can either be a single character or a list of single characters. Each leading and trailing trim operation stops when a non-trimmed character is encountered.",
+    "examples": [
+      {
+        "usage": "Text.Trim(\"     a b c d    \")",
+        "output": "\"a b c d\""
+      },
+      {
+        "usage": "Text.Trim(\"0000056.4200\", \"0\")",
+        "output": "\"56.42\""
+      },
+      {
+        "usage": "Text.Trim(\"<div/>\", {\"<\", \">\", \"/\"})",
+        "output": "\"div\""
+      },
+      {
+        "usage": "let\n    Source = #table(type table [Home Sale = text, Sales Date = date, Sales Status = text],\n    {\n        {\"1620 Ferris Way\", #date(2024, 8, 22), \"##@@Pending@@##\"},\n        {\"757 1st Ave. S.\", #date(2024, 3, 15), \"Sold\"},\n        {\"22303 Fillmore\", #date(2024, 10, 2), \"##@@Pending@@##\"}\n    }),\n    #\"Trimmed Status\" = Table.TransformColumns(Source, {\"Sales Status\", each Text.Trim(_, {\"#\", \"@\"})})\nin\n    #\"Trimmed Status\"",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Text.TrimEnd",
+    "signature": "Text.TrimEnd(text as nullable text, optional trim as any) as nullable text",
+    "description": "Returns the result of removing all trailing characters from the specified `text`. By default, all the trailing whitespace characters are removed. * `text`: The text from which the trailing characters are to be removed. * `trim`: Overrides the whitespace characters that are trimmed by default. This parameter can either be a single character or a list of single characters. Each trailing trim operation stops when a non-trimmed character is encountered.",
+    "examples": [
+      {
+        "usage": "Text.TrimEnd(\"     a b c d    \")",
+        "output": "\"     a b c d\""
+      },
+      {
+        "usage": "Text.TrimEnd(\"03.487700000\", \"0\")",
+        "output": "\"03.4877\""
+      },
+      {
+        "usage": "let\n    Source = #table(type table [Name = text, Account Name= text, Interest = number],\n    {\n        {\"Bob\", \"US-847263****@\", 2.8410},\n        {\"Leslie\", \"FR-4648****@**\", 3.8392},\n        {\"Ringo\", \"DE-2046790@***\", 12.6600}\n    }),\n    #\"Trimmed Account\" = Table.TransformColumns(Source, {{\"Account Name\", each Text.TrimEnd(_, {\"*\", \"@\"})}})\nin\n    #\"Trimmed Account\"",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Text.TrimStart",
+    "signature": "Text.TrimStart(text as nullable text, optional trim as any) as nullable text",
+    "description": "Returns the result of removing all leading characters from the specified `text`. By default, all the leading whitespace characters are removed. * `text`: The text from which the leading characters are to be removed. * `trim`: Overrides the whitespace characters that are trimmed by default. This parameter can either be a single character or a list of single characters. Each leading trim operation stops when a non-trimmed character is encountered.",
+    "examples": [
+      {
+        "usage": "Text.TrimStart(\"   a b c d    \")",
+        "output": "\"a b c d    \""
+      },
+      {
+        "usage": "Text.TrimStart(\"0000056.420\", \"0\")",
+        "output": "\"56.420\""
+      },
+      {
+        "usage": "let\n    Source = #table(type table [Name = text, Account Name= text, Interest = number],\n    {\n        {\"Bob\", \"@****847263-US\", 2.8410},\n        {\"Leslie\", \"@******4648-FR\", 3.8392},\n        {\"Ringo\", \"@***2046790-DE\", 12.6600}\n    }),\n    #\"Trimmed Account\" = Table.TransformColumns(Source, {{\"Account Name\", each Text.TrimStart(_, {\"*\", \"@\"})}})\nin\n    #\"Trimmed Account\"",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Text.Upper",
+    "signature": "Text.Upper(text as nullable text, optional culture as nullable text) as nullable text",
+    "description": "Returns the result of converting all characters in `text` to uppercase. An optional `culture` may also be provided (for example, \"en-US\").",
+    "examples": [
+      {
+        "usage": "Text.Upper(\"aBcD\")",
+        "output": "\"ABCD\""
+      }
+    ]
+  }
+]

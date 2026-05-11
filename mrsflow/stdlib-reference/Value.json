@@ -1,0 +1,216 @@
+[
+  {
+    "name": "Value.Add",
+    "signature": "Value.Add( value1 as any, value2 as any, optional precision as nullable number ) as any",
+    "description": "Returns the sum of `value1` and `value2`. An optional `precision` parameter may be specified, by default [`Precision.Double`](precision-type.md) is used.",
+    "examples": []
+  },
+  {
+    "name": "Value.Alternates",
+    "signature": "Value.Alternates(alternates as list) as any",
+    "description": "Expresses alternate query plans within a query plan expression obtained through `Value.Expression(Value.Optimize(...))`. Not intended for other uses.",
+    "examples": []
+  },
+  {
+    "name": "Value.As",
+    "signature": "Value.As(value as any, type as type) as any",
+    "description": "Returns the value if it's compatible with the specified type. This is equivalent to the \"as\" operator in M, with the exception that it can accept identifier type references such as Number.Type.",
+    "examples": [
+      {
+        "usage": "Value.As(123, Number.Type)",
+        "output": "123"
+      },
+      {
+        "usage": "Value.As(\"abc\", type number)",
+        "output": "[Expression.Error] We cannot convert the value \"abc\" to type Number."
+      }
+    ]
+  },
+  {
+    "name": "Value.Compare",
+    "signature": "Value.Compare( value1 as any, value2 as any, optional precision as nullable number ) as number",
+    "description": "Returns -1, 0, or 1 based on whether the first value is less than, equal to, or greater than the second.",
+    "examples": []
+  },
+  {
+    "name": "Value.Divide",
+    "signature": "Value.Divide( value1 as any, value2 as any, optional precision as nullable number ) as any",
+    "description": "Returns the result of dividing `value1` by `value2`. An optional `precision` parameter may be specified, by default [`Precision.Double`](precision-type.md) is used.",
+    "examples": []
+  },
+  {
+    "name": "Value.Equals",
+    "signature": "Value.Equals( value1 as any, value2 as any, optional precision as nullable number ) as logical",
+    "description": "Returns true if value `value1` is equal to value `value2`, false otherwise.",
+    "examples": []
+  },
+  {
+    "name": "Value.Expression",
+    "signature": "Value.Expression(value as any) as nullable record",
+    "description": "Returns an abstract syntax tree (AST) that represents the value's expression.",
+    "examples": []
+  },
+  {
+    "name": "Value.Firewall",
+    "signature": "Value.Firewall(key as text) as any",
+    "description": "This function is intended for internal use only.",
+    "examples": []
+  },
+  {
+    "name": "Value.FromText",
+    "signature": "Value.FromText(text as any, optional culture as nullable text) as any",
+    "description": "Decodes a value from a textual representation and interprets it as a value with an appropriate type. * `text`: The text to interpret. * `culture`: (Optional) A specific culture used to interpret the text (for example, \"en-US\"). This function takes a text value and returns a value of type `number`, `logical`, `null`, `datetime`, `duration`, or `text`. An empty text value is interpreted as a `null` value.",
+    "examples": [
+      {
+        "usage": "Value.FromText(\"12345.6789\")",
+        "output": "12345.6789"
+      },
+      {
+        "usage": "Value.FromText(\"25.4%\")",
+        "output": "0.254"
+      },
+      {
+        "usage": "Value.FromText(\"€1,190\", \"fr-FR\")",
+        "output": "1.19"
+      },
+      {
+        "usage": "Value.FromText(\"24 Dez 2024 14:33:20\", \"de-DE\")",
+        "output": "#datetime(2024, 12, 24, 14, 33, 20)"
+      }
+    ]
+  },
+  {
+    "name": "Value.Is",
+    "signature": "Value.Is(value as any, type as type) as logical",
+    "description": "Determines whether a value is compatible with the specified type. This is equivalent to the \"is\" operator in M, with the exception that it can accept identifier type references such as Number.Type.",
+    "examples": [
+      {
+        "usage": "Value.Is(123, Number.Type) = (123 is number)",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "Value.Lineage",
+    "signature": "Value.Lineage(value as any) as any",
+    "description": "This function is intended for internal use only.",
+    "examples": []
+  },
+  {
+    "name": "Value.Metadata",
+    "signature": "Value.Metadata(value as any) as any",
+    "description": "Returns a record containing the input's metadata.",
+    "examples": []
+  },
+  {
+    "name": "Value.Multiply",
+    "signature": "Value.Multiply( value1 as any, value2 as any, optional precision as nullable number ) as any",
+    "description": "Returns the product of multiplying `value1` by `value2`. An optional `precision` parameter may be specified, by default [`Precision.Double`](precision-type.md) is used.",
+    "examples": []
+  },
+  {
+    "name": "Value.NativeQuery",
+    "signature": "Value.NativeQuery( target as any, query as text, optional parameters as any, optional options as nullable record ) as any",
+    "description": "Evaluates `query` against `target` using the parameters specified in `parameters` and the options specified in `options`. The output of the query is defined by `target`. `target` provides the context for the operation described by `query`. `query` describes the query to be executed against `target`. `query` is expressed in a manner specific to `target` (for example, a T-SQL statement). The optional `parameters` value may contain either a list or record as appropriate to supply the parameter values expected by `query`. The optional `options` record may contain options that affect the evaluation behavior of `query` against `target`. These options are specific to `target`.",
+    "examples": []
+  },
+  {
+    "name": "Value.NullableEquals",
+    "signature": "Value.NullableEquals( value1 as any, value2 as any, optional precision as nullable number ) as nullable logical",
+    "description": "Returns null if either argument `value1` or `value2` is null, otherwise equivalent to [`Value.Equals`](value-equals.md).",
+    "examples": []
+  },
+  {
+    "name": "Value.Optimize",
+    "signature": "Value.Optimize(value as any) as any",
+    "description": "When used within [`Value.Expression`](value-expression.md), if `value` represents a query that can be optimized, this function indicates that the optimized expression should be returned. Otherwise, `value` will be passed through with no effect.",
+    "examples": []
+  },
+  {
+    "name": "Value.RemoveMetadata",
+    "signature": "Value.RemoveMetadata(value as any, optional metaValue as any) as any",
+    "description": "Strips the input of metadata.",
+    "examples": [
+      {
+        "usage": "Value.Metadata(\n    Value.RemoveMetadata(\"abc\" meta [a = 1, b = 2])\n)",
+        "output": "[]"
+      },
+      {
+        "usage": "Value.Metadata(\n    Value.RemoveMetadata(\"abc\" meta [a = 1, b = 2], {\"a\"})\n)",
+        "output": "[b = 2]"
+      }
+    ]
+  },
+  {
+    "name": "Value.ReplaceMetadata",
+    "signature": "Value.ReplaceMetadata(value as any, metaValue as any) as any",
+    "description": "Replaces the input's metadata information.",
+    "examples": []
+  },
+  {
+    "name": "Value.ReplaceType",
+    "signature": "Value.ReplaceType(value as any, type as type) as any",
+    "description": "Replaces the `value`'s type with the provided `type`.",
+    "examples": [
+      {
+        "usage": "Type.RecordFields(\n    Value.Type(\n        Value.ReplaceType(\n            [Column1 = 123],\n            type [Column1 = number]\n        )\n    )\n)[Column1][Type]",
+        "output": "type number"
+      }
+    ]
+  },
+  {
+    "name": "Value.Subtract",
+    "signature": "Value.Subtract( value1 as any, value2 as any, optional precision as nullable number ) as any",
+    "description": "Returns the difference of `value1` and `value2`. An optional `precision` parameter may be specified, by default [`Precision.Double`](precision-type.md) is used.",
+    "examples": []
+  },
+  {
+    "name": "Value.Traits",
+    "signature": "Value.Traits(value as any) as table",
+    "description": "This function is intended for internal use only.",
+    "examples": []
+  },
+  {
+    "name": "Value.Type",
+    "signature": "Value.Type(value as any) as type",
+    "description": "Returns the type of the given value. * `value`: The value whose type is returned.",
+    "examples": [
+      {
+        "usage": "Value.Type(243.448)",
+        "output": "type number"
+      },
+      {
+        "usage": "Value.Type(#date(2010, 12, 31))",
+        "output": "type date"
+      },
+      {
+        "usage": "Value.Type([a = 1, b = 2])",
+        "output": "type record"
+      }
+    ]
+  },
+  {
+    "name": "Value.VersionIdentity",
+    "signature": "Value.VersionIdentity(value as any) as any",
+    "description": "Returns the version identity of the `value`, or `null` if it doesn't have a version.",
+    "examples": []
+  },
+  {
+    "name": "Value.Versions",
+    "signature": "Value.Versions(value as any) as table",
+    "description": "Returns a navigation table containing the available versions of the `value`.",
+    "examples": []
+  },
+  {
+    "name": "Value.ViewError",
+    "signature": "Value.ViewError(errorRecord as record) as record",
+    "description": "This function is intended for internal use only.",
+    "examples": []
+  },
+  {
+    "name": "Value.ViewFunction",
+    "signature": "Value.ViewFunction(function as function) as function",
+    "description": "This function is intended for internal use only.",
+    "examples": []
+  }
+]

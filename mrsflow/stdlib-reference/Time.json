@@ -1,0 +1,125 @@
+[
+  {
+    "name": "Time.EndOfHour",
+    "signature": "Time.EndOfHour(dateTime as any) as any",
+    "description": "Returns the end of the hour represented by `dateTime`, including fractional seconds. Time zone information is preserved. * `dateTime`: A `time`, `datetime`, or `datetimezone` value from which the end of the hour is calculated.",
+    "examples": [
+      {
+        "usage": "Time.EndOfHour(#datetime(2011, 5, 14, 17, 0, 0))",
+        "output": "#datetime(2011, 5, 14, 17, 59, 59.9999999)"
+      },
+      {
+        "usage": "Time.EndOfHour(#datetimezone(2011, 5, 17, 5, 0, 0, -7, 0))",
+        "output": "#datetimezone(2011, 5, 17, 5, 59, 59.9999999, -7, 0)"
+      }
+    ]
+  },
+  {
+    "name": "Time.From",
+    "signature": "Time.From(value as any, optional culture as nullable text) as nullable time",
+    "description": "Returns a `time` value from the given `value`. An optional `culture` may also be provided (for example, \"en-US\"). If the given `value` is `null`, `Time.From` returns `null`. If the given `value` is `time`, `value` is returned. Values of the following types can be converted to a `time` value: * `text`: A `time` value from textual representation. Refer to [`Time.FromText`](time-fromtext.md) for details. * `datetime`: The time component of the `value`. * `datetimezone`: The time component of the local datetime equivalent of `value`. * `number`: A `time` equivalent to the number of fractional days expressed by `value`. If `value` is negative or greater or equal to 1, an error is returned. If `value` is of any other type, an error is returned.",
+    "examples": [
+      {
+        "usage": "Time.From(0.7575)",
+        "output": "#time(18, 10, 48)"
+      },
+      {
+        "usage": "Time.From(#datetime(1899, 12, 30, 06, 45, 12))",
+        "output": "#time(06, 45, 12)"
+      }
+    ]
+  },
+  {
+    "name": "Time.FromText",
+    "signature": "Time.FromText(text as nullable text, optional options as any) as nullable time",
+    "description": "Creates a `time` value from a textual representation, `text`. An optional `record` parameter, `options`, may be provided to specify additional properties. The `record` can contain the following fields: * `Format`: A `text` value indicating the format to use. For more details, go to [Standard date and time format strings](standard-date-and-time-format-strings.md) and [Custom date and time format strings](custom-date-and-time-format-strings.md). Omitting this field or providing `null` will result in parsing the time using a best effort. * `Culture`: When `Format` is not null, `Culture` controls some format specifiers. For example, in `\"en-US\"` `\"tt\"` is `\"AM\" or \"PM\"`, while in `\"ar-EG\"` `\"tt\"` is `\"ص\" or \"م\"`. When `Format` is `null`, `Culture` controls the default format to use. When `Culture` is `null` or omitted, [`Culture.Current`](culture-current.md) is used. To support legacy workflows, `options` may also be a text value. This has the same behavior as if `options = [Format = null, Culture = options]`.",
+    "examples": [
+      {
+        "usage": "Time.FromText(\"10:12:31am\")",
+        "output": "#time(10, 12, 31)"
+      },
+      {
+        "usage": "Time.FromText(\"1012\")",
+        "output": "#time(10, 12, 00)"
+      },
+      {
+        "usage": "Time.FromText(\"10\")",
+        "output": "#time(10, 00, 00)"
+      }
+    ]
+  },
+  {
+    "name": "Time.Hour",
+    "signature": "Time.Hour(dateTime as any) as nullable number",
+    "description": "Returns the hour component of the provided `time`, `datetime`, or `datetimezone` value, `dateTime`.",
+    "examples": [
+      {
+        "usage": "Time.Hour(#datetime(2011, 12, 31, 9, 15, 36))",
+        "output": "9"
+      }
+    ]
+  },
+  {
+    "name": "Time.Minute",
+    "signature": "Time.Minute(dateTime as any) as nullable number",
+    "description": "Returns the minute component of the provided `time`, `datetime`, or `datetimezone` value, `dateTime`.",
+    "examples": [
+      {
+        "usage": "Time.Minute(#datetime(2011, 12, 31, 9, 15, 36))",
+        "output": "15"
+      }
+    ]
+  },
+  {
+    "name": "Time.Second",
+    "signature": "Time.Second(dateTime as any) as nullable number",
+    "description": "Returns the second component of the provided `time`, `datetime`, or `datetimezone` value, `dateTime`.",
+    "examples": [
+      {
+        "usage": "Time.Second(#datetime(2011, 12, 31, 9, 15, 36.5))",
+        "output": "36.5"
+      }
+    ]
+  },
+  {
+    "name": "Time.StartOfHour",
+    "signature": "Time.StartOfHour(dateTime as any) as any",
+    "description": "Returns the start of the hour represented by `dateTime`. `dateTime` must be a `time`, `datetime` or `datetimezone` value.",
+    "examples": [
+      {
+        "usage": "Time.StartOfHour(#datetime(2011, 10, 10, 8, 10, 32))",
+        "output": "#datetime(2011, 10, 10, 8, 0, 0)"
+      }
+    ]
+  },
+  {
+    "name": "Time.ToRecord",
+    "signature": "Time.ToRecord(time as time) as record",
+    "description": "Returns a record containing the parts of the given Time value, `time`. * `time`: A `time` value for from which the record of its parts is to be calculated.",
+    "examples": [
+      {
+        "usage": "Time.ToRecord(#time(11, 56, 2))",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Time.ToText",
+    "signature": "Time.ToText( time as nullable time, optional options as any, optional culture as nullable text ) as nullable text",
+    "description": "Returns a textual representation of `time`. An optional `record` parameter, `options`, may be provided to specify additional properties. `culture` is only used for legacy workflows. The `record` can contain the following fields: * `Format`: A `text` value indicating the format to use. For more details, go to [Standard date and time format strings](standard-date-and-time-format-strings.md) and [Custom date and time format strings](custom-date-and-time-format-strings.md). Omitting this field or providing `null` will result in formatting the date using the default defined by `Culture`. * `Culture`: When `Format` is not null, `Culture` controls some format specifiers. For example, in `\"en-US\"` `\"tt\"` is `\"AM\" or \"PM\"`, while in `\"ar-EG\"` `\"tt\"` is `\"ص\" or \"م\"`. When `Format` is `null`, `Culture` controls the default format to use. When `Culture` is `null` or omitted, [`Culture.Current`](culture-current.md) is used. To support legacy workflows, `options` and `culture` may also be text values. This has the same behavior as if `options = [Format = options, Culture = culture]`.",
+    "examples": [
+      {
+        "usage": "Time.ToText(#time(11, 56, 2))",
+        "output": "\"11:56 AM\""
+      },
+      {
+        "usage": "Time.ToText(#time(11, 56, 2), [Format=\"hh:mm\", Culture=\"de-DE\"])",
+        "output": "\"11:56\""
+      },
+      {
+        "usage": "Time.ToText(#time(11, 56, 2), [Format=\"T\", Culture=\"de-DE\"])",
+        "output": "\"11:56:02\""
+      }
+    ]
+  }
+]

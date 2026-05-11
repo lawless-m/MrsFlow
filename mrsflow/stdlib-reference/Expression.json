@@ -1,0 +1,55 @@
+[
+  {
+    "name": "Expression.Constant",
+    "signature": "Expression.Constant(value as any) as text",
+    "description": "Returns the M source code representation of a constant value.",
+    "examples": [
+      {
+        "usage": "Expression.Constant(123)",
+        "output": "\"123\""
+      },
+      {
+        "usage": "Expression.Constant(#date(2035, 01, 02))",
+        "output": "\"#date(2035, 1, 2)\""
+      },
+      {
+        "usage": "Expression.Constant(\"abc\")",
+        "output": "\"\"\"abc\"\"\""
+      }
+    ]
+  },
+  {
+    "name": "Expression.Evaluate",
+    "signature": "Expression.Evaluate(document as text, optional environment as nullable record) as any",
+    "description": "Returns the result of evaluating an M expression `document`, with the available identifiers that can be referenced defined by `environment`.",
+    "examples": [
+      {
+        "usage": "Expression.Evaluate(\"1 + 1\")",
+        "output": "2"
+      },
+      {
+        "usage": "Expression.Evaluate(\"List.Sum({1, 2, 3})\", [List.Sum = List.Sum])",
+        "output": "6"
+      },
+      {
+        "usage": "Expression.Evaluate(Expression.Constant(\"\"\"abc\") & \" & \" & Expression.Identifier(\"x\"), [x = \"def\"\"\"])",
+        "output": "\"\"\"abcdef\"\"\""
+      }
+    ]
+  },
+  {
+    "name": "Expression.Identifier",
+    "signature": "Expression.Identifier(name as text) as text",
+    "description": "Returns the M source code representation of an identifier `name`.",
+    "examples": [
+      {
+        "usage": "Expression.Identifier(\"MyIdentifier\")",
+        "output": "\"MyIdentifier\""
+      },
+      {
+        "usage": "Expression.Identifier(\"My Identifier\")",
+        "output": "\"#\"\"My Identifier\"\"\""
+      }
+    ]
+  }
+]

@@ -1,0 +1,39 @@
+[
+  {
+    "name": "Logical.From",
+    "signature": "Logical.From(value as any) as nullable logical",
+    "description": "Returns a `logical` value from the given `value`. If the given `value` is `null`, `Logical.From` returns `null`. If the given `value` is `logical`, `value` is returned. Values of the following types can be converted to a `logical` value: * `text`: A `logical` value from the text value, either `\"true\"` or `\"false\"`. Refer to [`Logical.FromText`](logical-fromtext.md) for details. * `number`: `false` if `value` equals `0`, `true` otherwise. If `value` is of any other type, an error is returned.",
+    "examples": [
+      {
+        "usage": "Logical.From(2)",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "Logical.FromText",
+    "signature": "Logical.FromText(text as nullable text) as nullable logical",
+    "description": "Creates a logical value from the text value `text`, either \"true\" or \"false\". If `text` contains a different string, an error is raised. The text value `text` is case insensitive.",
+    "examples": [
+      {
+        "usage": "Logical.FromText(\"true\")",
+        "output": "true"
+      },
+      {
+        "usage": "Logical.FromText(\"a\")",
+        "output": "[Expression.Error] Could not convert to a logical."
+      }
+    ]
+  },
+  {
+    "name": "Logical.ToText",
+    "signature": "Logical.ToText(logicalValue as nullable logical) as nullable text",
+    "description": "Creates a text value from the logical value `logicalValue`, either `true` or `false`. If `logicalValue` is not a logical value, an error is raised.",
+    "examples": [
+      {
+        "usage": "Logical.ToText(true)",
+        "output": "\"true\""
+      }
+    ]
+  }
+]

@@ -1,0 +1,8 @@
+[
+  {
+    "name": "GoogleAnalytics.Accounts",
+    "signature": "GoogleAnalytics.Accounts(optional options as nullable record) as table",
+    "description": "Returns Google Analytics accounts that are accessible from the current credential.",
+    "examples": []
+  }
+]

@@ -1,0 +1,14 @@
+[
+  {
+    "name": "SqlExpression.SchemaFrom",
+    "signature": "SqlExpression.SchemaFrom(schema as any) as any",
+    "description": "This function is intended for internal use only.",
+    "examples": []
+  },
+  {
+    "name": "SqlExpression.ToExpression",
+    "signature": "SqlExpression.ToExpression(sql as text, environment as record) as text",
+    "description": "Converts the provided `sql` query to M code, with the available identifiers defined by `environment`. This function is intended for internal use only.",
+    "examples": []
+  }
+]

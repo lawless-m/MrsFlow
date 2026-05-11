@@ -1,0 +1,180 @@
+[
+  {
+    "name": "DateTimeZone.FixedLocalNow",
+    "signature": "DateTimeZone.FixedLocalNow() as datetimezone",
+    "description": "Returns a `datetime` value set to the current date and time on the system. The returned value contains timezone information representing the local timezone. This value is fixed and will not change with successive calls, unlike [`DateTimeZone.LocalNow`](datetimezone-localnow.md), which may return different values over the course of execution of an expression.",
+    "examples": []
+  },
+  {
+    "name": "DateTimeZone.FixedUtcNow",
+    "signature": "DateTimeZone.FixedUtcNow() as datetimezone",
+    "description": "Returns the current date and time in UTC (the GMT timezone). This value is fixed and will not change with successive calls.",
+    "examples": []
+  },
+  {
+    "name": "DateTimeZone.From",
+    "signature": "DateTimeZone.From(value as any, optional culture as nullable text) as nullable datetimezone",
+    "description": "Creates a `datetimezone` from the given value. * `value`: The value used to create a `datetimezone`. * `culture`: (Optional) The culture to use when transforming the value (for example, \"en-US\"). Values of the following types can be converted to a `datetimezone` value: * `text`: Returns a `datetimezone` value from textual representation. Refer to [`DateTimeZone.FromText`](datetimezone-fromtext.md) for details. * `date`: Returns a `datetimezone` with `value` as the date component, `12:00:00 AM` as the time component, and the offset corresponding the local time zone. * `datetime`: Returns a `datetimezone` with `value` as the datetime and the offset corresponding the local time zone. * `datetimezone`: Returns `value`. * `time`: Returns a `datetimezone` with the date equivalent of the OLE Automation Date of `0` as the date component, `value` as the time component, and the offset corresponding the local time zone. The OLE Automation Date consists of a floating-point number whose integral component is the number of days before or after midnight, 30 December 1899, and whose fractional component represents the time on that day divided by 24. For example, midnight, 31 December 1899 is represented by 1.0; 6 A.M., 1 January 1900 is represented by 2.25; midnight, 29 December 1899 is represented by -1.0; and 6 A.M., 29 December 1899 is represented by -1.25. The base value is midnight, 30 December 1899. The minimum value is midnight, 1 January 0100. The maximum value is the last moment of 31 December 9999. * `number`: Returns a `datetimezone` with the datetime equivalent of the OLE Automation Date expressed by `value` and the offset corresponding the local time zone. * `null`: Returns `null`. If `value` is of any other type, an error is returned. The value of the offset corresponding to the local time zone is different when running this function locally as opposed to running it online. When run locally, the local time zone is returned. When run online, the UTC time zone (+00:00) is returned.",
+    "examples": [
+      {
+        "usage": "DateTimeZone.From(\"2020-10-30T01:30:00-08:00\")",
+        "output": "#datetimezone(2020, 10, 30, 01, 30, 00, -8, 00)"
+      },
+      {
+        "usage": "DateTimeZone.From(\"13 de agosto de 2025 15:43:00 -03:00\", \"pt-BR\")",
+        "output": "#datetimezone(2025, 08, 13, 15, 43, 00, -3, 00)"
+      },
+      {
+        "usage": "DateTimeZone.From(45658.5)",
+        "output": "#datetimezone(2025, 01, 01, 12, 00, 00, 0, 00)"
+      }
+    ]
+  },
+  {
+    "name": "DateTimeZone.FromFileTime",
+    "signature": "DateTimeZone.FromFileTime(fileTime as nullable number) as nullable datetimezone",
+    "description": "Creates a `datetimezone` value from the `fileTime` value and converts it to the local time zone. The filetime is a Windows file time value that represents the number of 100-nanosecond intervals that have elapsed since 12:00 midnight, January 1, 1601 A.D. (C.E.) Coordinated Universal Time (UTC).",
+    "examples": [
+      {
+        "usage": "DateTimeZone.FromFileTime(129876402529842245)",
+        "output": "#datetimezone(2012, 7, 24, 14, 50, 52.9842245, -7, 0)"
+      }
+    ]
+  },
+  {
+    "name": "DateTimeZone.FromText",
+    "signature": "DateTimeZone.FromText(text as nullable text, optional options as any) as nullable datetimezone",
+    "description": "Creates a `datetimezone` value from a textual representation, `text`. An optional `record` parameter, `options`, may be provided to specify additional properties. The `record` can contain the following fields: * `Format`: A `text` value indicating the format to use. For more details, go to [Standard date and time format strings](standard-date-and-time-format-strings.md) and [Custom date and time format strings](custom-date-and-time-format-strings.md). Omitting this field or providing `null` will result in parsing the date using a best effort. * `Culture`: When `Format` is not null, `Culture` controls some format specifiers. For example, in `\"en-US\"` `\"MMM\"` is `\"Jan\", \"Feb\", \"Mar\", ...`, while in `\"ru-RU\"` `\"MMM\"` is `\"янв\", \"фев\", \"мар\", ...`. When `Format` is `null`, `Culture` controls the default format to use. When `Culture` is `null` or omitted, [`Culture.Current`](culture-current.md) is used. To support legacy workflows, `options` may also be a text value. This has the same behavior as if `options = [Format = null, Culture = options]`.",
+    "examples": [
+      {
+        "usage": "DateTimeZone.FromText(\"2010-12-31T01:30:00-08:00\")",
+        "output": "#datetimezone(2010, 12, 31, 1, 30, 0, -8, 0)"
+      },
+      {
+        "usage": "DateTimeZone.FromText(\"30 Dez 2010 02:04:50.369730 +02:00\", [Format=\"dd MMM yyyy HH:mm:ss.ffffff zzz\", Culture=\"de-DE\"])",
+        "output": "#datetimezone(2010, 12, 30, 2, 4, 50.36973, 2, 0)"
+      },
+      {
+        "usage": "DateTimeZone.FromText(\"2009-06-15T13:45:30.0000000-07:00\", [Format=\"O\", Culture=\"en-US\"])",
+        "output": "#datetimezone(2009, 6, 15, 13, 45, 30, -7, 0)"
+      }
+    ]
+  },
+  {
+    "name": "DateTimeZone.LocalNow",
+    "signature": "DateTimeZone.LocalNow() as datetimezone",
+    "description": "Returns a `datetimezone` value set to the current date and time on the system. The returned value contains timezone information representing the local timezone.",
+    "examples": []
+  },
+  {
+    "name": "DateTimeZone.RemoveZone",
+    "signature": "DateTimeZone.RemoveZone(dateTimeZone as nullable datetimezone) as nullable datetime",
+    "description": "Returns a [#datetime](sharpdatetime.md) value from `dateTimeZone` with timezone information removed.",
+    "examples": [
+      {
+        "usage": "DateTimeZone.RemoveZone(#datetimezone(2011, 12, 31, 9, 15, 36, -7, 0))",
+        "output": "#datetime(2011, 12, 31, 9, 15, 36)"
+      }
+    ]
+  },
+  {
+    "name": "DateTimeZone.SwitchZone",
+    "signature": "DateTimeZone.SwitchZone( dateTimeZone as nullable datetimezone, timezoneHours as number, optional timezoneMinutes as nullable number ) as nullable datetimezone",
+    "description": "Changes timezone information to on the datetimezone value `dateTimeZone` to the new timezone information provided by `timezoneHours` and optionally `timezoneMinutes`. If `dateTimeZone` does not have a timezone component, an error is raised.",
+    "examples": [
+      {
+        "usage": "DateTimeZone.SwitchZone(#datetimezone(2010, 12, 31, 11, 56, 02, 7, 30), 8)",
+        "output": "#datetimezone(2010, 12, 31, 12, 26, 2, 8, 0)"
+      },
+      {
+        "usage": "DateTimeZone.SwitchZone(#datetimezone(2010, 12, 31, 11, 56, 02, 7, 30), 0, -30)",
+        "output": "#datetimezone(2010, 12, 31, 3, 56, 2, 0, -30)"
+      }
+    ]
+  },
+  {
+    "name": "DateTimeZone.ToLocal",
+    "signature": "DateTimeZone.ToLocal(dateTimeZone as nullable datetimezone) as nullable datetimezone",
+    "description": "Changes timezone information of the datetimezone value `dateTimeZone` to the local timezone information. If `dateTimeZone` does not have a timezone component, the local timezone information is added.",
+    "examples": [
+      {
+        "usage": "DateTimeZone.ToLocal(#datetimezone(2010, 12, 31, 11, 56, 02, 7, 30))",
+        "output": "#datetimezone(2010, 12, 31, 12, 26, 2, -8, 0)"
+      }
+    ]
+  },
+  {
+    "name": "DateTimeZone.ToRecord",
+    "signature": "DateTimeZone.ToRecord(dateTimeZone as datetimezone) as record",
+    "description": "Returns a record containing the parts of the given datetimezone value, `dateTimeZone`. * `dateTimeZone`: A `datetimezone` value for from which the record of its parts is to be calculated.",
+    "examples": [
+      {
+        "usage": "DateTimeZone.ToRecord(#datetimezone(2011, 12, 31, 11, 56, 2, 8, 0))",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "DateTimeZone.ToText",
+    "signature": "DateTimeZone.ToText( dateTimeZone as nullable datetimezone, optional options as any, optional culture as nullable text ) as nullable text",
+    "description": "Returns a textual representation of `dateTimeZone`. An optional `record` parameter, `options`, may be provided to specify additional properties. `culture` is only used for legacy workflows. The `record` can contain the following fields: * `Format`: A `text` value indicating the format to use. For more details, go to [Standard date and time format strings](standard-date-and-time-format-strings.md) and [Custom date and time format strings](custom-date-and-time-format-strings.md). Omitting this field or providing `null` will result in formatting the date using the default defined by `Culture`. * `Culture`: When `Format` is not null, `Culture` controls some format specifiers. For example, in `\"en-US\"` `\"MMM\"` is `\"Jan\", \"Feb\", \"Mar\", ...`, while in `\"ru-RU\"` `\"MMM\"` is `\"янв\", \"фев\", \"мар\", ...`. When `Format` is `null`, `Culture` controls the default format to use. When `Culture` is `null` or omitted, [`Culture.Current`](culture-current.md) is used. To support legacy workflows, `options` and `culture` may also be text values. This has the same behavior as if `options = [Format = options, Culture = culture]`.",
+    "examples": [
+      {
+        "usage": "DateTimeZone.ToText(#datetimezone(2010, 12, 31, 01, 30, 25, 2, 0))",
+        "output": "\"12/31/2010 1:30:25 AM +02:00\""
+      },
+      {
+        "usage": "DateTimeZone.ToText(#datetimezone(2010, 12, 30, 2, 4, 50.36973, -8,0), [Format=\"dd MMM yyyy HH:mm:ss.ffffff zzz\", Culture=\"de-DE\"])",
+        "output": "\"30 Dez 2010 02:04:50.369730 -08:00\""
+      },
+      {
+        "usage": "DateTimeZone.ToText(#datetimezone(2000, 2, 8, 3, 45, 12, 2, 0),[Format=\"O\", Culture=\"en-US\"])",
+        "output": "\"2000-02-08T03:45:12.0000000+02:00\""
+      }
+    ]
+  },
+  {
+    "name": "DateTimeZone.ToUtc",
+    "signature": "DateTimeZone.ToUtc(dateTimeZone as nullable datetimezone) as nullable datetimezone",
+    "description": "Changes timezone information of the datetime value `dateTimeZone` to the UTC or Universal Time timezone information. If `dateTimeZone` does not have a timezone component, the UTC timezone information is added.",
+    "examples": [
+      {
+        "usage": "DateTimeZone.ToUtc(#datetimezone(2010, 12, 31, 11, 56, 02, 7, 30))",
+        "output": "#datetimezone(2010, 12, 31, 4, 26, 2, 0, 0)"
+      }
+    ]
+  },
+  {
+    "name": "DateTimeZone.UtcNow",
+    "signature": "DateTimeZone.UtcNow() as datetimezone",
+    "description": "Returns the current date and time in UTC (the GMT timezone).",
+    "examples": [
+      {
+        "usage": "DateTimeZone.UtcNow()",
+        "output": "#datetimezone(2011, 8, 16, 23, 34, 37.745, 0, 0)"
+      }
+    ]
+  },
+  {
+    "name": "DateTimeZone.ZoneHours",
+    "signature": "DateTimeZone.ZoneHours(dateTimeZone as nullable datetimezone) as nullable number",
+    "description": "Returns the time zone hour component of a `datetimezone` value. * `dateTimeZone`: A `datetimezone` value from which the time zone hour component is extracted. If `dateTimeZone` is `null`, the function returns `null`.",
+    "examples": [
+      {
+        "usage": "DateTimeZone.ZoneHours(#datetimezone(2024, 4, 28, 13, 24, 22, 7, 30))",
+        "output": "7"
+      }
+    ]
+  },
+  {
+    "name": "DateTimeZone.ZoneMinutes",
+    "signature": "DateTimeZone.ZoneMinutes(dateTimeZone as nullable datetimezone) as nullable number",
+    "description": "Returns the time zone minutes component of a `datetimezone` value. * `dateTimeZone`: A `datetimezone` value from which the time zone minutes component is extracted. If `dateTimeZone` is `null`, the function returns `null`.",
+    "examples": [
+      {
+        "usage": "DateTimeZone.ZoneMinutes(#datetimezone(2024, 4, 28, 13, 24, 22, 7, 30))",
+        "output": "30"
+      }
+    ]
+  }
+]

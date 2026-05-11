@@ -1,0 +1,8 @@
+[
+  {
+    "name": "Exchange.Contents",
+    "signature": "Exchange.Contents(optional mailboxAddress as nullable text) as table",
+    "description": "Returns a table of contents from the Microsoft Exchange account `mailboxAddress`. If `mailboxAddress` is not specified, the default account for the credential will be used.",
+    "examples": []
+  }
+]

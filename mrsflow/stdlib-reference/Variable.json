@@ -1,0 +1,14 @@
+[
+  {
+    "name": "Variable.Value",
+    "signature": "Variable.Value(identifier as text) as any",
+    "description": "Returns the value of the specified variable `identifier` defined by the current evaluation environment. If the variable is not defined, an error is raised.",
+    "examples": []
+  },
+  {
+    "name": "Variable.ValueOrDefault",
+    "signature": "Variable.ValueOrDefault(identifier as text, optional defaultValue as any) as any",
+    "description": "Returns the value of the specified variable `identifier` defined by the current evaluation environment. If the variable is not defined, the optional `defaultValue` is returned.",
+    "examples": []
+  }
+]

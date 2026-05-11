@@ -1,0 +1,152 @@
+[
+  {
+    "name": "Binary.ApproximateLength",
+    "signature": "Binary.ApproximateLength(binary as nullable binary) as nullable number",
+    "description": "Returns the approximate length of `binary`, or an error if the data source doesn't support an approximate length.",
+    "examples": [
+      {
+        "usage": "Binary.ApproximateLength(Binary.FromText(\"i45WMlSKjQUA\", BinaryEncoding.Base64))",
+        "output": "9"
+      }
+    ]
+  },
+  {
+    "name": "Binary.Buffer",
+    "signature": "Binary.Buffer(binary as nullable binary) as nullable binary",
+    "description": "Buffers the binary value in memory. The result of this call is a stable binary value, which means it will have a deterministic length and order of bytes.",
+    "examples": [
+      {
+        "usage": "Binary.Buffer(Binary.FromList({0..10}))",
+        "output": "#binary({0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10})"
+      }
+    ]
+  },
+  {
+    "name": "Binary.Combine",
+    "signature": "Binary.Combine(binaries as list) as binary",
+    "description": "Combines a list of binaries into a single binary.",
+    "examples": []
+  },
+  {
+    "name": "Binary.Compress",
+    "signature": "Binary.Compress(binary as nullable binary, compressionType as number) as nullable binary",
+    "description": "Compresses a binary value using the given compression type. The result of this call is a compressed copy of the input. Compression types include: * [`Compression.GZip`](compression-type.md) * [`Compression.Deflate`](compression-type.md)",
+    "examples": [
+      {
+        "usage": "Binary.Compress(Binary.FromList(List.Repeat({10}, 1000)), Compression.Deflate)",
+        "output": "#binary({227, 226, 26, 5, 163, 96, 20, 12, 119, 0, 0})"
+      }
+    ]
+  },
+  {
+    "name": "Binary.Decompress",
+    "signature": "Binary.Decompress(binary as nullable binary, compressionType as number) as nullable binary",
+    "description": "Decompresses a binary value using the given compression type. The result of this call is a decompressed copy of the input. Compression types include: * [`Compression.GZip`](compression-type.md) * [`Compression.Deflate`](compression-type.md)",
+    "examples": [
+      {
+        "usage": "Binary.Decompress(#binary({115, 103, 200, 7, 194, 20, 134, 36, 134, 74, 134, 84, 6, 0}), Compression.Deflate)",
+        "output": "#binary({71, 0, 111, 0, 111, 0, 100, 0, 98, 0, 121, 0, 101, 0})"
+      }
+    ]
+  },
+  {
+    "name": "Binary.From",
+    "signature": "Binary.From(value as any, optional encoding as nullable number) as nullable binary",
+    "description": "Returns a `binary` value from the given `value`. If the given `value` is `null`, `Binary.From` returns `null`. If the given `value` is `binary`, `value` is returned. Values of the following types can be converted to a `binary` value: * `text`: A `binary` value from the text representation. Refer to [`Binary.FromText`](binary-fromtext.md) for details. If `value` is of any other type, an error is returned.",
+    "examples": [
+      {
+        "usage": "Binary.From(\"1011\")",
+        "output": "Binary.FromText(\"1011\", BinaryEncoding.Base64)"
+      }
+    ]
+  },
+  {
+    "name": "Binary.FromList",
+    "signature": "Binary.FromList(list as list) as binary",
+    "description": "Converts a list of numbers into a binary value.",
+    "examples": []
+  },
+  {
+    "name": "Binary.FromText",
+    "signature": "Binary.FromText(text as nullable text, optional encoding as nullable number) as nullable binary",
+    "description": "Returns the result of converting text value `text` to a binary (list of `number`). `encoding` may be specified to indicate the encoding used in the text value. The following `BinaryEncoding` values may be used for `encoding`. * [`BinaryEncoding.Base64`](binaryencoding-type.md): Base 64 encoding * [`BinaryEncoding.Hex`](binaryencoding-type.md): Hex encoding",
+    "examples": [
+      {
+        "usage": "Binary.FromText(\"1011\")",
+        "output": "Binary.FromText(\"1011\", BinaryEncoding.Base64)"
+      },
+      {
+        "usage": "Binary.FromText(\"1011\", BinaryEncoding.Hex)",
+        "output": "Binary.FromText(\"EBE=\", BinaryEncoding.Base64)"
+      }
+    ]
+  },
+  {
+    "name": "Binary.InferContentType",
+    "signature": "Binary.InferContentType(source as binary) as record",
+    "description": "Returns a record with field Content.Type that contains the inferred MIME-type. If the inferred content type is text/*, and an encoding code page is detected, then additionally returns field Content.Encoding that contains the encoding of the stream. If the inferred content type is text/csv, and the format is delimited, additionally returns field Csv.PotentialDelimiter containing a table for analysis of potential delimiters. If the inferred content type is text/csv, and the format is fixed-width, additionally returns field Csv.PotentialPositions containing a list for analysis of potential fixed width column positions.",
+    "examples": []
+  },
+  {
+    "name": "Binary.Length",
+    "signature": "Binary.Length(binary as nullable binary) as nullable number",
+    "description": "Returns the number of characters.",
+    "examples": []
+  },
+  {
+    "name": "Binary.Range",
+    "signature": "Binary.Range( binary as binary, offset as number, optional count as nullable number ) as binary",
+    "description": "Returns a subset of the binary value beginning at the offset `binary`. An optional parameter, `offset`, sets the maximum length of the subset.",
+    "examples": [
+      {
+        "usage": "Binary.Range(#binary({0..10}), 6)",
+        "output": "#binary({6, 7, 8, 9, 10})"
+      },
+      {
+        "usage": "Binary.Range(#binary({0..10}), 6, 2)",
+        "output": "#binary({6, 7})"
+      }
+    ]
+  },
+  {
+    "name": "Binary.Split",
+    "signature": "Binary.Split(binary as binary, pageSize as number) as list",
+    "description": "Splits `binary` into a list of binaries where the first element of the output list is a binary containing the first `pageSize` bytes from the source binary, the next element of the output list is a binary containing the next `pageSize` bytes from the source binary, and so on.",
+    "examples": []
+  },
+  {
+    "name": "Binary.ToList",
+    "signature": "Binary.ToList(binary as binary) as list",
+    "description": "Converts a binary value into a list of numbers.",
+    "examples": []
+  },
+  {
+    "name": "Binary.ToText",
+    "signature": "Binary.ToText(binary as nullable binary, optional encoding as nullable number) as nullable text",
+    "description": "Returns the result of converting a binary list of numbers `binary` into a text value. Optionally, `encoding` may be specified to indicate the encoding to be used in the text value produced The following `BinaryEncoding` values may be used for `encoding`. * [`BinaryEncoding.Base64`](binaryencoding-type.md): Base 64 encoding * [`BinaryEncoding.Hex`](binaryencoding-type.md): Hex encoding",
+    "examples": []
+  },
+  {
+    "name": "Binary.View",
+    "signature": "Binary.View(binary as nullable binary, handlers as record) as binary",
+    "description": "Returns a view of `binary` where the functions specified in `handlers` are used in lieu of the default behavior of an operation when the operation is applied to the view. If `binary` is provided, all handler functions are optional. If `binary` isn't provided, the `GetStream` handler function is required. If a handler function isn't specified for an operation, the default behavior of the operation is applied to `binary` instead (except in the case of `GetExpression`). Handler functions must return a value that is semantically equivalent to the result of applying the operation against `binary` (or the resulting view in the case of `GetExpression`). If a handler function raises an error, the default behavior of the operation is applied to the view. `Binary.View` can be used to implement folding to a data source – the translation of M queries into source-specific operations (for example, to download a section of a file). Refer to the published Power Query custom connector documentation for a more complete description of `Binary.View`.",
+    "examples": [
+      {
+        "usage": "Binary.View(\n    null,\n    [\n        GetLength = () => 12,\n        GetStream = () => Text.ToBinary(\"hello world!\")\n    ]\n)",
+        "output": "Text.ToBinary(\"hello world!\")"
+      }
+    ]
+  },
+  {
+    "name": "Binary.ViewError",
+    "signature": "Binary.ViewError(errorRecord as record) as record",
+    "description": "Creates a modified error record from `errorRecord` which won't trigger a fallback when raised by a handler defined on a view (via [`Binary.View`](binary-view.md)).",
+    "examples": []
+  },
+  {
+    "name": "Binary.ViewFunction",
+    "signature": "Binary.ViewFunction(function as function) as function",
+    "description": "Creates a view function based on `function` that can be handled in a view created by [`Binary.View`](binary-view.md). The `OnInvoke` handler of [`Binary.View`](binary-view.md) can be used to define a handler for the view function. As with the handlers for built-in operations, if no `OnInvoke` handler is specified, or if it does not handle the view function, or if an error is raised by the handler, `function` is applied on top of the view. Refer to the published Power Query custom connector documentation for a more complete description of [`Binary.View`](binary-view.md) and custom view functions.",
+    "examples": []
+  }
+]

@@ -1,0 +1,238 @@
+[
+  {
+    "name": "Type.AddTableKey",
+    "signature": "Type.AddTableKey( table as type, columns as list, isPrimary as logical ) as type",
+    "description": "Adds a key to the given table type.",
+    "examples": []
+  },
+  {
+    "name": "Type.ClosedRecord",
+    "signature": "Type.ClosedRecord(type as type) as type",
+    "description": "Returns a closed version of the given `record` `type` (or the same type, if it is already closed).",
+    "examples": [
+      {
+        "usage": "Type.ClosedRecord(type [A = number, ...])",
+        "output": "type [A = number]"
+      }
+    ]
+  },
+  {
+    "name": "Type.Facets",
+    "signature": "Type.Facets(type as type) as record",
+    "description": "Returns a record containing the facets of `type`.",
+    "examples": []
+  },
+  {
+    "name": "Type.ForFunction",
+    "signature": "Type.ForFunction(signature as record, min as number) as type",
+    "description": "Creates a `function type` from `signature`, a record of `ReturnType` and `Parameters`, and `min`, the minimum number of arguments required to invoke the function.",
+    "examples": [
+      {
+        "usage": "Type.ForFunction([ReturnType = type number, Parameters = [X = type number]], 1)",
+        "output": "type function (X as number) as number"
+      }
+    ]
+  },
+  {
+    "name": "Type.ForRecord",
+    "signature": "Type.ForRecord(fields as record, open as logical) as type",
+    "description": "Returns a type that represents records with specific type constraints on fields.",
+    "examples": [
+      {
+        "usage": "let\n    columnNames = {\"Name\", \"Score\"},\n    columnTypes = {type text, type number},\n    rowColumnTypes = List.Transform(columnTypes, (t) => [Type = t, Optional = false]),\n    rowType = Type.ForRecord(Record.FromList(rowColumnTypes, columnNames), false)\nin\n    #table(type table rowType, {{\"Betty\", 90.3}, {\"Carl\", 89.5}})",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Type.FunctionParameters",
+    "signature": "Type.FunctionParameters(type as type) as record",
+    "description": "Returns a record with field values set to the name of the parameters of `type`, and their values set to their corresponding types.",
+    "examples": [
+      {
+        "usage": "Type.FunctionParameters(type function (x as number, y as text) as any)",
+        "output": "[x = type number, y = type text]"
+      }
+    ]
+  },
+  {
+    "name": "Type.FunctionRequiredParameters",
+    "signature": "Type.FunctionRequiredParameters(type as type) as number",
+    "description": "Returns a number indicating the minimum number of parameters required to invoke the input `type` of function.",
+    "examples": [
+      {
+        "usage": "Type.FunctionRequiredParameters(type function (x as number, optional y as text) as any)",
+        "output": "1"
+      }
+    ]
+  },
+  {
+    "name": "Type.FunctionReturn",
+    "signature": "Type.FunctionReturn(type as type) as type",
+    "description": "Returns a type returned by a function `type`.",
+    "examples": [
+      {
+        "usage": "Type.FunctionReturn(type function () as any)",
+        "output": "type any"
+      }
+    ]
+  },
+  {
+    "name": "Type.Is",
+    "signature": "Type.Is(type1 as type, type2 as type) as logical",
+    "description": "Determines if a value of `type1` is always compatible with `type2`. Parameter `type2` should be a primitive (or nullable primitive) type value. Otherwise, this function's behavior is undefined and shouldn't be relied on.",
+    "examples": [
+      {
+        "usage": "Type.Is(type number, type any)",
+        "output": "true"
+      },
+      {
+        "usage": "Type.Is(type any, type number)",
+        "output": "false"
+      }
+    ]
+  },
+  {
+    "name": "Type.IsNullable",
+    "signature": "Type.IsNullable(type as type) as logical",
+    "description": "Returns `true` if a type is a `nullable` type; otherwise, `false`.",
+    "examples": [
+      {
+        "usage": "Type.IsNullable(type number)",
+        "output": "false"
+      },
+      {
+        "usage": "Type.IsNullable(type nullable number)",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "Type.IsOpenRecord",
+    "signature": "Type.IsOpenRecord(type as type) as logical",
+    "description": "Returns a `logical` indicating whether a record `type` is open.",
+    "examples": [
+      {
+        "usage": "Type.IsOpenRecord(type [A = number, ...])",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "Type.ListItem",
+    "signature": "Type.ListItem(type as type) as type",
+    "description": "Returns an item type from a list `type`.",
+    "examples": [
+      {
+        "usage": "Type.ListItem(type {number})",
+        "output": "type number"
+      }
+    ]
+  },
+  {
+    "name": "Type.NonNullable",
+    "signature": "Type.NonNullable(type as type) as type",
+    "description": "Returns the non `nullable` type from the `type`.",
+    "examples": [
+      {
+        "usage": "Type.NonNullable(type nullable number)",
+        "output": "type number"
+      }
+    ]
+  },
+  {
+    "name": "Type.OpenRecord",
+    "signature": "Type.OpenRecord(type as type) as type",
+    "description": "Returns an opened version of the given `record` `type` (or the same type, if it is already opened).",
+    "examples": [
+      {
+        "usage": "Type.OpenRecord(type [A = number])",
+        "output": "type [A = number, ...]"
+      }
+    ]
+  },
+  {
+    "name": "Type.RecordFields",
+    "signature": "Type.RecordFields(type as type) as record",
+    "description": "Returns a record describing the fields of a record `type`. Each field of the returned record type has a corresponding name and a value, in the form of a record `[ Type = type, Optional = logical ]`.",
+    "examples": [
+      {
+        "usage": "Type.RecordFields(type [A = number, optional B = any])",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Type.ReplaceFacets",
+    "signature": "Type.ReplaceFacets(type as type, facets as record) as type",
+    "description": "Replaces the facets of `type` with the facets contained in the record `facets`.",
+    "examples": []
+  },
+  {
+    "name": "Type.ReplaceTableKeys",
+    "signature": "Type.ReplaceTableKeys(tableType as type, keys as list) as type",
+    "description": "Returns a new table type with all keys replaced by the specified list of keys. Each key is defined using a record in the following form: * `Columns`: a list of the column names that define the key * `Primary`: `true` if the key is the table's primary key; otherwise, `false` The specified list of keys is validated to ensure that no more than one primary key is defined and that all key column names exist on the table type.",
+    "examples": [
+      {
+        "usage": "let\n    BaseType = type table [ID = number, FirstName = text, LastName = text],\n    KeysAdded = Type.ReplaceTableKeys(\n        BaseType,\n        {\n            [Columns = {\"ID\"}, Primary = true],\n            [Columns = {\"FirstName\", \"LastName\"}, Primary = false]\n        }\n    ),\n    DetailsOfKeys = Type.TableKeys(KeysAdded)\nin\n    DetailsOfKeys",
+        "output": "`"
+      },
+      {
+        "usage": "let\n    TypeWithKey = Type.AddTableKey(type table [ID = number, Name = text], {\"ID\"}, true),\n    KeyRemoved = Type.ReplaceTableKeys(TypeWithKey, {}),\n    DetailsOfKeys = Type.TableKeys(KeyRemoved)\nin\n    DetailsOfKeys",
+        "output": "{}"
+      }
+    ]
+  },
+  {
+    "name": "Type.ReplaceTablePartitionKey",
+    "signature": "Type.ReplaceTablePartitionKey(tableType as type, partitionKey as nullable list) as type",
+    "description": "Returns a new table type with the partition key replaced by the specified partition key.",
+    "examples": []
+  },
+  {
+    "name": "Type.TableColumn",
+    "signature": "Type.TableColumn(tableType as type, column as text) as type",
+    "description": "Returns the type of the column `column` in the table type `tableType`.",
+    "examples": []
+  },
+  {
+    "name": "Type.TableKeys",
+    "signature": "Type.TableKeys(tableType as type) as list",
+    "description": "Returns the possibly empty list of keys for the given table type. Each key is defined using a record in the following form: * `Columns`: a list of the column names that define the key * `Primary`: `true` if the key is the table's primary key; otherwise, `false`",
+    "examples": [
+      {
+        "usage": "let\n    BaseType = type table [ID = number, Name = text],\n    AddKey = Type.AddTableKey(BaseType, {\"ID\"}, true),\n    DetailsOfKeys = Type.TableKeys(AddKey)\nin\n    DetailsOfKeys",
+        "output": "{[Columns = {\"ID\"}, Primary = true]}"
+      }
+    ]
+  },
+  {
+    "name": "Type.TablePartitionKey",
+    "signature": "Type.TablePartitionKey(tableType as type) as nullable list",
+    "description": "Returns the partition key for the given table type if it has one.",
+    "examples": []
+  },
+  {
+    "name": "Type.TableRow",
+    "signature": "Type.TableRow(table as type) as type",
+    "description": "Returns the row type of the specified table type. The result will always be a record type.",
+    "examples": [
+      {
+        "usage": "let\n    tableRowType = Type.TableRow(Value.Type(#table({\"Column1\"}, {})))\nin\n    Type.RecordFields(tableRowType)",
+        "output": "[Column1 = [Type = type any, Optional = false]]"
+      }
+    ]
+  },
+  {
+    "name": "Type.TableSchema",
+    "signature": "Type.TableSchema(tableType as type) as table",
+    "description": "Returns a table describing the columns of `tableType`. Refer to the documentation for [`Table.Schema`](table-schema.md) for a description of the resulting table.",
+    "examples": []
+  },
+  {
+    "name": "Type.Union",
+    "signature": "Type.Union(types as list) as type",
+    "description": "Returns the union of the types in `types`.",
+    "examples": []
+  }
+]

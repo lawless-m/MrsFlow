@@ -1,0 +1,98 @@
+[
+  {
+    "name": "Cube.AddAndExpandDimensionColumn",
+    "signature": "Cube.AddAndExpandDimensionColumn( cube as table, dimensionSelector as any, attributeNames as list, optional newColumnNames as any ) as table",
+    "description": "Merges the specified dimension table, `dimensionSelector`, into the filter context of the `cube` and changes the dimensional granularity by expanding the specified set, `attributeNames`, of dimension attributes. The dimension attributes are added to the tabular view with columns named `newColumnNames`, or `attributeNames` if not specified.",
+    "examples": []
+  },
+  {
+    "name": "Cube.AddMeasureColumn",
+    "signature": "Cube.AddMeasureColumn( cube as table, column as text, measureSelector as any ) as table",
+    "description": "Adds a column with the name `column` to the `cube` that contains the results of the measure `measureSelector` applied in the row context of each row. Measure application is affected by changes to dimension granularity and slicing. Measure values will be adjusted after certain cube operations are performed.",
+    "examples": []
+  },
+  {
+    "name": "Cube.ApplyParameter",
+    "signature": "Cube.ApplyParameter( cube as table, parameter as any, optional arguments as nullable list ) as table",
+    "description": "Returns a cube after applying `parameter` with `arguments` to `cube`.",
+    "examples": []
+  },
+  {
+    "name": "Cube.AttributeMemberId",
+    "signature": "Cube.AttributeMemberId(attribute as any) as any",
+    "description": "Returns the unique member identifier from a member property value. `attribute`. Returns null for any other values.",
+    "examples": []
+  },
+  {
+    "name": "Cube.AttributeMemberProperty",
+    "signature": "Cube.AttributeMemberProperty(attribute as any, propertyName as text) as any",
+    "description": "Returns the property `propertyName` of dimension attribute `attribute`.",
+    "examples": []
+  },
+  {
+    "name": "Cube.CollapseAndRemoveColumns",
+    "signature": "Cube.CollapseAndRemoveColumns(cube as table, columnNames as list) as table",
+    "description": "Changes the dimensional granularity of the filter context for the `cube` by collapsing the attributes mapped to the specified columns `columnNames`. The columns are also removed from the tabular view of the cube.",
+    "examples": []
+  },
+  {
+    "name": "Cube.Dimensions",
+    "signature": "Cube.Dimensions(cube as table) as table",
+    "description": "Returns a table containing the set of available dimensions within the `cube`. Each dimension is a table containing a set of dimension attributes and each dimension attribute is represented as a column in the dimension table. Dimensions can be expanded in the cube using [`Cube.AddAndExpandDimensionColumn`](cube-addandexpanddimensioncolumn.md).",
+    "examples": []
+  },
+  {
+    "name": "Cube.DisplayFolders",
+    "signature": "Cube.DisplayFolders(cube as table) as table",
+    "description": "Returns a nested tree of tables representing the display folder hierarchy of the objects (for example, dimensions and measures) available for use in the `cube`.",
+    "examples": []
+  },
+  {
+    "name": "Cube.MeasureProperties",
+    "signature": "Cube.MeasureProperties(cube as table) as table",
+    "description": "Returns a table containing the set of available properties for measures that are expanded in the cube.",
+    "examples": []
+  },
+  {
+    "name": "Cube.MeasureProperty",
+    "signature": "Cube.MeasureProperty(measure as any, propertyName as text) as any",
+    "description": "Returns the property `propertyName` of measure `measure`.",
+    "examples": []
+  },
+  {
+    "name": "Cube.Measures",
+    "signature": "Cube.Measures(cube as any) as table",
+    "description": "Returns a table containing the set of available measures within the `cube`. Each measure is represented as a function. Measures can be applied to the cube using [`Cube.AddMeasureColumn`](cube-addmeasurecolumn.md).",
+    "examples": []
+  },
+  {
+    "name": "Cube.Parameters",
+    "signature": "Cube.Parameters(cube as table) as table",
+    "description": "Returns a table containing the set of parameters that can be applied to `cube`. Each parameter is a function that can be invoked to get `cube` with the parameter and its arguments applied.",
+    "examples": []
+  },
+  {
+    "name": "Cube.Properties",
+    "signature": "Cube.Properties(cube as table) as table",
+    "description": "Returns a table containing the set of available properties for dimensions that are expanded in the cube.",
+    "examples": []
+  },
+  {
+    "name": "Cube.PropertyKey",
+    "signature": "Cube.PropertyKey(property as any) as any",
+    "description": "Returns the key of property `property`.",
+    "examples": []
+  },
+  {
+    "name": "Cube.ReplaceDimensions",
+    "signature": "Cube.ReplaceDimensions(cube as table, dimensions as any) as table",
+    "description": "Replaces the set of dimensions returned by [`Cube.Dimensions`](cube-dimensions.md). For example, this function can be used to add an ID column to a dimension attribute, so that the data source can group on the ID rather than the displayed value.",
+    "examples": []
+  },
+  {
+    "name": "Cube.Transform",
+    "signature": "Cube.Transform(cube as table, transforms as list) as table",
+    "description": "Applies the list cube functions, `transforms`, on the `cube`.",
+    "examples": []
+  }
+]

@@ -1,0 +1,25 @@
+[
+  {
+    "name": "Diagnostics.ActivityId",
+    "signature": "Diagnostics.ActivityId() as nullable text",
+    "description": "Returns an opaque identifier for the currently-running evaluation.",
+    "examples": []
+  },
+  {
+    "name": "Diagnostics.CorrelationId",
+    "signature": "Diagnostics.CorrelationId() as nullable text",
+    "description": "Returns an opaque identifier to correlate incoming requests with outgoing ones.",
+    "examples": []
+  },
+  {
+    "name": "Diagnostics.Trace",
+    "signature": "Diagnostics.Trace( traceLevel as number, message as anynonnull, value as any, optional delayed as nullable logical ) as any",
+    "description": "Writes a trace `message`, if tracing is enabled, and returns `value`. An optional parameter `delayed` specifies whether to delay the evaluation of `value` until the message is traced. `traceLevel` can take one of the following values: * [`TraceLevel.Critical`](tracelevel-type.md) * [`TraceLevel.Error`](tracelevel-type.md) * [`TraceLevel.Warning`](tracelevel-type.md) * [`TraceLevel.Information`](tracelevel-type.md) * [`TraceLevel.Verbose`](tracelevel-type.md)",
+    "examples": [
+      {
+        "usage": "Diagnostics.Trace(TraceLevel.Information, \"TextValueFromNumber\", () => Text.From(123), true)",
+        "output": "\"123\""
+      }
+    ]
+  }
+]

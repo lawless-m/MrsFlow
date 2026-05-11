@@ -1,0 +1,17 @@
+[
+  {
+    "name": "Error.Record",
+    "signature": "Error.Record( reason as text, optional message as nullable text, optional detail as any, optional parameters as nullable list, optional errorCode as nullable text ) as record",
+    "description": "Returns an error record from the provided text values for reason, message, detail, and error code. * `reason`: The high-level cause of the error. * `message`: (Optional) A description of the error. * `detail`: (Optional) Additional detailed information about the error. * `parameters`: (Optional) A list of values that provide additional context for the error, typically used for diagnostics or programmatic handling. * `errorCode`: (Optional) An identifier for the error.",
+    "examples": [
+      {
+        "usage": "let\n    input = 100,\n    divisor = 0,\n    result = try if divisor = 0 then\n        error Error.Record(\n            \"DivideByZero\",\n            \"You attempted to divide by zero.\"\n        )\n    else\n        input / divisor\nin\n    result",
+        "output": "`"
+      },
+      {
+        "usage": "let\n    CustomerId = 12345,\n    result = try if CustomerId > 9999 then\n        error Error.Record(\n            \"CustomerNotFound\",\n            Text.Format(\"Customer ID #{0} wasn't found.\", {CustomerId}),\n            \"Customer doesn't exist.\",\n            {\n                Text.Format(\"Invalid ID = #{0}\", {CustomerId}),\n                \"Valid IDs: https://api.contoso.com/customers\"\n            },\n            \"ERR404\"\n        )\n    else CustomerId\nin\n    result",
+        "output": "`"
+      }
+    ]
+  }
+]

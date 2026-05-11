@@ -1,0 +1,8 @@
+[
+  {
+    "name": "Tables.GetRelationships",
+    "signature": "Tables.GetRelationships(tables as table, optional dataColumn as nullable text) as table",
+    "description": "Gets the relationships among a set of tables. The set `tables` is assumed to have a structure similar to that of a navigation table. The column defined by `dataColumn` contains the actual data tables.",
+    "examples": []
+  }
+]

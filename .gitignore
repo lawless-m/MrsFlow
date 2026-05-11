@@ -1,1 +1,6 @@
 /target/
+
+# Sparse clone of MicrosoftDocs/query-docs — kept locally for the
+# tools/extract_ms_docs.py pipeline; the parsed JSON in
+# mrsflow/stdlib-reference/ is the committed artefact.
+/tools/ms-docs-mirror/

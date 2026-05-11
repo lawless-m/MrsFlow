@@ -1,0 +1,61 @@
+[
+  {
+    "name": "Function.From",
+    "signature": "Function.From(functionType as type, function as function) as function",
+    "description": "Takes a unary function `function` and creates a new function with the type `functionType` that constructs a list out of its arguments and passes it to `function`.",
+    "examples": [
+      {
+        "usage": "Function.From(type function (a as number, b as number) as number, List.Sum)(2, 1)",
+        "output": "3"
+      },
+      {
+        "usage": "Function.From(type function (a as text, b as text) as text, (list) => list{0} & list{1})(\"2\", \"1\")",
+        "output": "\"21\""
+      }
+    ]
+  },
+  {
+    "name": "Function.Invoke",
+    "signature": "Function.Invoke(function as function, args as list) as any",
+    "description": "Invokes the given function using the specified list of arguments and returns the result.",
+    "examples": [
+      {
+        "usage": "Function.Invoke(Record.FieldNames, {[A = 1, B = 2]})",
+        "output": "{\"A\", \"B\"}"
+      }
+    ]
+  },
+  {
+    "name": "Function.InvokeAfter",
+    "signature": "Function.InvokeAfter(function as function, delay as duration) as any",
+    "description": "Returns the result of invoking `function` after duration `delay` has passed.",
+    "examples": []
+  },
+  {
+    "name": "Function.InvokeWithErrorContext",
+    "signature": "Function.InvokeWithErrorContext(function as function, context as text) as any",
+    "description": "This function is intended for internal use only.",
+    "examples": []
+  },
+  {
+    "name": "Function.IsDataSource",
+    "signature": "Function.IsDataSource(function as function) as logical",
+    "description": "Returns whether or not `function` is considered a data source.",
+    "examples": []
+  },
+  {
+    "name": "Function.ScalarVector",
+    "signature": "Function.ScalarVector(scalarFunctionType as type, vectorFunction as function) as function",
+    "description": "Returns a scalar function of type `scalarFunctionType` that invokes `vectorFunction` with a single row of arguments and returns its single output. Additionally, when the scalar function is repeatedly applied for each row of a table of inputs, such as in [`Table.AddColumn`](table-addcolumn.md), instead `vectorFunction` will be applied once for all inputs. `vectorFunction` will be passed a table whose columns match in name and position the parameters of `scalarFunctionType`. Each row of this table contains the arguments for one call to the scalar function, with the columns corresponding to the parameters of `scalarFunctionType`. `vectorFunction` must return a list of the same length as the input table, whose item at each position must be the same result as evaluating the scalar function on the input row of the same position. The input table is expected to be streamed in, so `vectorFunction` is expected to stream its output as input comes in, only working with one chunk of input at a time. In particular, `vectorFunction` must not enumerate its input table more than once.",
+    "examples": [
+      {
+        "usage": "let\n    Compute.ScoreScalar = (left, right) => left * right,\n    // When Function.ScalarVector batching kicks in, we'll receive all\n    // of the inputs for the entire table here at once.\n    Compute.ScoreVector = (input) => let\n        chunks = Table.Split(input, 100),\n        scoreChunk = (chunk) => Table.TransformRows(chunk, each Compute.ScoreScalar([left], [right]))\n      in\n        List.Combine(List.Transform(chunks, scoreChunk)),\n    Compute.Score = Function.ScalarVector(\n        type function (left as number, right as number) as number,\n        Compute.ScoreVector\n    ),\n    Final = Table.AddColumn(\n        Table.FromRecords({\n            [a = 1, b = 2],\n            [a = 3, b = 4]\n        }),\n        \"Result\",\n        each Compute.Score([a], [b])\n    )\nin\n    Final",
+        "output": "`"
+      },
+      {
+        "usage": "let\n  _GradeTest = (right, total) => Number.Round(right / total, 2),\n  _GradeTests = (inputs as table) as list => let\n    batches = Table.Split(inputs, 2),\n    gradeBatch = (batch as table) as list =>\n      let\n        batchId = Text.NewGuid()\n      in\n        Table.TransformRows(batch, each [Grade = _GradeTest([right], [total]), BatchId = batchId])\n  in\n    List.Combine(List.Transform(batches, gradeBatch)),\n  GradeTest = Function.ScalarVector(type function (right as number, total as number) as number, _GradeTests),\n  Tests = #table(type table [Test Name = text, Right = number, Total = number],\n    {\n      {\"Quiz 1\", 3, 4},\n      {\"Test 1\", 17, 22},\n      {\"Quiz 2\", 10, 10}\n    }),\n  // To break batching, replace [Right] with {[Right]}{0}.\n  TestsWithGrades = Table.AddColumn(Tests, \"Grade Info\", each GradeTest([Right], [Total]), type record),\n  // To verify batching, also expand BatchId.\n  Final = Table.ExpandRecordColumn(TestsWithGrades, \"Grade Info\", {\"Grade\"})\nin\n  Final",
+        "output": "`"
+      }
+    ]
+  }
+]

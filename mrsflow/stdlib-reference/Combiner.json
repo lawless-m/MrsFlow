@@ -1,0 +1,65 @@
+[
+  {
+    "name": "Combiner.CombineTextByDelimiter",
+    "signature": "Combiner.CombineTextByDelimiter(delimiter as text, optional quoteStyle as nullable number) as function",
+    "description": "Returns a function that combines a list of text values into a single text value using the specified delimiter.",
+    "examples": [
+      {
+        "usage": "Combiner.CombineTextByDelimiter(\";\")({\"a\", \"b\", \"c\"})",
+        "output": "\"a;b;c\""
+      },
+      {
+        "usage": "let\n    Source = #table(\n        type table [Column1 = text, Column2 = text],\n        {{\"a\", \"b\"}, {\"c\", \"d,e,f\"}}\n    ),\n    Merged = Table.CombineColumns(\n        Source,\n        {\"Column1\", \"Column2\"},\n        Combiner.CombineTextByDelimiter(\",\", QuoteStyle.Csv),\n        \"Merged\"\n    )\nin\n    Merged",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Combiner.CombineTextByEachDelimiter",
+    "signature": "Combiner.CombineTextByEachDelimiter(delimiters as list, optional quoteStyle as nullable number) as function",
+    "description": "Returns a function that combines a list of text values into a single text value using a sequence of delimiters.",
+    "examples": [
+      {
+        "usage": "Combiner.CombineTextByEachDelimiter({\"=\", \"+\"})({\"a\", \"b\", \"c\"})",
+        "output": "\"a=b+c\""
+      }
+    ]
+  },
+  {
+    "name": "Combiner.CombineTextByLengths",
+    "signature": "Combiner.CombineTextByLengths(lengths as list, optional template as nullable text) as function",
+    "description": "Returns a function that combines a list of text values into a single text value using the specified lengths.",
+    "examples": [
+      {
+        "usage": "Combiner.CombineTextByLengths({1, 2, 3})({\"aaa\", \"bbb\", \"ccc\"})",
+        "output": "\"abbccc\""
+      },
+      {
+        "usage": "Combiner.CombineTextByLengths({1, 2, 3}, \"*********\")({\"aaa\", \"bbb\", \"ccc\"})",
+        "output": "\"abbccc***\""
+      }
+    ]
+  },
+  {
+    "name": "Combiner.CombineTextByPositions",
+    "signature": "Combiner.CombineTextByPositions(positions as list, optional template as nullable text) as function",
+    "description": "Returns a function that combines a list of text values into a single text value using the specified output positions.",
+    "examples": [
+      {
+        "usage": "Combiner.CombineTextByPositions({0, 5, 10})({\"abc\", \"def\", \"ghi\"})",
+        "output": "\"abc  def  ghi\""
+      }
+    ]
+  },
+  {
+    "name": "Combiner.CombineTextByRanges",
+    "signature": "Combiner.CombineTextByRanges(ranges as list, optional template as nullable text) as function",
+    "description": "Returns a function that combines a list of text values into a single text value using the specified output positions and lengths. A null length indicates that the entire text value should be included.",
+    "examples": [
+      {
+        "usage": "Combiner.CombineTextByRanges({{0, 1}, {3, 2}, {6, null}})({\"abc\", \"def\", \"ghijkl\"})",
+        "output": "\"a  de ghijkl\""
+      }
+    ]
+  }
+]

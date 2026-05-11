@@ -1,0 +1,1032 @@
+[
+  {
+    "name": "List.Accumulate",
+    "signature": "List.Accumulate( list as list, seed as any, accumulator as function ) as any",
+    "description": "Accumulates a summary value from the items in the specified list using the accumulator. * `list`: The list to iterate. * `seed`: An initial accumulated value. * `accumulator`: A function that takes the current state and the current item and returns the new state.",
+    "examples": [
+      {
+        "usage": "let\n    Source = List.Accumulate(\n        {1, 2, 3, 4, 5},\n        0,\n        (runningSum, nextNumber) => runningSum + nextNumber\n    )\nin\n    Source",
+        "output": "15"
+      },
+      {
+        "usage": "let\n    Source = List.Accumulate(\n        {\"The\", \"quick\", \"brown\", \"fox\", \"jumps\", \"over\", \"the\", \"lazy\", \"dog.\"},\n        null,\n        (fullTextSoFar, nextPart) =>\n            Text.Combine({fullTextSoFar, nextPart}, \" \")\n    )\nin\n    Source",
+        "output": "\"The quick brown fox jumps over the lazy dog.\""
+      },
+      {
+        "usage": "let\n    #\"Process Duration\" =\n    {\n        #duration(0,1,0,0),\n        #duration(0,2,0,0),\n        #duration(0,3,0,0)\n    },\n    #\"Start Time\" = #datetime(2025, 9, 8, 19, 0, 0),\n    #\"Process Timeline\" = List.Accumulate(\n        #\"Process Duration\",\n        {#\"Start Time\"},\n        (accumulatedTimes, nextDuration) =>\n            accumulatedTimes & {List.Last(accumulatedTimes) + nextDuration}\n    )\nin\n    #\"Process Timeline\"",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "List.AllTrue",
+    "signature": "List.AllTrue(list as list) as logical",
+    "description": "Returns true if all expressions in the list `list` are true.",
+    "examples": [
+      {
+        "usage": "List.AllTrue({true, true, 2 > 0})",
+        "output": "true"
+      },
+      {
+        "usage": "List.AllTrue({true, false, 2 < 0})",
+        "output": "false"
+      }
+    ]
+  },
+  {
+    "name": "List.Alternate",
+    "signature": "List.Alternate( list as list, count as number, optional repeatInterval as nullable number, optional offset as nullable number ) as list",
+    "description": "Returns a list comprised of all the odd numbered offset elements in a list. Alternates between taking and skipping values from the list `list` depending on the parameters. * `count`: Specifies number of values that are skipped each time. * `repeatInterval`: An optional repeat interval to indicate how many values are added in between the skipped values. * `offset`: An option offset parameter to begin skipping the values at the initial offset.",
+    "examples": [
+      {
+        "usage": "List.Alternate({1..10}, 1)",
+        "output": "{2, 3, 4, 5, 6, 7, 8, 9, 10}"
+      },
+      {
+        "usage": "List.Alternate({1..10}, 1, 1)",
+        "output": "{2, 4, 6, 8, 10}"
+      },
+      {
+        "usage": "List.Alternate({1..10}, 1, 1, 1)",
+        "output": "{1, 3, 5, 7, 9}"
+      },
+      {
+        "usage": "List.Alternate({1..10}, 1, 2, 1)",
+        "output": "{1, 3, 4, 6, 7, 9, 10}"
+      }
+    ]
+  },
+  {
+    "name": "List.AnyTrue",
+    "signature": "List.AnyTrue(list as list) as logical",
+    "description": "Returns true if any expression in the list `list` is true.",
+    "examples": [
+      {
+        "usage": "List.AnyTrue({true, false, 2>0})",
+        "output": "true"
+      },
+      {
+        "usage": "List.AnyTrue({2 = 0, false, 2 < 0})",
+        "output": "false"
+      }
+    ]
+  },
+  {
+    "name": "List.Average",
+    "signature": "List.Average(list as list, optional precision as nullable number) as any",
+    "description": "Returns the average value for the items in the list, `list`. The result is given in the same datatype as the values in the list. Only works with number, date, time, datetime, datetimezone and duration values. If the list is empty null is returned.",
+    "examples": [
+      {
+        "usage": "List.Average({3, 4, 6})",
+        "output": "4.333333333333333"
+      },
+      {
+        "usage": "List.Average({#date(2011, 1, 1), #date(2011, 1, 2), #date(2011, 1, 3)})",
+        "output": "#date(2011, 1, 2)"
+      }
+    ]
+  },
+  {
+    "name": "List.Buffer",
+    "signature": "List.Buffer(list as list) as list",
+    "description": "Buffers the list `list` in memory. The result of this call is a stable list.",
+    "examples": [
+      {
+        "usage": "List.Buffer({1..10})",
+        "output": "{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}"
+      }
+    ]
+  },
+  {
+    "name": "List.Combine",
+    "signature": "List.Combine(lists as list) as list",
+    "description": "Takes a list of lists, `lists`, and merges them into a single new list.",
+    "examples": [
+      {
+        "usage": "List.Combine({{1, 2}, {3, 4}})",
+        "output": "`"
+      },
+      {
+        "usage": "List.Combine({{1, 2}, {3, {4, 5}}})",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "List.ConformToPageReader",
+    "signature": "List.ConformToPageReader(list as list, optional options as nullable record) as table",
+    "description": "This function is intended for internal use only.",
+    "examples": []
+  },
+  {
+    "name": "List.Contains",
+    "signature": "List.Contains( list as list, value as any, optional equationCriteria as any ) as logical",
+    "description": "Indicates whether the list contains the specified value. Returns `true` if the value is found in the list, `false` otherwise. * `list`: The list to search. * `value`: The value to search for in the list. * `equationCriteria`: (Optional) The comparer used to determine if two values are equal.",
+    "examples": [
+      {
+        "usage": "List.Contains({1, 2, 3, 4, 5}, 3)",
+        "output": "true"
+      },
+      {
+        "usage": "List.Contains({1, 2, 3, 4, 5}, 6)",
+        "output": "false"
+      },
+      {
+        "usage": "List.Contains({\"Pears\", \"Bananas\", \"Rhubarb\", \"Peaches\"},\n    \"rhubarb\",\n    Comparer.OrdinalIgnoreCase\n)",
+        "output": "true"
+      },
+      {
+        "usage": "let\n    Source = {#date(2024, 2, 23), #date(2023, 12, 2), #date(2022, 4, 8), #date(2021, 7, 6)},\n    ContainsDate = List.Contains(Source, Date.From(\"4/8/2022\"))\nin\n    ContainsDate",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "List.ContainsAll",
+    "signature": "List.ContainsAll( list as list, values as list, optional equationCriteria as any ) as logical",
+    "description": "Indicates whether the list includes all the values from another list. Returns `true` if all the values are found in the list, `false` otherwise. * `list`: The list to search. * `values`: The list of values to search for in the first list. * `equationCriteria`: (Optional) The comparer used to determine if two values are equal.",
+    "examples": [
+      {
+        "usage": "List.ContainsAll({1, 2, 3, 4, 5}, {3, 4})",
+        "output": "true"
+      },
+      {
+        "usage": "List.ContainsAll({1, 2, 3, 4, 5}, {5, 6})",
+        "output": "false"
+      },
+      {
+        "usage": "List.ContainsAll({\"dog\", \"cat\", \"racoon\", \"horse\", \"rabbit\"}, {\"DOG\", \"Horse\"}, Comparer.OrdinalIgnoreCase)",
+        "output": "true"
+      },
+      {
+        "usage": "let\n    Source = {#date(2024, 2, 23), #date(2023, 12, 2), #date(2022, 4, 8), #date(2021, 7, 6)},\n    ContainsDates = List.ContainsAll(Source, {#date(2022, 4, 8), #date(2021, 7, 6)})\nin\n    ContainsDates",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "List.ContainsAny",
+    "signature": "List.ContainsAny( list as list, values as list, optional equationCriteria as any ) as logical",
+    "description": "Indicates whether the list contains any of the values from another list. Returns `true` if the values are found in the list, `false` otherwise. * `list`: The list to search. * `values`: The list of values to search for in the first list. * `equationCriteria`: (Optional) The comparer used to determine if two values are equal.",
+    "examples": [
+      {
+        "usage": "List.ContainsAny({1, 2, 3, 4, 5}, {3, 9})",
+        "output": "true"
+      },
+      {
+        "usage": "List.ContainsAny({1, 2, 3, 4, 5}, {6, 7})",
+        "output": "false"
+      },
+      {
+        "usage": "List.ContainsAny({\"dog\", \"cat\", \"racoon\", \"horse\", \"rabbit\"}, {\"Horse\", \"OWL\"}, Comparer.OrdinalIgnoreCase)",
+        "output": "true"
+      },
+      {
+        "usage": "let\n    Source = {#date(2024, 2, 23), #date(2023, 12, 2), #date(2022, 4, 8), #date(2021, 7, 6)},\n    ContainsDates = List.ContainsAny(Source, {Date.From(\"Apr 8, 2022\"), Date.From(\"Jan 11, 2021\")})\nin\n    ContainsDates",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "List.Count",
+    "signature": "List.Count(list as list) as number",
+    "description": "Returns the number of items in the specified list. * `list`: The list to examine.",
+    "examples": [
+      {
+        "usage": "List.Count({1, 2, 3})",
+        "output": "3"
+      },
+      {
+        "usage": "let\n    colors = {\"Red\", \"Blue\", \"GREEN\", \"red\", \"Yellow\", \"RED\"},\n    redCount = List.Count(\n        List.Select(colors, each Text.Lower(_) = \"red\")\n    )\nin\n    redCount",
+        "output": "3"
+      },
+      {
+        "usage": "let\n    customers = {\n        [CustomerID = 101, CustomerName = \"Alice\", AmountPurchased = 150],\n        [CustomerID = 102, CustomerName = \"Bob\", AmountPurchased = 75],\n        [CustomerID = 103, CustomerName = \"Carol\", AmountPurchased = 50],\n        [CustomerID = 104, CustomerName = \"Dave\", AmountPurchased = 90],\n        [CustomerID = 105, CustomerName = \"Eve\", AmountPurchased = 120]\n    },\n    highValueCustomerCount = List.Count(\n        List.Select(customers, each [AmountPurchased] > 100)\n    )\nin\n    highValueCustomerCount",
+        "output": "2"
+      }
+    ]
+  },
+  {
+    "name": "List.Covariance",
+    "signature": "List.Covariance(numberList1 as list, numberList2 as list) as nullable number",
+    "description": "Returns the covariance between two lists, `numberList1` and `numberList2`. `numberList1` and `numberList2` must contain the same number of `number` values.",
+    "examples": [
+      {
+        "usage": "List.Covariance({1, 2, 3}, {1, 2, 3})",
+        "output": "0.66666666666666607"
+      }
+    ]
+  },
+  {
+    "name": "List.DateTimeZones",
+    "signature": "List.DateTimeZones( start as datetimezone, count as number, step as duration ) as list",
+    "description": "Returns a list of `datetimezone` values of size `count`, starting at `start`. The given increment, `step`, is a `duration` value that is added to every value.",
+    "examples": [
+      {
+        "usage": "List.DateTimeZones(#datetimezone(2011, 12, 31, 23, 55, 0, -8, 0), 10, #duration(0, 0, 1, 0))",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "List.DateTimes",
+    "signature": "List.DateTimes( start as datetime, count as number, step as duration ) as list",
+    "description": "Returns a list of `datetime` values of size `count`, starting at `start`. The given increment, `step`, is a `duration` value that is added to every value.",
+    "examples": [
+      {
+        "usage": "List.DateTimes(#datetime(2011, 12, 31, 23, 55, 0), 10, #duration(0, 0, 1, 0))",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "List.Dates",
+    "signature": "List.Dates( start as date, count as number, step as duration ) as list",
+    "description": "Returns a list of `date` values of size `count`, starting at `start`. The given increment, `step`, is a `duration` value that is added to every value.",
+    "examples": [
+      {
+        "usage": "List.Dates(#date(2011, 12, 31), 5, #duration(1, 0, 0, 0))",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "List.Difference",
+    "signature": "List.Difference( list1 as list, list2 as list, optional equationCriteria as any ) as list",
+    "description": "Returns the items in list `list1` that do not appear in list `list2`. Duplicate values are supported. An optional equation criteria value, `equationCriteria`, can be specified to control equality testing.",
+    "examples": [
+      {
+        "usage": "List.Difference({1, 2, 3, 4, 5}, {4, 5, 3})",
+        "output": "{1, 2}"
+      },
+      {
+        "usage": "List.Difference({1, 2}, {1, 2, 3})",
+        "output": "{}"
+      }
+    ]
+  },
+  {
+    "name": "List.Distinct",
+    "signature": "List.Distinct(list as list, optional equationCriteria as any) as list",
+    "description": "Returns a list that contains all the values in the specified list with duplicates removed. If the specified list is empty, the result is an empty list. * `list`: The list from which distinct values are extracted. * `equationCriteria`: (Optional) Specifies how equality is determined when comparing values. This parameter can be a key selector function, a comparer function, or a list containing both a key selector and a comparer.",
+    "examples": [
+      {
+        "usage": "List.Distinct({1, 1, 2, 3, 3, 3})",
+        "output": "{1, 2, 3}"
+      },
+      {
+        "usage": "let\n    Source = {\"Apple\", \"Banana\", \"Cherry\", \"Date\", \"Fig\"},\n    Result = List.Distinct(List.Reverse(Source), each Text.Length(_))\nin\n    Result",
+        "output": "{\"Fig\", \"Date\", \"Cherry\", \"Apple\"}"
+      },
+      {
+        "usage": "let\n    Source = {\"apple\", \"Pear\", \"aPPle\", \"banana\", \"ORANGE\", \"pear\", \"Banana\", \"Cherry\"},\n    Result = List.Distinct(Source, Comparer.OrdinalIgnoreCase)\nin\n    Result",
+        "output": "{\"apple\", \"Pear\", \"banana\", \"ORANGE\", \"Cherry\"}"
+      },
+      {
+        "usage": "let\n    Source = {\n        {\"USA\", #date(2023, 8, 1), 567},\n        {\"canada\", #date(2023, 8, 1), 254},\n        {\"Usa\", #date(2023, 7, 1), 450},\n        {\"CANADA\", #date(2023, 6, 1), 357},\n        {\"Panama\", #date(2023, 6, 2), 20},\n        {\"panama\", #date(2023, 7, 1), 40}\n    },\n    DistinctByCountry = List.Distinct(\n        Source,\n        {each _{0}, Comparer.OrdinalIgnoreCase}\n    ),\n    ToTable = Table.FromRows(DistinctByCountry, {\"Country\", \"Date\", \"Value\"}),\n    ChangeTypes = Table.TransformColumnTypes(\n        ToTable, {{\"Country\", type text}, {\"Date\", type date}, {\"Value\", Int64.Type}}\n    )\nin\n    ChangeTypes",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "List.Durations",
+    "signature": "List.Durations( start as duration, count as number, step as duration ) as list",
+    "description": "Returns a list of `count` `duration` values, starting at `start` and incremented by the given `duration` `step`.",
+    "examples": [
+      {
+        "usage": "List.Durations(#duration(0, 1, 0, 0), 5, #duration(0, 1, 0, 0))",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "List.FindText",
+    "signature": "List.FindText(list as list, text as text) as list",
+    "description": "Returns a list of the values from the list `list` which contained the value `text`.",
+    "examples": [
+      {
+        "usage": "List.FindText({\"a\", \"b\", \"ab\"}, \"a\")",
+        "output": "{\"a\", \"ab\"}"
+      }
+    ]
+  },
+  {
+    "name": "List.First",
+    "signature": "List.First(list as list, optional defaultValue as any) as any",
+    "description": "Returns the first item in the list `list`, or the optional default value, `defaultValue`, if the list is empty. If the list is empty and a default value is not specified, the function returns `null`.",
+    "examples": [
+      {
+        "usage": "List.First({1, 2, 3})",
+        "output": "1"
+      },
+      {
+        "usage": "List.First({}, -1)",
+        "output": "-1"
+      }
+    ]
+  },
+  {
+    "name": "List.FirstN",
+    "signature": "List.FirstN(list as list, countOrCondition as any) as any",
+    "description": "* If a number is specified, up to that many items are returned. * If a condition is specified, all items are returned that initially meet the condition. Once an item fails the condition, no further items are considered.",
+    "examples": [
+      {
+        "usage": "List.FirstN({3, 4, 5, -1, 7, 8, 2}, each _ > 0)",
+        "output": "{3, 4, 5}"
+      }
+    ]
+  },
+  {
+    "name": "List.Generate",
+    "signature": "List.Generate( initial as function, condition as function, next as function, optional selector as nullable function ) as list",
+    "description": "Generates a list of values using the provided functions. The `initial` function generates a starting candidate value, which is then tested against `condition`. If the candidate value is approved, then it's returned as part of the resulting list, and the next candidate value is generated by passing the newly approved value to `next`. Once a candidate value fails to match `condition`, the list generation process stops. An optional parameter, `selector`, may also be provided to transform the items in the resulting list.",
+    "examples": [
+      {
+        "usage": "List.Generate(() => 10, each _ > 0, each _ - 1)",
+        "output": "{10, 9, 8, 7, 6, 5, 4, 3, 2, 1}"
+      },
+      {
+        "usage": "List.Generate(\n    () => [x = 1, y = {}],\n    each [x] < 10,\n    each [x = List.Count([y]), y = [y] & {x}],\n    each [x]\n)",
+        "output": "{1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9}"
+      }
+    ]
+  },
+  {
+    "name": "List.InsertRange",
+    "signature": "List.InsertRange( list as list, index as number, values as list ) as list",
+    "description": "Returns a new list produced by inserting the values in `values` into `list` at `index`. The first position in the list is at index 0. * `list`: The target list where values are to be inserted. * `index`: The index of the target list(`list`) where the values are to be inserted. The first position in the list is at index 0. * `values`: The list of values which are to be inserted into `list`.",
+    "examples": [
+      {
+        "usage": "List.InsertRange({1, 2, 5}, 2, {3, 4})",
+        "output": "`"
+      },
+      {
+        "usage": "List.InsertRange({2, 3, 4}, 0, {1, {1.1, 1.2}})",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "List.Intersect",
+    "signature": "List.Intersect(lists as list, optional equationCriteria as any) as list",
+    "description": "Returns the intersection of the list values found in the input list `lists`. An optional parameter, `equationCriteria`, can be specified.",
+    "examples": [
+      {
+        "usage": "List.Intersect({{1..5}, {2..6}, {3..7}})",
+        "output": "{3, 4, 5}"
+      }
+    ]
+  },
+  {
+    "name": "List.IsDistinct",
+    "signature": "List.IsDistinct(list as list, optional equationCriteria as any) as logical",
+    "description": "Returns a logical value whether there are duplicates in the list `list`; `true` if the list is distinct, `false` if there are duplicate values.",
+    "examples": [
+      {
+        "usage": "List.IsDistinct({1, 2, 3})",
+        "output": "true"
+      },
+      {
+        "usage": "List.IsDistinct({1, 2, 3, 3})",
+        "output": "false"
+      }
+    ]
+  },
+  {
+    "name": "List.IsEmpty",
+    "signature": "List.IsEmpty(list as list) as logical",
+    "description": "Returns `true` if the list, `list`, contains no values (length 0). If the list contains values (length > 0), returns `false`.",
+    "examples": [
+      {
+        "usage": "List.IsEmpty({})",
+        "output": "true"
+      },
+      {
+        "usage": "List.IsEmpty({1, 2})",
+        "output": "false"
+      }
+    ]
+  },
+  {
+    "name": "List.Last",
+    "signature": "List.Last(list as list, optional defaultValue as any) as any",
+    "description": "Returns the last item in the specified list, or the optional default value if the list is empty. * `list`: The list to examine. * `defaultValue`: (Optional) The default value to return if the list is empty. If the list is empty and a default value isn't specified, the function returns `null`.",
+    "examples": [
+      {
+        "usage": "List.Last({1, 2, 3})",
+        "output": "3"
+      },
+      {
+        "usage": "List.Last({}, -1)",
+        "output": "-1"
+      }
+    ]
+  },
+  {
+    "name": "List.LastN",
+    "signature": "List.LastN(list as list, optional countOrCondition as any) as any",
+    "description": "Returns a list of the last item or items in the specified list. * `list`: The list to examine. If the list is empty, an empty list is returned. * `countOrCondition`: (Optional) Supports gathering multiple items or filtering items. Although this parameter is listed as optional, an error occurs if this value isn't provided or is `null`. This parameter can be specified in two ways: * If a number is specified, up to that many items are returned. * If a condition is specified, all items are returned that meet the condition, starting at the end of the list. Once an item fails the condition, no further items are considered.",
+    "examples": [
+      {
+        "usage": "List.LastN({3, 4, 5, -1, 7, 8, 2}, 1)",
+        "output": "{2}"
+      },
+      {
+        "usage": "List.LastN({3, 4, 5, -1, 7, 8, 2}, each _ > 0)",
+        "output": "{7, 8, 2}"
+      }
+    ]
+  },
+  {
+    "name": "List.MatchesAll",
+    "signature": "List.MatchesAll(list as list, condition as function) as logical",
+    "description": "Returns `true` if the condition function is satisfied by all values in the list, otherwise returns `false`. * `list`: The list containing the values to check. * `condition`: The condition to check against the values in the list.",
+    "examples": [
+      {
+        "usage": "List.MatchesAll({11, 12, 13}, each _  > 10)",
+        "output": "true"
+      },
+      {
+        "usage": "List.MatchesAll({1, 2, 3}, each _  > 10)",
+        "output": "false"
+      },
+      {
+        "usage": "let\n    Source = {\"Savannah\", \"Annabelle\", \"Annals\", \"wannabe\", \"MANNA\"},\n    Result = List.MatchesAll(Source, each Text.Contains(_, \"anna\", Comparer.OrdinalIgnoreCase))\nin\n    Result",
+        "output": "true"
+      },
+      {
+        "usage": "let\n    Source = {#date(2021, 11, 28), #date(2021, 1, 14), #date(2021, 12, 31), #date(2021, 7, 6)},\n    Result = List.MatchesAll(Source, each Date.Year(_) = 2021)\nin\n    Result",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "List.MatchesAny",
+    "signature": "List.MatchesAny(list as list, condition as function) as logical",
+    "description": "Returns `true` if the condition function is satisfied by any of the values in the list, otherwise returns `false`. * `list`: The list containing the values to check. * `condition`: The condition to check against the values in the list.",
+    "examples": [
+      {
+        "usage": "List.MatchesAny({9, 10, 11}, each _  > 10)",
+        "output": "true"
+      },
+      {
+        "usage": "List.MatchesAny({1, 2, 3}, each _  > 10)",
+        "output": "false"
+      },
+      {
+        "usage": "let\n    Source = {\"A Brown Fox\", \"A Loyal Dog\", \"A Curious Cat\", \"A Wild Horse\", \"A Rascally Rabbit\"},\n    Result = List.MatchesAny(Source, each Text.Contains(_, \"cat\", Comparer.OrdinalIgnoreCase))\nin\n    Result",
+        "output": "true"
+      },
+      {
+        "usage": "let\n    Source = {#date(2024, 11, 28), #date(2023, 1, 14), #date(2021, 12, 31), #date(2025, 7, 6)},\n    Result = List.MatchesAny(Source, each Date.Year(_) = 2021)\nin\n    Result",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "List.Max",
+    "signature": "List.Max( list as list, optional default as any, optional comparisonCriteria as any, optional includeNulls as nullable logical ) as any",
+    "description": "Returns the maximum item in the list or the optional default value if the list is empty. * `list`: The list of values. * `default`: (Optional) The value to return if the list is empty. * `comparisonCriteria`: (Optional) A function that's used to transform the values before they're compared. If this parameter is `null`, then the values are compared without any transformation. * `includeNulls`: (Optional) Indicates whether `null` values in the list should be included in determining the maximum item. The default value is `true`.",
+    "examples": [
+      {
+        "usage": "List.Max({1, 4, 7, 3, -2, 5}, 1)",
+        "output": "7"
+      },
+      {
+        "usage": "List.Max({}, -1)",
+        "output": "-1"
+      },
+      {
+        "usage": "let\n    Source = {\"boy\", \"dog\", \"girl\", \"zebra\", \"cat\", \"mouse\", \"rabbit\"},\n    MaxText = List.Max(Source, \"none\")\nin\n    MaxText",
+        "output": "\"zebra\""
+      },
+      {
+        "usage": "let\n    Source = {\"12.02.2024\", \"15.05.2025\", \"10.10.2021\", \"16.01.2025\", \"30.12.2022\"},\n    MaxDate = List.Max(Source, #date(2000, 1, 1), each Date.FromText(_, [Culture = \"de-DE\"]))\nin\n    MaxDate",
+        "output": "\"15.05.2025\""
+      }
+    ]
+  },
+  {
+    "name": "List.MaxN",
+    "signature": "List.MaxN( list as list, countOrCondition as any, optional comparisonCriteria as any, optional includeNulls as nullable logical ) as list",
+    "description": "Returns the maximum value(s) in the specified list. After the rows are sorted, optional parameters can be specified to further filter the result. * `list`: The list of values. * `countOrCondition`: Specifies the number of values to return or a filter condition. If a number is specified, a list of up to `countOrCondition` items in descending order is returned. If a condition is specified, the returned list includes all items that meet the condition. * `comparisonCriteria`: (Optional) A function that's used to transform the values before they're compared. If this parameter is `null`, then the values are compared without any transformation. * `includeNulls`: (Optional) Indicates whether `null` values in the list should be included in determining the maximum item. The default value is `true`.",
+    "examples": [
+      {
+        "usage": "List.MaxN({3, 4, 5, -1, 7, 8, 2}, 5)",
+        "output": "{8, 7, 5, 4, 3}"
+      },
+      {
+        "usage": "List.MaxN(\n    {\"boy\", \"dog\", \"pony\", \"cat\", \"rabbit\", \"bat\"},\n    each Text.Length(_) > 3\n)",
+        "output": "{\"rabbit\", \"pony\"}"
+      },
+      {
+        "usage": "let\n    Source = {\"12.02.2024\", \"15.05.2025\", \"10.10.2021\", \"16.01.2025\", \"30.12.2022\"},\n    MaxDate = List.MaxN(Source, 3, each Date.FromText(_, [Culture = \"de-DE\"]))\nin\n    MaxDate",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "List.Median",
+    "signature": "List.Median(list as list, optional comparisonCriteria as any) as any",
+    "description": "Returns the median item of the list `list`. This function returns `null` if the list contains no non-`null` values. If there is an even number of items, the function chooses the smaller of the two median items unless the list is comprised entirely of datetimes, durations, numbers or times, in which case it returns the average of the two items.",
+    "examples": [
+      {
+        "usage": "List.Median({5, 3, 1, 7, 9})",
+        "output": "5"
+      }
+    ]
+  },
+  {
+    "name": "List.Min",
+    "signature": "List.Min( list as list, optional default as any, optional comparisonCriteria as any, optional includeNulls as nullable logical ) as any",
+    "description": "Returns the minimum item in the list `list`, or the optional default value `default` if the list is empty. An optional comparisonCriteria value, `comparisonCriteria`, may be specified to determine how to compare the items in the list. If this parameter is null, the default comparer is used.",
+    "examples": [
+      {
+        "usage": "List.Min({1, 4, 7, 3, -2, 5})",
+        "output": "-2"
+      },
+      {
+        "usage": "List.Min({}, -1)",
+        "output": "-1"
+      }
+    ]
+  },
+  {
+    "name": "List.MinN",
+    "signature": "List.MinN( list as list, countOrCondition as any, optional comparisonCriteria as any, optional includeNulls as nullable logical ) as list",
+    "description": "Returns the minimum value(s) in the list, `list`. The parameter, `countOrCondition`, specifies the number of values to return or a filtering condition. The optional parameter, `comparisonCriteria`, specifies how to compare values in the list. * `list`: The list of values. * `countOrCondition`: If a number is specified, a list of up to `countOrCondition` items in ascending order is returned. If a condition is specified, a list of items that initially meet the condition is returned. Once an item fails the condition, no further items are considered. If this parameter is null, the single smallest value in the list is returned. * `comparisonCriteria`: *(Optional)* An optional `comparisonCriteria` value can be specified to determine how to compare the items in the list. If this parameter is null, the default comparer is used.",
+    "examples": [
+      {
+        "usage": "List.MinN({3, 4, 5, -1, 7, 8, 2}, 5)",
+        "output": "{-1, 2, 3, 4, 5}"
+      }
+    ]
+  },
+  {
+    "name": "List.Mode",
+    "signature": "List.Mode(list as list, optional equationCriteria as any) as any",
+    "description": "Returns the item that appears most frequently in `list`. If the list is empty an error is raised. If multiple items appear with the same maximum frequency, the last one is chosen. An optional comparison criteria value, `equationCriteria`, can be specified to control equality testing.",
+    "examples": [
+      {
+        "usage": "List.Mode({\"A\", 1, 2, 3, 3, 4, 5})",
+        "output": "3"
+      },
+      {
+        "usage": "List.Mode({\"A\", 1, 2, 3, 3, 4, 5, 5})",
+        "output": "5"
+      }
+    ]
+  },
+  {
+    "name": "List.Modes",
+    "signature": "List.Modes(list as list, optional equationCriteria as any) as list",
+    "description": "Returns the items that appear most frequently in `list`. If the list is empty an error is raised. If multiple items appear with the same maximum frequency, all of them are returned. An optional comparison criteria value, `equationCriteria`, can be specified to control equality testing.",
+    "examples": [
+      {
+        "usage": "List.Modes({\"A\", 1, 2, 3, 3, 4, 5, 5})",
+        "output": "{3, 5}"
+      }
+    ]
+  },
+  {
+    "name": "List.NonNullCount",
+    "signature": "List.NonNullCount(list as list) as number",
+    "description": "Returns the number of non-null items in the list `list`.",
+    "examples": []
+  },
+  {
+    "name": "List.Numbers",
+    "signature": "List.Numbers( start as number, count as number, optional increment as nullable number ) as list",
+    "description": "Returns a list of numbers given an initial value, count, and optional increment value. The default increment value is 1. * `start`: The initial value in the list. * `count`: The number of values to create. * `increment`: *(Optional)* The value to increment by. If omitted values are incremented by 1.",
+    "examples": [
+      {
+        "usage": "List.Numbers(1, 10)",
+        "output": "`"
+      },
+      {
+        "usage": "List.Numbers(1, 10, 2)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "List.Percentile",
+    "signature": "List.Percentile( list as list, percentiles as any, optional options as nullable record ) as any",
+    "description": "Returns one or more sample percentiles of the list `list`. If the value `percentiles` is a number between 0.0 and 1.0, it will be treated as a percentile and the result will be a single value corresponding to that probability. If the value `percentiles` is a list of numbers with values between 0.0 and 1.0, the result will be a list of percentiles corresponding to the input probability. The PercentileMode option in `options` can be used by advanced users to pick a more-specific interpolation method but is not recommended for most uses. Predefined symbols [`PercentileMode.ExcelInc`](percentilemode-type.md) and [`PercentileMode.ExcelExc`](percentilemode-type.md) match the interpolation methods used by the Excel functions `PERCENTILE.INC` and `PERCENTILE.EXC`. The default behavior matches [`PercentileMode.ExcelInc`](percentilemode-type.md). The symbols [`PercentileMode.SqlCont`](percentilemode-type.md) and [`PercentileMode.SqlDisc`](percentilemode-type.md) match the SQL Server behavior for `PERCENTILE_CONT` and `PERCENTILE_DISC`, respectively.",
+    "examples": [
+      {
+        "usage": "List.Percentile({5, 3, 1, 7, 9}, 0.25)",
+        "output": "3"
+      },
+      {
+        "usage": "List.Percentile({5, 3, 1, 7, 9}, {0.25, 0.5, 0.75}, [PercentileMode=PercentileMode.ExcelExc])",
+        "output": "{2, 5, 8}"
+      }
+    ]
+  },
+  {
+    "name": "List.PositionOf",
+    "signature": "List.PositionOf( list as list, value as any, optional occurrence as nullable number, optional equationCriteria as any ) as any",
+    "description": "Returns the offset at which the specified value appears in a list. Returns -1 if the value doesn't appear. * `list`: The list to search. * `value`: The value to find in the list. * `occurrence`: (Optional) The specific occurrence to report. This value can be [`Occurrence.First`](occurrence-type.md), [`Occurrence.Last`](occurrence-type.md), or [`Occurrence.All`](occurrence-type.md). If no `occurrence` is specified, [`Occurrence.First`](occurrence-type.md) is used. * `equationCriteria`: (Optional) Specifies how equality is determined when comparing values. This parameter can be a key selector function, a comparer function, or a list containing both a key selector and a comparer.",
+    "examples": [
+      {
+        "usage": "List.PositionOf({1, 2, 3}, 3)",
+        "output": "2"
+      },
+      {
+        "usage": "let\n    Source = {\n        #date(2021, 5, 10),\n        #date(2022, 6, 28),\n        #date(2023, 7, 15),\n        #date(2022, 12, 31),\n        #date(2022, 4, 8),\n        #date(2024, 3, 20)\n    },\n    YearList = List.Transform(Source, each Date.Year(_)),\n    TargetYear = 2022,\n    FindPositions = List.PositionOf(YearList, TargetYear, Occurrence.All)\nin\n    FindPositions",
+        "output": "{1, 3, 4}"
+      },
+      {
+        "usage": "let\n    Source = List.PositionOf(\n        {\"dog\", \"cat\", \"DOG\", \"pony\", \"bat\", \"rabbit\", \"dOG\"},\n        \"dog\",\n        Occurrence.Last,\n        Comparer.OrdinalIgnoreCase\n    )\nin\n    Source",
+        "output": "6"
+      },
+      {
+        "usage": "let\n    Source = { 10, 15, 20, 25, 30 },\n    Position = List.PositionOf(\n        Source,\n        28,\n        Occurrence.First,\n        (x, y) => Number.Abs(x - y) <= 2\n    )\nin\n    Position",
+        "output": "4"
+      }
+    ]
+  },
+  {
+    "name": "List.PositionOfAny",
+    "signature": "List.PositionOfAny( list as list, values as list, optional occurrence as nullable number, optional equationCriteria as any ) as any",
+    "description": "Returns the offset at which an item from the specified list of values appears in a list. Returns -1 if no occurrence is found. * `list`: The list to search. * `values`: The list of values to find in the original list. * `occurrence`: (Optional) The specific occurrence to report. This value can be [`Occurrence.First`](occurrence-type.md), [`Occurrence.Last`](occurrence-type.md), or [`Occurrence.All`](occurrence-type.md). If no `occurrence` is specified, [`Occurrence.First`](occurrence-type.md) is used. * `equationCriteria`: (Optional) Specifies how equality is determined when comparing values. This parameter can be a key selector function, a comparer function, or a list containing both a key selector and a comparer.",
+    "examples": [
+      {
+        "usage": "List.PositionOfAny({1, 2, 3}, {2, 3})",
+        "output": "1"
+      },
+      {
+        "usage": "let\n    Source = {\n        #date(2021, 5, 10),\n        #date(2022, 6, 28),\n        #date(2023, 7, 15),\n        #date(2025, 12, 31),\n        #date(2022, 4, 8),\n        #date(2024, 3, 20)\n    },\n    YearList = List.Transform(Source, each Date.Year(_)),\n    TargetYear = {2022, 2023},\n    FindPositions = List.PositionOfAny(YearList, TargetYear, Occurrence.All)\nin\n    FindPositions",
+        "output": "{1, 2, 4}"
+      },
+      {
+        "usage": "let\n    Source = List.PositionOfAny(\n        {\"dog\", \"cat\", \"DOG\", \"pony\", \"bat\", \"rabbit\", \"dOG\"},\n        {\"dog\", \"cat\"},\n        Occurrence.Last,\n        Comparer.OrdinalIgnoreCase\n    )\nin\n    Source",
+        "output": "6"
+      },
+      {
+        "usage": "let\n    Source = { 10, 15, 20, 25, 30 },\n    Position = List.PositionOfAny(\n        Source,\n        {17, 28},\n        Occurrence.All,\n        (x, y) => Number.Abs(x - y) <= 2\n    )\nin\n    Position",
+        "output": "{1, 4}"
+      }
+    ]
+  },
+  {
+    "name": "List.Positions",
+    "signature": "List.Positions(list as list) as list",
+    "description": "Returns a list of offsets for the specified input list. * `list`: The input list. When using [`List.Transform`](list-transform.md) to change a list, the list of positions can be used to give the transform access to the position.",
+    "examples": [
+      {
+        "usage": "List.Positions({1, 2, 3, 4, null, 5})",
+        "output": "{0, 1, 2, 3, 4, 5}"
+      },
+      {
+        "usage": "let\n    customers = {\"Alice\", \"Bob\", \"Charlie\", \"Diana\"},\n    resultTable =\n        Table.FromRecords(\n            List.Transform(\n                List.Positions(customers),\n                each [\n                    IDNumber = _ + 1,   // Make it 1-based\n                    CustomerName = customers{_}\n                ]\n            ),\n            type table [IDNumber = Int64.Type, CustomerName = text]\n        )\nin\n    resultTable",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "List.Product",
+    "signature": "List.Product(numbersList as list, optional precision as nullable number) as nullable number",
+    "description": "Returns the product of the non-null numbers in the list, `numbersList`. Returns null if there are no non-null values in the list.",
+    "examples": [
+      {
+        "usage": "List.Product({1, 2, 3, 3, 4, 5, 5})",
+        "output": "1800"
+      }
+    ]
+  },
+  {
+    "name": "List.Random",
+    "signature": "List.Random(count as number, optional seed as nullable number) as list",
+    "description": "Returns a list of random numbers between 0 and 1, given the number of values to generate and an optional seed value. * `count`: The number of random values to generate. * `seed`: *(Optional)* A numeric value used to seed the random number generator. If omitted a unique list of random numbers is generated each time you call the function. If you specify the seed value with a number every call to the function generates the same list of random numbers.",
+    "examples": [
+      {
+        "usage": "List.Random(3)",
+        "output": "{0.992332, 0.132334, 0.023592}"
+      },
+      {
+        "usage": "List.Random(3, 2)",
+        "output": "{0.883002, 0.245344, 0.723212}"
+      }
+    ]
+  },
+  {
+    "name": "List.Range",
+    "signature": "List.Range( list as list, offset as number, optional count as nullable number ) as list",
+    "description": "Returns a subset of `list` beginning at `offset`. An optional parameter, `count`, sets the maximum number of items in the subset.",
+    "examples": [
+      {
+        "usage": "List.Range({1..10}, 6)",
+        "output": "{7, 8, 9, 10}"
+      },
+      {
+        "usage": "List.Range({1..10}, 6, 2)",
+        "output": "{7, 8}"
+      }
+    ]
+  },
+  {
+    "name": "List.RemoveFirstN",
+    "signature": "List.RemoveFirstN(list as list, optional countOrCondition as any) as list",
+    "description": "Returns a list that removes the first element of list `list`. If `list` is an empty list an empty list is returned. This function takes an optional parameter, `countOrCondition`, to support removing multiple values as listed below. * If a number is specified, up to that many items are removed. * If a condition is specified, any consecutive matching items at the start of `list` are removed. * If this parameter is null, the default behavior is observed.",
+    "examples": [
+      {
+        "usage": "List.RemoveFirstN({1, 2, 3, 4, 5}, 3)",
+        "output": "{4, 5}"
+      },
+      {
+        "usage": "List.RemoveFirstN({5, 4, 2, 6, 1}, each _ > 3)",
+        "output": "{2, 6, 1}"
+      }
+    ]
+  },
+  {
+    "name": "List.RemoveItems",
+    "signature": "List.RemoveItems(list1 as list, list2 as list) as list",
+    "description": "Removes all occurrences of the given values in the `list2` from `list1`. If the values in `list2` don't exist in `list1`, the original list is returned.",
+    "examples": [
+      {
+        "usage": "List.RemoveItems({1, 2, 3, 4, 2, 5, 5}, {2, 4, 6})",
+        "output": "{1, 3, 5, 5}"
+      }
+    ]
+  },
+  {
+    "name": "List.RemoveLastN",
+    "signature": "List.RemoveLastN(list as list, optional countOrCondition as any) as list",
+    "description": "Returns a list that removes the last `countOrCondition` elements from the end of list `list`. If `list` has less than `countOrCondition` elements, an empty list is returned. * If a number is specified, up to that many items are removed. * If a condition is specified, any consecutive matching items at the end of `list` are removed. * If this parameter is null, only one item is removed.",
+    "examples": [
+      {
+        "usage": "List.RemoveLastN({1, 2, 3, 4, 5}, 3)",
+        "output": "{1, 2}"
+      },
+      {
+        "usage": "List.RemoveLastN({5, 4, 2, 6, 4}, each _ > 3)",
+        "output": "{5, 4, 2}"
+      }
+    ]
+  },
+  {
+    "name": "List.RemoveMatchingItems",
+    "signature": "List.RemoveMatchingItems( list1 as list, list2 as list, optional equationCriteria as any ) as list",
+    "description": "Removes all occurrences of the given values in `list2` from the list `list1`. If the values in `list2` don't exist in `list1`, the original list is returned. An optional equation criteria value, `equationCriteria`, can be specified to control equality testing.",
+    "examples": [
+      {
+        "usage": "List.RemoveMatchingItems({1, 2, 3, 4, 5, 5}, {1, 5})",
+        "output": "{2, 3, 4}"
+      }
+    ]
+  },
+  {
+    "name": "List.RemoveNulls",
+    "signature": "List.RemoveNulls(list as list) as list",
+    "description": "Removes all occurrences of \"null\" values in the `list`. If there are no 'null' values in the list, the original list is returned.",
+    "examples": [
+      {
+        "usage": "List.RemoveNulls({1, 2, 3, null, 4, 5, null, 6})",
+        "output": "{1, 2, 3, 4, 5, 6}"
+      }
+    ]
+  },
+  {
+    "name": "List.RemoveRange",
+    "signature": "List.RemoveRange( list as list, index as number, optional count as nullable number ) as list",
+    "description": "Removes `count` values in the `list` starting at the specified position, `index`.",
+    "examples": [
+      {
+        "usage": "List.RemoveRange({1, 2, 3, 4, -6, -2, -1, 5}, 4, 3)",
+        "output": "{1, 2, 3, 4, 5}"
+      }
+    ]
+  },
+  {
+    "name": "List.Repeat",
+    "signature": "List.Repeat(list as list, count as number) as list",
+    "description": "Returns a list that is `count` repetitions of the original list, `list`.",
+    "examples": [
+      {
+        "usage": "List.Repeat({1, 2}, 3)",
+        "output": "{1, 2, 1, 2, 1, 2}"
+      }
+    ]
+  },
+  {
+    "name": "List.ReplaceMatchingItems",
+    "signature": "List.ReplaceMatchingItems( list as list, replacements as list, optional equationCriteria as any ) as list",
+    "description": "Performs the given replacements to the list `list`. A replacement operation `replacements` consists of a list of two values, the old value and new value, provided in a list. An optional equation criteria value, `equationCriteria`, can be specified to control equality testing.",
+    "examples": [
+      {
+        "usage": "List.ReplaceMatchingItems({1, 2, 3, 4, 5}, {{5, -5}, {1, -1}})",
+        "output": "{-1, 2, 3, 4, -5}"
+      }
+    ]
+  },
+  {
+    "name": "List.ReplaceRange",
+    "signature": "List.ReplaceRange( list as list, index as number, count as number, replaceWith as list ) as list",
+    "description": "Replaces `count` values in the `list` with the list `replaceWith`, starting at specified position, `index`.",
+    "examples": [
+      {
+        "usage": "List.ReplaceRange({1, 2, 7, 8, 9, 5}, 2, 3, {3, 4})",
+        "output": "{1, 2, 3, 4, 5}"
+      }
+    ]
+  },
+  {
+    "name": "List.ReplaceValue",
+    "signature": "List.ReplaceValue( list as list, oldValue as any, newValue as any, replacer as function ) as list",
+    "description": "Searches a list of values, `list`, for the value `oldValue` and replaces each occurrence with the replacement value `newValue`.",
+    "examples": [
+      {
+        "usage": "List.ReplaceValue({\"a\", \"B\", \"a\", \"a\"}, \"a\", \"A\", Replacer.ReplaceText)",
+        "output": "{\"A\", \"B\", \"A\", \"A\"}"
+      }
+    ]
+  },
+  {
+    "name": "List.Reverse",
+    "signature": "List.Reverse(list as list) as list",
+    "description": "Returns a list with the values in the list `list` in reversed order.",
+    "examples": [
+      {
+        "usage": "List.Reverse({1..10})",
+        "output": "{10, 9, 8, 7, 6, 5, 4, 3, 2, 1}"
+      }
+    ]
+  },
+  {
+    "name": "List.Select",
+    "signature": "List.Select(list as list, selection as function) as list",
+    "description": "Returns the values from the specified list that match the selection condition. * `list`: The list to examine. * `selection`: The function that determines the values to select.",
+    "examples": [
+      {
+        "usage": "List.Select({1, -3, 4, 9, -2}, each _ > 0)",
+        "output": "{1, 4, 9}"
+      },
+      {
+        "usage": "let\n    dates = {\n        #date(2025, 10, 20),  // Monday\n        #date(2025, 10, 21),  // Tuesday\n        #date(2025, 10, 25),  // Saturday\n        #date(2025, 10, 26),  // Sunday\n        #date(2025, 10, 27)   // Monday\n    },\n    weekendDates = List.Select(\n        dates,\n        each Date.DayOfWeek(_, Day.Monday) >= 5\n    )\nin\n    weekendDates",
+        "output": "`"
+      },
+      {
+        "usage": "let\n    customers = {\n        [Name = \"Alice\", Status = \"Active\", Purchases = 150],\n        [Name = \"Bob\", Status = \"Inactive\", Purchases = 200],\n        [Name = \"Carol\", Status = \"Active\", Purchases = 90],\n        [Name = \"Dave\", Status = \"Active\", Purchases = 120]\n    },\n    highValueActiveCustomers = List.Select(\n        customers,\n        each [Status] = \"Active\" and [Purchases] > 100\n    ),\n    resultTable = Table.FromRecords(\n        highValueActiveCustomers,\n        type table [Name = text, Status = text, Purchases = number]\n    )\nin\n    resultTable",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "List.Single",
+    "signature": "List.Single(list as list) as any",
+    "description": "If there is only one item in the list `list`, returns that item. If there is more than one item or the list is empty, the function raises an error.",
+    "examples": [
+      {
+        "usage": "List.Single({1})",
+        "output": "1"
+      },
+      {
+        "usage": "List.Single({1, 2, 3})",
+        "output": "[Expression.Error] There were too many elements in the enumeration to complete the operation."
+      }
+    ]
+  },
+  {
+    "name": "List.SingleOrDefault",
+    "signature": "List.SingleOrDefault(list as list, optional default as any) as any",
+    "description": "If there is only one item in the list `list`, returns that item. If the list is empty, the function returns null unless an optional `default` is specified. If there is more than one item in the list, the function returns an error.",
+    "examples": [
+      {
+        "usage": "List.SingleOrDefault({1})",
+        "output": "1"
+      },
+      {
+        "usage": "List.SingleOrDefault({})",
+        "output": "null"
+      },
+      {
+        "usage": "List.SingleOrDefault({}, -1)",
+        "output": "-1"
+      }
+    ]
+  },
+  {
+    "name": "List.Skip",
+    "signature": "List.Skip(list as list, optional countOrCondition as any) as list",
+    "description": "Returns a list that skips the first element of list `list`. If `list` is an empty list an empty list is returned. This function takes an optional parameter, `countOrCondition`, to support skipping multiple values as listed below. * If a number is specified, up to that many items are skipped. * If a condition is specified, any consecutive matching items at the start of `list` are skipped. * If this parameter is null, the default behavior is observed.",
+    "examples": [
+      {
+        "usage": "List.Skip({1, 2, 3, 4, 5}, 3)",
+        "output": "{4, 5}"
+      },
+      {
+        "usage": "List.Skip({5, 4, 2, 6, 1}, each _ > 3)",
+        "output": "{2, 6, 1}"
+      }
+    ]
+  },
+  {
+    "name": "List.Sort",
+    "signature": "List.Sort(list as list, optional comparisonCriteria as any) as list",
+    "description": "Sorts a list of data, `list`, according to the optional criteria specified. An optional parameter, `comparisonCriteria`, can be specified as the comparison criterion. This can take the following values: * To control the order, the comparison criterion can be an Order enum value. ([`Order.Descending`](order-type.md), [`Order.Ascending`](order-type.md)). * To compute a key to be used for sorting, a function of 1 argument can be used. * To both select a key and control order, comparison criterion can be a list containing the key and order (`{each 1 / _, Order.Descending}`). * To completely control the comparison, a function of 2 arguments can be used (such as [`Value.Compare`](value-compare.md)). This function will be passed two items from the list (any two items, in any order). The function should return one of the following values: * `-1`: The first item is less than the second item. * `0`: The items are equal. * `1`: The first item is greater than the second item.",
+    "examples": [
+      {
+        "usage": "List.Sort({2, 3, 1})",
+        "output": "{1, 2, 3}"
+      },
+      {
+        "usage": "List.Sort({2, 3, 1}, Order.Descending)",
+        "output": "{3, 2, 1}"
+      },
+      {
+        "usage": "List.Sort({2, 3, 1}, (x, y) => Value.Compare(1/x, 1/y))",
+        "output": "{3, 2, 1}"
+      }
+    ]
+  },
+  {
+    "name": "List.Split",
+    "signature": "List.Split(list as list, pageSize as number) as list",
+    "description": "Splits `list` into a list of lists where the first element of the output list is a list containing the first `pageSize` elements from the source list, the next element of the output list is a list containing the next `pageSize` elements from the source list, and so on.",
+    "examples": []
+  },
+  {
+    "name": "List.StandardDeviation",
+    "signature": "List.StandardDeviation(numbersList as list) as nullable number",
+    "description": "Returns a sample based estimate of the standard deviation of the values in the list, `numbersList`. If `numbersList` is a list of numbers, a number is returned. An error is raised on an empty list or a list of items that is not type `number`.",
+    "examples": [
+      {
+        "usage": "List.StandardDeviation({1..5})",
+        "output": "1.5811388300841898"
+      }
+    ]
+  },
+  {
+    "name": "List.Sum",
+    "signature": "List.Sum(list as list, optional precision as nullable number) as any",
+    "description": "Returns the sum of the non-null values in the list, `list`. Returns null if there are no non-null values in the list.",
+    "examples": [
+      {
+        "usage": "List.Sum({1, 2, 3})",
+        "output": "6"
+      }
+    ]
+  },
+  {
+    "name": "List.Times",
+    "signature": "List.Times( start as time, count as number, step as duration ) as list",
+    "description": "Returns a list of `time` values of size `count`, starting at `start`. The given increment, `step`, is a `duration` value that is added to every value.",
+    "examples": [
+      {
+        "usage": "List.Times(#time(12, 0, 0), 4, #duration(0, 1, 0, 0))",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "List.Transform",
+    "signature": "List.Transform(list as list, transform as function) as list",
+    "description": "Returns a new list of values by applying the transform function `transform` to the list, `list`.",
+    "examples": [
+      {
+        "usage": "List.Transform({1, 2}, each _ + 1)",
+        "output": "{2, 3}"
+      }
+    ]
+  },
+  {
+    "name": "List.TransformMany",
+    "signature": "List.TransformMany( list as list, collectionTransform as function, resultTransform as function ) as list",
+    "description": "Returns a list whose elements are projected from the input list. The `collectionTransform` function transforms each element into an intermediate list, and the `resultTransform` function receives the original element as well as an item from the intermediate list in order to construct the final result. The `collectionTransform` function has the signature `(x as any) as list => ...`, where `x` is an element in `list`. The `resultTransform` function projects the shape of the result and has the signature `(x as any, y as any) as any => ...`, where `x` is an element in `list` and `y` is an element from the list generated by passing `x` to `collectionTransform`.",
+    "examples": [
+      {
+        "usage": "List.TransformMany(\n    {\n        [Name = \"Alice\", Pets = {\"Scruffy\", \"Sam\"}],\n        [Name = \"Bob\", Pets = {\"Walker\"}]\n    },\n    each [Pets],\n    (person, pet) => [Name = person[Name], Pet = pet]\n)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "List.Union",
+    "signature": "List.Union(lists as list, optional equationCriteria as any) as list",
+    "description": "Takes a list of lists `lists`, unions the items in the individual lists and returns them in the output list. As a result, the returned list contains all items in any input lists. This operation maintains traditional bag semantics, so duplicate values are matched as part of the Union. An optional equation criteria value, `equationCriteria`, can be specified to control equality testing.",
+    "examples": [
+      {
+        "usage": "List.Union({{1..5}, {2..6}, {3..7}})",
+        "output": "{1, 2, 3, 4, 5, 6, 7}"
+      }
+    ]
+  },
+  {
+    "name": "List.Zip",
+    "signature": "List.Zip(lists as list) as list",
+    "description": "Takes a list of lists, `lists`, and returns a list of lists combining items at the same position.",
+    "examples": [
+      {
+        "usage": "List.Zip({{1, 2}, {3, 4}})",
+        "output": "`"
+      },
+      {
+        "usage": "List.Zip({{1, 2}, {3}})",
+        "output": "`"
+      }
+    ]
+  }
+]

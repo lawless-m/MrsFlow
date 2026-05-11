@@ -1,0 +1,13 @@
+[
+  {
+    "name": "Single.From",
+    "signature": "Single.From(value as any, optional culture as nullable text) as nullable number",
+    "description": "Returns a Single `number` value from the given `value`. If the given `value` is `null`, `Single.From` returns `null`. If the given `value` is `number` within the range of Single, `value` is returned, otherwise an error is returned. If `value` is of any other type, it will first be converted to a `number` using [`Number.FromText`](number-fromtext.md). An optional `culture` may also be provided (for example, \"en-US\").",
+    "examples": [
+      {
+        "usage": "Single.From(\"1.5\")",
+        "output": "1.5"
+      }
+    ]
+  }
+]

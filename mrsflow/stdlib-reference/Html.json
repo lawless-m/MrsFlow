@@ -1,0 +1,17 @@
+[
+  {
+    "name": "Html.Table",
+    "signature": "Html.Table( html as any, columnNameSelectorPairs as list, optional options as nullable record ) as table",
+    "description": "Returns a table containing the results of running the specified CSS selectors against the provided `html`. An optional record parameter, `options`, may be provided to specify additional properties. The record can contain the following fields: * `RowSelector`",
+    "examples": [
+      {
+        "usage": "Html.Table(\"<div class=\"\"name\"\">Jo</div><span>Manager</span>\", {{\"Name\", \".name\"}, {\"Title\", \"span\"}}, [RowSelector=\".name\"])",
+        "output": "#table({\"Name\", \"Title\"}, {{\"Jo\", \"Manager\"}})"
+      },
+      {
+        "usage": "Html.Table(\"<a href=\"\"/test.html\"\">Test</a>\", {{\"Link\", \"a\", each [Attributes][href]}})",
+        "output": "#table({\"Link\"}, {{\"/test.html\"}})"
+      }
+    ]
+  }
+]

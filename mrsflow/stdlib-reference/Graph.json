@@ -1,0 +1,8 @@
+[
+  {
+    "name": "Graph.Nodes",
+    "signature": "Graph.Nodes(graph as record) as list",
+    "description": "This function is intended for internal use only.",
+    "examples": []
+  }
+]

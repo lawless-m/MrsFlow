@@ -1,0 +1,14 @@
+[
+  {
+    "name": "Identity.From",
+    "signature": "Identity.From(identityProvider as function, value as any) as record",
+    "description": "Creates an identity.",
+    "examples": []
+  },
+  {
+    "name": "Identity.IsMemberOf",
+    "signature": "Identity.IsMemberOf(identity as record, collection as record) as logical",
+    "description": "Determines whether an identity is a member of an identity collection.",
+    "examples": []
+  }
+]

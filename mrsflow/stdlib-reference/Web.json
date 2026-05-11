@@ -1,0 +1,61 @@
+[
+  {
+    "name": "Web.BrowserContents",
+    "signature": "Web.BrowserContents(url as text, optional options as nullable record) as text",
+    "description": "Returns the HTML for the specified `url`, as viewed by a web browser. An optional record parameter, `options`, may be provided to specify additional properties. The record can contain the following fields: * `ApiKeyName`: If the target site has a notion of an API key, this parameter can be used to specify the name (not the value) of the key parameter that must be used in the URL. The actual key value is provided in the credential. * `WaitFor`: Specifies a condition to wait for before downloading the HTML, in addition to waiting for the page to load (which is always done). Can be a record containing Timeout and/or Selector fields. If only a Timeout is specified, the function will wait the amount of time specified before downloading the HTML. If both a Selector and Timeout are specified, and the Timeout elapses before the Selector exists on the page, an error will be raised. If a Selector is specified with no Timeout, a default Timeout of 30 seconds is applied.",
+    "examples": [
+      {
+        "usage": "Web.BrowserContents(\"https://microsoft.com\")",
+        "output": "\"<!DOCTYPE html><html xmlns=...\""
+      },
+      {
+        "usage": "Web.BrowserContents(\"https://microsoft.com\", [WaitFor = [Selector = \"div.ready\"]])",
+        "output": "\"<!DOCTYPE html><html xmlns=...\""
+      },
+      {
+        "usage": "Web.BrowserContents(\"https://microsoft.com\", [WaitFor = [Timeout = #duration(0,0,0,10)]])",
+        "output": "\"<!DOCTYPE html><html xmlns=...\""
+      },
+      {
+        "usage": "Web.BrowserContents(\"https://microsoft.com\", [WaitFor = [Selector = \"div.ready\", Timeout = #duration(0,0,0,10)]])",
+        "output": "\"<!DOCTYPE html><html xmlns=...\""
+      }
+    ]
+  },
+  {
+    "name": "Web.Contents",
+    "signature": "Web.Contents(url as text, optional options as nullable record) as binary",
+    "description": "Returns the contents downloaded from `url` as binary. An optional record parameter, `options`, may be provided to specify additional properties. The record can contain the following fields: * `Query`: Programmatically add query parameters to the URL without having to worry about escaping. * `ApiKeyName`: If the target site has a notion of an API key, this parameter can be used to specify the name (not the value) of the key parameter that must be used in the URL. The actual key value is provided in the credential. * `Headers`: Specifying this value as a record will supply additional headers to an HTTP request. * `Timeout`: Specifying this value as a duration will change the timeout for an HTTP request. The default value is 100 seconds. * `ExcludedFromCacheKey`: Specifying this value as a list will exclude these HTTP header keys from being part of the calculation for caching data. * `IsRetry`: Specifying this logical value as true will ignore any existing response in the cache when fetching data. * `ManualStatusHandling`: Specifying this value as a list will prevent any builtin handling for HTTP requests whose response has one of these status codes. * `RelativePath`: Specifying this value as text appends it to the base URL before making the request. * `Content`: Specifying this value changes the web request from a GET to a POST, using the value of the option as the content of the POST. The HTTP request is made as either a GET (when no Content is specified) or a POST (when there is Content). POST requests may only be made anonymously. The headers of the HTTP response are available as metadata on the binary result. Outside of a custom data connector context, only a subset of response headers is available (for security reasons).",
+    "examples": [
+      {
+        "usage": "let\n    searchText = \"Power Query\"\nin\n    Web.Contents(\n        \"https://www.bing.com\",\n        [\n            RelativePath = \"search\",\n            Query = [q = searchText]\n        ]\n    )",
+        "output": "binary"
+      },
+      {
+        "usage": "let\n    url = ...,\n    headers = [#\"Content-Type\" = \"application/json\"],\n    postData = Json.FromValue([x = 235.7, y = 41.53]),\n    response = Web.Contents(\n        url,\n        [\n            Headers = headers,\n            Content = postData\n        ]\n    ),\n    jsonResponse = Json.Document(response)\nin\n    jsonResponse",
+        "output": "table"
+      },
+      {
+        "usage": "Web.Contents(\"https://contoso.com/api/customers/get\", [ApiKeyName=\"api_key\"])",
+        "output": "binary"
+      }
+    ]
+  },
+  {
+    "name": "Web.Headers",
+    "signature": "Web.Headers(url as text, optional options as nullable record) as record",
+    "description": "Returns the headers downloaded from `url` as a record. An optional record parameter, `options`, may be provided to specify additional properties. The record can contain the following fields: * `Query`: Programmatically add query parameters to the URL without having to worry about escaping. * `ApiKeyName`: If the target site has a notion of an API key, this parameter can be used to specify the name (not the value) of the key parameter that must be used in the URL. The actual key value is provided in the credential. * `Headers`: Specifying this value as a record will supply additional headers to an HTTP request. * `Timeout`: Specifying this value as a duration will change the timeout for an HTTP request. The default value is 100 seconds. * `ExcludedFromCacheKey`: Specifying this value as a list will exclude these HTTP header keys from being part of the calculation for caching data. * `IsRetry`: Specifying this logical value as true will ignore any existing response in the cache when fetching data. * `ManualStatusHandling`: Specifying this value as a list will prevent any builtin handling for HTTP requests whose response has one of these status codes. * `RelativePath`: Specifying this value as text appends it to the base URL before making the request. The HTTP request is made with the HEAD method. Outside of a custom data connector context, only a subset of response headers is available (for security reasons).",
+    "examples": [
+      {
+        "usage": "let\n    searchText = \"Power Query\"\nin\n    Web.Headers(\n        \"https://www.bing.com\",\n        [\n            RelativePath = \"search\",\n            Query = [q = searchText]\n        ]\n    )",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Web.Page",
+    "signature": "Web.Page(html as any) as table",
+    "description": "Returns the contents of the HTML document broken into its constituent structures, as well as a representation of the full document and its text after removing tags.",
+    "examples": []
+  }
+]

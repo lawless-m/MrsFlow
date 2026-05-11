@@ -1,0 +1,8 @@
+[
+  {
+    "name": "Action.WithErrorContext",
+    "signature": "Action.WithErrorContext(action as action, context as text) as action",
+    "description": "This function is intended for internal use only.",
+    "examples": []
+  }
+]

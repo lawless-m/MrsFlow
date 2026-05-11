@@ -1,0 +1,8 @@
+[
+  {
+    "name": "Progress.DataSourceProgress",
+    "signature": "Progress.DataSourceProgress() as any",
+    "description": "This function is intended for internal use only.",
+    "examples": []
+  }
+]

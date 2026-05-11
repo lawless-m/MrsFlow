@@ -1,0 +1,8 @@
+[
+  {
+    "name": "File.Contents",
+    "signature": "File.Contents(path as text, optional options as nullable record) as binary",
+    "description": "Returns the contents of the file, `path`, as binary. The `options` parameter is currently intended for internal use only.",
+    "examples": []
+  }
+]

@@ -1,0 +1,693 @@
+[
+  {
+    "name": "Date.AddDays",
+    "signature": "Date.AddDays(dateTime as any, numberOfDays as number) as any",
+    "description": "Returns the `date`, `datetime`, or `datetimezone` result from adding `numberOfDays` days to the `datetime` value `dateTime`. * `dateTime`: The `date`, `datetime`, or `datetimezone` value to which days are being added. * `numberOfDays`: The number of days to add.",
+    "examples": [
+      {
+        "usage": "Date.AddDays(#date(2011, 5, 14), 5)",
+        "output": "#date(2011, 5, 19)"
+      }
+    ]
+  },
+  {
+    "name": "Date.AddMonths",
+    "signature": "Date.AddMonths(dateTime as any, numberOfMonths as number) as any",
+    "description": "Returns the `date`, `datetime`, or `datetimezone` result from adding `numberOfMonths` months to the `datetime` value `dateTime`. * `dateTime`: The `date`, `datetime`, or `datetimezone` value to which months are being added. * `numberOfMonths`: The number of months to add.",
+    "examples": [
+      {
+        "usage": "Date.AddMonths(#date(2011, 5, 14), 5)",
+        "output": "#date(2011, 10, 14)"
+      },
+      {
+        "usage": "Date.AddMonths(#datetime(2011, 5, 14, 8, 15, 22), 18)",
+        "output": "#datetime(2012, 11, 14, 8, 15, 22)"
+      }
+    ]
+  },
+  {
+    "name": "Date.AddQuarters",
+    "signature": "Date.AddQuarters(dateTime as any, numberOfQuarters as number) as any",
+    "description": "Returns the `date`, `datetime`, or `datetimezone` result from adding `numberOfQuarters` quarters to the `datetime` value `dateTime`. * `dateTime`: The `date`, `datetime`, or `datetimezone` value to which quarters are being added. * `numberOfQuarters`: The number of quarters to add.",
+    "examples": [
+      {
+        "usage": "Date.AddQuarters(#date(2011, 5, 14), 1)",
+        "output": "#date(2011, 8, 14)"
+      }
+    ]
+  },
+  {
+    "name": "Date.AddWeeks",
+    "signature": "Date.AddWeeks(dateTime as any, numberOfWeeks as number) as any",
+    "description": "Returns the `date`, `datetime`, or `datetimezone` result from adding `numberOfWeeks` weeks to the `datetime` value `dateTime`. * `dateTime`: The `date`, `datetime`, or `datetimezone` value to which weeks are being added. * `numberOfWeeks`: The number of weeks to add.",
+    "examples": [
+      {
+        "usage": "Date.AddWeeks(#date(2011, 5, 14), 2)",
+        "output": "#date(2011, 5, 28)"
+      }
+    ]
+  },
+  {
+    "name": "Date.AddYears",
+    "signature": "Date.AddYears(dateTime as any, numberOfYears as number) as any",
+    "description": "Returns the `date`, `datetime`, or `datetimezone` result of adding `numberOfYears` to a `datetime` value `dateTime`. * `dateTime`: The `date`, `datetime`, or `datetimezone` value to which years are added. * `numberOfYears`: The number of years to add.",
+    "examples": [
+      {
+        "usage": "Date.AddYears(#date(2011, 5, 14), 4)",
+        "output": "#date(2015, 5, 14)"
+      },
+      {
+        "usage": "Date.AddYears(#datetime(2011, 5, 14, 8, 15, 22), 10)",
+        "output": "#datetime(2021, 5, 14, 8, 15, 22)"
+      }
+    ]
+  },
+  {
+    "name": "Date.Day",
+    "signature": "Date.Day(dateTime as any) as nullable number",
+    "description": "Returns the day component of a `date`, `datetime`, or `datetimezone` value. * `dateTime`: A `date`, `datetime`, or `datetimezone` value from which the day component is extracted.",
+    "examples": [
+      {
+        "usage": "Date.Day(#datetime(2011, 5, 14, 17, 0, 0))",
+        "output": "14"
+      }
+    ]
+  },
+  {
+    "name": "Date.DayOfWeek",
+    "signature": "Date.DayOfWeek(dateTime as any, optional firstDayOfWeek as nullable number) as nullable number",
+    "description": "Returns a number (from 0 to 6) indicating the day of the week of the provided `dateTime`. * `dateTime`: A `date`, `datetime`, or `datetimezone` value. * `firstDayOfWeek`: A `Day` value indicating which day should be considered the first day of the week. Allowed values are [`Day.Sunday`](day-type.md), [`Day.Monday`](day-type.md), [`Day.Tuesday`](day-type.md), [`Day.Wednesday`](day-type.md), [`Day.Thursday`](day-type.md), [`Day.Friday`](day-type.md), or [`Day.Saturday`](day-type.md). If unspecified, a culture-dependent default is used.",
+    "examples": [
+      {
+        "usage": "Date.DayOfWeek(#date(2011, 02, 21), Day.Sunday)",
+        "output": "1"
+      },
+      {
+        "usage": "Date.DayOfWeek(#date(2011, 02, 21), Day.Monday)",
+        "output": "0"
+      }
+    ]
+  },
+  {
+    "name": "Date.DayOfWeekName",
+    "signature": "Date.DayOfWeekName(date as any, optional culture as nullable text) as nullable text",
+    "description": "Returns the day of the week name for the provided `date`. An optional `culture` may also be provided (for example, \"en-US\").",
+    "examples": [
+      {
+        "usage": "Date.DayOfWeekName(#date(2011, 12, 31), \"en-US\")",
+        "output": "\"Saturday\""
+      }
+    ]
+  },
+  {
+    "name": "Date.DayOfYear",
+    "signature": "Date.DayOfYear(dateTime as any) as nullable number",
+    "description": "Returns a number representing the day of the year in the provided `date`, `datetime`, or `datetimezone` value, `dateTime`.",
+    "examples": [
+      {
+        "usage": "Date.DayOfYear(#date(2011, 03, 01))",
+        "output": "60"
+      }
+    ]
+  },
+  {
+    "name": "Date.DaysInMonth",
+    "signature": "Date.DaysInMonth(dateTime as any) as nullable number",
+    "description": "Returns the number of days in the month in the `date`, `datetime`, or `datetimezone` value `dateTime`. * `dateTime`: A `date`, `datetime`, or `datetimezone` value for which the number of days in the month is returned.",
+    "examples": [
+      {
+        "usage": "Date.DaysInMonth(#date(2011, 12, 01))",
+        "output": "31"
+      }
+    ]
+  },
+  {
+    "name": "Date.EndOfDay",
+    "signature": "Date.EndOfDay(dateTime as any) as any",
+    "description": "Returns the end of the day represented by `dateTime`. Time zone information is preserved. * `dateTime`: A `date`, `datetime`, or `datetimezone` value from from which the end of the day is calculated.",
+    "examples": [
+      {
+        "usage": "Date.EndOfDay(#datetime(2011, 5, 14, 17, 0, 0))",
+        "output": "#datetime(2011, 5, 14, 23, 59, 59.9999999)"
+      },
+      {
+        "usage": "Date.EndOfDay(#datetimezone(2011, 5, 17, 5, 0, 0, -7, 0))",
+        "output": "#datetimezone(2011, 5, 17, 23, 59, 59.9999999, -7, 0)"
+      }
+    ]
+  },
+  {
+    "name": "Date.EndOfMonth",
+    "signature": "Date.EndOfMonth(dateTime as any) as any",
+    "description": "Returns the end of the month that contains `dateTime`. * `dateTime`: A `date`, `datetime`, or `datetimezone` value from which the end of the month is calculated.",
+    "examples": [
+      {
+        "usage": "Date.EndOfMonth(#date(2011, 5, 14))",
+        "output": "#date(2011, 5, 31)"
+      },
+      {
+        "usage": "Date.EndOfMonth(#datetimezone(2011, 5, 17, 5, 0, 0, -7, 0))",
+        "output": "#datetimezone(2011, 5, 31, 23, 59, 59.9999999, -7, 0)"
+      }
+    ]
+  },
+  {
+    "name": "Date.EndOfQuarter",
+    "signature": "Date.EndOfQuarter(dateTime as any) as any",
+    "description": "Returns the end of the quarter that contains `dateTime`. Time zone information is preserved. * `dateTime`: A `date`, `datetime`, or `datetimezone` value from which the end of the quarter is calculated.",
+    "examples": [
+      {
+        "usage": "Date.EndOfQuarter(#datetime(2011, 10, 10, 8, 0, 0))",
+        "output": "#datetime(2011, 12, 31, 23, 59, 59.9999999)"
+      }
+    ]
+  },
+  {
+    "name": "Date.EndOfWeek",
+    "signature": "Date.EndOfWeek(dateTime as any, optional firstDayOfWeek as nullable number) as any",
+    "description": "Returns the end of the week that contains `dateTime`. This function takes an optional `Day`, `firstDayOfWeek`, to set as the first day of the week for this relative calculation. The default value is [`Day.Sunday`](day-type.md). * `dateTime`: A `date`, `datetime`, or `datetimezone` value from which the last day of the week is calculated * `firstDayOfWeek`: *(Optional)* A [`Day.Type`](day-type.md) value representing the first day of the week. Possible values are [`Day.Sunday`](day-type.md), [`Day.Monday`](day-type.md), [`Day.Tuesday`](day-type.md), [`Day.Wednesday`](day-type.md), [`Day.Thursday`](day-type.md), [`Day.Friday`](day-type.md) and [`Day.Saturday`](day-type.md). The default value is [`Day.Sunday`](day-type.md).",
+    "examples": [
+      {
+        "usage": "Date.EndOfWeek(#date(2011, 5, 14))",
+        "output": "#date(2011, 5, 14)"
+      },
+      {
+        "usage": "Date.EndOfWeek(#datetimezone(2011, 5, 17, 5, 0, 0, -7, 0), Day.Sunday)",
+        "output": "#datetimezone(2011, 5, 21, 23, 59, 59.9999999, -7, 0)"
+      }
+    ]
+  },
+  {
+    "name": "Date.EndOfYear",
+    "signature": "Date.EndOfYear(dateTime as any) as any",
+    "description": "Returns the end of the year that contains `dateTime`, including fractional seconds. Time zone information is preserved. * `dateTime`: A `date`, `datetime`, or `datetimezone` value from which the end of the year is calculated.",
+    "examples": [
+      {
+        "usage": "Date.EndOfYear(#datetime(2011, 5, 14, 17, 0, 0))",
+        "output": "#datetime(2011, 12, 31, 23, 59, 59.9999999)"
+      },
+      {
+        "usage": "Date.EndOfYear(#datetimezone(2011, 5, 17, 5, 0, 0, -7, 0))",
+        "output": "#datetimezone(2011, 12, 31, 23, 59, 59.9999999, -7, 0)"
+      }
+    ]
+  },
+  {
+    "name": "Date.From",
+    "signature": "Date.From(value as any, optional culture as nullable text) as nullable date",
+    "description": "Returns a date value from the given value. * `value`: The value to covert to a date. If the given value is `null`, this function returns `null`. If the given value is `date`, `value` is returned. Values of the following types can be converted to a `date` value: * `text`: A `date` value from textual representation. Refer to [`Date.FromText`](date-fromtext.md) for details. * `datetime`: The date component of the `value`. * `datetimezone`: The date component of the local datetime equivalent of `value`. * `number`: The date component of the datetime equivalent of a floating-point number whose integral component is the number of days before or after midnight, 30 December 1899, and whose fractional component represents the time on that day divided by 24. For example, midnight, 31 December 1899 is represented by 1.0; 6 A.M., 1 January 1900 is represented by 2.25; midnight, 29 December 1899 is represented by -1.0; and 6 A.M., 29 December 1899 is represented by -1.25. The base value is midnight, 30 December 1899. The minimum value is midnight, 1 January 0100. The maximum value is the last moment of 31 December 9999. * If `value` is of any other type, an error is returned. * `culture`: The culture of the given value (for example, \"en-US\").",
+    "examples": [
+      {
+        "usage": "Date.From(#datetime(1899, 12, 30, 06, 45, 12))",
+        "output": "#date(1899, 12, 30)"
+      },
+      {
+        "usage": "Date.From(43910)",
+        "output": "#date(2020, 3, 20)"
+      },
+      {
+        "usage": "let\n    Source = #table(type table [Account Code = text, Posted Date = text, Sales = number],\n    {\n        {\"US-2004\", \"20 Januar 2023\", 580},\n        {\"CA-8843\", \"18 Juli, 2023\", 280},\n        {\"PA-1274\", \"12 Januar, 2022\", 90},\n        {\"PA-4323\", \"14 April 2023\", 187},\n        {\"US-1200\", \"14 Dezember, 2022\", 350},\n        {\"PTY-507\", \"4 Juni, 2023\", 110}\n    }),\n    #\"Filtered rows\" = Table.TransformColumns(\n        Source,\n        {\"Posted Date\", each Date.From(_, \"de-DE\"), type date}\n    )\nin\n    #\"Filtered rows\"",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Date.FromText",
+    "signature": "Date.FromText(text as nullable text, optional options as any) as nullable date",
+    "description": "Creates a date value from a textual representation. * `text`: A text value to covert to a date. * `options`: An optional `record` that can be provided to specify additional properties. The `record` can contain the following fields: * `Format`: A `text` value indicating the format to use. For more details, go to [Standard date and time format strings](standard-date-and-time-format-strings.md) and [Custom date and time format strings](custom-date-and-time-format-strings.md). Omitting this field or providing `null` results in parsing the date using a best effort. * `Culture`: When `Format` isn't null, `Culture` controls some format specifiers. For example, in `\"en-US\"` `\"MMM\"` is `\"Jan\", \"Feb\", \"Mar\", ...`, while in `\"ru-RU\"` `\"MMM\"` is `\"янв\", \"фев\", \"мар\", ...`. When `Format` is `null`, `Culture` controls the default format to use. When `Culture` is `null` or omitted, [`Culture.Current`](culture-current.md) is used. To support legacy workflows, `options` can also be a text value. This has the same behavior as if `options = [Format = null, Culture = options]`.",
+    "examples": [
+      {
+        "usage": "Date.FromText(\"2010-12-31\")",
+        "output": "#date(2010, 12, 31)"
+      },
+      {
+        "usage": "Date.FromText(\"30 Dez 2010\", [Format=\"dd MMM yyyy\", Culture=\"de-DE\"])",
+        "output": "#date(2010, 12, 30)"
+      },
+      {
+        "usage": "Date.FromText(\"1400\", [Format=\"yyyy\", Culture=\"ar-SA\"])",
+        "output": "#date(1979, 11, 20)"
+      },
+      {
+        "usage": "let\n    Source = #table(type table [Account Code = text, Posted Date = text, Sales = number],\n    {\n        {\"US-2004\", \"20 gen. 2023\", 580},\n        {\"CA-8843\", \"18 lug. 2024\", 280},\n        {\"PA-1274\", \"12 gen. 2023\", 90},\n        {\"PA-4323\", \"14 apr. 2023\", 187},\n        {\"US-1200\", \"14 dic. 2023\", 350},\n        {\"PTY-507\", \"4 giu. 2024\", 110}\n    }),\n    #\"Converted Date\" = Table.TransformColumns(\n        Source,\n        {\"Posted Date\", each Date.FromText(_, [Culture = \"it-IT\"]), type date}\n    )\nin\n    #\"Converted Date\"",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Date.IsInCurrentDay",
+    "signature": "Date.IsInCurrentDay(dateTime as any) as nullable logical",
+    "description": "Indicates whether the given datetime value `dateTime` occurs during the current day, as determined by the current date and time on the system. * `dateTime`: A `date`, `datetime`, or `datetimezone` value to be evaluated.",
+    "examples": [
+      {
+        "usage": "Date.IsInCurrentDay(DateTime.FixedLocalNow())",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "Date.IsInCurrentMonth",
+    "signature": "Date.IsInCurrentMonth(dateTime as any) as nullable logical",
+    "description": "Indicates whether the given datetime value `dateTime` occurs during the current month, as determined by the current date and time on the system. * `dateTime`: A `date`, `datetime`, or `datetimezone` value to be evaluated.",
+    "examples": [
+      {
+        "usage": "Date.IsInCurrentMonth(DateTime.FixedLocalNow())",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "Date.IsInCurrentQuarter",
+    "signature": "Date.IsInCurrentQuarter(dateTime as any) as nullable logical",
+    "description": "Indicates whether the given datetime value `dateTime` occurs during the current quarter, as determined by the current date and time on the system. * `dateTime`: A `date`, `datetime`, or `datetimezone` value to be evaluated.",
+    "examples": [
+      {
+        "usage": "Date.IsInCurrentQuarter(DateTime.FixedLocalNow())",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "Date.IsInCurrentWeek",
+    "signature": "Date.IsInCurrentWeek(dateTime as any) as nullable logical",
+    "description": "Indicates whether the given datetime value `dateTime` occurs during the current week, as determined by the current date and time on the system. * `dateTime`: A `date`, `datetime`, or `datetimezone` value to be evaluated.",
+    "examples": [
+      {
+        "usage": "Date.IsInCurrentWeek(DateTime.FixedLocalNow())",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "Date.IsInCurrentYear",
+    "signature": "Date.IsInCurrentYear(dateTime as any) as nullable logical",
+    "description": "Indicates whether the given datetime value `dateTime` occurs during the current year, as determined by the current date and time on the system. * `dateTime`: A `date`, `datetime`, or `datetimezone` value to be evaluated.",
+    "examples": [
+      {
+        "usage": "Date.IsInCurrentYear(DateTime.FixedLocalNow())",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "Date.IsInNextDay",
+    "signature": "Date.IsInNextDay(dateTime as any) as nullable logical",
+    "description": "Indicates whether the given datetime value `dateTime` occurs during the next day, as determined by the current date and time on the system. Note that this function will return false when passed a value that occurs within the current day. * `dateTime`: A `date`, `datetime`, or `datetimezone` value to be evaluated.",
+    "examples": [
+      {
+        "usage": "Date.IsInNextDay(Date.AddDays(DateTime.FixedLocalNow(), 1))",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "Date.IsInNextMonth",
+    "signature": "Date.IsInNextMonth(dateTime as any) as nullable logical",
+    "description": "Indicates whether the given datetime value `dateTime` occurs during the next month, as determined by the current date and time on the system. Note that this function will return false when passed a value that occurs within the current month. * `dateTime`: A `date`, `datetime`, or `datetimezone` value to be evaluated.",
+    "examples": [
+      {
+        "usage": "Date.IsInNextMonth(Date.AddMonths(DateTime.FixedLocalNow(), 1))",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "Date.IsInNextNDays",
+    "signature": "Date.IsInNextNDays(dateTime as any, days as number) as nullable logical",
+    "description": "Indicates whether the given datetime value `dateTime` occurs during the next number of days, as determined by the current date and time on the system. Note that this function will return false when passed a value that occurs within the current day. * `dateTime`: A `date`, `datetime`, or `datetimezone` value to be evaluated. * `days`: The number of days.",
+    "examples": [
+      {
+        "usage": "Date.IsInNextNDays(Date.AddDays(DateTime.FixedLocalNow(), 1), 2)",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "Date.IsInNextNMonths",
+    "signature": "Date.IsInNextNMonths(dateTime as any, months as number) as nullable logical",
+    "description": "Indicates whether the given datetime value `dateTime` occurs during the next number of months, as determined by the current date and time on the system. Note that this function will return false when passed a value that occurs within the current month. * `dateTime`: A `date`, `datetime`, or `datetimezone` value to be evaluated. * `months`: The number of months.",
+    "examples": [
+      {
+        "usage": "Date.IsInNextNMonths(Date.AddMonths(DateTime.FixedLocalNow(), 1), 2)",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "Date.IsInNextNQuarters",
+    "signature": "Date.IsInNextNQuarters(dateTime as any, quarters as number) as nullable logical",
+    "description": "Indicates whether the given datetime value `dateTime` occurs during the next number of quarters, as determined by the current date and time on the system. Note that this function will return false when passed a value that occurs within the current quarter. * `dateTime`: A `date`, `datetime`, or `datetimezone` value to be evaluated. * `quarters`: The number of quarters.",
+    "examples": [
+      {
+        "usage": "Date.IsInNextNQuarters(Date.AddQuarters(DateTime.FixedLocalNow(), 1), 2)",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "Date.IsInNextNWeeks",
+    "signature": "Date.IsInNextNWeeks(dateTime as any, weeks as number) as nullable logical",
+    "description": "Indicates whether the given datetime value `dateTime` occurs during the next number of weeks, as determined by the current date and time on the system. Note that this function will return false when passed a value that occurs within the current week. * `dateTime`: A `date`, `datetime`, or `datetimezone` value to be evaluated. * `weeks`: The number of weeks.",
+    "examples": [
+      {
+        "usage": "Date.IsInNextNWeeks(Date.AddDays(DateTime.FixedLocalNow(), 7), 2)",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "Date.IsInNextNYears",
+    "signature": "Date.IsInNextNYears(dateTime as any, years as number) as nullable logical",
+    "description": "Indicates whether the given datetime value `dateTime` occurs during the next number of years, as determined by the current date and time on the system. Note that this function will return false when passed a value that occurs within the current year. * `dateTime`: A `date`, `datetime`, or `datetimezone` value to be evaluated. * `years`: The number of years.",
+    "examples": [
+      {
+        "usage": "Date.IsInNextNYears(Date.AddYears(DateTime.FixedLocalNow(), 1), 2)",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "Date.IsInNextQuarter",
+    "signature": "Date.IsInNextQuarter(dateTime as any) as nullable logical",
+    "description": "Indicates whether the given datetime value `dateTime` occurs during the next quarter, as determined by the current date and time on the system. Note that this function will return false when passed a value that occurs within the current quarter. * `dateTime`: A `date`, `datetime`, or `datetimezone` value to be evaluated.",
+    "examples": [
+      {
+        "usage": "Date.IsInNextQuarter(Date.AddQuarters(DateTime.FixedLocalNow(), 1))",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "Date.IsInNextWeek",
+    "signature": "Date.IsInNextWeek(dateTime as any) as nullable logical",
+    "description": "Indicates whether the given datetime value `dateTime` occurs during the next week, as determined by the current date and time on the system. Note that this function will return false when passed a value that occurs within the current week. * `dateTime`: A `date`, `datetime`, or `datetimezone` value to be evaluated.",
+    "examples": [
+      {
+        "usage": "Date.IsInNextWeek(Date.AddDays(DateTime.FixedLocalNow(), 7))",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "Date.IsInNextYear",
+    "signature": "Date.IsInNextYear(dateTime as any) as nullable logical",
+    "description": "Indicates whether the given datetime value `dateTime` occurs during the next year, as determined by the current date and time on the system. Note that this function will return false when passed a value that occurs within the current year. * `dateTime`: A `date`, `datetime`, or `datetimezone` value to be evaluated.",
+    "examples": [
+      {
+        "usage": "Date.IsInNextYear(Date.AddYears(DateTime.FixedLocalNow(), 1))",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "Date.IsInPreviousDay",
+    "signature": "Date.IsInPreviousDay(dateTime as any) as nullable logical",
+    "description": "Indicates whether the given datetime value `dateTime` occurs during the previous day, as determined by the current date and time on the system. Note that this function will return false when passed a value that occurs within the current day. * `dateTime`: A `date`, `datetime`, or `datetimezone` value to be evaluated.",
+    "examples": [
+      {
+        "usage": "Date.IsInPreviousDay(Date.AddDays(DateTime.FixedLocalNow(), -1))",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "Date.IsInPreviousMonth",
+    "signature": "Date.IsInPreviousMonth(dateTime as any) as nullable logical",
+    "description": "Indicates whether the given datetime value `dateTime` occurs during the previous month, as determined by the current date and time on the system. Note that this function will return false when passed a value that occurs within the current month. * `dateTime`: A `date`, `datetime`, or `datetimezone` value to be evaluated.",
+    "examples": [
+      {
+        "usage": "Date.IsInPreviousMonth(Date.AddMonths(DateTime.FixedLocalNow(), -1))",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "Date.IsInPreviousNDays",
+    "signature": "Date.IsInPreviousNDays(dateTime as any, days as number) as nullable logical",
+    "description": "Indicates whether the given datetime value `dateTime` occurs during the previous number of days, as determined by the current date and time on the system. Note that this function will return false when passed a value that occurs within the current day. * `dateTime`: A `date`, `datetime`, or `datetimezone` value to be evaluated. * `days`: The number of days.",
+    "examples": [
+      {
+        "usage": "Date.IsInPreviousNDays(Date.AddDays(DateTime.FixedLocalNow(), -1), 2)",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "Date.IsInPreviousNMonths",
+    "signature": "Date.IsInPreviousNMonths(dateTime as any, months as number) as nullable logical",
+    "description": "Indicates whether the given datetime value `dateTime` occurs during the previous number of months, as determined by the current date and time on the system. Note that this function will return false when passed a value that occurs within the current month. * `dateTime`: A `date`, `datetime`, or `datetimezone` value to be evaluated. * `months`: The number of months.",
+    "examples": [
+      {
+        "usage": "Date.IsInPreviousNMonths(Date.AddMonths(DateTime.FixedLocalNow(), -1), 2)",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "Date.IsInPreviousNQuarters",
+    "signature": "Date.IsInPreviousNQuarters(dateTime as any, quarters as number) as nullable logical",
+    "description": "Indicates whether the given datetime value `dateTime` occurs during the previous number of quarters, as determined by the current date and time on the system. Note that this function will return false when passed a value that occurs within the current quarter. * `dateTime`: A `date`, `datetime`, or `datetimezone` value to be evaluated. * `quarters`: The number of quarters.",
+    "examples": [
+      {
+        "usage": "Date.IsInPreviousNQuarters(Date.AddQuarters(DateTime.FixedLocalNow(), -1), 2)",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "Date.IsInPreviousNWeeks",
+    "signature": "Date.IsInPreviousNWeeks(dateTime as any, weeks as number) as nullable logical",
+    "description": "Indicates whether the given datetime value `dateTime` occurs during the previous number of weeks, as determined by the current date and time on the system. Note that this function will return false when passed a value that occurs within the current week. * `dateTime`: A `date`, `datetime`, or `datetimezone` value to be evaluated. * `weeks`: The number of weeks.",
+    "examples": [
+      {
+        "usage": "Date.IsInPreviousNWeeks(Date.AddDays(DateTime.FixedLocalNow(), -7), 2)",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "Date.IsInPreviousNYears",
+    "signature": "Date.IsInPreviousNYears(dateTime as any, years as number) as nullable logical",
+    "description": "Indicates whether the given datetime value `dateTime` occurs during the previous number of years, as determined by the current date and time on the system. Note that this function will return false when passed a value that occurs within the current year. * `dateTime`: A `date`, `datetime`, or `datetimezone` value to be evaluated. * `years`: The number of years.",
+    "examples": [
+      {
+        "usage": "Date.IsInPreviousNYears(Date.AddYears(DateTime.FixedLocalNow(), -1), 2)",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "Date.IsInPreviousQuarter",
+    "signature": "Date.IsInPreviousQuarter(dateTime as any) as nullable logical",
+    "description": "Indicates whether the given datetime value `dateTime` occurs during the previous quarter, as determined by the current date and time on the system. Note that this function will return false when passed a value that occurs within the current quarter. * `dateTime`: A `date`, `datetime`, or `datetimezone` value to be evaluated.",
+    "examples": [
+      {
+        "usage": "Date.IsInPreviousQuarter(Date.AddQuarters(DateTime.FixedLocalNow(), -1))",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "Date.IsInPreviousWeek",
+    "signature": "Date.IsInPreviousWeek(dateTime as any) as nullable logical",
+    "description": "Indicates whether the given datetime value `dateTime` occurs during the previous week, as determined by the current date and time on the system. Note that this function will return false when passed a value that occurs within the current week. * `dateTime`: A `date`, `datetime`, or `datetimezone` value to be evaluated.",
+    "examples": [
+      {
+        "usage": "Date.IsInPreviousWeek(Date.AddDays(DateTime.FixedLocalNow(), -7))",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "Date.IsInPreviousYear",
+    "signature": "Date.IsInPreviousYear(dateTime as any) as nullable logical",
+    "description": "Indicates whether the given datetime value `dateTime` occurs during the previous year, as determined by the current date and time on the system. Note that this function will return false when passed a value that occurs within the current year. * `dateTime`: A `date`, `datetime`, or `datetimezone` value to be evaluated.",
+    "examples": [
+      {
+        "usage": "Date.IsInPreviousYear(Date.AddYears(DateTime.FixedLocalNow(), -1))",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "Date.IsInYearToDate",
+    "signature": "Date.IsInYearToDate(dateTime as any) as nullable logical",
+    "description": "Indicates whether the given datetime value `dateTime` occurs during the current year and is on or before the current day, as determined by the current date and time on the system. * `dateTime`: A `date`, `datetime`, or `datetimezone` value to be evaluated.",
+    "examples": [
+      {
+        "usage": "Date.IsInYearToDate(DateTime.FixedLocalNow())",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "Date.IsLeapYear",
+    "signature": "Date.IsLeapYear(dateTime as any) as nullable logical",
+    "description": "Indicates whether the given datetime value `dateTime` falls in is a leap year. * `dateTime`: A `date`, `datetime`, or `datetimezone` value to be evaluated.",
+    "examples": [
+      {
+        "usage": "Date.IsLeapYear(#date(2012, 01, 01))",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "Date.Month",
+    "signature": "Date.Month(dateTime as any) as nullable number",
+    "description": "Returns the month component of the provided `datetime` value, `dateTime`.",
+    "examples": [
+      {
+        "usage": "Date.Month(#datetime(2011, 12, 31, 9, 15, 36))",
+        "output": "12"
+      }
+    ]
+  },
+  {
+    "name": "Date.MonthName",
+    "signature": "Date.MonthName(date as any, optional culture as nullable text) as nullable text",
+    "description": "Returns the name of the month component for the provided `date`. An optional `culture` may also be provided (for example, \"en-US\").",
+    "examples": [
+      {
+        "usage": "Date.MonthName(#datetime(2011, 12, 31, 5, 0, 0), \"en-US\")",
+        "output": "\"December\""
+      }
+    ]
+  },
+  {
+    "name": "Date.QuarterOfYear",
+    "signature": "Date.QuarterOfYear(dateTime as any) as nullable number",
+    "description": "Returns a number from 1 to 4 indicating which quarter of the year the date `dateTime` falls in. `dateTime` can be a `date`, `datetime`, or `datetimezone` value.",
+    "examples": [
+      {
+        "usage": "Date.QuarterOfYear(#date(2011, 12, 31))",
+        "output": "4"
+      }
+    ]
+  },
+  {
+    "name": "Date.StartOfDay",
+    "signature": "Date.StartOfDay(dateTime as any) as any",
+    "description": "Returns the start of the day represented by `dateTime`. `dateTime` must be a `date`, `datetime`, or `datetimezone` value.",
+    "examples": [
+      {
+        "usage": "Date.StartOfDay(#datetime(2011, 10, 10, 8, 0, 0))",
+        "output": "#datetime(2011, 10, 10, 0, 0, 0)"
+      }
+    ]
+  },
+  {
+    "name": "Date.StartOfMonth",
+    "signature": "Date.StartOfMonth(dateTime as any) as any",
+    "description": "Returns the start of the month that contains `dateTime`. `dateTime` must be a `date` or `datetime` value.",
+    "examples": [
+      {
+        "usage": "Date.StartOfMonth(#datetime(2011, 10, 10, 8, 10, 32))",
+        "output": "#datetime(2011, 10, 1, 0, 0, 0)"
+      }
+    ]
+  },
+  {
+    "name": "Date.StartOfQuarter",
+    "signature": "Date.StartOfQuarter(dateTime as any) as any",
+    "description": "Returns the start of the quarter that contains `dateTime`. `dateTime` must be a `date`, `datetime`, or `datetimezone` value.",
+    "examples": [
+      {
+        "usage": "Date.StartOfQuarter(#datetime(2011, 10, 10, 8, 0, 0))",
+        "output": "#datetime(2011, 10, 1, 0, 0, 0)"
+      }
+    ]
+  },
+  {
+    "name": "Date.StartOfWeek",
+    "signature": "Date.StartOfWeek(dateTime as any, optional firstDayOfWeek as nullable number) as any",
+    "description": "Returns the start of the week that contains `dateTime`. `dateTime` must be a `date`, `datetime`, or `datetimezone` value.",
+    "examples": [
+      {
+        "usage": "Date.StartOfWeek(#datetime(2011, 10, 11, 8, 10, 32))",
+        "output": "`"
+      },
+      {
+        "usage": "Date.StartOfWeek(#datetime(2011, 10, 11, 8, 10, 32), Day.Monday)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Date.StartOfYear",
+    "signature": "Date.StartOfYear(dateTime as any) as any",
+    "description": "Returns the start of the year that contains `dateTime`. `dateTime` must be a `date`, `datetime`, or `datetimezone` value.",
+    "examples": [
+      {
+        "usage": "Date.StartOfYear(#datetime(2011, 10, 10, 8, 10, 32))",
+        "output": "#datetime(2011, 1, 1, 0, 0, 0)"
+      }
+    ]
+  },
+  {
+    "name": "Date.ToRecord",
+    "signature": "Date.ToRecord(date as date) as record",
+    "description": "Returns a record containing the parts of the given date value, `date`. * `date`: A `date` value for from which the record of its parts is to be calculated.",
+    "examples": [
+      {
+        "usage": "Date.ToRecord(#date(2011, 12, 31))",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Date.ToText",
+    "signature": "Date.ToText( date as nullable date, optional options as any, optional culture as nullable text ) as nullable text",
+    "description": "Returns a textual representation of `date`. An optional `record` parameter, `options`, may be provided to specify additional properties. `culture` is only used for legacy workflows. The `record` can contain the following fields: * `Format`: A `text` value indicating the format to use. For more details, go to [Standard date and time format strings](standard-date-and-time-format-strings.md) and [Custom date and time format strings](custom-date-and-time-format-strings.md). Omitting this field or providing `null` will result in formatting the date using the default defined by `Culture`. * `Culture`: When `Format` is not null, `Culture` controls some format specifiers. For example, in `\"en-US\"` `\"MMM\"` is `\"Jan\", \"Feb\", \"Mar\", ...`, while in `\"ru-RU\"` `\"MMM\"` is `\"янв\", \"фев\", \"мар\", ...`. When `Format` is `null`, `Culture` controls the default format to use. When `Culture` is `null` or omitted, [`Culture.Current`](culture-current.md) is used. To support legacy workflows, `options` and `culture` may also be text values. This has the same behavior as if `options = [Format = options, Culture = culture]`.",
+    "examples": [
+      {
+        "usage": "Date.ToText(#date(2010, 12, 31))",
+        "output": "\"12/31/2010\""
+      },
+      {
+        "usage": "Date.ToText(#date(2010, 12, 31), [Format=\"dd MMM yyyy\", Culture=\"de-DE\"])",
+        "output": "\"31 Dez 2010\""
+      },
+      {
+        "usage": "Date.ToText(#date(2000, 1, 1), [Format=\"yyyy\", Culture=\"ar-SA\"])",
+        "output": "\"1420\""
+      }
+    ]
+  },
+  {
+    "name": "Date.WeekOfMonth",
+    "signature": "Date.WeekOfMonth(dateTime as any, optional firstDayOfWeek as nullable number) as nullable number",
+    "description": "Returns a number from 1 to 6 indicating which week of the month the date `dateTime` falls in. * `dateTime`: A `datetime` value for which the week-of-the-month is determined.",
+    "examples": [
+      {
+        "usage": "Date.WeekOfMonth(#date(2011, 03, 15))",
+        "output": "3"
+      }
+    ]
+  },
+  {
+    "name": "Date.WeekOfYear",
+    "signature": "Date.WeekOfYear(dateTime as any, optional firstDayOfWeek as nullable number) as nullable number",
+    "description": "Returns a number from 1 to 54 indicating which week of the year the date, `dateTime`, falls in. * `dateTime`: A `datetime` value for which the week-of-the-year is determined. * `firstDayOfWeek`: An optional [`Day.Type`](day-type.md) value that indicates which day is considered the start of a new week (for example, [`Day.Sunday`](day-type.md)). If unspecified, a culture-dependent default is used.",
+    "examples": [
+      {
+        "usage": "Date.WeekOfYear(#date(2011, 03, 27))",
+        "output": "14"
+      },
+      {
+        "usage": "Date.WeekOfYear(#date(2011, 03, 27), Day.Monday)",
+        "output": "13"
+      }
+    ]
+  },
+  {
+    "name": "Date.Year",
+    "signature": "Date.Year(dateTime as any) as nullable number",
+    "description": "Returns the year component of the provided `datetime` value, `dateTime`.",
+    "examples": [
+      {
+        "usage": "Date.Year(#datetime(2011, 12, 31, 9, 15, 36))",
+        "output": "2011"
+      }
+    ]
+  }
+]

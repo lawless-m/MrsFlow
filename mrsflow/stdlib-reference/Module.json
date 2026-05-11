@@ -1,0 +1,8 @@
+[
+  {
+    "name": "Module.Versions",
+    "signature": "Module.Versions() as record",
+    "description": "Returns a record of module versions for the current module and its dependencies.",
+    "examples": []
+  }
+]

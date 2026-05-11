@@ -1,0 +1,217 @@
+[
+  {
+    "name": "Record.AddField",
+    "signature": "Record.AddField( record as record, fieldName as text, value as any, optional delayed as nullable logical ) as record",
+    "description": "Adds a field to a record `record`, given the name of the field `fieldName` and the value `value`.",
+    "examples": [
+      {
+        "usage": "Record.AddField([CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"], \"Address\", \"123 Main St.\")",
+        "output": "[CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\", Address = \"123 Main St.\"]"
+      }
+    ]
+  },
+  {
+    "name": "Record.Combine",
+    "signature": "Record.Combine(records as list) as record",
+    "description": "Combines the records in the given `records`. If the `records` contains non-record values, an error is returned.",
+    "examples": [
+      {
+        "usage": "Record.Combine({\n    [CustomerID = 1, Name = \"Bob\"],\n    [Phone = \"123-4567\"]\n})",
+        "output": "[CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"]"
+      }
+    ]
+  },
+  {
+    "name": "Record.Field",
+    "signature": "Record.Field(record as record, field as text) as any",
+    "description": "Returns the value of the specified `field` in the `record`. If the field is not found, an error is raised.",
+    "examples": [
+      {
+        "usage": "Record.Field([CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"], \"CustomerID\")",
+        "output": "1"
+      }
+    ]
+  },
+  {
+    "name": "Record.FieldCount",
+    "signature": "Record.FieldCount(record as record) as number",
+    "description": "Returns the number of fields in the record `record`.",
+    "examples": [
+      {
+        "usage": "Record.FieldCount([CustomerID = 1, Name = \"Bob\"])",
+        "output": "2"
+      }
+    ]
+  },
+  {
+    "name": "Record.FieldNames",
+    "signature": "Record.FieldNames(record as record) as list",
+    "description": "Returns the names of the fields in the record `record` as text.",
+    "examples": [
+      {
+        "usage": "Record.FieldNames([OrderID = 1, CustomerID = 1, Item = \"Fishing rod\", Price = 100.0])",
+        "output": "{\"OrderID\", \"CustomerID\", \"Item\", \"Price\"}"
+      }
+    ]
+  },
+  {
+    "name": "Record.FieldOrDefault",
+    "signature": "Record.FieldOrDefault( record as nullable record, field as text, optional defaultValue as any ) as any",
+    "description": "Returns the value of the specified field `field` in the record `record`. If the field is not found, the optional `defaultValue` is returned.",
+    "examples": [
+      {
+        "usage": "Record.FieldOrDefault([CustomerID = 1, Name = \"Bob\"], \"Phone\")",
+        "output": "null"
+      },
+      {
+        "usage": "Record.FieldOrDefault([CustomerID = 1, Name = \"Bob\"], \"Phone\", \"123-4567\")",
+        "output": "\"123-4567\""
+      }
+    ]
+  },
+  {
+    "name": "Record.FieldValues",
+    "signature": "Record.FieldValues(record as record) as list",
+    "description": "Returns a list of the field values in record `record`.",
+    "examples": [
+      {
+        "usage": "Record.FieldValues([CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"])",
+        "output": "{1, \"Bob\", \"123-4567\"}"
+      }
+    ]
+  },
+  {
+    "name": "Record.FromList",
+    "signature": "Record.FromList(list as list, fields as any) as record",
+    "description": "Returns a record given a `list` of field values and a set of fields. The `fields` can be specified either by a list of text values, or a record type. An error is raised if the fields are not unique.",
+    "examples": [
+      {
+        "usage": "Record.FromList({1, \"Bob\", \"123-4567\"}, {\"CustomerID\", \"Name\", \"Phone\"})",
+        "output": "[CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"]"
+      },
+      {
+        "usage": "Record.FromList({1, \"Bob\", \"123-4567\"}, type [CustomerID = number, Name = text, Phone = number])",
+        "output": "[CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"]"
+      }
+    ]
+  },
+  {
+    "name": "Record.FromTable",
+    "signature": "Record.FromTable(table as table) as record",
+    "description": "Returns a record from a table of records `table` containing field names and value names `{[Name = name, Value = value]}`. An error is raised if the field names are not unique.",
+    "examples": [
+      {
+        "usage": "Record.FromTable(\n    Table.FromRecords({\n        [Name = \"CustomerID\", Value = 1],\n        [Name = \"Name\", Value = \"Bob\"],\n        [Name = \"Phone\", Value = \"123-4567\"]\n    })\n)",
+        "output": "[CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"]"
+      }
+    ]
+  },
+  {
+    "name": "Record.HasFields",
+    "signature": "Record.HasFields(record as record, fields as any) as logical",
+    "description": "Indicates whether the record `record` has the fields specified in `fields`, by returning a logical value (true or false). Multiple field values can be specified using a list.",
+    "examples": [
+      {
+        "usage": "Record.HasFields([CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"], \"CustomerID\")",
+        "output": "true"
+      },
+      {
+        "usage": "Record.HasFields([CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"], {\"CustomerID\", \"Address\"})",
+        "output": "false"
+      }
+    ]
+  },
+  {
+    "name": "Record.RemoveFields",
+    "signature": "Record.RemoveFields( record as record, fields as any, optional missingField as nullable number ) as record",
+    "description": "Returns a record that removes all the fields specified in list `fields` from the input `record`. If the field specified does not exist, an error is raised.",
+    "examples": [
+      {
+        "usage": "Record.RemoveFields([CustomerID = 1, Item = \"Fishing rod\", Price = 18.00], \"Price\")",
+        "output": "[CustomerID = 1, Item = \"Fishing rod\"]"
+      },
+      {
+        "usage": "Record.RemoveFields([CustomerID = 1, Item = \"Fishing rod\", Price = 18.00], {\"Price\", \"Item\"})",
+        "output": "[CustomerID = 1]"
+      }
+    ]
+  },
+  {
+    "name": "Record.RenameFields",
+    "signature": "Record.RenameFields( record as record, renames as list, optional missingField as nullable number ) as record",
+    "description": "Returns a record after renaming fields in the input `record` to the new field names specified in list `renames`. For multiple renames, a nested list can be used ({ {old1, new1}, {old2, new2} }).",
+    "examples": [
+      {
+        "usage": "Record.RenameFields(\n    [OrderID = 1, CustomerID = 1, Item = \"Fishing rod\", UnitPrice = 100.0],\n    {\"UnitPrice\", \"Price\"}\n)",
+        "output": "[OrderID = 1, CustomerID = 1, Item = \"Fishing rod\", Price = 100.0]"
+      },
+      {
+        "usage": "Record.RenameFields(\n    [OrderNum = 1, CustomerID = 1, Item = \"Fishing rod\", UnitPrice = 100.0],\n    {\n        {\"UnitPrice\", \"Price\"},\n        {\"OrderNum\", \"OrderID\"}\n    }\n)",
+        "output": "[OrderID = 1, CustomerID = 1, Item = \"Fishing rod\", Price = 100.0]"
+      }
+    ]
+  },
+  {
+    "name": "Record.ReorderFields",
+    "signature": "Record.ReorderFields( record as record, fieldOrder as list, optional missingField as nullable number ) as record",
+    "description": "Reorders the fields of a record to match the order of a list of field names. * `record`: The record containing the fields to reorder. * `fieldOrder`: A list containing the new order of the fields to apply to the record. Field values are maintained and fields not listed in this parameter are left in their original positions. * `missingField`: Specifies the expected action for missing values in a row that contains fewer fields than expected. The following values are valid: * [`MissingField.Error`](missingfield-type.md): (Default) Indicates that missing fields should result in an error. If no value is entered for the `missingField` parameter, this value is used. * [`MissingField.Ignore`](missingfield-type.md): Indicates that missing fields should be ignored. * [`MissingField.UseNull`](missingfield-type.md): Indicates that missing fields should be included as `null` values.",
+    "examples": [
+      {
+        "usage": "Record.ReorderFields(\n    [CustomerID = 1, OrderID = 1, Item = \"Fishing rod\", Price = 100.0],\n    {\"OrderID\", \"CustomerID\"}\n)",
+        "output": "[OrderID = 1, CustomerID = 1, Item = \"Fishing rod\", Price = 100.0]"
+      },
+      {
+        "usage": "let\n    Source = [CustomerID = 3, First Name = \"Paul\", Phone = \"543-7890\", Purchase = \"Fishing Rod\"],\n    reorderedRecord = Record.ReorderFields(\n        Source,\n        {\"Purchase\", \"Last Name\", \"First Name\"},\n        MissingField.UseNull\n    )\nin\n    reorderedRecord",
+        "output": "[CustomerID = 3, Purchase = \"Fishing Rod\", Phone = \"543-7890\", Last Name = null, First Name = \"Paul\"]"
+      }
+    ]
+  },
+  {
+    "name": "Record.SelectFields",
+    "signature": "Record.SelectFields( record as record, fields as any, optional missingField as nullable number ) as record",
+    "description": "Returns a record which includes only the fields specified in list `fields` from the input `record`.",
+    "examples": [
+      {
+        "usage": "Record.SelectFields(\n    [OrderID = 1, CustomerID = 1, Item = \"Fishing rod\", Price = 100.0],\n    {\"Item\", \"Price\"}\n)",
+        "output": "[Item = \"Fishing rod\", Price = 100]"
+      }
+    ]
+  },
+  {
+    "name": "Record.ToList",
+    "signature": "Record.ToList(record as record) as list",
+    "description": "Returns a list of values containing the field values from the input `record`.",
+    "examples": [
+      {
+        "usage": "Record.ToList([A = 1, B = 2, C = 3])",
+        "output": "{1, 2, 3}"
+      }
+    ]
+  },
+  {
+    "name": "Record.ToTable",
+    "signature": "Record.ToTable(record as record) as table",
+    "description": "Returns a table containing the columns `Name` and `Value` with a row for each field in `record`.",
+    "examples": [
+      {
+        "usage": "Record.ToTable([OrderID = 1, CustomerID = 1, Item = \"Fishing rod\", Price = 100.0])",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Record.TransformFields",
+    "signature": "Record.TransformFields( record as record, transformOperations as list, optional missingField as nullable number ) as record",
+    "description": "Returns a record after applying transformations specified in list `transformOperations` to `record`. One or more fields may be transformed at a given time. In the case of a single field being transformed, `transformOperations` is expected to be a list with two items. The first item in `transformOperations` specifies a field name, and the second item in `transformOperations` specifies the function to be used for transformation. For example, `{\"Quantity\", Number.FromText}` In the case of a multiple fields being transformed, `transformOperations` is expected to be a list of lists, where each inner list is a pair of field name and transformation operation. For example, `{{\"Quantity\",Number.FromText},{\"UnitPrice\", Number.FromText}}`",
+    "examples": [
+      {
+        "usage": "Record.TransformFields(\n    [OrderID = 1, CustomerID = 1, Item = \"Fishing rod\", Price = \"100.0\"],\n    {\"Price\", Number.FromText}\n)",
+        "output": "[OrderID = 1, CustomerID = 1, Item = \"Fishing rod\", Price = 100]"
+      },
+      {
+        "usage": "Record.TransformFields(\n    [OrderID = \"1\", CustomerID = 1, Item = \"Fishing rod\", Price = \"100.0\"],\n    {{\"OrderID\", Number.FromText}, {\"Price\", Number.FromText}}\n)",
+        "output": "[OrderID = 1, CustomerID = 1, Item = \"Fishing rod\", Price = 100]"
+      }
+    ]
+  }
+]

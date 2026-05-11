@@ -1,0 +1,14 @@
+[
+  {
+    "name": "DeltaLake.Metadata",
+    "signature": "DeltaLake.Metadata(table as table) as table",
+    "description": "Given a Delta Lake table, returns the log entries for that table.",
+    "examples": []
+  },
+  {
+    "name": "DeltaLake.Table",
+    "signature": "DeltaLake.Table(directory as table, optional options as nullable record) as any",
+    "description": "Returns the contents of the Delta Lake table.",
+    "examples": []
+  }
+]

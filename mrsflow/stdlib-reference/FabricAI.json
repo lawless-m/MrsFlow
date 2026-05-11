@@ -1,0 +1,13 @@
+[
+  {
+    "name": "FabricAI.Prompt",
+    "signature": "FabricAI.Prompt(input as text, optional context as any) as text",
+    "description": "Returns the result of passing the specified `input` to an AI model. An optional `context` value can be provided in order to specify additional data that's relevant to the request.",
+    "examples": [
+      {
+        "usage": "FabricAI.Prompt(\n    \"Categorize the review as positive, negative, or neutral, and extract a single key word in parentheses.\",\n    [Review = \"This is a great product. It only broke four times before we had to return it!\"]\n)",
+        "output": "\"Negative (broke)\""
+      }
+    ]
+  }
+]

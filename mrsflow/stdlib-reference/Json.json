@@ -1,0 +1,32 @@
+[
+  {
+    "name": "Json.Document",
+    "signature": "Json.Document(jsonText as any, optional encoding as nullable number) as any",
+    "description": "Returns the content of the JSON document. * `jsonText`: The content of the JSON document. The value of this parameter can be text or a binary value returned by a function like [`File.Contents`](file-contents.md). * `encoding`: A [`TextEncoding.Type`](textencoding-type.md) that specifies the encoding used in the JSON document. If `encoding` is omitted, UTF8 is used.",
+    "examples": [
+      {
+        "usage": "let\n    Source = \"{\n        \"\"project\"\": \"\"Contosoware\"\",\n        \"\"description\"\": \"\"A comprehensive initiative aimed at enhancing digital presence.\"\",\n        \"\"components\"\": [\n            \"\"Website Development\"\",\n            \"\"CRM Implementation\"\",\n            \"\"Mobile Application\"\"\n        ]\n    }\",\n    jsonDocument = Json.Document(Source)\nin\n    jsonDocument",
+        "output": "`"
+      },
+      {
+        "usage": "let\n    Source = Json.Document(\n        File.Contents(\"C:\\test-examples\\JSON\\Contosoware.json\")\n    )\nin\n    Source",
+        "output": "A record, list, or primitive value representing the JSON data contained in the file"
+      },
+      {
+        "usage": "let\n    Source = Json.Document(\n        Web.Contents(\"htts://contoso.com/products/Contosoware.json\"),\n        TextEncoding.Utf16)\n    )\nin\n    Source",
+        "output": "A record, list, or primitive value representing the JSON UTF16 data contained in the file"
+      }
+    ]
+  },
+  {
+    "name": "Json.FromValue",
+    "signature": "Json.FromValue(value as any, optional encoding as nullable number) as binary",
+    "description": "Produces a JSON representation of a given value `value` with a text encoding specified by `encoding`. If `encoding` is omitted, UTF8 is used. Values are represented as follows: * Null, text and logical values are represented as the corresponding JSON types * Numbers are represented as numbers in JSON, except that `#infinity`, `-#infinity` and `#nan` are converted to null * Lists are represented as JSON arrays * Records are represented as JSON objects * Tables are represented as an array of objects * Dates, times, datetimes, datetimezones, and durations are represented as ISO-8601 text * Binary values are represented as base-64 encoded text * Types and functions produce an error",
+    "examples": [
+      {
+        "usage": "Text.FromBinary(Json.FromValue([A = {1, true, \"3\"}, B = #date(2012, 3, 25)]))",
+        "output": "\"{\"\"A\"\":[1,true,\"\"3\"\"],\"\"B\"\":\"\"2012-03-25\"\"}\""
+      }
+    ]
+  }
+]

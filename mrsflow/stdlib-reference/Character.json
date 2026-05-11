@@ -1,0 +1,36 @@
+[
+  {
+    "name": "Character.FromNumber",
+    "signature": "Character.FromNumber(number as nullable number) as nullable text",
+    "description": "Returns the character equivalent of the number. The provided `number` should be a 21-bit Unicode code point.",
+    "examples": [
+      {
+        "usage": "Character.FromNumber(9)",
+        "output": "\"#(tab)\""
+      },
+      {
+        "usage": "Character.FromNumber(Character.ToNumber(\"A\"))",
+        "output": "\"A\""
+      },
+      {
+        "usage": "Character.FromNumber(0x1F600)",
+        "output": "\"#(0001F600)\""
+      }
+    ]
+  },
+  {
+    "name": "Character.ToNumber",
+    "signature": "Character.ToNumber(character as nullable text) as nullable number",
+    "description": "Returns the number equivalent of the `character`. The result will be the 21-bit Unicode code point represented by the provided character or surrogate pair.",
+    "examples": [
+      {
+        "usage": "Character.ToNumber(\"#(tab)\")",
+        "output": "9"
+      },
+      {
+        "usage": "Number.ToText(Character.ToNumber(\"#(0001F600)\"), \"X\")",
+        "output": "\"1F600\""
+      }
+    ]
+  }
+]

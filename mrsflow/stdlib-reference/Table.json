@@ -1,0 +1,1476 @@
+[
+  {
+    "name": "Table.AddColumn",
+    "signature": "Table.AddColumn( table as table, newColumnName as text, columnGenerator as function, optional columnType as nullable type ) as table",
+    "description": "Adds a column named `newColumnName` to the table `table`. The values for the column are computed using the specified selection function `columnGenerator` with each row taken as an input.",
+    "examples": [
+      {
+        "usage": "Table.AddColumn(\n    Table.FromRecords({\n        [OrderID = 1, CustomerID = 1, Item = \"Fishing rod\", Price = 100.0, Shipping = 10.00],\n        [OrderID = 2, CustomerID = 1, Item = \"1 lb. worms\", Price = 5.0, Shipping = 15.00],\n        [OrderID = 3, CustomerID = 2, Item = \"Fishing net\", Price = 25.0, Shipping = 10.00]\n    }),\n    \"TotalPrice\",\n    each [Price] + [Shipping],\n    type number\n)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.AddFuzzyClusterColumn",
+    "signature": "Table.AddFuzzyClusterColumn( table as table, columnName as text, newColumnName as text, optional options as nullable record ) as table",
+    "description": "Adds a new column `newColumnName` to `table` with representative values of `columnName`. The representatives are obtained by fuzzily matching values in `columnName`, for each row. An optional set of `options` may be included to specify how to compare the key columns. Options include: * `Culture`: Allows grouping records based on culture-specific rules. It can be any valid culture name. For example, a Culture option of \"ja-JP\" groups records based on the Japanese culture. The default value is \"\", which groups based on the Invariant English culture. * `IgnoreCase`: A logical (true/false) value that allows case-insensitive key grouping. For example, when true, \"Grapes\" is grouped with \"grapes\". The default value is true. * `IgnoreSpace`: A logical (true/false) value that allows combining of text parts in order to find groups. For example, when true, \"Gra pes\" is grouped with \"Grapes\". The default value is true. * `SimilarityColumnName`: A name for the column that shows the similarity between an input value and the representative value for that input. The default value is null, in which case a new column for similarities will not be added. * `Threshold`: A number between 0.00 and 1.00 that specifies the similarity score at which two values will be grouped. For example, \"Grapes\" and \"Graes\" (missing the \"p\") are grouped together only if this option is set to less than 0.90. A threshold of 1.00 only allows exact matches. (Note that a fuzzy \"exact match\" might ignore differences like casing, word order, and punctuation.) The default value is 0.80. * `TransformationTable`: A table that allows grouping records based on custom value mappings. It should contain \"From\" and \"To\" columns. For example, \"Grapes\" is grouped with \"Raisins\" if a transformation table is provided with the \"From\" column containing \"Grapes\" and the \"To\" column containing \"Raisins\". Note that the transformation will be applied to all occurrences of the text in the transformation table. With the above transformation table, \"Grapes are sweet\" will also be grouped with \"Raisins are sweet\".",
+    "examples": [
+      {
+        "usage": "Table.AddFuzzyClusterColumn(\n    Table.FromRecords(\n        {\n            [EmployeeID = 1, Location = \"Seattle\"],\n            [EmployeeID = 2, Location = \"seattl\"],\n            [EmployeeID = 3, Location = \"Vancouver\"],\n            [EmployeeID = 4, Location = \"Seatle\"],\n            [EmployeeID = 5, Location = \"vancover\"],\n            [EmployeeID = 6, Location = \"Seattle\"],\n            [EmployeeID = 7, Location = \"Vancouver\"]\n        },\n        type table [EmployeeID = nullable number, Location = nullable text]\n    ),\n    \"Location\",\n    \"Location_Cleaned\",\n    [IgnoreCase = true, IgnoreSpace = true]\n)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.AddIndexColumn",
+    "signature": "Table.AddIndexColumn( table as table, newColumnName as text, optional initialValue as nullable number, optional increment as nullable number, optional columnType as nullable type ) as table",
+    "description": "Appends a column named `newColumnName` to the `table` with explicit position values. An optional value, `initialValue`, the initial index value. An optional value, `increment`, specifies how much to increment each index value.",
+    "examples": [
+      {
+        "usage": "Table.AddIndexColumn(\n    Table.FromRecords({\n        [CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"],\n        [CustomerID = 2, Name = \"Jim\", Phone = \"987-6543\"],\n        [CustomerID = 3, Name = \"Paul\", Phone = \"543-7890\"],\n        [CustomerID = 4, Name = \"Ringo\", Phone = \"232-1550\"]\n    }),\n    \"Index\"\n)",
+        "output": "`"
+      },
+      {
+        "usage": "Table.AddIndexColumn(\n    Table.FromRecords({\n        [CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"],\n        [CustomerID = 2, Name = \"Jim\", Phone = \"987-6543\"],\n        [CustomerID = 3, Name = \"Paul\", Phone = \"543-7890\"],\n        [CustomerID = 4, Name = \"Ringo\", Phone = \"232-1550\"]\n    }),\n    \"Index\",\n    10,\n    5\n)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.AddJoinColumn",
+    "signature": "Table.AddJoinColumn( table1 as table, key1 as any, table2 as any, key2 as any, newColumnName as text ) as table",
+    "description": "Joins the rows of `table1` with the rows of `table2` based on the equality of the values of the key columns selected by `key1` (for `table1`) and `key2` (for `table2`). The results are stored in a column named `newColumnName`. This function behaves identically to [`Table.NestedJoin`](table-nestedjoin.md) with `joinKind` set to [`JoinKind.LeftOuter`](joinkind-type.md).",
+    "examples": [
+      {
+        "usage": "Table.AddJoinColumn(\n    Table.FromRecords({\n        [saleID = 1, item = \"Shirt\"],\n        [saleID = 2, item = \"Hat\"]\n    }),\n    \"saleID\",\n    Table.FromRecords({\n        [saleID = 1, price = 20, stock = 1234],\n        [saleID = 2, price = 10, stock = 5643]\n    }),\n    \"saleID\",\n    \"price\"\n)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.AddKey",
+    "signature": "Table.AddKey( table as table, columns as list, isPrimary as logical ) as table",
+    "description": "Adds a key to `table`, where `columns` is the list of column names that define the key, and `isPrimary` specifies whether the key is primary.",
+    "examples": [
+      {
+        "usage": "let\n    table = Table.FromRecords({\n        [Id = 1, Name = \"Hello There\"],\n        [Id = 2, Name = \"Good Bye\"]\n    }),\n    resultTable = Table.AddKey(table, {\"Id\"}, true)\nin\n    resultTable",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.AddRankColumn",
+    "signature": "Table.AddRankColumn( table as table, newColumnName as text, comparisonCriteria as any, optional options as nullable record ) as table",
+    "description": "Appends a column named `newColumnName` to the `table` with the ranking of one or more other columns described by `comparisonCriteria`. The RankKind option in `options` can be used by advanced users to pick a more-specific ranking method.",
+    "examples": [
+      {
+        "usage": "Table.AddRankColumn(\n    Table.FromRecords({\n        [CustomerID = 1, Name = \"Bob\", Revenue = 200],\n        [CustomerID = 2, Name = \"Jim\", Revenue = 100],\n        [CustomerID = 3, Name = \"Paul\", Revenue = 200],\n        [CustomerID = 4, Name = \"Ringo\", Revenue = 50]\n    }),\n    \"RevenueRank\",\n    {\"Revenue\", Order.Descending},\n    [RankKind = RankKind.Competition]\n)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.AggregateTableColumn",
+    "signature": "Table.AggregateTableColumn( table as table, column as text, aggregations as list ) as table",
+    "description": "Aggregates tables in `table`[`column`] into multiple columns containing aggregate values for the tables. `aggregations` is used to specify the columns containing the tables to aggregate, the aggregation functions to apply to the tables to generate their values, and the names of the aggregate columns to create.",
+    "examples": [
+      {
+        "usage": "Table.AggregateTableColumn(\n    Table.FromRecords(\n        {\n            [\n                t = Table.FromRecords({\n                    [a = 1, b = 2, c = 3],\n                    [a = 2, b = 4, c = 6]\n                }),\n                b = 2\n            ]\n        },\n        type table [t = table [a = number, b = number, c = number], b = number]\n    ),\n    \"t\",\n    {\n        {\"a\", List.Sum, \"sum of t.a\"},\n        {\"b\", List.Min, \"min of t.b\"},\n        {\"b\", List.Max, \"max of t.b\"},\n        {\"a\", List.Count, \"count of t.a\"}\n    }\n)",
+        "output": "Table.FromRecords({[#\"sum of t.a\" = 3, #\"min of t.b\" = 2, #\"max of t.b\" = 4, #\"count of t.a\" = 2, b = 2]})"
+      }
+    ]
+  },
+  {
+    "name": "Table.AlternateRows",
+    "signature": "Table.AlternateRows( table as table, offset as number, skip as number, take as number ) as table",
+    "description": "Keeps the initial offset then alternates taking and skipping the following rows. * `table`: The input table. * `offset`: The number of rows to keep before starting iterations. * `skip`: The number of rows to remove in each iteration. * `take`: The number of rows to keep in each iteration.",
+    "examples": [
+      {
+        "usage": "Table.AlternateRows(\n    Table.FromRecords({\n        [CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"],\n        [CustomerID = 2, Name = \"Jim\", Phone = \"987-6543\"],\n        [CustomerID = 3, Name = \"Paul\", Phone = \"543-7890\"]\n    }),\n    1,\n    1,\n    1\n)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.ApproximateRowCount",
+    "signature": "Table.ApproximateRowCount(table as table) as number",
+    "description": "Returns the approximate number of rows in the `table`, or an error if the data source doesn't support approximation.",
+    "examples": [
+      {
+        "usage": "Table.ApproximateRowCount(Table.Distinct(Table.SelectColumns(sqlTable, {\"city\", \"state\"})))",
+        "output": "number"
+      }
+    ]
+  },
+  {
+    "name": "Table.Buffer",
+    "signature": "Table.Buffer(table as table, optional options as nullable record) as table",
+    "description": "Buffers a table in memory, isolating it from external changes during evaluation. Buffering is shallow. It forces the evaluation of any scalar cell values, but leaves non-scalar values (records, lists, tables, and so on) as-is. * `table`: The table to buffer in memory. * `options`: (Optional) The following options record values can be used: * `BufferMode`: The buffer mode that describes the type of buffering to be performed. This option can be either [`BufferMode.Eager`](buffermode-type.md) or [`BufferMode.Delayed`](buffermode-type.md). Using this function might or might not make your queries run faster. In some cases, it can make your queries run more slowly due to the added cost of reading all the data and storing it in memory, as well as the fact that buffering prevents downstream folding. If the data doesn't need to be buffered but you just want to prevent downstream folding, use [`Table.StopFolding`](table-stopfolding.md) instead.",
+    "examples": [
+      {
+        "usage": "let\n    Source = Sql.Database(\"SomeSQLServer\", \"MyDb\"),\n    MyTable = Source{[Item=\"MyTable\"]}[Data],\n    BufferMyTable = Table.Buffer(MyTable)\nin\n    BufferMyTable",
+        "output": "table"
+      }
+    ]
+  },
+  {
+    "name": "Table.Column",
+    "signature": "Table.Column(table as table, column as text) as list",
+    "description": "Returns the column of data specified by `column` from the table `table` as a list.",
+    "examples": [
+      {
+        "usage": "Table.Column(\n    Table.FromRecords({\n        [CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"],\n        [CustomerID = 2, Name = \"Jim\", Phone = \"987-6543\"],\n        [CustomerID = 3, Name = \"Paul\", Phone = \"543-7890\"],\n        [CustomerID = 4, Name = \"Ringo\", Phone = \"232-1550\"]\n    }),\n    \"Name\"\n)",
+        "output": "{\"Bob\", \"Jim\", \"Paul\", \"Ringo\"}"
+      }
+    ]
+  },
+  {
+    "name": "Table.ColumnCount",
+    "signature": "Table.ColumnCount(table as table) as number",
+    "description": "Returns the number of columns in the table `table`.",
+    "examples": [
+      {
+        "usage": "Table.ColumnCount(\n    Table.FromRecords({\n        [CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"],\n        [CustomerID = 2, Name = \"Jim\", Phone = \"987-6543\"],\n        [CustomerID = 3, Name = \"Paul\", Phone = \"543-7890\"]\n    })\n)",
+        "output": "3"
+      }
+    ]
+  },
+  {
+    "name": "Table.ColumnNames",
+    "signature": "Table.ColumnNames(table as table) as list",
+    "description": "Returns the column names in the table `table` as a list of text.",
+    "examples": [
+      {
+        "usage": "Table.ColumnNames(\n    Table.FromRecords({\n        [CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"],\n        [CustomerID = 2, Name = \"Jim\", Phone = \"987-6543\"],\n        [CustomerID = 3, Name = \"Paul\", Phone = \"543-7890\"],\n        [CustomerID = 4, Name = \"Ringo\", Phone = \"232-1550\"]\n    })\n)",
+        "output": "{\"CustomerID\", \"Name\", \"Phone\"}"
+      }
+    ]
+  },
+  {
+    "name": "Table.ColumnsOfType",
+    "signature": "Table.ColumnsOfType(table as table, listOfTypes as list) as list",
+    "description": "Returns a list with the names of the columns from table `table` that match the types specified in `listOfTypes`.",
+    "examples": [
+      {
+        "usage": "Table.ColumnsOfType(\n    Table.FromRecords(\n        {[a = 1, b = \"hello\"]},\n        type table[a = Number.Type, b = Text.Type]\n    ),\n    {type number}\n)",
+        "output": "{\"a\"}"
+      }
+    ]
+  },
+  {
+    "name": "Table.Combine",
+    "signature": "Table.Combine(tables as list, optional columns as any) as table",
+    "description": "Returns a table that is the result of merging a list of tables, `tables`. The resulting table will have a row type structure defined by `columns` or by a union of the input types if `columns` is not specified.",
+    "examples": [
+      {
+        "usage": "Table.Combine({\n    Table.FromRecords({[CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"]}),\n    Table.FromRecords({[CustomerID = 2, Name = \"Jim\", Phone = \"987-6543\"]}),\n    Table.FromRecords({[CustomerID = 3, Name = \"Paul\", Phone = \"543-7890\"]})\n})",
+        "output": "`"
+      },
+      {
+        "usage": "Table.Combine({\n    Table.FromRecords({[Name = \"Bob\", Phone = \"123-4567\"]}),\n    Table.FromRecords({[Fax = \"987-6543\", Phone = \"838-7171\"]}),\n    Table.FromRecords({[Cell = \"543-7890\"]})\n})",
+        "output": "`"
+      },
+      {
+        "usage": "Table.Combine(\n    {\n        Table.FromRecords({[Name = \"Bob\", Phone = \"123-4567\"]}),\n        Table.FromRecords({[Fax = \"987-6543\", Phone = \"838-7171\"]}),\n        Table.FromRecords({[Cell = \"543-7890\"]})\n    },\n    {\"CustomerID\", \"Name\"}\n)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.CombineColumns",
+    "signature": "Table.CombineColumns( table as table, sourceColumns as list, combiner as function, column as text ) as table",
+    "description": "Combines the specified columns into a new column using the specified combiner function.",
+    "examples": [
+      {
+        "usage": "Table.CombineColumns(\n    Table.FromRecords({[FirstName = \"Bob\", LastName = \"Smith\"]}),\n    {\"LastName\", \"FirstName\"},\n    Combiner.CombineTextByDelimiter(\",\", QuoteStyle.None),\n    \"FullName\"\n)",
+        "output": "Table.FromRecords({[FullName = \"Smith,Bob\"]})"
+      }
+    ]
+  },
+  {
+    "name": "Table.CombineColumnsToRecord",
+    "signature": "Table.CombineColumnsToRecord( table as table, newColumnName as text, sourceColumns as list, optional options as nullable record ) as table",
+    "description": "Combines the specified columns of `table` into a new record-valued column named `newColumnName` where each record has field names and values corresponding to the column names and values of the columns that were combined. If a record is specified for `options`, the following options may be provided: * `DisplayNameColumn`: When specified as text, indicates that the given column name should be treated as the display name of the record. This need not be one of the columns in the record itself. * `TypeName`: When specified as text, supplies a logical type name for the resulting record which can be used during data load to drive behavior by the loading environment.",
+    "examples": []
+  },
+  {
+    "name": "Table.ConformToPageReader",
+    "signature": "Table.ConformToPageReader(table as table, shapingFunction as function) as table",
+    "description": "This function is intended for internal use only.",
+    "examples": []
+  },
+  {
+    "name": "Table.Contains",
+    "signature": "Table.Contains( table as table, row as record, optional equationCriteria as any ) as logical",
+    "description": "Indicates whether the specified record, `row`, appears as a row in the `table`. An optional parameter `equationCriteria` may be specified to control comparison between the rows of the table.",
+    "examples": [
+      {
+        "usage": "Table.Contains(\n    Table.FromRecords({\n        [CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"],\n        [CustomerID = 2, Name = \"Jim\", Phone = \"987-6543\"],\n        [CustomerID = 3, Name = \"Paul\", Phone = \"543-7890\"],\n        [CustomerID = 4, Name = \"Ringo\", Phone = \"232-1550\"]\n    }),\n    [Name = \"Bob\"]\n)",
+        "output": "true"
+      },
+      {
+        "usage": "Table.Contains(\n    Table.FromRecords({\n        [CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"],\n        [CustomerID = 2, Name = \"Jim\", Phone = \"987-6543\"],\n        [CustomerID = 3, Name = \"Paul\", Phone = \"543-7890\"],\n        [CustomerID = 4, Name = \"Ringo\", Phone = \"232-1550\"]\n    }),\n    [Name = \"Ted\"]\n)",
+        "output": "false"
+      },
+      {
+        "usage": "Table.Contains(\n    Table.FromRecords({\n        [CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"],\n        [CustomerID = 2, Name = \"Jim\", Phone = \"987-6543\"],\n        [CustomerID = 3, Name = \"Paul\", Phone = \"543-7890\"],\n        [CustomerID = 4, Name = \"Ringo\", Phone = \"232-1550\"]\n    }),\n    [CustomerID = 4, Name = \"Bob\"],\n    \"Name\"\n)",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "Table.ContainsAll",
+    "signature": "Table.ContainsAll( table as table, rows as list, optional equationCriteria as any ) as logical",
+    "description": "Indicates whether all the specified records in the list of records `rows`, appear as rows in the `table`. An optional parameter `equationCriteria` may be specified to control comparison between the rows of the table.",
+    "examples": [
+      {
+        "usage": "Table.ContainsAll(\n    Table.FromRecords({\n        [CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"],\n        [CustomerID = 2, Name = \"Jim\", Phone = \"987-6543\"],\n        [CustomerID = 3, Name = \"Paul\", Phone = \"543-7890\"],\n        [CustomerID = 4, Name = \"Ringo\", Phone = \"232-1550\"]\n    }),\n    {\n        [CustomerID = 1, Name = \"Bill\"],\n        [CustomerID = 2, Name = \"Fred\"]\n    },\n    \"CustomerID\"\n)",
+        "output": "true"
+      },
+      {
+        "usage": "Table.ContainsAll(\n    Table.FromRecords({\n        [CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"],\n        [CustomerID = 2, Name = \"Jim\", Phone = \"987-6543\"],\n        [CustomerID = 3, Name = \"Paul\", Phone = \"543-7890\"],\n        [CustomerID = 4, Name = \"Ringo\", Phone = \"232-1550\"]\n    }),\n    {\n        [CustomerID = 1, Name = \"Bill\"],\n        [CustomerID = 2, Name = \"Fred\"]\n    }\n)",
+        "output": "false"
+      }
+    ]
+  },
+  {
+    "name": "Table.ContainsAny",
+    "signature": "Table.ContainsAny( table as table, rows as list, optional equationCriteria as any ) as logical",
+    "description": "Indicates whether any the specified records in the list of records `rows`, appear as rows in the `table`. An optional parameter `equationCriteria` may be specified to control comparison between the rows of the table.",
+    "examples": [
+      {
+        "usage": "Table.ContainsAny(\n    Table.FromRecords({\n        [a = 1, b = 2],\n        [a = 3, b = 4]\n    }),\n    {\n        [a = 1, b = 2],\n        [a = 3, b = 5]\n    }\n)",
+        "output": "true"
+      },
+      {
+        "usage": "Table.ContainsAny(\n    Table.FromRecords({\n        [a = 1, b = 2],\n        [a = 3, b = 4]\n    }),\n    {\n        [a = 1, b = 3],\n        [a = 3, b = 5]\n    }\n)",
+        "output": "false"
+      },
+      {
+        "usage": "Table.ContainsAny(\n    Table.FromRecords({\n        [a = 1, b = 2],\n        [a = 3, b = 4]\n    }),\n    {\n        [a = 1, b = 3],\n        [a = 3, b = 5]\n    },\n    \"a\"\n)",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "Table.DemoteHeaders",
+    "signature": "Table.DemoteHeaders(table as table) as table",
+    "description": "Demotes the column headers (i.e. column names) to the first row of values. The default column names are \"Column1\", \"Column2\" and so on.",
+    "examples": [
+      {
+        "usage": "Table.DemoteHeaders(\n    Table.FromRecords({\n        [CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"],\n        [CustomerID = 2, Name = \"Jim\", Phone = \"987-6543\"]\n    })\n)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.Distinct",
+    "signature": "Table.Distinct(table as table, optional equationCriteria as any) as table",
+    "description": "Removes duplicate rows from the table. An optional parameter, `equationCriteria`, specifies which columns of the table are tested for duplication. If `equationCriteria` is not specified, all columns are tested. Because Power Query sometimes offloads certain operations to backend data sources (known as \"folding\"), and also sometimes optimizes queries by skipping operations that aren't strictly necessary, in general there's no guarantee which specific duplicate will be preserved. For example, you can't assume that the first row with a unique set of column values will remain, and rows further down in the table will be removed. If you want the duplicate removal to behave predictably, first buffer the table using [`Table.Buffer`](table-buffer.md).",
+    "examples": [
+      {
+        "usage": "Table.Distinct(\n    Table.FromRecords({\n        [a = \"A\", b = \"a\"],\n        [a = \"B\", b = \"b\"],\n        [a = \"A\", b = \"a\"]\n    })\n)",
+        "output": "`"
+      },
+      {
+        "usage": "Table.Distinct(\n    Table.FromRecords({\n        [a = \"A\", b = \"a\"],\n        [a = \"B\", b = \"a\"],\n        [a = \"A\", b = \"b\"]\n    }),\n    \"b\"\n)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.DuplicateColumn",
+    "signature": "Table.DuplicateColumn( table as table, columnName as text, newColumnName as text, optional columnType as nullable type ) as table",
+    "description": "Duplicate the column named `columnName` to the table `table`. The values and type for the column `newColumnName` are copied from column `columnName`.",
+    "examples": [
+      {
+        "usage": "Table.DuplicateColumn(\n    Table.FromRecords({\n        [a = 1, b = 2],\n        [a = 3, b = 4]\n    }),\n    \"a\",\n    \"copied column\"\n)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.ExpandListColumn",
+    "signature": "Table.ExpandListColumn(table as table, column as text) as table",
+    "description": "Given a `table` where `column` contains a list of values, splits the list into a row for each value. Values in the other columns are duplicated in each new row created. This function can also expand nested tables by treating them as lists of records.",
+    "examples": [
+      {
+        "usage": "Table.ExpandListColumn(\n    Table.FromRecords({[Name = {\"Bob\", \"Jim\", \"Paul\"}, Discount = .15]}),\n    \"Name\"\n)",
+        "output": "`"
+      },
+      {
+        "usage": "Table.ExpandListColumn(\n    #table(\n        {\"Part\", \"Components\"},\n        {\n            {\"Tool\", #table({\"Name\", \"Quantity\"}, {{\"Thingamajig\", 2}, {\"Widget\", 3}})}\n        }\n    ),\n    \"Components\"\n)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.ExpandRecordColumn",
+    "signature": "Table.ExpandRecordColumn( table as table, column as text, fieldNames as list, optional newColumnNames as nullable list ) as table",
+    "description": "Given the `column` of records in the input `table`, creates a table with a column for each field in the record. Optionally, `newColumnNames` may be specified to ensure unique names for the columns in the new table. * `table`: The original table with the record column to expand. * `column`: The column to expand. * `fieldNames`: The list of fields to expand into columns in the table. * `newColumnNames`: The list of column names to give the new columns. The new column names cannot duplicate any column in the new table.",
+    "examples": [
+      {
+        "usage": "Table.ExpandRecordColumn(\n    Table.FromRecords({\n        [\n            a = [aa = 1, bb = 2, cc = 3],\n            b = 2\n        ]\n    }),\n    \"a\",\n    {\"aa\", \"bb\", \"cc\"}\n)",
+        "output": "Table.FromRecords({[aa = 1, bb = 2, cc = 3, b = 2]})"
+      }
+    ]
+  },
+  {
+    "name": "Table.ExpandTableColumn",
+    "signature": "Table.ExpandTableColumn( table as table, column as text, columnNames as list, optional newColumnNames as nullable list ) as table",
+    "description": "Expands tables in `table`[`column`] into multiple rows and columns. `columnNames` is used to select the columns to expand from the inner table. Specify `newColumnNames` to avoid conflicts between existing columns and new columns.",
+    "examples": [
+      {
+        "usage": "Table.ExpandTableColumn(\n    Table.FromRecords({\n        [\n            t = Table.FromRecords({\n                [a = 1, b = 2, c = 3],\n                [a = 2, b = 4, c = 6]\n            }),\n            b = 2\n        ]\n    }),\n    \"t\",\n    {\"a\", \"b\", \"c\"},\n    {\"t.a\", \"t.b\", \"t.c\"}\n)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.FillDown",
+    "signature": "Table.FillDown(table as table, columns as list) as table",
+    "description": "Returns a table from the `table` specified where the value of a previous cell is propagated to the null-valued cells below in the `columns` specified.",
+    "examples": [
+      {
+        "usage": "Table.FillDown(\n    Table.FromRecords({\n        [Place = 1, Name = \"Bob\"],\n        [Place = null, Name = \"John\"],\n        [Place = 2, Name = \"Brad\"],\n        [Place = 3, Name = \"Mark\"],\n        [Place = null, Name = \"Tom\"],\n        [Place = null, Name = \"Adam\"]\n    }),\n    {\"Place\"}\n)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.FillUp",
+    "signature": "Table.FillUp(table as table, columns as list) as table",
+    "description": "Returns a table from the `table` specified where the value of the next cell is propagated to the null-valued cells above in the `columns` specified.",
+    "examples": [
+      {
+        "usage": "Table.FillUp(\n    Table.FromRecords({\n        [Column1 = 1, Column2 = 2],\n        [Column1 = 3, Column2 = null],\n        [Column1 = 5, Column2 = 3]\n    }),\n    {\"Column2\"}\n)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.FilterWithDataTable",
+    "signature": "Table.FilterWithDataTable(table as table, dataTableIdentifier as text) as any",
+    "description": "This function is intended for internal use only.",
+    "examples": []
+  },
+  {
+    "name": "Table.FindText",
+    "signature": "Table.FindText(table as table, text as text) as table",
+    "description": "Returns the rows in the table `table` that contain the text `text`. If the text is not found, an empty table is returned.",
+    "examples": [
+      {
+        "usage": "Table.FindText(\n    Table.FromRecords({\n        [CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"],\n        [CustomerID = 2, Name = \"Jim\", Phone = \"987-6543\"],\n        [CustomerID = 3, Name = \"Paul\", Phone = \"543-7890\"],\n        [CustomerID = 4, Name = \"Ringo\", Phone = \"232-1550\"]\n    }),\n    \"Bob\"\n)",
+        "output": "Table.FromRecords({[CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"]})"
+      }
+    ]
+  },
+  {
+    "name": "Table.First",
+    "signature": "Table.First(table as table, optional default as any) as any",
+    "description": "Returns the first row of the `table` or an optional default value, `default`, if the table is empty.",
+    "examples": [
+      {
+        "usage": "Table.First(\n    Table.FromRecords({\n        [CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"],\n        [CustomerID = 2, Name = \"Jim\", Phone = \"987-6543\"],\n        [CustomerID = 3, Name = \"Paul\", Phone = \"543-7890\"]\n    })\n)",
+        "output": "[CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"]"
+      },
+      {
+        "usage": "Table.First(Table.FromRecords({}), [a = 0, b = 0])",
+        "output": "[a = 0, b = 0]"
+      }
+    ]
+  },
+  {
+    "name": "Table.FirstN",
+    "signature": "Table.FirstN(table as table, countOrCondition as any) as table",
+    "description": "Returns the first row(s) of the table `table`, depending on the value of `countOrCondition`: * If `countOrCondition` is a number, that many rows (starting at the top) will be returned. * If `countOrCondition` is a condition, the rows that meet the condition will be returned until a row does not meet the condition.",
+    "examples": [
+      {
+        "usage": "Table.FirstN(\n    Table.FromRecords({\n        [CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"],\n        [CustomerID = 2, Name = \"Jim\", Phone = \"987-6543\"],\n        [CustomerID = 3, Name = \"Paul\", Phone = \"543-7890\"]\n    }),\n    2\n)",
+        "output": "`"
+      },
+      {
+        "usage": "Table.FirstN(\n    Table.FromRecords({\n        [a = 1, b = 2],\n        [a = 3, b = 4],\n        [a = -5, b = -6]\n    }),\n    each [a] > 0\n)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.FirstValue",
+    "signature": "Table.FirstValue(table as table, optional default as any) as any",
+    "description": "Returns the first column of the first row of the table `table` or a specified default value.",
+    "examples": []
+  },
+  {
+    "name": "Table.FromColumns",
+    "signature": "Table.FromColumns(lists as list, optional columns as any) as table",
+    "description": "Creates a table of type `columns` from a list `lists` containing nested lists with the column names and values. If some columns have more values then others, the missing values will be filled with the default value, 'null', if the columns are nullable.",
+    "examples": [
+      {
+        "usage": "Table.FromColumns({\n    {1, \"Bob\", \"123-4567\"},\n    {2, \"Jim\", \"987-6543\"},\n    {3, \"Paul\", \"543-7890\"}\n})",
+        "output": "`"
+      },
+      {
+        "usage": "Table.FromColumns(\n    {\n        {1, \"Bob\", \"123-4567\"},\n        {2, \"Jim\", \"987-6543\"},\n        {3, \"Paul\", \"543-7890\"}\n    },\n    {\"CustomerID\", \"Name\", \"Phone\"}\n)",
+        "output": "`"
+      },
+      {
+        "usage": "Table.FromColumns(\n    {\n        {1, 2, 3},\n        {4, 5},\n        {6, 7, 8, 9}\n    },\n    {\"column1\", \"column2\", \"column3\"}\n)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.FromList",
+    "signature": "Table.FromList( list as list, optional splitter as nullable function, optional columns as any, optional default as any, optional extraValues as nullable number ) as table",
+    "description": "Converts a list, `list` into a table by applying the optional [splitting function](splitter-functions.md), `splitter`, to each item in the list. By default, the list is assumed to be a list of text values that is split by commas. Optional `columns` may be the number of columns, a list of columns or a TableType. Optional `default` and `extraValues` may also be specified.",
+    "examples": [
+      {
+        "usage": "Table.FromList(\n    {\"a,apple\", \"b,ball\", \"c,cookie\", \"d,door\"},\n    null,\n    {\"Letter\", \"Example Word\"}\n)",
+        "output": "`"
+      },
+      {
+        "usage": "Table.FromList(\n    {\"a,apple\", \"b,ball\", \"c,cookie\", \"d,door\"},\n    Splitter.SplitByNothing(),\n    {\"Letter and Example Word\"}\n)",
+        "output": "`"
+      },
+      {
+        "usage": "Table.FromList(\n    {\n        [CustomerID = 1, Name = \"Bob\"],\n        [CustomerID = 2, Name = \"Jim\"]\n    },\n    Record.FieldValues,\n    {\"CustomerID\", \"Name\"}\n)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.FromPartitions",
+    "signature": "Table.FromPartitions( partitionColumn as text, partitions as list, optional partitionColumnType as nullable type ) as table",
+    "description": "Returns a table that is the result of combining a set of partitioned tables, `partitions`. `partitionColumn` is the name of the column to add. The type of the column defaults to `any`, but can be specified by `partitionColumnType`.",
+    "examples": [
+      {
+        "usage": "Table.FromPartitions(\n    \"Year\",\n    {\n        {\n            1994,\n            Table.FromPartitions(\n                \"Month\",\n                {\n                    {\n                        \"Jan\",\n                        Table.FromPartitions(\n                            \"Day\",\n                            {\n                                {1, #table({\"Foo\"}, {{\"Bar\"}})},\n                                {2, #table({\"Foo\"}, {{\"Bar\"}})}\n                            }\n                        )\n                    },\n                    {\n                        \"Feb\",\n                        Table.FromPartitions(\n                            \"Day\",\n                            {\n                                {3, #table({\"Foo\"}, {{\"Bar\"}})},\n                                {4, #table({\"Foo\"}, {{\"Bar\"}})}\n                            }\n                        )\n                    }\n                }\n            )\n        }\n    }\n)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.FromRecords",
+    "signature": "Table.FromRecords( records as list, optional columns as any, optional missingField as nullable number ) as table",
+    "description": "Converts a specified list of records into a table. * `records`: The list of records to convert to a table. * `columns`: (Optional) A list of the table's column names, or the table's type. * `missingField`: (Optional) Specifies how to handle missing fields in a row. Use one of the following values: * [`MissingField.Error`](missingfield-type.md): Any missing fields produce an error (default). * [`MissingField.UseNull`](missingfield-type.md): Any missing fields are included as `null` values. Using [`MissingField.Ignore`](missingfield-type.md) in this parameter produces an error.",
+    "examples": [
+      {
+        "usage": "Table.FromRecords({\n    [CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"],\n    [CustomerID = 2, Name = \"Jim\", Phone = \"987-6543\"],\n    [CustomerID = 3, Name = \"Paul\", Phone = \"543-7890\"]\n})",
+        "output": "`"
+      },
+      {
+        "usage": "Table.ColumnsOfType(\n    Table.FromRecords(\n        {[CustomerID = 1, Name = \"Bob\"]},\n        type table[CustomerID = Number.Type, Name = Text.Type]\n    ),\n    {type number}\n)",
+        "output": "{\"CustomerID\"}"
+      },
+      {
+        "usage": "Table.FromRecords({\n        [CustomerID = 1, FirstName = \"Bob\", MiddleInitial = \"C\", LastName = \"Smith\"],\n        [CustomerID = 2, FirstName = \"Sarah\", LastName = \"Jones\"],\n        [CustomerID = 3, FirstName = \"Harry\", MiddleInitial = \"H\"]\n    },\n    type table [FirstName = nullable text, MiddleInitial = nullable text, LastName = nullable text],\n    MissingField.UseNull)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.FromRows",
+    "signature": "Table.FromRows(rows as list, optional columns as any) as table",
+    "description": "Creates a table from the list `rows` where each element of the list is an inner list that contains the column values for a single row. An optional list of column names, a table type, or a number of columns could be provided for `columns`.",
+    "examples": [
+      {
+        "usage": "Table.FromRows(\n    {\n        {1, \"Bob\", \"123-4567\"},\n        {2, \"Jim\", \"987-6543\"}\n    },\n    {\"CustomerID\", \"Name\", \"Phone\"}\n)",
+        "output": "`"
+      },
+      {
+        "usage": "Table.FromRows(\n    {\n        {1, \"Bob\", \"123-4567\"},\n        {2, \"Jim\", \"987-6543\"}\n    },\n    type table [CustomerID = number, Name = text, Phone = text]\n)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.FromValue",
+    "signature": "Table.FromValue(value as any, optional options as nullable record) as table",
+    "description": "Creates a table with a column containing the provided value or list of values, `value`. An optional record parameter, `options`, may be specified to control the following options: * `DefaultColumnName`: The column name used when constructing a table from a list or scalar value.",
+    "examples": [
+      {
+        "usage": "Table.FromValue(1)",
+        "output": "Table.FromRecords({[Value = 1]})"
+      },
+      {
+        "usage": "Table.FromValue({1, \"Bob\", \"123-4567\"})",
+        "output": "`"
+      },
+      {
+        "usage": "Table.FromValue(1, [DefaultColumnName = \"MyValue\"])",
+        "output": "Table.FromRecords({[MyValue = 1]})"
+      }
+    ]
+  },
+  {
+    "name": "Table.FuzzyGroup",
+    "signature": "Table.FuzzyGroup( table as table, key as any, aggregatedColumns as list, optional options as nullable record ) as table",
+    "description": "Groups the rows of `table` by fuzzily matching values in the specified column, `key`, for each row. For each group, a record is constructed containing the key columns (and their values) along with any aggregated columns specified by `aggregatedColumns`. This function cannot guarantee to return a fixed order of rows. An optional set of `options` may be included to specify how to compare the key columns. Options include: * `Culture`: Allows grouping records based on culture-specific rules. It can be any valid culture name. For example, a Culture option of \"ja-JP\" groups records based on the Japanese culture. The default value is \"\", which groups based on the Invariant English culture. * `IgnoreCase`: A logical (true/false) value that allows case-insensitive key grouping. For example, when true, \"Grapes\" is grouped with \"grapes\". The default value is true. * `IgnoreSpace`: A logical (true/false) value that allows combining of text parts in order to find groups. For example, when true, \"Gra pes\" is grouped with \"Grapes\". The default value is true. * `SimilarityColumnName`: A name for the column that shows the similarity between an input value and the representative value for that input. The default value is null, in which case a new column for similarities will not be added. * `Threshold`: A number between 0.00 and 1.00 that specifies the similarity score at which two values will be grouped. For example, \"Grapes\" and \"Graes\" (missing the \"p\") are grouped together only if this option is set to less than 0.90. A threshold of 1.00 only allows exact matches. (Note that a fuzzy \"exact match\" might ignore differences like casing, word order, and punctuation.) The default value is 0.80. * `TransformationTable`: A table that allows grouping records based on custom value mappings. It should contain \"From\" and \"To\" columns. For example, \"Grapes\" is grouped with \"Raisins\" if a transformation table is provided with the \"From\" column containing \"Grapes\" and the \"To\" column containing \"Raisins\". Note that the transformation will be applied to all occurrences of the text in the transformation table. With the above transformation table, \"Grapes are sweet\" will also be grouped with \"Raisins are sweet\".",
+    "examples": [
+      {
+        "usage": "Table.FuzzyGroup(\n    Table.FromRecords(\n        {\n            [EmployeeID = 1, Location = \"Seattle\"],\n            [EmployeeID = 2, Location = \"seattl\"],\n            [EmployeeID = 3, Location = \"Vancouver\"],\n            [EmployeeID = 4, Location = \"Seatle\"],\n            [EmployeeID = 5, Location = \"vancover\"],\n            [EmployeeID = 6, Location = \"Seattle\"],\n            [EmployeeID = 7, Location = \"Vancouver\"]\n        },\n        type table [EmployeeID = nullable number, Location = nullable text]\n    ),\n    \"Location\",\n    {\"Count\", each Table.RowCount(_)},\n    [IgnoreCase = true, IgnoreSpace = true]\n)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.FuzzyJoin",
+    "signature": "Table.FuzzyJoin( table1 as table, key1 as any, table2 as table, key2 as any, optional joinKind as nullable number, optional joinOptions as nullable record ) as table",
+    "description": "Joins the rows of `table1` with the rows of `table2` based on a fuzzy matching of the values of the key columns selected by `key1` (for `table1`) and `key2` (for `table2`). Fuzzy matching is a comparison based on similarity of text rather than equality of text. By default, an inner join is performed, however an optional `joinKind` may be included to specify the type of join. Options include: * [`JoinKind.Inner`](joinkind-type.md) * [`JoinKind.LeftOuter`](joinkind-type.md) * [`JoinKind.RightOuter`](joinkind-type.md) * [`JoinKind.FullOuter`](joinkind-type.md) * [`JoinKind.LeftAnti`](joinkind-type.md) * [`JoinKind.RightAnti`](joinkind-type.md) * [`JoinKind.LeftSemi`](joinkind-type.md) * [`JoinKind.RightSemi`](joinkind-type.md) An optional set of `joinOptions` may be included to specify how to compare the key columns. Options include: * `ConcurrentRequests`: A number between 1 and 8 that specifies the number of parallel threads to use for fuzzy matching. The default value is 1. * `Culture`: Allows matching records based on culture-specific rules. It can be any valid culture name. For example, a Culture option of \"ja-JP\" matches records based on the Japanese culture. The default value is \"\", which matches based on the Invariant English culture. * `IgnoreCase`: A logical (true/false) value that allows case-insensitive key matching. For example, when true, \"Grapes\" is matched with \"grapes\". The default value is true. * `IgnoreSpace`: A logical (true/false) value that allows combining of text parts in order to find matches. For example, when true, \"Gra pes\" is matched with \"Grapes\". The default value is true. * `NumberOfMatches`: A whole number that specifies the maximum number of matching rows that can be returned for every input row. For example, a value of 1 will return at most one matching row for each input row. If this option is not provided, all matching rows are returned. * `SimilarityColumnName`: A name for the column that shows the similarity between an input value and the representative value for that input. The default value is null, in which case a new column for similarities will not be added. * `Threshold`: A number between 0.00 and 1.00 that specifies the similarity score at which two values will be matched. For example, \"Grapes\" and \"Graes\" (missing the \"p\") are matched only if this option is set to less than 0.90. A threshold of 1.00 only allows exact matches. (Note that a fuzzy \"exact match\" might ignore differences like casing, word order, and punctuation.) The default value is 0.80. * `TransformationTable`: A table that allows matching records based on custom value mappings. It should contain \"From\" and \"To\" columns. For example, \"Grapes\" is matched with \"Raisins\" if a transformation table is provided with the \"From\" column containing \"Grapes\" and the \"To\" column containing \"Raisins\". Note that the transformation will be applied to all occurrences of the text in the transformation table. With the above transformation table, \"Grapes are sweet\" will also be matched with \"Raisins are sweet\".",
+    "examples": [
+      {
+        "usage": "Table.FuzzyJoin(\n    Table.FromRecords(\n        {\n            [CustomerID = 1, FirstName1 = \"Bob\", Phone = \"555-1234\"],\n            [CustomerID = 2, FirstName1 = \"Robert\", Phone = \"555-4567\"]\n        },\n        type table [CustomerID = nullable number, FirstName1 = nullable text, Phone = nullable text]\n    ),\n    {\"FirstName1\"},\n    Table.FromRecords(\n        {\n            [CustomerStateID = 1, FirstName2 = \"Bob\", State = \"TX\"],\n            [CustomerStateID = 2, FirstName2 = \"bOB\", State = \"CA\"]\n        },\n        type table [CustomerStateID = nullable number, FirstName2 = nullable text, State = nullable text]\n    ),\n    {\"FirstName2\"},\n    JoinKind.LeftOuter,\n    [IgnoreCase = true, IgnoreSpace = false]\n)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.FuzzyNestedJoin",
+    "signature": "Table.FuzzyNestedJoin( table1 as table, key1 as any, table2 as table, key2 as any, newColumnName as text, optional joinKind as nullable number, optional joinOptions as nullable record ) as table",
+    "description": "Joins the rows of `table1` with the rows of `table2` based on a fuzzy matching of the values of the key columns selected by `key1` (for `table1`) and `key2` (for `table2`). The results are returned in a new column named `newColumnName`. Fuzzy matching is a comparison based on similarity of text rather than equality of text. The optional `joinKind` specifies the kind of join to perform. By default, a left outer join is performed if a `joinKind` is not specified. Options include: * [`JoinKind.Inner`](joinkind-type.md) * [`JoinKind.LeftOuter`](joinkind-type.md) * [`JoinKind.RightOuter`](joinkind-type.md) * [`JoinKind.FullOuter`](joinkind-type.md) * [`JoinKind.LeftAnti`](joinkind-type.md) * [`JoinKind.RightAnti`](joinkind-type.md) * [`JoinKind.LeftSemi`](joinkind-type.md) * [`JoinKind.RightSemi`](joinkind-type.md) An optional set of `joinOptions` may be included to specify how to compare the key columns. Options include: * `ConcurrentRequests`: A number between 1 and 8 that specifies the number of parallel threads to use for fuzzy matching. The default value is 1. * `Culture`: Allows matching records based on culture-specific rules. It can be any valid culture name. For example, a Culture option of \"ja-JP\" matches records based on the Japanese culture. The default value is \"\", which matches based on the Invariant English culture. * `IgnoreCase`: A logical (true/false) value that allows case-insensitive key matching. For example, when true, \"Grapes\" is matched with \"grapes\". The default value is true. * `IgnoreSpace`: A logical (true/false) value that allows combining of text parts in order to find matches. For example, when true, \"Gra pes\" is matched with \"Grapes\". The default value is true. * `NumberOfMatches`: A whole number that specifies the maximum number of matching rows that can be returned for every input row. For example, a value of 1 will return at most one matching row for each input row. If this option is not provided, all matching rows are returned. * `SimilarityColumnName`: A name for the column that shows the similarity between an input value and the representative value for that input. The default value is null, in which case a new column for similarities will not be added. * `Threshold`: A number between 0.00 and 1.00 that specifies the similarity score at which two values will be matched. For example, \"Grapes\" and \"Graes\" (missing the \"p\") are matched only if this option is set to less than 0.90. A threshold of 1.00 only allows exact matches. (Note that a fuzzy \"exact match\" might ignore differences like casing, word order, and punctuation.) The default value is 0.80. * `TransformationTable`: A table that allows matching records based on custom value mappings. It should contain \"From\" and \"To\" columns. For example, \"Grapes\" is matched with \"Raisins\" if a transformation table is provided with the \"From\" column containing \"Grapes\" and the \"To\" column containing \"Raisins\". Note that the transformation will be applied to all occurrences of the text in the transformation table. With the above transformation table, \"Grapes are sweet\" will also be matched with \"Raisins are sweet\".",
+    "examples": [
+      {
+        "usage": "Table.FuzzyNestedJoin(\n    Table.FromRecords(\n        {\n            [CustomerID = 1, FirstName1 = \"Bob\", Phone = \"555-1234\"],\n            [CustomerID = 2, FirstName1 = \"Robert\", Phone = \"555-4567\"]\n        },\n        type table [CustomerID = nullable number, FirstName1 = nullable text, Phone = nullable text]\n    ),\n    {\"FirstName1\"},\n    Table.FromRecords(\n        {\n            [CustomerStateID = 1, FirstName2 = \"Bob\", State = \"TX\"],\n            [CustomerStateID = 2, FirstName2 = \"bOB\", State = \"CA\"]\n        },\n        type table [CustomerStateID = nullable number, FirstName2 = nullable text, State = nullable text]\n    ),\n    {\"FirstName2\"},\n    \"NestedTable\",\n    JoinKind.LeftOuter,\n    [IgnoreCase = true, IgnoreSpace = false]\n)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.Group",
+    "signature": "Table.Group( table as table, key as any, aggregatedColumns as list, optional groupKind as nullable number, optional comparer as nullable function ) as table",
+    "description": "Groups the rows of `table` by the key columns defined by `key`. The `key` can either be a single column name, or a list of column names. For each group, a record is constructed containing the key columns (and their values), along with any aggregated columns specified by `aggregatedColumns`. Optionally, `groupKind` and `comparer` may also be specified. If the data is already sorted by the key columns, then a `groupKind` of [`GroupKind.Local`](groupkind-type.md) can be provided. This may improve the performance of grouping in certain cases, since all the rows with a given set of key values are assumed to be contiguous. When passing a `comparer`, note that if it treats differing keys as equal, a row may be placed in a group whose keys differ from its own. This function does not guarantee the ordering of the rows it returns.",
+    "examples": [
+      {
+        "usage": "Table.Group(\n    Table.FromRecords({\n        [CustomerID = 1, price = 20],\n        [CustomerID = 2, price = 10],\n        [CustomerID = 2, price = 20],\n        [CustomerID = 1, price = 10],\n        [CustomerID = 3, price = 20],\n        [CustomerID = 3, price = 5]\n    }),\n    \"CustomerID\",\n    {\"total\", each List.Sum([price])}\n)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.HasColumns",
+    "signature": "Table.HasColumns(table as table, columns as any) as logical",
+    "description": "Indicates whether the `table` contains the specified column(s), `columns`. Returns `true` if the table contains the column(s), `false` otherwise.",
+    "examples": [
+      {
+        "usage": "Table.HasColumns(\n    Table.FromRecords({\n        [CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"],\n        [CustomerID = 2, Name = \"Jim\", Phone = \"987-6543\"],\n        [CustomerID = 3, Name = \"Paul\", Phone = \"543-7890\"],\n        [CustomerID = 4, Name = \"Ringo\", Phone = \"232-1550\"]\n    }),\n    \"Name\"\n)",
+        "output": "true"
+      },
+      {
+        "usage": "Table.HasColumns(\n    Table.FromRecords({\n        [CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"],\n        [CustomerID = 2, Name = \"Jim\", Phone = \"987-6543\"],\n        [CustomerID = 3, Name = \"Paul\", Phone = \"543-7890\"],\n        [CustomerID = 4, Name = \"Ringo\", Phone = \"232-1550\"]\n    }),\n    {\"Name\", \"PhoneNumber\"}\n)",
+        "output": "false"
+      }
+    ]
+  },
+  {
+    "name": "Table.InsertRows",
+    "signature": "Table.InsertRows( table as table, offset as number, rows as list ) as table",
+    "description": "Returns a table with the list of rows, `rows`, inserted into the `table` at the given position, `offset`. Each column in the row to insert must match the column types of the table.",
+    "examples": [
+      {
+        "usage": "Table.InsertRows(\n    Table.FromRecords({\n        [CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"],\n        [CustomerID = 2, Name = \"Jim\", Phone = \"987-6543\"]\n    }),\n    1,\n    {[CustomerID = 3, Name = \"Paul\", Phone = \"543-7890\"]}\n)",
+        "output": "`"
+      },
+      {
+        "usage": "Table.InsertRows(\n    Table.FromRecords({[CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"]}),\n    1,\n    {\n        [CustomerID = 2, Name = \"Jim\", Phone = \"987-6543\"],\n        [CustomerID = 3, Name = \"Paul\", Phone = \"543-7890\"]\n    }\n)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.IsDistinct",
+    "signature": "Table.IsDistinct(table as table, optional comparisonCriteria as any) as logical",
+    "description": "Indicates whether the `table` contains only distinct rows (no duplicates). Returns `true` if the rows are distinct, `false` otherwise. An optional parameter, `comparisonCriteria`, specifies which columns of the table are tested for duplication. If `comparisonCriteria` is not specified, all columns are tested.",
+    "examples": [
+      {
+        "usage": "Table.IsDistinct(\n    Table.FromRecords({\n        [CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"],\n        [CustomerID = 2, Name = \"Jim\", Phone = \"987-6543\"],\n        [CustomerID = 3, Name = \"Paul\", Phone = \"543-7890\"],\n        [CustomerID = 4, Name = \"Ringo\", Phone = \"232-1550\"]\n    })\n)",
+        "output": "true"
+      },
+      {
+        "usage": "Table.IsDistinct(\n    Table.FromRecords({\n        [CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"],\n        [CustomerID = 2, Name = \"Jim\", Phone = \"987-6543\"],\n        [CustomerID = 3, Name = \"Paul\", Phone = \"543-7890\"],\n        [CustomerID = 5, Name = \"Bob\", Phone = \"232-1550\"]\n    }),\n    \"Name\"\n)",
+        "output": "false"
+      }
+    ]
+  },
+  {
+    "name": "Table.IsEmpty",
+    "signature": "Table.IsEmpty(table as table) as logical",
+    "description": "Indicates whether the `table` contains any rows. Returns `true` if there are no rows (i.e. the table is empty), `false` otherwise.",
+    "examples": [
+      {
+        "usage": "Table.IsEmpty(\n    Table.FromRecords({\n        [CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"],\n        [CustomerID = 2, Name = \"Jim\", Phone = \"987-6543\"],\n        [CustomerID = 3, Name = \"Paul\", Phone = \"543-7890\"]\n    })\n)",
+        "output": "false"
+      },
+      {
+        "usage": "Table.IsEmpty(Table.FromRecords({}))",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "Table.Join",
+    "signature": "Table.Join( table1 as table, key1 as any, table2 as table, key2 as any, optional joinKind as nullable number, optional joinAlgorithm as nullable number, optional keyEqualityComparers as nullable list ) as table",
+    "description": "Joins the rows of `table1` with the rows of `table2` based on the equality of the values of the key columns selected by `key1` (for `table1`) and `key2` (for `table2`). By default, an inner join is performed, however an optional `joinKind` may be included to specify the type of join. Options include: * [`JoinKind.Inner`](joinkind-type.md) * [`JoinKind.LeftOuter`](joinkind-type.md) * [`JoinKind.RightOuter`](joinkind-type.md) * [`JoinKind.FullOuter`](joinkind-type.md) * [`JoinKind.LeftAnti`](joinkind-type.md) * [`JoinKind.RightAnti`](joinkind-type.md) * [`JoinKind.LeftSemi`](joinkind-type.md) * [`JoinKind.RightSemi`](joinkind-type.md) An optional set of `keyEqualityComparers` may be included to specify how to compare the key columns. This parameter is currently intended for internal use only.",
+    "examples": [
+      {
+        "usage": "Table.Join(\n    Table.FromRecords({\n        [CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"],\n        [CustomerID = 2, Name = \"Jim\", Phone = \"987-6543\"],\n        [CustomerID = 3, Name = \"Paul\", Phone = \"543-7890\"],\n        [CustomerID = 4, Name = \"Ringo\", Phone = \"232-1550\"]\n    }),\n    \"CustomerID\",\n    Table.FromRecords({\n        [OrderID = 1, CustomerID = 1, Item = \"Fishing rod\", Price = 100.0],\n        [OrderID = 2, CustomerID = 1, Item = \"1 lb. worms\", Price = 5.0],\n        [OrderID = 3, CustomerID = 2, Item = \"Fishing net\", Price = 25.0],\n        [OrderID = 4, CustomerID = 3, Item = \"Fish tazer\", Price = 200.0],\n        [OrderID = 5, CustomerID = 3, Item = \"Bandaids\", Price = 2.0],\n        [OrderID = 6, CustomerID = 1, Item = \"Tackle box\", Price = 20.0],\n        [OrderID = 7, CustomerID = 5, Item = \"Bait\", Price = 3.25]\n    }),\n    \"CustomerID\"\n)",
+        "output": "`"
+      },
+      {
+        "usage": "let\n    customers = Table.FromRecords({\n        [TenantID = 1, CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"],\n        [TenantID = 1, CustomerID = 2, Name = \"Jim\", Phone = \"987-6543\"]\n    }),\n    orders = Table.FromRecords({\n        [TenantID = 1, OrderID = 1, CustomerID = 1, Name = \"Fishing rod\", Price = 100.0],\n        [TenantID = 1, OrderID = 2, CustomerID = 1, Name = \"1 lb. worms\", Price = 5.0],\n        [TenantID = 1, OrderID = 3, CustomerID = 2, Name = \"Fishing net\", Price = 25.0]\n    })\nin\n    Table.Join(\n        customers,\n        {\"TenantID\", \"CustomerID\"},\n        Table.PrefixColumns(orders, \"Order\"),\n        {\"Order.TenantID\", \"Order.CustomerID\"}\n    )",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.Keys",
+    "signature": "Table.Keys(table as table) as list",
+    "description": "Returns the keys of the specified table.",
+    "examples": [
+      {
+        "usage": "let\n    table = Table.FromRecords({\n        [Id = 1, Name = \"Hello There\"],\n        [Id = 2, Name = \"Good Bye\"]\n    }),\n    tableWithKeys = Table.AddKey(table, {\"Id\"}, true),\n    keys = Table.Keys(tableWithKeys)\nin\n    keys",
+        "output": "{[Columns = {\"Id\"}, Primary = true]}"
+      }
+    ]
+  },
+  {
+    "name": "Table.Last",
+    "signature": "Table.Last(table as table, optional default as any) as any",
+    "description": "Returns the last row of the `table` or an optional default value, `default`, if the table is empty.",
+    "examples": [
+      {
+        "usage": "Table.Last(\n    Table.FromRecords({\n        [CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"],\n        [CustomerID = 2, Name = \"Jim\", Phone = \"987-6543\"],\n        [CustomerID = 3, Name = \"Paul\", Phone = \"543-7890\"]\n    })\n)",
+        "output": "[CustomerID = 3, Name = \"Paul\", Phone = \"543-7890\"]"
+      },
+      {
+        "usage": "Table.Last(Table.FromRecords({}), [a = 0, b = 0])",
+        "output": "[a = 0, b = 0]"
+      }
+    ]
+  },
+  {
+    "name": "Table.LastN",
+    "signature": "Table.LastN(table as table, countOrCondition as any) as table",
+    "description": "Returns the last row(s) from the table, `table`, depending on the value of `countOrCondition`: * If `countOrCondition` is a number, that many rows will be returned starting from position (end - `countOrCondition`). * If `countOrCondition` is a condition, the rows that meet the condition will be returned in ascending position until a row does not meet the condition.",
+    "examples": [
+      {
+        "usage": "Table.LastN(\n    Table.FromRecords({\n        [CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"],\n        [CustomerID = 2, Name = \"Jim\", Phone = \"987-6543\"],\n        [CustomerID = 3, Name = \"Paul\", Phone = \"543-7890\"]\n    }),\n    2\n)",
+        "output": "`"
+      },
+      {
+        "usage": "Table.LastN(\n    Table.FromRecords({\n        [a = -1, b = -2],\n        [a = 3, b = 4],\n        [a = 5, b = 6]\n    }),\n    each _ [a] > 0\n)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.MatchesAllRows",
+    "signature": "Table.MatchesAllRows(table as table, condition as function) as logical",
+    "description": "Indicates whether all the rows in the `table` match the given `condition`. Returns `true` if all of the rows match, `false` otherwise.",
+    "examples": [
+      {
+        "usage": "Table.MatchesAllRows(\n    Table.FromRecords({\n        [a = 2, b = 4],\n        [a = 6, b = 8]\n    }),\n    each Number.Mod([a], 2) = 0\n)",
+        "output": "true"
+      },
+      {
+        "usage": "Table.MatchesAllRows(\n    Table.FromRecords({\n        [a = 1, b = 2],\n        [a = -3, b = 4]\n    }),\n    each _ = [a = 1, b = 2]\n)",
+        "output": "false"
+      }
+    ]
+  },
+  {
+    "name": "Table.MatchesAnyRows",
+    "signature": "Table.MatchesAnyRows(table as table, condition as function) as logical",
+    "description": "Indicates whether any the rows in the `table` match the given `condition`. Returns `true` if any of the rows match, `false` otherwise.",
+    "examples": [
+      {
+        "usage": "Table.MatchesAnyRows(\n    Table.FromRecords({\n        [a = 1, b = 4],\n        [a = 3, b = 8]\n    }),\n    each Number.Mod([a], 2) = 0\n)",
+        "output": "false"
+      },
+      {
+        "usage": "Table.MatchesAnyRows(\n    Table.FromRecords({\n        [a = 1, b = 2],\n        [a = -3, b = 4]\n    }),\n    each _ = [a = 1, b = 2]\n)",
+        "output": "true"
+      }
+    ]
+  },
+  {
+    "name": "Table.Max",
+    "signature": "Table.Max( table as table, comparisonCriteria as any, optional default as any ) as any",
+    "description": "Returns the largest row in the `table`, given the `comparisonCriteria`. If the table is empty, the optional `default` value is returned.",
+    "examples": [
+      {
+        "usage": "Table.Max(\n    Table.FromRecords({\n        [a = 2, b = 4],\n        [a = 6, b = 8]\n    }),\n    \"a\"\n)",
+        "output": "[a = 6, b = 8]"
+      },
+      {
+        "usage": "Table.Max(#table({\"a\"}, {}), \"a\", -1)",
+        "output": "-1"
+      }
+    ]
+  },
+  {
+    "name": "Table.MaxN",
+    "signature": "Table.MaxN( table as table, comparisonCriteria as any, countOrCondition as any ) as table",
+    "description": "Returns the largest row(s) in the `table`, given the `comparisonCriteria`. After the rows are sorted, the `countOrCondition` parameter must be specified to further filter the result. Note the sorting algorithm cannot guarantee a fixed sorted result. The `countOrCondition` parameter can take multiple forms: * If a number is specified, a list of up to `countOrCondition` items in ascending order is returned. * If a condition is specified, a list of items that initially meet the condition is returned. Once an item fails the condition, no further items are considered.",
+    "examples": [
+      {
+        "usage": "Table.MaxN(\n    Table.FromRecords({\n        [a = 2, b = 4],\n        [a = 0, b = 0],\n        [a = 6, b = 2]\n    }),\n    \"a\",\n    each [a] > 0\n)",
+        "output": "`"
+      },
+      {
+        "usage": "Table.MaxN(\n    Table.FromRecords({\n        [a = 2, b = 4],\n        [a = 8, b = 0],\n        [a = 6, b = 2]\n    }),\n    \"a\",\n    each [b] > 0\n)",
+        "output": "Table.FromRecords({})"
+      }
+    ]
+  },
+  {
+    "name": "Table.Min",
+    "signature": "Table.Min( table as table, comparisonCriteria as any, optional default as any ) as any",
+    "description": "Returns the smallest row in the `table`, given the `comparisonCriteria`. If the table is empty, the optional `default` value is returned.",
+    "examples": [
+      {
+        "usage": "Table.Min(\n    Table.FromRecords({\n        [a = 2, b = 4],\n        [a = 6, b = 8]\n    }),\n    \"a\"\n)",
+        "output": "[a = 2, b = 4]"
+      },
+      {
+        "usage": "Table.Min(#table({\"a\"}, {}), \"a\", -1)",
+        "output": "-1"
+      }
+    ]
+  },
+  {
+    "name": "Table.MinN",
+    "signature": "Table.MinN( table as table, comparisonCriteria as any, countOrCondition as any ) as table",
+    "description": "Returns the smallest row(s) in the `table`, given the `comparisonCriteria`. After the rows are sorted, the `countOrCondition` parameter must be specified to further filter the result. Note the sorting algorithm cannot guarantee a fixed sorted result. The `countOrCondition` parameter can take multiple forms: * If a number is specified, a list of up to `countOrCondition` items in ascending order is returned. * If a condition is specified, a list of items that initially meet the condition is returned. Once an item fails the condition, no further items are considered.",
+    "examples": [
+      {
+        "usage": "Table.MinN(\n    Table.FromRecords({\n        [a = 2, b = 4],\n        [a = 0, b = 0],\n        [a = 6, b = 4]\n    }),\n    \"a\",\n    each [a] < 3\n)",
+        "output": "`"
+      },
+      {
+        "usage": "Table.MinN(\n    Table.FromRecords({\n        [a = 2, b = 4],\n        [a = 8, b = 0],\n        [a = 6, b = 2]\n    }),\n    \"a\",\n    each [b] < 0\n)",
+        "output": "Table.FromRecords({})"
+      }
+    ]
+  },
+  {
+    "name": "Table.NestedJoin",
+    "signature": "Table.NestedJoin( table1 as table, key1 as any, table2 as any, key2 as any, newColumnName as text, optional joinKind as nullable number, optional keyEqualityComparers as nullable list ) as table",
+    "description": "Joins the rows of `table1` with the rows of `table2` based on the equality of the values of the key columns selected by `key1` (for `table1`) and `key2` (for `table2`). The results are entered into the column named `newColumnName`. The optional `joinKind` specifies the kind of join to perform. By default, a left outer join is performed if a `joinKind` is not specified. An optional set of `keyEqualityComparers` may be included to specify how to compare the key columns. This feature is currently intended for internal use only.",
+    "examples": [
+      {
+        "usage": "Table.NestedJoin(\n    Table.FromRecords({\n        [CustomerToCall = 1],\n        [CustomerToCall = 3]\n    }),\n    {\"CustomerToCall\"},\n    Table.FromRecords({\n        [CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"],\n        [CustomerID = 2, Name = \"Jim\", Phone = \"987-6543\"],\n        [CustomerID = 3, Name = \"Paul\", Phone = \"543-7890\"],\n        [CustomerID = 4, Name = \"Ringo\", Phone = \"232-1550\"]\n    }),\n    {\"CustomerID\"},\n    \"CustomerDetails\"\n)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.Partition",
+    "signature": "Table.Partition( table as table, column as text, groups as number, hash as function ) as list",
+    "description": "Partitions the `table` into a list of `groups` number of tables, based on the value of the `column` and a `hash` function. The `hash` function is applied to the value of the `column` row to obtain a hash value for the row. The hash value modulo `groups` determines in which of the returned tables the row will be placed. * `table`: The table to partition. * `column`: The column to hash to determine which returned table the row is in. * `groups`: The number of tables the input table will be partitioned into. * `hash`: The function applied to obtain a hash value.",
+    "examples": [
+      {
+        "usage": "Table.Partition(\n    Table.FromRecords({\n        [a = 2, b = 4],\n        [a = 1, b = 4],\n        [a = 2, b = 4],\n        [a = 1, b = 4]\n    }),\n    \"a\",\n    2,\n    each _\n)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.PartitionKey",
+    "signature": "Table.PartitionKey(table as table) as nullable list",
+    "description": "Returns the partition key of the specified table.",
+    "examples": []
+  },
+  {
+    "name": "Table.PartitionValues",
+    "signature": "Table.PartitionValues(table as table) as table",
+    "description": "Returns information about how a table is partitioned. A table is returned where each column is a partition column in the original table, and each row corresponds to a partition in the original table.",
+    "examples": []
+  },
+  {
+    "name": "Table.Pivot",
+    "signature": "Table.Pivot( table as table, pivotValues as list, attributeColumn as text, valueColumn as text, optional aggregationFunction as nullable function ) as table",
+    "description": "Given a pair of columns representing attribute-value pairs, rotates the data in the attribute column into a column headings.",
+    "examples": [
+      {
+        "usage": "Table.Pivot(\n    Table.FromRecords({\n        [key = \"x\", attribute = \"a\", value = 1],\n        [key = \"x\", attribute = \"c\", value = 3],\n        [key = \"y\", attribute = \"a\", value = 2],\n        [key = \"y\", attribute = \"b\", value = 4]\n    }),\n    {\"a\", \"b\", \"c\"},\n    \"attribute\",\n    \"value\"\n)",
+        "output": "`"
+      },
+      {
+        "usage": "Table.Pivot(\n    Table.FromRecords({\n        [key = \"x\", attribute = \"a\", value = 1],\n        [key = \"x\", attribute = \"c\", value = 3],\n        [key = \"x\", attribute = \"c\", value = 5],\n        [key = \"y\", attribute = \"a\", value = 2],\n        [key = \"y\", attribute = \"b\", value = 4]\n    }),\n    {\"a\", \"b\", \"c\"},\n    \"attribute\",\n    \"value\",\n    List.Max\n)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.PositionOf",
+    "signature": "Table.PositionOf( table as table, row as record, optional occurrence as any, optional equationCriteria as any ) as any",
+    "description": "Returns the row position of the first occurrence of the `row` in the `table` specified. Returns -1 if no occurrence is found. * `table`: The input table. * `row`: The row in the table to find the position of. * `occurrence`: *(Optional)* Specifies which occurrences of the row to return. * `equationCriteria`: *(Optional)* Controls the comparison between the table rows.",
+    "examples": [
+      {
+        "usage": "Table.PositionOf(\n    Table.FromRecords({\n        [a = 2, b = 4],\n        [a = 1, b = 4],\n        [a = 2, b = 4],\n        [a = 1, b = 4]\n    }),\n    [a = 2, b = 4]\n)",
+        "output": "0"
+      },
+      {
+        "usage": "Table.PositionOf(\n    Table.FromRecords({\n        [a = 2, b = 4],\n        [a = 1, b = 4],\n        [a = 2, b = 4],\n        [a = 1, b = 4]\n    }),\n    [a = 2, b = 4],\n    1\n)",
+        "output": "2"
+      },
+      {
+        "usage": "Table.PositionOf(\n    Table.FromRecords({\n        [a = 2, b = 4],\n        [a = 1, b = 4],\n        [a = 2, b = 4],\n        [a = 1, b = 4]\n    }),\n    [a = 2, b = 4],\n    Occurrence.All\n)",
+        "output": "{0, 2}"
+      }
+    ]
+  },
+  {
+    "name": "Table.PositionOfAny",
+    "signature": "Table.PositionOfAny( table as table, rows as list, optional occurrence as nullable number, optional equationCriteria as any ) as any",
+    "description": "Returns the row(s) position(s) from the `table` of the first occurrence of the list of `rows`. Returns -1 if no occurrence is found. * `table`: The input table. * `rows`: The list of rows in the table to find the positions of. * `occurrence`: *(Optional)* Specifies which occurrences of the row to return. * `equationCriteria`: *(Optional)* Controls the comparison between the table rows.",
+    "examples": [
+      {
+        "usage": "Table.PositionOfAny(\n    Table.FromRecords({\n        [a = 2, b = 4],\n        [a = 1, b = 4],\n        [a = 2, b = 4],\n        [a = 1, b = 4]\n    }),\n    {\n        [a = 2, b = 4],\n        [a = 6, b = 8]\n    }\n)",
+        "output": "0"
+      },
+      {
+        "usage": "Table.PositionOfAny(\n    Table.FromRecords({\n        [a = 2, b = 4],\n        [a = 6, b = 8],\n        [a = 2, b = 4],\n        [a = 1, b = 4]\n    }),\n    {\n        [a = 2, b = 4],\n        [a = 6, b = 8]\n    },\n    Occurrence.All\n)",
+        "output": "{0, 1, 2}"
+      }
+    ]
+  },
+  {
+    "name": "Table.PrefixColumns",
+    "signature": "Table.PrefixColumns(table as table, prefix as text) as table",
+    "description": "Returns a table where all the column names from the `table` provided are prefixed with the given text, `prefix`, plus a period in the form `prefix.ColumnName`.",
+    "examples": [
+      {
+        "usage": "Table.PrefixColumns(\n    Table.FromRecords({[CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"]}),\n    \"MyTable\"\n)",
+        "output": "Table.FromRecords({[MyTable.CustomerID = 1, MyTable.Name = \"Bob\", MyTable.Phone = \"123-4567\"]})"
+      }
+    ]
+  },
+  {
+    "name": "Table.Profile",
+    "signature": "Table.Profile(table as table, optional additionalAggregates as nullable list) as table",
+    "description": "Returns a profile for the columns in `table`. The following information is returned for each column (when applicable): * minimum * maximum * average * standard deviation * count * null count * distinct count",
+    "examples": []
+  },
+  {
+    "name": "Table.PromoteHeaders",
+    "signature": "Table.PromoteHeaders(table as table, optional options as nullable record) as table",
+    "description": "Promotes the first row of values as the new column headers (i.e. column names). By default, only text or number values are promoted to headers. Valid options: * `PromoteAllScalars`: If set to `true`, all the scalar values in the first row are promoted to headers using the `Culture`, if specified (or current document locale). For values that cannot be converted to text, a default column name will be used. * `Culture`: A culture name specifying the culture for the data.",
+    "examples": [
+      {
+        "usage": "Table.PromoteHeaders(\n    Table.FromRecords({\n        [Column1 = \"CustomerID\", Column2 = \"Name\", Column3 = #date(1980, 1, 1)],\n        [Column1 = 1, Column2 = \"Bob\", Column3 = #date(1980, 1, 1)]\n    })\n)",
+        "output": "Table.FromRecords({[CustomerID = 1, Name = \"Bob\", Column3 = #date(1980, 1, 1)]})"
+      },
+      {
+        "usage": "Table.PromoteHeaders(\n    Table.FromRecords({\n        [Rank = 1, Name = \"Name\", Date = #date(1980, 1, 1)],\n        [Rank = 1, Name = \"Bob\", Date = #date(1980, 1, 1)]}\n    ),\n    [PromoteAllScalars = true, Culture = \"en-US\"]\n)",
+        "output": "Table.FromRecords({[1 = 1, Name = \"Bob\", #\"1/1/1980\" = #date(1980, 1, 1)]})"
+      }
+    ]
+  },
+  {
+    "name": "Table.Range",
+    "signature": "Table.Range( table as table, offset as number, optional count as nullable number ) as table",
+    "description": "Returns the rows from the `table` starting at the specified `offset`. An optional parameter, `count`, specifies how many rows to return. By default, all the rows after the offset are returned.",
+    "examples": [
+      {
+        "usage": "Table.Range(\n    Table.FromRecords({\n        [CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"],\n        [CustomerID = 2, Name = \"Jim\", Phone = \"987-6543\"],\n        [CustomerID = 3, Name = \"Paul\", Phone = \"543-7890\"],\n        [CustomerID = 4, Name = \"Ringo\", Phone = \"232-1550\"]\n    }),\n    1\n)",
+        "output": "`"
+      },
+      {
+        "usage": "Table.Range(\n    Table.FromRecords({\n        [CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"],\n        [CustomerID = 2, Name = \"Jim\", Phone = \"987-6543\"],\n        [CustomerID = 3, Name = \"Paul\", Phone = \"543-7890\"],\n        [CustomerID = 4, Name = \"Ringo\", Phone = \"232-1550\"]\n    }),\n    1,\n    1\n)",
+        "output": "Table.FromRecords({[CustomerID = 2, Name = \"Jim\", Phone = \"987-6543\"]})"
+      }
+    ]
+  },
+  {
+    "name": "Table.RemoveColumns",
+    "signature": "Table.RemoveColumns( table as table, columns as any, optional missingField as nullable number ) as table",
+    "description": "Removes the specified `columns` from the `table` provided. If the specified column doesn't exist, an error is raised unless the optional parameter `missingField` specifies an alternative behavior (for example, [`MissingField.UseNull`](missingfield-type.md) or [`MissingField.Ignore`](missingfield-type.md)).",
+    "examples": [
+      {
+        "usage": "Table.RemoveColumns(\n    Table.FromRecords({[CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"]}),\n    \"Phone\"\n)",
+        "output": "Table.FromRecords({[CustomerID = 1, Name = \"Bob\"]})"
+      },
+      {
+        "usage": "Table.RemoveColumns(\n    Table.FromRecords({[CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"]}),\n    \"Address\"\n)",
+        "output": "[Expression.Error] The column 'Address' of the table wasn't found."
+      }
+    ]
+  },
+  {
+    "name": "Table.RemoveFirstN",
+    "signature": "Table.RemoveFirstN(table as table, optional countOrCondition as any) as table",
+    "description": "Returns a table that does not contain the first specified number of rows, `countOrCondition`, of the table `table`. The number of rows removed depends on the optional parameter `countOrCondition`. * If `countOrCondition` is omitted only the first row is removed. * If `countOrCondition` is a number, that many rows (starting at the top) will be removed. * If `countOrCondition` is a condition, the rows that meet the condition will be removed until a row does not meet the condition.",
+    "examples": [
+      {
+        "usage": "Table.RemoveFirstN(\n    Table.FromRecords({\n        [CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"],\n        [CustomerID = 2, Name = \"Jim\", Phone = \"987-6543\"],\n        [CustomerID = 3, Name = \"Paul\", Phone = \"543-7890\"],\n        [CustomerID = 4, Name = \"Ringo\", Phone = \"232-1550\"]\n    }),\n    1\n)",
+        "output": "`"
+      },
+      {
+        "usage": "Table.RemoveFirstN(\n    Table.FromRecords({\n        [CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"],\n        [CustomerID = 2, Name = \"Jim\", Phone = \"987-6543\"],\n        [CustomerID = 3, Name = \"Paul\", Phone = \"543-7890\"],\n        [CustomerID = 4, Name = \"Ringo\", Phone = \"232-1550\"]\n    }),\n    2\n)",
+        "output": "`"
+      },
+      {
+        "usage": "Table.RemoveFirstN(\n    Table.FromRecords({\n        [CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"],\n        [CustomerID = 2, Name = \"Jim\", Phone = \"987-6543\"],\n        [CustomerID = 3, Name = \"Paul\", Phone = \"543-7890\"],\n        [CustomerID = 4, Name = \"Ringo\", Phone = \"232-1550\"]\n    }),\n    each [CustomerID] <= 2\n)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.RemoveLastN",
+    "signature": "Table.RemoveLastN(table as table, optional countOrCondition as any) as table",
+    "description": "Returns a table that does not contain the last `countOrCondition` rows of the table `table`. The number of rows removed depends on the optional parameter `countOrCondition`. * If `countOrCondition` is omitted only the last row is removed. * If `countOrCondition` is a number, that many rows (starting at the bottom) will be removed. * If `countOrCondition` is a condition, the rows that meet the condition will be removed until a row does not meet the condition.",
+    "examples": [
+      {
+        "usage": "Table.RemoveLastN(\n    Table.FromRecords({\n        [CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"],\n        [CustomerID = 2, Name = \"Jim\", Phone = \"987-6543\"],\n        [CustomerID = 3, Name = \"Paul\", Phone = \"543-7890\"],\n        [CustomerID = 4, Name = \"Ringo\", Phone = \"232-1550\"]\n    }),\n    1\n)",
+        "output": "`"
+      },
+      {
+        "usage": "Table.RemoveLastN(\n    Table.FromRecords({\n        [CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"],\n        [CustomerID = 2, Name = \"Jim\", Phone = \"987-6543\"],\n        [CustomerID = 3, Name = \"Paul\", Phone = \"543-7890\"],\n        [CustomerID = 4, Name = \"Ringo\", Phone = \"232-1550\"]\n    }),\n    each [CustomerID] >= 2\n)",
+        "output": "Table.FromRecords({[CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"]})"
+      }
+    ]
+  },
+  {
+    "name": "Table.RemoveMatchingRows",
+    "signature": "Table.RemoveMatchingRows( table as table, rows as list, optional equationCriteria as any ) as table",
+    "description": "Removes all occurrences of the specified rows from the table. * `table`: The table to search. * `rows`: A list containing information about the rows to be removed. * `equationCriteria`: (Optional) Specifies how equality is determined when comparing values. This parameter can be a key selector function, a comparer function, or a list of the columns in the table to use when comparing rows.",
+    "examples": [
+      {
+        "usage": "Table.RemoveMatchingRows(\n    Table.FromRecords({\n        [a = 1, b = 2],\n        [a = 3, b = 4],\n        [a = 1, b = 6]\n    }),\n    {[a = 1]},\n    \"a\"\n)",
+        "output": "Table.FromRecords({[a = 3, b = 4]})"
+      },
+      {
+        "usage": "let\n    CurrentOrders = #table(type table[OrderID = number, Product = text, Quantity = number],\n    {\n        {101, \"Widget\", 5},\n        {102, \"Gadget\", 3},\n        {103, \"Widget\", 5}\n    }),\n    CanceledOrders = {\n        [OrderID = 103, Product = \"widget\", Quantity = 5]\n    },\n    FilteredOrders = Table.RemoveMatchingRows(CurrentOrders, CanceledOrders, Comparer.OrdinalIgnoreCase)\nin\n    FilteredOrders",
+        "output": "`"
+      },
+      {
+        "usage": "let\n    MaintenanceSchedule = #table(type table [Task = text, Date = date],\n    {\n        {\"HVAC Check\", #date(2025, 7, 10)},              // Not a holiday\n        {\"Window Washing\", #date(2025, 9, 1)},           // Labor Day\n        {\"Fire Drill\", #date(2025, 9, 17)},              // Not a holiday\n        {\"Light Bulb Replacement\", #date(2025, 11, 27)}  // Thanksgiving\n    }),\n\n    USHolidays = {\n        [Date = #date(2025, 1, 1)],   // New Year's Day\n        [Date = #date(2025, 7, 4)],   // Independence Day\n        [Date = #date(2025, 9, 1)],   // Labor Day\n        [Date = #date(2025, 11, 27)], // Thanksgiving\n        [Date = #date(2025, 12, 25)]  // Christmas\n    },\n\n    FilteredSchedule = Table.RemoveMatchingRows(\n        MaintenanceSchedule,\n        USHolidays,\n        {\"Date\"}\n    )\nin\n    FilteredSchedule",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.RemoveRows",
+    "signature": "Table.RemoveRows( table as table, offset as number, optional count as nullable number ) as table",
+    "description": "Removes `count` of rows from the beginning of the `table`, starting at the `offset` specified. A default count of 1 is used if the `count` parameter isn't provided.",
+    "examples": [
+      {
+        "usage": "Table.RemoveRows(\n    Table.FromRecords({\n        [CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"],\n        [CustomerID = 2, Name = \"Jim\", Phone = \"987-6543\"],\n        [CustomerID = 3, Name = \"Paul\", Phone = \"543-7890\"],\n        [CustomerID = 4, Name = \"Ringo\", Phone = \"232-1550\"]\n    }),\n    0\n)",
+        "output": "`"
+      },
+      {
+        "usage": "Table.RemoveRows(\n    Table.FromRecords({\n        [CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"],\n        [CustomerID = 2, Name = \"Jim\", Phone = \"987-6543\"],\n        [CustomerID = 3, Name = \"Paul\", Phone = \"543-7890\"],\n        [CustomerID = 4, Name = \"Ringo\", Phone = \"232-1550\"]\n    }),\n    1\n)",
+        "output": "`"
+      },
+      {
+        "usage": "Table.RemoveRows(\n    Table.FromRecords({\n        [CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"],\n        [CustomerID = 2, Name = \"Jim\", Phone = \"987-6543\"],\n        [CustomerID = 3, Name = \"Paul\", Phone = \"543-7890\"],\n        [CustomerID = 4, Name = \"Ringo\", Phone = \"232-1550\"]\n    }),\n    1,\n    2\n)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.RemoveRowsWithErrors",
+    "signature": "Table.RemoveRowsWithErrors(table as table, optional columns as nullable list) as table",
+    "description": "Returns a table with the rows removed from the input table that contain an error in at least one of the cells. If a columns list is specified, then only the cells in the specified columns are inspected for errors.",
+    "examples": [
+      {
+        "usage": "Table.RemoveRowsWithErrors(\n    Table.FromRecords({\n        [Column1 = ...],\n        [Column1 = 2],\n        [Column1 = 3]\n    })\n)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.RenameColumns",
+    "signature": "Table.RenameColumns( table as table, renames as list, optional missingField as nullable number ) as table",
+    "description": "Performs the given renames to the columns in table `table`. A replacement operation `renames` consists of a list of two values, the old column name and new column name, provided in a list. If the column doesn't exist, an error is raised unless the optional parameter `missingField` specifies an alternative (eg. [`MissingField.UseNull`](missingfield-type.md) or [`MissingField.Ignore`](missingfield-type.md)).",
+    "examples": [
+      {
+        "usage": "Table.RenameColumns(\n    Table.FromRecords({[CustomerNum = 1, Name = \"Bob\", Phone = \"123-4567\"]}),\n    {\"CustomerNum\", \"CustomerID\"}\n)",
+        "output": "Table.FromRecords({[CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"]})"
+      },
+      {
+        "usage": "Table.RenameColumns(\n    Table.FromRecords({[CustomerNum = 1, Name = \"Bob\", PhoneNum = \"123-4567\"]}),\n    {\n        {\"CustomerNum\", \"CustomerID\"},\n        {\"PhoneNum\", \"Phone\"}\n    }\n)",
+        "output": "Table.FromRecords({[CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"]})"
+      },
+      {
+        "usage": "Table.RenameColumns(\n    Table.FromRecords({[CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"]}),\n    {\"NewCol\", \"NewColumn\"},\n    MissingField.Ignore\n)",
+        "output": "Table.FromRecords({[CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"]})"
+      }
+    ]
+  },
+  {
+    "name": "Table.ReorderColumns",
+    "signature": "Table.ReorderColumns( table as table, columnOrder as list, optional missingField as nullable number ) as table",
+    "description": "Returns a table from the input `table`, with the columns in the order specified by `columnOrder`. Columns that are not specified in the list will not be reordered. If the column doesn't exist, an error is raised unless the optional parameter `missingField` specifies an alternative (eg. [`MissingField.UseNull`](missingfield-type.md) or [`MissingField.Ignore`](missingfield-type.md)).",
+    "examples": [
+      {
+        "usage": "Table.ReorderColumns(\n    Table.FromRecords({[CustomerID = 1, Phone = \"123-4567\", Name = \"Bob\"]}),\n    {\"Name\", \"Phone\"}\n)",
+        "output": "Table.FromRecords({[CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"]})"
+      },
+      {
+        "usage": "Table.ReorderColumns(\n    Table.FromRecords({[CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"]}),\n    {\"Phone\", \"Address\"},\n    MissingField.Ignore\n)",
+        "output": "Table.FromRecords({[CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"]})"
+      }
+    ]
+  },
+  {
+    "name": "Table.Repeat",
+    "signature": "Table.Repeat(table as table, count as number) as table",
+    "description": "Returns a table with the rows from the input `table` repeated the specified `count` times.",
+    "examples": [
+      {
+        "usage": "Table.Repeat(\n    Table.FromRecords({\n        [a = 1, b = \"hello\"],\n        [a = 3, b = \"world\"]\n    }),\n    2\n)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.ReplaceErrorValues",
+    "signature": "Table.ReplaceErrorValues(table as table, errorReplacement as list) as table",
+    "description": "Replaces the error values in the specified columns of the `table` with the new values in the `errorReplacement` list. The format of the list is {{column1, value1}, ...}. There may only be one replacement value per column, specifying the column more than once will result in an error.",
+    "examples": [
+      {
+        "usage": "Table.ReplaceErrorValues(\n    Table.FromRows({{1, \"hello\"}, {3, ...}}, {\"A\", \"B\"}),\n    {\"B\", \"world\"}\n)",
+        "output": "`"
+      },
+      {
+        "usage": "Table.ReplaceErrorValues(\n    Table.FromRows({{..., ...}, {1, 2}}, {\"A\", \"B\"}),\n    {{\"A\", \"hello\"}, {\"B\", \"world\"}}\n)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.ReplaceKeys",
+    "signature": "Table.ReplaceKeys(table as table, keys as list) as table",
+    "description": "Replaces the keys of the specified table.",
+    "examples": [
+      {
+        "usage": "let\n    table = Table.FromRecords({\n        [Id = 1, Name = \"Hello There\"],\n        [Id = 2, Name = \"Good Bye\"]\n    }),\n    tableWithKeys = Table.AddKey(table, {\"Id\"}, true),\n    resultTable = Table.ReplaceKeys(tableWithKeys, {[Columns = {\"Id\"}, Primary = false]})\nin\n    resultTable",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.ReplaceMatchingRows",
+    "signature": "Table.ReplaceMatchingRows( table as table, replacements as list, optional equationCriteria as any ) as table",
+    "description": "Replaces all the specified rows in the `table` with the provided ones. The rows to replace and the replacements are specified in `replacements`, using {old, new} formatting. An optional `equationCriteria` parameter may be specified to control comparison between the rows of the table.",
+    "examples": [
+      {
+        "usage": "Table.ReplaceMatchingRows(\n    Table.FromRecords({\n        [a = 1, b = 2],\n        [a = 2, b = 3],\n        [a = 3, b = 4],\n        [a = 1, b = 2]\n    }),\n    {\n        {[a = 1, b = 2], [a = -1, b = -2]},\n        {[a = 2, b = 3], [a = -2, b = -3]}\n    }\n)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.ReplacePartitionKey",
+    "signature": "Table.ReplacePartitionKey(table as table, partitionKey as nullable list) as table",
+    "description": "Replaces the partition key of the specified table.",
+    "examples": []
+  },
+  {
+    "name": "Table.ReplaceRelationshipIdentity",
+    "signature": "Table.ReplaceRelationshipIdentity(value as any, identity as text) as any",
+    "description": "This function is intended for internal use only.",
+    "examples": []
+  },
+  {
+    "name": "Table.ReplaceRows",
+    "signature": "Table.ReplaceRows( table as table, offset as number, count as number, rows as list ) as table",
+    "description": "Replaces a specified number of rows, `count`, in the input `table` with the specified `rows`, beginning after the `offset`. The `rows` parameter is a list of records. * `table`: The table where the replacement is performed. * `offset`: The number of rows to skip before making the replacement. * `count`: The number of rows to replace. * `rows`: The list of row records to insert into the `table` at the location specified by the `offset`.",
+    "examples": [
+      {
+        "usage": "Table.ReplaceRows(\n    Table.FromRecords({\n        [Column1 = 1],\n        [Column1 = 2],\n        [Column1 = 3],\n        [Column1 = 4],\n        [Column1 = 5]\n    }),\n    1,\n    3,\n    {[Column1 = 6], [Column1 = 7]}\n)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.ReplaceValue",
+    "signature": "Table.ReplaceValue( table as table, oldValue as any, newValue as any, replacer as function, columnsToSearch as list ) as table",
+    "description": "Replaces a value with a new value in the specified columns of a table. * `table`: The table to search. * `oldValue`: The value to be replaced. * `newValue`: The replacement value. * `replacer`: The replacer function to use. The function can be either [`Replacer.ReplaceText`](replacer-replacetext.md) to replace the original text with new text, [`Replacer.ReplaceValue`](replacer-replacevalue.md) to replace the original value with a new value, or a custom replacer. * `columnsToSearch`: A list containing the specific column or columns in the table to search for the value to replace.",
+    "examples": [
+      {
+        "usage": "Table.ReplaceValue(\n    Table.FromRecords({\n        [A = 1, B = \"hello\"],\n        [A = 2, B = \"goodbye\"],\n        [A = 3, B = \"goodbyes\"]\n    }),\n    \"goodbye\",\n    \"world\",\n    Replacer.ReplaceValue,\n    {\"B\"}\n)",
+        "output": "`"
+      },
+      {
+        "usage": "Table.ReplaceValue(\n    Table.FromRecords({\n        [A = 1, B = \"hello\"],\n        [A = 2, B = \"wurld\"]\n    }),\n    \"ur\",\n    \"or\",\n    Replacer.ReplaceText,\n    {\"B\"}\n)",
+        "output": "`"
+      },
+      {
+        "usage": "Table.ReplaceValue(\n    Table.FromRecords({\n        [Name = \"Cindy\", Country = \"US\"],\n        [Name = \"Bob\", Country = \"CA\"]\n    }),\n    each if [Country] = \"US\" then [Name] else false,\n    each Text.Repeat(\"*\", Text.Length([Name])),\n    Replacer.ReplaceValue,\n    {\"Name\"}\n)",
+        "output": "`"
+      },
+      {
+        "usage": "Table.ReplaceValue(\n    Table.FromRecords({\n        [Name = \"Cindy\", Country = \"US\"],\n        [Name = \"Bob\", Country = \"CA\"]\n    }),\n    each [Country] = \"US\",\n    \"?\",\n    (currentValue, isUS, replacementValue) =>\n        if isUS then\n            Text.Repeat(replacementValue, Text.Length(currentValue))\n        else\n            currentValue,\n    {\"Name\", \"Country\"}\n)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.ReverseRows",
+    "signature": "Table.ReverseRows(table as table) as table",
+    "description": "Returns a table with the rows from the input `table` in reverse order.",
+    "examples": [
+      {
+        "usage": "Table.ReverseRows(\n    Table.FromRecords({\n        [CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"],\n        [CustomerID = 2, Name = \"Jim\", Phone = \"987-6543\"],\n        [CustomerID = 3, Name = \"Paul\", Phone = \"543-7890\"],\n        [CustomerID = 4, Name = \"Ringo\", Phone = \"232-1550\"]\n    })\n)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.RowCount",
+    "signature": "Table.RowCount(table as table) as number",
+    "description": "Returns the number of rows in the `table`.",
+    "examples": [
+      {
+        "usage": "Table.RowCount(\n    Table.FromRecords({\n        [CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"],\n        [CustomerID = 2, Name = \"Jim\", Phone = \"987-6543\"],\n        [CustomerID = 3, Name = \"Paul\", Phone = \"543-7890\"]\n    })\n)",
+        "output": "3"
+      }
+    ]
+  },
+  {
+    "name": "Table.Schema",
+    "signature": "Table.Schema(table as table) as table",
+    "description": "Returns a table describing the columns of `table`. Each row in the table describes the properties of a column of `table`: |**Column Name**|**Description**| |---|---| |`Name`|The name of the column.| |`Position`|The 0-based position of the column in `table`.| |`TypeName`|The name of the type of the column.| |`Kind`|The kind of the type of the column.| |`IsNullable`|Whether the column can contain `null` values.| |`NumericPrecisionBase`|The numeric base (for example, base-2 or base-10) of the `NumericPrecision` and `NumericScale` fields.| |`NumericPrecision`|The precision of a numeric column in the base specified by `NumericPrecisionBase`. This is the maximum number of digits that can be represented by a value of this type (including fractional digits).| |`NumericScale`|The scale of a numeric column in the base specified by `NumericPrecisionBase`. This is the number of digits in the fractional part of a value of this type. A value of `0` indicates a fixed scale with no fractional digits. A value of `null` indicates the scale is not known (either because it is floating or not defined).| |`DateTimePrecision`|The maximum number of fractional digits supported in the seconds portion of a date or time value.| |`MaxLength`|The maximum number of characters permitted in a `text` column, or the maximum number of bytes permitted in a `binary` column.| |`IsVariableLength`|Indicates whether this column can vary in length (up to `MaxLength`) or if it is of fixed size.| ||| |`NativeTypeName`|The name of the type of the column in the native type system of the source (for example, `nvarchar` for SQL Server).| |`NativeDefaultExpression`|The default expression for a value of this column in the native expression language of the source (for example, `42` or `newid()` for SQL Server).| ||| |`Description`|The description of the column.|",
+    "examples": []
+  },
+  {
+    "name": "Table.SelectColumns",
+    "signature": "Table.SelectColumns( table as table, columns as any, optional missingField as nullable number ) as table",
+    "description": "Returns the `table` with only the specified `columns`. * `table`: The provided table. * `columns`: The list of columns from the table `table` to return. Columns in the returned table are in the order listed in `columns`. * `missingField`: *(Optional)* What to do if the column does not exist. Example: [`MissingField.UseNull`](missingfield-type.md) or [`MissingField.Ignore`](missingfield-type.md).",
+    "examples": [
+      {
+        "usage": "Table.SelectColumns(\n    Table.FromRecords({\n        [CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"],\n        [CustomerID = 2, Name = \"Jim\", Phone = \"987-6543\"],\n        [CustomerID = 3, Name = \"Paul\", Phone = \"543-7890\"],\n        [CustomerID = 4, Name = \"Ringo\", Phone = \"232-1550\"]\n    }),\n    \"Name\"\n)",
+        "output": "`"
+      },
+      {
+        "usage": "Table.SelectColumns(\n    Table.FromRecords({[CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"]}),\n    {\"CustomerID\", \"Name\"}\n)",
+        "output": "Table.FromRecords({[CustomerID = 1, Name = \"Bob\"]})"
+      },
+      {
+        "usage": "Table.SelectColumns(\n    Table.FromRecords({[CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"]}),\n    \"NewColumn\"\n)",
+        "output": "[Expression.Error] The field 'NewColumn' of the record wasn't found."
+      },
+      {
+        "usage": "Table.SelectColumns(\n    Table.FromRecords({[CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"]}),\n    {\"CustomerID\", \"NewColumn\"},\n    MissingField.UseNull\n)",
+        "output": "Table.FromRecords({[CustomerID = 1, NewColumn = null]})"
+      }
+    ]
+  },
+  {
+    "name": "Table.SelectRows",
+    "signature": "Table.SelectRows(table as table, condition as function) as table",
+    "description": "Returns a table of rows from the `table`, that matches the selection `condition`.",
+    "examples": [
+      {
+        "usage": "Table.SelectRows(\n    Table.FromRecords({\n        [CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"],\n        [CustomerID = 2, Name = \"Jim\", Phone = \"987-6543\"],\n        [CustomerID = 3, Name = \"Paul\", Phone = \"543-7890\"],\n        [CustomerID = 4, Name = \"Ringo\", Phone = \"232-1550\"]\n    }),\n    each [CustomerID] > 2\n)",
+        "output": "`"
+      },
+      {
+        "usage": "Table.SelectRows(\n    Table.FromRecords({\n        [CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"],\n        [CustomerID = 2, Name = \"Jim\", Phone = \"987-6543\"],\n        [CustomerID = 3, Name = \"Paul\", Phone = \"543-7890\"],\n        [CustomerID = 4, Name = \"Ringo\", Phone = \"232-1550\"]\n    }),\n    each not Text.Contains([Name], \"B\")\n)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.SelectRowsWithErrors",
+    "signature": "Table.SelectRowsWithErrors(table as table, optional columns as nullable list) as table",
+    "description": "Returns a table with only those rows of the input table that contain an error in at least one of the cells. If a columns list is specified, then only the cells in the specified columns are inspected for errors.",
+    "examples": [
+      {
+        "usage": "Table.SelectRowsWithErrors(\n    Table.FromRecords({\n        [CustomerID = ..., Name = \"Bob\", Phone = \"123-4567\"],\n        [CustomerID = 2, Name = \"Jim\", Phone = \"987-6543\"],\n        [CustomerID = 3, Name = \"Paul\", Phone = \"543-7890\"],\n        [CustomerID = 4, Name = \"Ringo\", Phone = \"232-1550\"]\n    })\n)[Name]",
+        "output": "{\"Bob\"}"
+      }
+    ]
+  },
+  {
+    "name": "Table.SingleRow",
+    "signature": "Table.SingleRow(table as table) as record",
+    "description": "Returns the single row in the one row `table`. If the `table` has more than one row, an error is raised.",
+    "examples": [
+      {
+        "usage": "Table.SingleRow(Table.FromRecords({[CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"]}))",
+        "output": "[CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"]"
+      }
+    ]
+  },
+  {
+    "name": "Table.Skip",
+    "signature": "Table.Skip(table as table, optional countOrCondition as any) as table",
+    "description": "Returns a table that does not contain the first specified number of rows, `countOrCondition`, of the table `table`. The number of rows skipped depends on the optional parameter `countOrCondition`. * If `countOrCondition` is omitted only the first row is skipped. * If `countOrCondition` is a number, that many rows (starting at the top) will be skipped. * If `countOrCondition` is a condition, the rows that meet the condition will be skipped until a row does not meet the condition.",
+    "examples": [
+      {
+        "usage": "Table.Skip(\n    Table.FromRecords({\n        [CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"],\n        [CustomerID = 2, Name = \"Jim\", Phone = \"987-6543\"],\n        [CustomerID = 3, Name = \"Paul\", Phone = \"543-7890\"],\n        [CustomerID = 4, Name = \"Ringo\", Phone = \"232-1550\"]\n    }),\n    1\n)",
+        "output": "`"
+      },
+      {
+        "usage": "Table.Skip(\n    Table.FromRecords({\n        [CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"],\n        [CustomerID = 2, Name = \"Jim\", Phone = \"987-6543\"],\n        [CustomerID = 3, Name = \"Paul\", Phone = \"543-7890\"],\n        [CustomerID = 4, Name = \"Ringo\", Phone = \"232-1550\"]\n    }),\n    2\n)",
+        "output": "`"
+      },
+      {
+        "usage": "Table.Skip(\n    Table.FromRecords({\n        [OrderID = 1, CustomerID = 1, Item = \"Fishing rod\", Price = 100.0],\n        [OrderID = 2, CustomerID = 1, Item = \"1 lb. worms\", Price = 5.0],\n        [OrderID = 3, CustomerID = 2, Item = \"Fishing net\", Price = 25.0],\n        [OrderID = 4, CustomerID = 3, Item = \"Fish tazer\", Price = 200.0],\n        [OrderID = 5, CustomerID = 3, Item = \"Bandaids\", Price = 2.0],\n        [OrderID = 6, CustomerID = 1, Item = \"Tackle box\", Price = 20.0],\n        [OrderID = 7, CustomerID = 5, Item = \"Bait\", Price = 3.25],\n        [OrderID = 8, CustomerID = 5, Item = \"Fishing Rod\", Price = 100.0],\n        [OrderID = 9, CustomerID = 6, Item = \"Bait\", Price = 3.25]\n    }),\n    each [Price] > 25\n)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.Sort",
+    "signature": "Table.Sort(table as table, comparisonCriteria as any) as table",
+    "description": "Sorts the `table` using the list of one or more column names and optional `comparisonCriteria` in the form { { col1, comparisonCriteria }, {col2} }.",
+    "examples": [
+      {
+        "usage": "Table.Sort(\n    Table.FromRecords({\n        [OrderID = 1, CustomerID = 1, Item = \"Fishing rod\", Price = 100.0],\n        [OrderID = 2, CustomerID = 1, Item = \"1 lb. worms\", Price = 5.0],\n        [OrderID = 3, CustomerID = 2, Item = \"Fishing net\", Price = 25.0],\n        [OrderID = 4, CustomerID = 3, Item = \"Fish tazer\", Price = 200.0],\n        [OrderID = 5, CustomerID = 3, Item = \"Bandaids\", Price = 2.0],\n        [OrderID = 6, CustomerID = 1, Item = \"Tackle box\", Price = 20.0],\n        [OrderID = 7, CustomerID = 5, Item = \"Bait\", Price = 3.25],\n        [OrderID = 8, CustomerID = 5, Item = \"Fishing Rod\", Price = 100.0],\n        [OrderID = 9, CustomerID = 6, Item = \"Bait\", Price = 3.25]\n    }),\n    {\"OrderID\"}\n)",
+        "output": "`"
+      },
+      {
+        "usage": "Table.Sort(\n    Table.FromRecords({\n        [OrderID = 1, CustomerID = 1, Item = \"Fishing rod\", Price = 100.0],\n        [OrderID = 2, CustomerID = 1, Item = \"1 lb. worms\", Price = 5.0],\n        [OrderID = 3, CustomerID = 2, Item = \"Fishing net\", Price = 25.0],\n        [OrderID = 4, CustomerID = 3, Item = \"Fish tazer\", Price = 200.0],\n        [OrderID = 5, CustomerID = 3, Item = \"Bandaids\", Price = 2.0],\n        [OrderID = 6, CustomerID = 1, Item = \"Tackle box\", Price = 20.0],\n        [OrderID = 7, CustomerID = 5, Item = \"Bait\", Price = 3.25],\n        [OrderID = 8, CustomerID = 5, Item = \"Fishing Rod\", Price = 100.0],\n        [OrderID = 9, CustomerID = 6, Item = \"Bait\", Price = 3.25]\n    }),\n    {\"OrderID\", Order.Descending}\n)",
+        "output": "`"
+      },
+      {
+        "usage": "Table.Sort(\n    Table.FromRecords({\n        [OrderID = 1, CustomerID = 1, Item = \"Fishing rod\", Price = 100.0],\n        [OrderID = 2, CustomerID = 1, Item = \"1 lb. worms\", Price = 5.0],\n        [OrderID = 3, CustomerID = 2, Item = \"Fishing net\", Price = 25.0],\n        [OrderID = 4, CustomerID = 3, Item = \"Fish tazer\", Price = 200.0],\n        [OrderID = 5, CustomerID = 3, Item = \"Bandaids\", Price = 2.0],\n        [OrderID = 6, CustomerID = 1, Item = \"Tackle box\", Price = 20.0],\n        [OrderID = 7, CustomerID = 5, Item = \"Bait\", Price = 3.25],\n        [OrderID = 8, CustomerID = 5, Item = \"Fishing Rod\", Price = 100.0],\n        [OrderID = 9, CustomerID = 6, Item = \"Bait\", Price = 3.25]\n    }),\n    {\n        {\"CustomerID\", Order.Ascending},\n        \"OrderID\"\n    }\n)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.Split",
+    "signature": "Table.Split(table as table, pageSize as number) as list",
+    "description": "Splits `table` into a list of tables where the first element of the list is a table containing the first `pageSize` rows from the source table, the next element of the list is a table containing the next `pageSize` rows from the source table, and so on.",
+    "examples": [
+      {
+        "usage": "let\n    Customers = Table.FromRecords({\n        [CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"],\n        [CustomerID = 2, Name = \"Jim\", Phone = \"987-6543\"],\n        [CustomerID = 3, Name = \"Paul\", Phone = \"543-7890\"],\n        [CustomerID = 4, Name = \"Cristina\", Phone = \"232-1550\"],\n        [CustomerID = 5, Name = \"Anita\", Phone = \"530-1459\"]\n    })\nin\n    Table.Split(Customers, 2)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.SplitAt",
+    "signature": "Table.SplitAt(table as table, count as number) as list",
+    "description": "Returns a list containing two tables: a table with the first N rows of `table` (as specified by `count`) and a table containing the remaining rows of `table`. If the tables of the resulting list are enumerated exactly once and in order, the function will enumerate `table` only once.",
+    "examples": [
+      {
+        "usage": "Table.SplitAt(#table({\"a\", \"b\", \"c\"}, {{1, 2, 3}, {4, 5, 6}, {7, 8, 9}}), 2)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.SplitColumn",
+    "signature": "Table.SplitColumn( table as table, sourceColumn as text, splitter as function, optional columnNamesOrNumber as any, optional default as any, optional extraColumns as any ) as table",
+    "description": "Splits the specified column into a set of additional columns using the specified splitter function. * `table`: The table containing the column to split. * `sourceColumn`: The name of the column to split. * `splitter`: The [splitter function](splitter-functions.md) used to split the column (for example, [`Splitter.SplitTextByDelimiter`](splitter-splittextbydelimiter.md) or [`Splitter.SplitTextByPositions`](splitter-splittextbypositions.md)). * `columnNamesOrNumber`: Either a list of new column names to create, or the number of new columns. * `default`: Overrides the value used when there aren't enough split values to fill all of the new columns. The default for this parameter is `null`. * `extraColumns`: Specifies what to do if there might be more split values than the number of new columns. You can pass an [`ExtraValues.Type`](extravalues-type.md) enumeration value to this parameter. The default is [`ExtraValues.Ignore`](extravalues-type.md).",
+    "examples": [
+      {
+        "usage": "let\n    Source = #table(type table[CustomerID = number, Name = text, Phone = text],\n    {\n        {1, \"Bob White\", \"123-4567\"},\n        {2, \"Jim Smith\", \"987-6543\"},\n        {3, \"Paul\", \"543-7890\"},\n        {4, \"Cristina Best\", \"232-1550\"}\n    }),\n    SplitColumns = Table.SplitColumn(\n        Source,\n        \"Name\",\n        Splitter.SplitTextByDelimiter(\" \"))\nin\n    SplitColumns",
+        "output": "`"
+      },
+      {
+        "usage": "let\n    Source = #table(type table[CustomerID = number, Name = text, Phone = text],\n    {\n        {1, \"Bob White\", \"123-4567\"},\n        {2, \"Jim Smith\", \"987-6543\"},\n        {3, \"Paul\", \"543-7890\"},\n        {4, \"Cristina Best\", \"232-1550\"}\n    }),\n    SplitColumns = Table.SplitColumn(\n        Source,\n        \"Name\",\n        Splitter.SplitTextByDelimiter(\" \"),\n        {\"First Name\", \"Last Name\"})\nin\n    SplitColumns",
+        "output": "`"
+      },
+      {
+        "usage": "let\n    Source = #table(type table[CustomerID = number, Name = text, Phone = text],\n    {\n        {1, \"Bob White\", \"123-4567\"},\n        {2, \"Jim Smith\", \"987-6543\"},\n        {3, \"Paul\", \"543-7890\"},\n        {4, \"Cristina Best\", \"232-1550\"}\n    }),\n    SplitColumns = Table.SplitColumn(\n        Source,\n        \"Name\",\n        Splitter.SplitTextByDelimiter(\" \"),\n        {\"First Name\", \"Last Name\"},\n        \"-No Entry-\")\nin\n    SplitColumns",
+        "output": "`"
+      },
+      {
+        "usage": "let\n    Source = #table(type table[CustomerID = number, Name = text, Phone = text],\n    {\n        {1, \"Bob White\", \"123-4567\"},\n        {2, \"Jim Smith\", \"987-6543\"},\n        {3, \"Paul Green\", \"543-7890\"},\n        {4, \"Cristina J. Best\", \"232-1550\"}\n    }),\n    SplitColumns = Table.SplitColumn(\n        Source,\n        \"Name\",\n        Splitter.SplitTextByDelimiter(\" \"),\n        {\"First Name\", \"Last Name\"},\n        null,\n        ExtraValues.List)\nin\n    SplitColumns",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.StopFolding",
+    "signature": "Table.StopFolding(table as table) as table",
+    "description": "Prevents any downstream operations from being run against the original source of the data in `table`.",
+    "examples": [
+      {
+        "usage": "let\n    Source = Sql.Database(\"SomeSQLServer\", \"MyDb\"),\n    MyTable = Source{[Item=\"MyTable\"]}[Data],\n    MyLocalTable = Table.StopFolding(MyTable)\nin\n    MyLocalTable",
+        "output": "table"
+      }
+    ]
+  },
+  {
+    "name": "Table.ToColumns",
+    "signature": "Table.ToColumns(table as table) as list",
+    "description": "Creates a list of nested lists from the table, `table`. Each list item is an inner list that contains the column values.",
+    "examples": [
+      {
+        "usage": "Table.ToColumns(\n    Table.FromRecords({\n        [CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"],\n        [CustomerID = 2, Name = \"Jim\", Phone = \"987-6543\"]\n    })\n)",
+        "output": "{{1, 2}, {\"Bob\", \"Jim\"}, {\"123-4567\", \"987-6543\"}}"
+      }
+    ]
+  },
+  {
+    "name": "Table.ToList",
+    "signature": "Table.ToList(table as table, optional combiner as nullable function) as list",
+    "description": "Converts a table into a list by applying the specified combining function to each row of values in the table.",
+    "examples": [
+      {
+        "usage": "Table.ToList(\n    Table.FromRows({\n        {Number.ToText(1), \"Bob\", \"123-4567\"},\n        {Number.ToText(2), \"Jim\", \"987-6543\"},\n        {Number.ToText(3), \"Paul\", \"543-7890\"}\n    }),\n    Combiner.CombineTextByDelimiter(\",\")\n)",
+        "output": "{\"1,Bob,123-4567\", \"2,Jim,987-6543\", \"3,Paul,543-7890\"}"
+      }
+    ]
+  },
+  {
+    "name": "Table.ToRecords",
+    "signature": "Table.ToRecords(table as table) as list",
+    "description": "Converts a table, `table`, to a list of records.",
+    "examples": [
+      {
+        "usage": "Table.ToRecords(\n    Table.FromRows(\n        {\n            {1, \"Bob\", \"123-4567\"},\n            {2, \"Jim\", \"987-6543\"},\n            {3, \"Paul\", \"543-7890\"}\n        },\n        {\"CustomerID\", \"Name\", \"Phone\"}\n    )\n)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.ToRows",
+    "signature": "Table.ToRows(table as table) as list",
+    "description": "Creates a list of nested lists from the table, `table`. Each list item is an inner list that contains the row values.",
+    "examples": [
+      {
+        "usage": "Table.ToRows(\n    Table.FromRecords({\n        [CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"],\n        [CustomerID = 2, Name = \"Jim\", Phone = \"987-6543\"],\n        [CustomerID = 3, Name = \"Paul\", Phone = \"543-7890\"]\n    })\n)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.TransformColumnNames",
+    "signature": "Table.TransformColumnNames( table as table, nameGenerator as function, optional options as nullable record ) as table",
+    "description": "Transforms column names by using the given `nameGenerator` function. Valid options: `MaxLength` specifies the maximum length of new column names. If the given function results with a longer column name, the long name will be trimmed. `Comparer` is used to control the comparison while generating new column names. Comparers can be used to provide case-insensitive or culture and locale-aware comparisons. The following built-in comparers are available in the formula language: * [`Comparer.Ordinal`](comparer-ordinal.md): Used to perform an exact ordinal comparison * [`Comparer.OrdinalIgnoreCase`](comparer-ordinalignorecase.md): Used to perform an exact ordinal case-insensitive comparison * [`Comparer.FromCulture`](comparer-fromculture.md): Used to perform a culture-aware comparison",
+    "examples": [
+      {
+        "usage": "Table.TransformColumnNames(Table.FromRecords({[#\"Col#(tab)umn\" = 1]}), Text.Clean)",
+        "output": "Table.FromRecords({[Column = 1]})"
+      },
+      {
+        "usage": "Table.TransformColumnNames(\n    Table.FromRecords({[ColumnNum = 1, cOlumnnum = 2, coLumnNUM = 3]}),\n    Text.Clean,\n    [MaxLength = 6, Comparer = Comparer.OrdinalIgnoreCase]\n)",
+        "output": "Table.FromRecords({[Column = 1, cOlum1 = 2, coLum2 = 3]})"
+      }
+    ]
+  },
+  {
+    "name": "Table.TransformColumnTypes",
+    "signature": "Table.TransformColumnTypes( table as table, typeTransformations as list, optional culture as any ) as table",
+    "description": "Returns a table by applying the transform operations to the specified columns using an optional culture. * `table`: The input table to transform. * `typeTransformations`: The type transformations to apply. The format for a single transformation is { column name, type value }. A list of transformations can be used to change the types of more than one column at a time. If a column doesn't exist, an error is raised. * `culture`: (Optional) The culture to use when transforming the column types (for example, \"en-US\"). If a record is specified for `culture`, it can contain the following fields: * `Culture`: The culture to use when transforming the column types (for example, \"en-US\"). * `MissingField`: If a column doesn't exist, an error is raised unless this field provides an alternative behavior (for example, [`MissingField.UseNull`](missingfield-type.md) or [`MissingField.Ignore`](missingfield-type.md)). The type value in the `typeTransformations` parameter can be `any`, all of the `number` types, `text`, all of the `date`, `time`, `datetime`, `datetimezone`, and `duration` types, `logical`, or `binary`. The `list`, `record`, `table`, or `function` types aren't valid for this parameter. For each column listed in `typeTransformations`, the \".From\" method corresponding to the specified type value is normally used to perform the transformation. For example, if a [`Currency.Type`](type-conversion.md#commonly-used-types) type value is given for a column, the transformation function [`Currency.From`](currency-from.md) is applied to each value in that column.",
+    "examples": [
+      {
+        "usage": "let\n    Source = #table(type table [a = number, b = number],\n    {\n        {1, 2},\n        {3, 4}\n    }),\n    #\"Transform Column\" = Table.TransformColumnTypes(\n        Source,\n        {\"a\", type text}\n    )\nin\n    #\"Transform Column\"",
+        "output": "`"
+      },
+      {
+        "usage": "let\n    Source = #table(type table [Company ID = text, Country = text, Date = date],\n    {\n        {\"JS-464\", \"USA\", #date(2024, 3, 24)},\n        {\"LT-331\", \"France\", #date(2024, 10, 5)},\n        {\"XE-100\", \"USA\", #date(2024, 5, 21)},\n        {\"RT-430\", \"Germany\", #date(2024, 1,18)},\n        {\"LS-005\", \"France\", #date(2023, 12, 31)},\n        {\"UW-220\", \"Germany\", #date(2024, 2, 25)}\n    }),\n    #\"Transform Column\" = Table.TransformColumnTypes(\n        Source,\n        {\"Date\", type text},\n        \"fr-FR\"\n    )\nin\n    #\"Transform Column\"",
+        "output": "`"
+      },
+      {
+        "usage": "let\n    Source = #table(type table [Date = date, Customer ID = text, Value = number],\n    {\n        {#date(2024, 3, 12), \"134282\", .24368},\n        {#date(2024, 5, 30), \"44343\", .03556},\n        {#date(2023, 12, 14), \"22\", .3834}\n    }),\n    #\"Transform Columns\" = Table.TransformColumnTypes(\n        Source,\n        {{\"Date\", type text}, {\"Value\", Percentage.Type}},\n        \"de-DE\")\nin\n    #\"Transform Columns\"",
+        "output": "`"
+      },
+      {
+        "usage": "let\n    Source = #table(type table [Company ID = text, Country = text, Date = date],\n    {\n        {\"JS-464\", \"USA\", #date(2024, 3, 24)},\n        {\"LT-331\", \"France\", #date(2024, 10, 5)},\n        {\"XE-100\", \"USA\", #date(2024, 5, 21)},\n        {\"RT-430\", \"Germany\", #date(2024, 1,18)},\n        {\"LS-005\", \"France\", #date(2023, 12, 31)},\n        {\"UW-220\", \"Germany\", #date(2024, 2, 25)}\n    }),\n    #\"Transform Column\" = Table.TransformColumnTypes(\n        Source,\n        {{\"Date\", type text}, {\"NewColumn\", type number}},\n        [Culture=\"fr-FR\", MissingField=MissingField.UseNull]\n    )\nin\n    #\"Transform Column\"",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.TransformColumns",
+    "signature": "Table.TransformColumns( table as table, transformOperations as list, optional defaultTransformation as nullable function, optional missingField as nullable number ) as table",
+    "description": "Transforms the specified table by applying each column operation in a list. * `table`: The table to transform. * `transformOperations`: The transformations to make to the table. The format of this parameter is either { column name, transformation } or { column name, transformation, new column type }. * `defaultTransformation`: (Optional) The default transformation applied to all columns not listed in `transformOperations`. * `missingField`: (Optional) Specifies the expected action for missing values. If a column listed in `transformOperations` doesn't exist, an error is raised ([`MissingField.Error`](missingfield-type.md)) unless this parameter specifies an alternative. Use one of the following values: * [`MissingField.UseNull`](missingfield-type.md): Any missing fields are included as `null` values. * [`MissingField.Ignore`](missingfield-type.md): Any missing fields are ignored.",
+    "examples": [
+      {
+        "usage": "Table.TransformColumns(\n    Table.FromRecords({\n        [A = \"1\", B = 2],\n        [A = \"5\", B = 10]\n    }),\n    {\n        {\"A\", Number.FromText},\n        {\"B\", Text.From}\n    }\n)",
+        "output": "`"
+      },
+      {
+        "usage": "Table.TransformColumns(\n    Table.FromRecords({\n        [A = \"1\", B = 2],\n        [A = \"5\", B = 10]\n    }),\n    {\"X\", Number.FromText},\n    null,\n    MissingField.UseNull\n)",
+        "output": "`"
+      },
+      {
+        "usage": "Table.TransformColumns(\n    Table.FromRecords({\n        [A = \"1\", B = 2],\n        [A = \"5\", B = 10]\n    }),\n    {\"B\", each Text.From(_ + 1), type text},\n    Number.FromText\n)",
+        "output": "`"
+      },
+      {
+        "usage": "let\n    MaintenanceSchedule = #table(type table [Task = text, Date = date],\n    {\n        {\"HVAC Check\", #date(2025, 7, 10)},         // Not a holiday\n        {\"Window Washing\", #date(2025, 9, 1)},      // Labor Day\n        {\"Fire Drill\", #date(2025, 9, 17)},         // Not a holiday\n        {\"Light Replacement\", #date(2025, 11, 27)}  // Thanksgiving\n    }),\n    USHolidays = {\n        #date(2025, 1, 1),   // New Year's Day\n        #date(2025, 7, 4),   // Independence Day\n        #date(2025, 9, 1),   // Labor Day\n        #date(2025, 11, 27), // Thanksgiving\n        #date(2025, 12, 25)  // Christmas\n    },\n    AdjustedSchedule = Table.TransformColumns(\n        MaintenanceSchedule,\n        {{\"Date\", each if List.Contains(USHolidays, _) then\n            if Date.DayOfWeek(_, Day.Sunday) = 5 then\n                Date.AddDays(_, 3)     // Friday to Monday\n            else\n                Date.AddDays(_, 1)     // Other to next day\n        else _, type date}}\n    )\nin\n    AdjustedSchedule",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.TransformRows",
+    "signature": "Table.TransformRows(table as table, transform as function) as list",
+    "description": "Creates a `list` by applying the `transform` operation to each row in `table`.",
+    "examples": [
+      {
+        "usage": "Table.TransformRows(\n    Table.FromRecords({\n        [a = 1],\n        [a = 2],\n        [a = 3],\n        [a = 4],\n        [a = 5]\n    }),\n    each [a]\n)",
+        "output": "{1, 2, 3, 4, 5}"
+      },
+      {
+        "usage": "Table.TransformRows(\n    Table.FromRecords({\n        [a = 1],\n        [a = 2],\n        [a = 3],\n        [a = 4],\n        [a = 5]\n    }),\n    (row) as record => [B = Number.ToText(row[a])]\n)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.Transpose",
+    "signature": "Table.Transpose(table as table, optional columns as any) as table",
+    "description": "Makes columns into rows and rows into columns.",
+    "examples": [
+      {
+        "usage": "Table.Transpose(\n    Table.FromRecords({\n        [Name = \"Full Name\", Value = \"Fred\"],\n        [Name = \"Age\", Value = 42],\n        [Name = \"Country\", Value = \"UK\"]\n    })\n)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.Unpivot",
+    "signature": "Table.Unpivot( table as table, pivotColumns as list, attributeColumn as text, valueColumn as text ) as table",
+    "description": "Translates a set of columns in a table into attribute-value pairs, combined with the rest of the values in each row.",
+    "examples": [
+      {
+        "usage": "Table.Unpivot(\n    Table.FromRecords({\n        [key = \"x\", a = 1, b = null, c = 3],\n        [key = \"y\", a = 2, b = 4, c = null]\n    }),\n    {\"a\", \"b\", \"c\"},\n    \"attribute\",\n    \"value\"\n)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.UnpivotOtherColumns",
+    "signature": "Table.UnpivotOtherColumns( table as table, pivotColumns as list, attributeColumn as text, valueColumn as text ) as table",
+    "description": "Translates all columns other than a specified set into attribute-value pairs, combined with the rest of the values in each row.",
+    "examples": [
+      {
+        "usage": "Table.UnpivotOtherColumns(\n    Table.FromRecords({\n        [key = \"key1\", attribute1 = 1, attribute2 = 2, attribute3 = 3],\n        [key = \"key2\", attribute1 = 4, attribute2 = 5, attribute3 = 6]\n    }),\n    {\"key\"},\n    \"column1\",\n    \"column2\"\n)",
+        "output": "`"
+      }
+    ]
+  },
+  {
+    "name": "Table.View",
+    "signature": "Table.View(table as nullable table, handlers as record) as table",
+    "description": "Returns a view of `table` where the functions specified in `handlers` are used in lieu of the default behavior of an operation when the operation is applied to the view. If `table` is provided, all handler functions are optional. If `table` isn't provided, the `GetType` and `GetRows` handler functions are required. If a handler function isn't specified for an operation, the default behavior of the operation is applied to `table` instead (except in the case of `GetExpression`). Handler functions must return a value that is semantically equivalent to the result of applying the operation against `table` (or the resulting view in the case of `GetExpression`). If a handler function raises an error, the default behavior of the operation is applied to the view. `Table.View` can be used to implement folding to a data source – the translation of M queries into source-specific queries (for example, to create T-SQL statements from M queries). Refer to the published [Power Query custom connector documentation](/power-query/samples/trippin/10-tableview1/readme#using-tableview) for a more complete description of `Table.View`.",
+    "examples": [
+      {
+        "usage": "Table.View(\n    null,\n    [\n        GetType = () => type table [CustomerID = number, Name = text, Phone = nullable text],\n        GetRows = () => Table.FromRecords({[CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"]}),\n        GetRowCount = () => 1\n    ]\n)",
+        "output": "Table.FromRecords({[CustomerID = 1, Name = \"Bob\", Phone = \"123-4567\"]})"
+      }
+    ]
+  },
+  {
+    "name": "Table.ViewError",
+    "signature": "Table.ViewError(errorRecord as record) as record",
+    "description": "Creates a modified error record from `errorRecord` which won't trigger a fallback when raised by a handler defined on a view (via [`Table.View`](table-view.md)).",
+    "examples": []
+  },
+  {
+    "name": "Table.ViewFunction",
+    "signature": "Table.ViewFunction(function as function) as function",
+    "description": "Creates a view function based on `function` that can be handled in a view created by [`Table.View`](table-view.md). The `OnInvoke` handler of [`Table.View`](table-view.md) can be used to define a handler for the view function. As with the handlers for built-in operations, if no `OnInvoke` handler is specified, or if it does not handle the view function, or if an error is raised by the handler, `function` is applied on top of the view. Refer to the published [Power Query custom connector documentation](/power-query/samples/trippin/10-tableview1/readme#using-tableview) for a more complete description of [`Table.View`](table-view.md) and custom view functions.",
+    "examples": []
+  },
+  {
+    "name": "Table.WithErrorContext",
+    "signature": "Table.WithErrorContext(value as any, context as text) as any",
+    "description": "This function is intended for internal use only.",
+    "examples": []
+  }
+]

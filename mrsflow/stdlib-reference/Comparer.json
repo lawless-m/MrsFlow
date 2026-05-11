@@ -1,0 +1,50 @@
+[
+  {
+    "name": "Comparer.Equals",
+    "signature": "Comparer.Equals( comparer as function, x as any, y as any ) as logical",
+    "description": "Returns a `logical` value based on the equality check over the two given values, `x` and `y`, using the provided `comparer`. `comparer` is a `Comparer` which is used to control the comparison. A comparer is a function that accepts two arguments and returns -1, 0, or 1 based on whether the first value is less than, equal to, or greater than the second. Comparers can be used to provide case-insensitive or culture and locale-aware comparisons. The following built-in comparers are available in the formula language: * [`Comparer.Ordinal`](comparer-ordinal.md): Used to perform an exact ordinal comparison * [`Comparer.OrdinalIgnoreCase`](comparer-ordinalignorecase.md): Used to perform an exact ordinal case-insensitive comparison * [`Comparer.FromCulture`](comparer-fromculture.md): Used to perform a culture-aware comparison",
+    "examples": [
+      {
+        "usage": "Comparer.Equals(Comparer.FromCulture(\"en-US\"), \"1\", \"A\")",
+        "output": "false"
+      }
+    ]
+  },
+  {
+    "name": "Comparer.FromCulture",
+    "signature": "Comparer.FromCulture(culture as text, optional ignoreCase as nullable logical) as function",
+    "description": "Returns a comparer function that uses the `culture` and the case-sensitivity specified by `ignoreCase` to perform comparisons. A comparer function accepts two arguments and returns -1, 0, or 1 based on whether the first value is less than, equal to, or greater than the second. The default value for `ignoreCase` is false. The `culture` should be one of the locales supported by the .NET framework (for example, \"en-US\").",
+    "examples": [
+      {
+        "usage": "Comparer.FromCulture(\"en-US\")(\"a\", \"A\")",
+        "output": "-1"
+      },
+      {
+        "usage": "Comparer.FromCulture(\"en-US\", true)(\"a\", \"A\")",
+        "output": "0"
+      }
+    ]
+  },
+  {
+    "name": "Comparer.Ordinal",
+    "signature": "Comparer.Ordinal(x as any, y as any) as number",
+    "description": "Returns a comparer function which uses Ordinal rules to compare the provided values `x` and `y`. A comparer function accepts two arguments and returns -1, 0, or 1 based on whether the first value is less than, equal to, or greater than the second.",
+    "examples": [
+      {
+        "usage": "Comparer.Equals(Comparer.Ordinal, \"encyclopædia\", \"encyclopaedia\")",
+        "output": "false"
+      }
+    ]
+  },
+  {
+    "name": "Comparer.OrdinalIgnoreCase",
+    "signature": "Comparer.OrdinalIgnoreCase(x as any, y as any) as number",
+    "description": "Returns a case-insensitive comparer function which uses Ordinal rules to compare the provided values `x` and `y`. A comparer function accepts two arguments and returns -1, 0, or 1 based on whether the first value is less than, equal to, or greater than the second.",
+    "examples": [
+      {
+        "usage": "Comparer.OrdinalIgnoreCase(\"Abc\", \"abc\")",
+        "output": "0"
+      }
+    ]
+  }
+]

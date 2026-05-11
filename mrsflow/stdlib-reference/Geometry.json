@@ -1,0 +1,14 @@
+[
+  {
+    "name": "Geometry.FromWellKnownText",
+    "signature": "Geometry.FromWellKnownText(input as nullable text) as nullable record",
+    "description": "Translates text representing a geometric value in Well-Known Text (WKT) format into a structured record. WKT is a standard format defined by the Open Geospatial Consortium (OGC) and is the typical serialization format used by databases including SQL Server.",
+    "examples": []
+  },
+  {
+    "name": "Geometry.ToWellKnownText",
+    "signature": "Geometry.ToWellKnownText(input as nullable record, optional omitSRID as nullable logical) as nullable text",
+    "description": "Translates a structured geometric point value into its Well-Known Text (WKT) representation as defined by the Open Geospatial Consortium (OGC), also the serialization format used by many databases including SQL Server.",
+    "examples": []
+  }
+]

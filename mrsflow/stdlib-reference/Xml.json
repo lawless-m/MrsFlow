@@ -1,0 +1,19 @@
+[
+  {
+    "name": "Xml.Document",
+    "signature": "Xml.Document(contents as any, optional encoding as nullable number) as table",
+    "description": "Returns the contents of the XML document as a hierarchical table.",
+    "examples": []
+  },
+  {
+    "name": "Xml.Tables",
+    "signature": "Xml.Tables( contents as any, optional options as nullable record, optional encoding as nullable number ) as table",
+    "description": "Returns the contents of the XML document as a nested collection of flattened tables.",
+    "examples": [
+      {
+        "usage": "Xml.Tables(File.Contents(\"C:\\invoices.xml\"))",
+        "output": "table"
+      }
+    ]
+  }
+]

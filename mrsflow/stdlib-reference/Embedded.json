@@ -1,0 +1,8 @@
+[
+  {
+    "name": "Embedded.Value",
+    "signature": "Embedded.Value(value as any, path as text) as any",
+    "description": "This function is intended for internal use only.",
+    "examples": []
+  }
+]

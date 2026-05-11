@@ -1,0 +1,24 @@
+[
+  {
+    "name": "Replacer.ReplaceText",
+    "signature": "Replacer.ReplaceText( text as nullable text, old as text, new as text ) as nullable text",
+    "description": "Replaces the `old` text in the original `text` with the `new` text. This replacer function can be used in [`List.ReplaceValue`](list-replacevalue.md) and [`Table.ReplaceValue`](table-replacevalue.md).",
+    "examples": [
+      {
+        "usage": "Replacer.ReplaceText(\"hEllo world\", \"hE\", \"He\")",
+        "output": "\"Hello world\""
+      }
+    ]
+  },
+  {
+    "name": "Replacer.ReplaceValue",
+    "signature": "Replacer.ReplaceValue( value as any, old as any, new as any ) as any",
+    "description": "Replaces the `old` value in the original `value` with the `new` value. This replacer function can be used in [`List.ReplaceValue`](list-replacevalue.md) and [`Table.ReplaceValue`](table-replacevalue.md).",
+    "examples": [
+      {
+        "usage": "Replacer.ReplaceValue(11, 11, 10)",
+        "output": "10"
+      }
+    ]
+  }
+]

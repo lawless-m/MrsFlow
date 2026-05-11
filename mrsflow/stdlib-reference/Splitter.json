@@ -1,0 +1,135 @@
+[
+  {
+    "name": "Splitter.SplitByNothing",
+    "signature": "Splitter.SplitByNothing() as function",
+    "description": "Returns a function that does no splitting, returning its argument as a single element list.",
+    "examples": []
+  },
+  {
+    "name": "Splitter.SplitTextByAnyDelimiter",
+    "signature": "Splitter.SplitTextByAnyDelimiter( delimiters as list, optional quoteStyle as nullable number, optional startAtEnd as nullable logical ) as function",
+    "description": "Returns a function that splits text into a list of text at any of the specified delimiters.",
+    "examples": [
+      {
+        "usage": "Splitter.SplitTextByAnyDelimiter({\",\", \";\"}, QuoteStyle.Csv)(\"a,b;\"\"c,d;e\"\",f\")",
+        "output": "{\"a\", \"b\", \"c,d;e\", \"f\"}"
+      },
+      {
+        "usage": "let\n    startAtEnd = true\nin\n    Splitter.SplitTextByAnyDelimiter({\",\", \";\"}, QuoteStyle.Csv, startAtEnd)(\"a,\"\"b;c,d\")",
+        "output": "{\"a,b\", \"c\", \"d\"}"
+      }
+    ]
+  },
+  {
+    "name": "Splitter.SplitTextByCharacterTransition",
+    "signature": "Splitter.SplitTextByCharacterTransition(before as anynonnull, after as anynonnull) as function",
+    "description": "Returns a function that splits text into a list of text according to a transition from one kind of character to another. The `before` and `after` parameters can either be a list of characters, or a function that takes a character and returns true/false.",
+    "examples": [
+      {
+        "usage": "Splitter.SplitTextByCharacterTransition({\"A\"..\"Z\", \"a\"..\"z\"}, {\"0\"..\"9\"})(\"Abc123\")",
+        "output": "{\"Abc\", \"123\"}"
+      }
+    ]
+  },
+  {
+    "name": "Splitter.SplitTextByDelimiter",
+    "signature": "Splitter.SplitTextByDelimiter( delimiter as text, optional quoteStyle as nullable number, optional csvStyle as nullable number ) as function",
+    "description": "Returns a function that splits text into a list of text according to the specified delimiter.",
+    "examples": [
+      {
+        "usage": "Splitter.SplitTextByDelimiter(\",\", QuoteStyle.Csv)(\"a,\"\"b,c\"\",d\")",
+        "output": "{\"a\", \"b,c\", \"d\"}"
+      }
+    ]
+  },
+  {
+    "name": "Splitter.SplitTextByEachDelimiter",
+    "signature": "Splitter.SplitTextByEachDelimiter( delimiters as list, optional quoteStyle as nullable number, optional startAtEnd as nullable logical ) as function",
+    "description": "Returns a function that splits text into a list of text at each specified delimiter in sequence.",
+    "examples": [
+      {
+        "usage": "Splitter.SplitTextByEachDelimiter({\",\", \";\"})(\"a,b;c,d\")",
+        "output": "{\"a\", \"b\", \"c,d\"}"
+      },
+      {
+        "usage": "let\n    startAtEnd = true\nin\n    Splitter.SplitTextByEachDelimiter({\",\", \";\"}, QuoteStyle.None, startAtEnd)(\"a,\"\"b;c\"\",d\")",
+        "output": "{\"a,\"\"b\", \"c\"\"\", \"d\"}"
+      }
+    ]
+  },
+  {
+    "name": "Splitter.SplitTextByLengths",
+    "signature": "Splitter.SplitTextByLengths(lengths as list, optional startAtEnd as nullable logical) as function",
+    "description": "Returns a function that splits text into a list of text by each specified length.",
+    "examples": [
+      {
+        "usage": "Splitter.SplitTextByLengths({2, 3})(\"AB123\")",
+        "output": "{\"AB\", \"123\"}"
+      },
+      {
+        "usage": "let\n    startAtEnd = true\nin\n    Splitter.SplitTextByLengths({5, 2}, startAtEnd)(\"RedmondWA98052\")",
+        "output": "{\"WA\", \"98052\"}"
+      }
+    ]
+  },
+  {
+    "name": "Splitter.SplitTextByPositions",
+    "signature": "Splitter.SplitTextByPositions(positions as list, optional startAtEnd as nullable logical) as function",
+    "description": "Returns a function that splits text into a list of text at each specified position.",
+    "examples": [
+      {
+        "usage": "Splitter.SplitTextByPositions({0, 3, 4})(\"ABC|12345\")",
+        "output": "{\"ABC\", \"|\", \"12345\"}"
+      },
+      {
+        "usage": "let\n    startAtEnd = true\nin\n    Splitter.SplitTextByPositions({0, 5}, startAtEnd)(\"Redmond98052\")",
+        "output": "{\"Redmond\", \"98052\"}"
+      }
+    ]
+  },
+  {
+    "name": "Splitter.SplitTextByRanges",
+    "signature": "Splitter.SplitTextByRanges(ranges as list, optional startAtEnd as nullable logical) as function",
+    "description": "Returns a function that splits text into a list of text according to the specified offsets and lengths. A null length indicates that all remaining input should be included.",
+    "examples": [
+      {
+        "usage": "Splitter.SplitTextByRanges({{0, 4}, {2, 10}})(\"codelimiter\")",
+        "output": "{\"code\", \"delimiter\"}"
+      },
+      {
+        "usage": "let\n    startAtEnd = true\nin\n    Splitter.SplitTextByRanges({{0, 5}, {6, 2}}, startAtEnd)(\"RedmondWA?98052\")",
+        "output": "{\"WA\", \"98052\"}"
+      },
+      {
+        "usage": "Splitter.SplitTextByRanges({{0, 5}, {5, null}})(\"98052Redmond\")",
+        "output": "{\"98052\", \"Redmond\"}"
+      }
+    ]
+  },
+  {
+    "name": "Splitter.SplitTextByRepeatedLengths",
+    "signature": "Splitter.SplitTextByRepeatedLengths(length as number, optional startAtEnd as nullable logical) as function",
+    "description": "Returns a function that splits text into a list of text after the specified length repeatedly.",
+    "examples": [
+      {
+        "usage": "Splitter.SplitTextByRepeatedLengths(3)(\"12345678\")",
+        "output": "{\"123\", \"456\", \"78\"}"
+      },
+      {
+        "usage": "let\n    startAtEnd = true\nin\n    Splitter.SplitTextByRepeatedLengths(3, startAtEnd)(\"87654321\")",
+        "output": "{\"87\", \"654\", \"321\"}"
+      }
+    ]
+  },
+  {
+    "name": "Splitter.SplitTextByWhitespace",
+    "signature": "Splitter.SplitTextByWhitespace(optional quoteStyle as nullable number) as function",
+    "description": "Returns a function that splits text into a list of text at whitespace.",
+    "examples": [
+      {
+        "usage": "Splitter.SplitTextByWhitespace(QuoteStyle.None)(\"a b#(tab)c\")",
+        "output": "{\"a\", \"b\", \"c\"}"
+      }
+    ]
+  }
+]

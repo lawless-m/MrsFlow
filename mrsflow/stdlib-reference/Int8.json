@@ -1,0 +1,17 @@
+[
+  {
+    "name": "Int8.From",
+    "signature": "Int8.From( value as any, optional culture as nullable text, optional roundingMode as nullable number ) as nullable number",
+    "description": "Returns a signed 8-bit integer `number` value from the given `value`. If the given `value` is `null`, `Int8.From` returns `null`. If the given `value` is `number` within the range of signed 8-bit integer without a fractional part, `value` is returned. If it has fractional part, then the number is rounded with the rounding mode specified. The default rounding mode is [`RoundingMode.ToEven`](roundingmode-type.md). If `value` is of any other type, it will first be converted to a `number` using [`Number.FromText`](number-fromtext.md). Refer to [`Number.Round`](number-round.md) for the available rounding modes. An optional `culture` may also be provided (for example, \"en-US\").",
+    "examples": [
+      {
+        "usage": "Int8.From(\"4\")",
+        "output": "4"
+      },
+      {
+        "usage": "Int8.From(\"4.5\", null, RoundingMode.AwayFromZero)",
+        "output": "5"
+      }
+    ]
+  }
+]
