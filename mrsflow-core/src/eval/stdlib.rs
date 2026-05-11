@@ -11,7 +11,10 @@
 
 use std::sync::Arc;
 
-use arrow::array::{Array, ArrayRef, BooleanArray, Date32Array, Float64Array, NullArray, StringArray};
+use arrow::array::{
+    Array, ArrayRef, BooleanArray, Date32Array, Float64Array, NullArray, StringArray,
+    TimestampMicrosecondArray,
+};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
 
@@ -915,11 +918,13 @@ pub(crate) fn infer_cells(cells: &[&Value]) -> Result<(DataType, ArrayRef), MErr
                 kind = Some("date");
                 break;
             }
+            Value::Datetime(_) => {
+                kind = Some("datetime");
+                break;
+            }
             other => {
                 return Err(MError::NotImplemented(match other {
-                    Value::Datetime(_) | Value::Duration(_) => {
-                        "datetime/duration cells (deferred)"
-                    }
+                    Value::Duration(_) => "duration cells (deferred)",
                     Value::Binary(_) => "binary cells (deferred)",
                     _ => "non-primitive cell type (deferred)",
                 }));
@@ -991,6 +996,24 @@ pub(crate) fn infer_cells(cells: &[&Value]) -> Result<(DataType, ArrayRef), MErr
                 .collect::<Result<_, _>>()?;
             Ok((DataType::Date32, Arc::new(Date32Array::from(values))))
         }
+        Some("datetime") => {
+            // Timestamp(Microsecond, None): i64 microseconds since unix epoch.
+            let values: Vec<Option<i64>> = cells
+                .iter()
+                .map(|v| match v {
+                    Value::Null => Ok(None),
+                    Value::Datetime(dt) => Ok(Some(dt.and_utc().timestamp_micros())),
+                    other => Err(MError::Other(format!(
+                        "column: mixed types: datetime + {}",
+                        super::type_name(other)
+                    ))),
+                })
+                .collect::<Result<_, _>>()?;
+            Ok((
+                DataType::Timestamp(arrow::datatypes::TimeUnit::Microsecond, None),
+                Arc::new(TimestampMicrosecondArray::from(values)),
+            ))
+        }
         _ => unreachable!(),
     }
 }
@@ -1034,9 +1057,20 @@ pub fn cell_to_value(batch: &RecordBatch, col: usize, row: usize) -> Result<Valu
                 .ok_or_else(|| MError::Other(format!("Date32 out of range: {} days", days)))?;
             Ok(Value::Date(d))
         }
+        DataType::Timestamp(arrow::datatypes::TimeUnit::Microsecond, None) => {
+            let a = array
+                .as_any()
+                .downcast_ref::<TimestampMicrosecondArray>()
+                .expect("TimestampMicrosecond");
+            let micros = a.value(row);
+            let dt = chrono::DateTime::from_timestamp_micros(micros)
+                .ok_or_else(|| MError::Other(format!("Timestamp out of range: {} us", micros)))?
+                .naive_utc();
+            Ok(Value::Datetime(dt))
+        }
         other => Err(MError::NotImplemented(match other {
             DataType::Date64 | DataType::Timestamp(_, _) => {
-                "datetime cell decode (deferred)"
+                "non-microsecond timestamp decode (deferred)"
             }
             _ => "unsupported cell type",
         })),

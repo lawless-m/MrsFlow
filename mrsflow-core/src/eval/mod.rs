@@ -2093,6 +2093,19 @@ mod tests {
     }
 
     #[test]
+    fn table_with_datetime_column_roundtrip() {
+        // #table with Datetime cells → Timestamp(us) column → row_to_record gets Datetime back.
+        match eval_str(
+            r#"let t = #table({"d"}, {{#datetime(2024, 3, 15, 10, 30, 45)}}) in t{0}[d]"#,
+        )
+        .unwrap()
+        {
+            Value::Datetime(dt) => assert_eq!(dt.to_string(), "2024-03-15 10:30:45"),
+            other => panic!("expected datetime, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn table_with_date_column_roundtrip() {
         // #table with Date cells → Date32 column → row_to_record gets Date back.
         match eval_str(
