@@ -11,11 +11,13 @@
 
 mod env;
 mod iohost;
+mod stdlib;
 mod value;
 
 pub use env::{Env, EnvNode, EnvOps};
 pub use iohost::{IoError, IoHost, NoIoHost};
-pub use value::{Closure, MError, Record, Table, ThunkState, TypeRep, Value};
+pub use stdlib::root_env;
+pub use value::{BuiltinFn, Closure, FnBody, MError, Record, Table, ThunkState, TypeRep, Value};
 
 use std::rc::Rc;
 
@@ -165,7 +167,7 @@ pub fn evaluate(ast: &Expr, env: &Env, host: &dyn IoHost) -> Result<Value, MErro
             body,
         } => Ok(Value::Function(Closure {
             params: params.clone(),
-            body: body.clone(),
+            body: FnBody::M(body.clone()),
             env: Rc::clone(env),
         })),
 
@@ -176,7 +178,7 @@ pub fn evaluate(ast: &Expr, env: &Env, host: &dyn IoHost) -> Result<Value, MErro
                 optional: false,
                 type_annotation: None,
             }],
-            body: body.clone(),
+            body: FnBody::M(body.clone()),
             env: Rc::clone(env),
         })),
 
@@ -218,13 +220,19 @@ pub fn evaluate(ast: &Expr, env: &Env, host: &dyn IoHost) -> Result<Value, MErro
                 arg_values.push(Value::Null);
             }
 
-            // Extend the closure's captured env with the bound params.
-            let mut call_env = Rc::clone(&closure.env);
-            for (param, value) in closure.params.iter().zip(arg_values.into_iter()) {
-                call_env = call_env.extend(param.name.clone(), value);
+            // Dispatch on body kind: M-source closures extend the captured
+            // env and recurse; builtins call the native Rust fn directly
+            // with the forced arg values.
+            match &closure.body {
+                FnBody::M(body) => {
+                    let mut call_env = Rc::clone(&closure.env);
+                    for (param, value) in closure.params.iter().zip(arg_values.into_iter()) {
+                        call_env = call_env.extend(param.name.clone(), value);
+                    }
+                    evaluate(body, &call_env, host)
+                }
+                FnBody::Builtin(f) => f(&arg_values),
             }
-
-            evaluate(&closure.body, &call_env, host)
         }
 
         // --- List literal: items are eagerly evaluated (only records have
@@ -738,7 +746,7 @@ fn values_equal(a: &Value, b: &Value) -> bool {
     }
 }
 
-fn type_name(v: &Value) -> &'static str {
+pub(crate) fn type_name(v: &Value) -> &'static str {
     match v {
         Value::Null => "null",
         Value::Logical(_) => "logical",
@@ -810,7 +818,9 @@ mod tests {
     fn eval_str(src: &str) -> Result<Value, MError> {
         let toks = tokenize(src).expect("lex");
         let ast = parse(&toks).expect("parse");
-        let env = EnvNode::empty();
+        // Use root_env so stdlib functions are in scope. Tests that depend
+        // on an empty env continue to construct EnvNode::empty() directly.
+        let env = root_env();
         let host = NoIoHost;
         evaluate(&ast, &env, &host)
     }
@@ -1593,6 +1603,162 @@ mod tests {
         // To test nested-error propagation, we need the outer try's body
         // itself to raise. Use: `try error "outer" otherwise 7` = 7.
         assert_eq!(eval_number(r#"try error "outer" otherwise 7"#), 7.0);
+    }
+
+    // --- Starter stdlib (eval-6) ---
+
+    #[test]
+    fn number_from_parses_text() {
+        assert_eq!(eval_number(r#"Number.From("3.14")"#), 3.14);
+    }
+
+    #[test]
+    fn number_from_logical() {
+        assert_eq!(eval_number(r#"Number.From(true)"#), 1.0);
+        assert_eq!(eval_number(r#"Number.From(false)"#), 0.0);
+    }
+
+    #[test]
+    fn text_from_number() {
+        // Debug-format gives "42.0" for f64 whole numbers (parity with
+        // the differential's `(num 42.0)`).
+        assert_eq!(eval_text(r#"Text.From(42)"#), "42.0");
+    }
+
+    #[test]
+    fn text_from_logical() {
+        assert_eq!(eval_text(r#"Text.From(true)"#), "true");
+        assert_eq!(eval_text(r#"Text.From(false)"#), "false");
+    }
+
+    #[test]
+    fn text_contains_basic() {
+        assert_eq!(eval_bool(r#"Text.Contains("hello world", "world")"#), true);
+        assert_eq!(eval_bool(r#"Text.Contains("hello", "x")"#), false);
+    }
+
+    #[test]
+    fn text_replace_basic() {
+        assert_eq!(eval_text(r#"Text.Replace("hello", "l", "L")"#), "heLLo");
+    }
+
+    #[test]
+    fn text_trim_basic() {
+        assert_eq!(eval_text(r#"Text.Trim("  hi  ")"#), "hi");
+    }
+
+    #[test]
+    fn text_length_char_count() {
+        assert_eq!(eval_number(r#"Text.Length("hello")"#), 5.0);
+    }
+
+    #[test]
+    fn text_position_of_found_and_missing() {
+        assert_eq!(eval_number(r#"Text.PositionOf("hello", "ll")"#), 2.0);
+        assert_eq!(eval_number(r#"Text.PositionOf("hi", "x")"#), -1.0);
+    }
+
+    #[test]
+    fn text_ends_with_basic() {
+        assert_eq!(eval_bool(r#"Text.EndsWith("hello", "lo")"#), true);
+        assert_eq!(eval_bool(r#"Text.EndsWith("hello", "x")"#), false);
+    }
+
+    #[test]
+    fn list_transform_doubles() {
+        match eval_str("List.Transform({1, 2, 3}, each _ * 2)").unwrap() {
+            Value::List(xs) => {
+                let nums: Vec<f64> = xs
+                    .iter()
+                    .map(|v| match v {
+                        Value::Number(n) => *n,
+                        other => panic!("expected number, got {:?}", other),
+                    })
+                    .collect();
+                assert_eq!(nums, vec![2.0, 4.0, 6.0]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn list_select_predicate() {
+        match eval_str("List.Select({1, 2, 3, 4}, each _ > 2)").unwrap() {
+            Value::List(xs) => {
+                let nums: Vec<f64> = xs
+                    .iter()
+                    .map(|v| match v {
+                        Value::Number(n) => *n,
+                        other => panic!("expected number, got {:?}", other),
+                    })
+                    .collect();
+                assert_eq!(nums, vec![3.0, 4.0]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn list_sum_basic_and_empty() {
+        assert_eq!(eval_number("List.Sum({1, 2, 3})"), 6.0);
+        assert!(matches!(eval_str("List.Sum({})").unwrap(), Value::Null));
+    }
+
+    #[test]
+    fn list_count_basic() {
+        assert_eq!(eval_number("List.Count({10, 20, 30})"), 3.0);
+    }
+
+    #[test]
+    fn list_min_max_basic_and_empty() {
+        assert_eq!(eval_number("List.Min({3, 1, 2})"), 1.0);
+        assert_eq!(eval_number("List.Max({3, 1, 2})"), 3.0);
+        assert!(matches!(eval_str("List.Min({})").unwrap(), Value::Null));
+        assert!(matches!(eval_str("List.Max({})").unwrap(), Value::Null));
+    }
+
+    #[test]
+    fn record_field_basic() {
+        assert_eq!(eval_number(r#"Record.Field([a = 1, b = 2], "b")"#), 2.0);
+    }
+
+    #[test]
+    fn record_field_names_basic() {
+        match eval_str("Record.FieldNames([a = 1, b = 2])").unwrap() {
+            Value::List(xs) => {
+                let names: Vec<&str> = xs
+                    .iter()
+                    .map(|v| match v {
+                        Value::Text(s) => s.as_str(),
+                        other => panic!("expected text, got {:?}", other),
+                    })
+                    .collect();
+                assert_eq!(names, vec!["a", "b"]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn logical_from_text_basic() {
+        assert_eq!(eval_bool(r#"Logical.FromText("true")"#), true);
+        assert_eq!(eval_bool(r#"Logical.FromText("false")"#), false);
+    }
+
+    #[test]
+    fn nan_constant_is_nan() {
+        match eval_str("#nan").unwrap() {
+            Value::Number(n) => assert!(n.is_nan()),
+            other => panic!("expected NaN number, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn infinity_constant_is_inf() {
+        match eval_str("#infinity").unwrap() {
+            Value::Number(n) => assert!(n.is_infinite() && n > 0.0),
+            other => panic!("expected +inf number, got {:?}", other),
+        }
     }
 
     // --- Type system: type / as / is (eval-5) ---

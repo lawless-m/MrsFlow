@@ -45,9 +45,32 @@ pub enum Value {
 #[derive(Debug, Clone)]
 pub struct Closure {
     pub params: Vec<Param>,
-    pub body: Box<Expr>,
+    pub body: FnBody,
     pub env: Env,
 }
+
+/// A function's body is either an M expression (user-defined closures, `each`
+/// desugaring, function literals) or a native Rust function pointer (the
+/// stdlib intrinsics bound in the root env).
+#[derive(Clone)]
+pub enum FnBody {
+    M(Box<Expr>),
+    Builtin(BuiltinFn),
+}
+
+impl std::fmt::Debug for FnBody {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FnBody::M(expr) => f.debug_tuple("M").field(expr).finish(),
+            FnBody::Builtin(_) => f.write_str("Builtin(<fn>)"),
+        }
+    }
+}
+
+/// Signature for an intrinsic. Pure functions only at eval-6; IoHost-mediated
+/// intrinsics (Parquet, ODBC, Web, …) land in later slices with a different
+/// signature.
+pub type BuiltinFn = fn(&[Value]) -> Result<Value, MError>;
 
 #[derive(Debug, Clone)]
 pub struct Record {

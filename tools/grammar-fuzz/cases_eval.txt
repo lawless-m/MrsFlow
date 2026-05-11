@@ -114,3 +114,28 @@ null as null
 1 as any
 {1, 2, 3} is list
 [a = 1] is record
+Number.From("3.14")
+Number.From(true)
+Text.From(42)
+Text.From(true)
+Text.Contains("hello world", "world")
+Text.Contains("hello", "x")
+Text.Replace("hello", "l", "L")
+Text.Trim("  hi  ")
+Text.Length("hello")
+Text.PositionOf("hello", "ll")
+Text.PositionOf("hi", "x")
+Text.EndsWith("hello", "lo")
+List.Transform({1, 2, 3}, each _ * 2)
+List.Select({1, 2, 3, 4}, each _ > 2)
+List.Sum({1, 2, 3})
+List.Sum({})
+List.Count({10, 20, 30})
+List.Min({3, 1, 2})
+List.Max({3, 1, 2})
+Record.Field([a = 1, b = 2], "b")
+Record.FieldNames([a = 1, b = 2])
+Logical.FromText("true")
+Logical.FromText("false")
+#nan
+#infinity

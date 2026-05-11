@@ -33,6 +33,10 @@
 % as slices land — same scryer trap as syntactic.pl, head it off now.
 :- discontiguous(eval/3).
 :- discontiguous(print_value/1).
+:- discontiguous(eval_builtin/3).
+:- discontiguous(builtin_number_from/2).
+:- discontiguous(builtin_text_from/2).
+:- discontiguous(builtin_logical_from/2).
 
 % --- eval/3: Ast × Env → Value ---
 %
@@ -148,11 +152,24 @@ eval(each(Body), Env, closure([param(['_'], req, none)], Body, Env)).
 
 % Function invocation — eager arg evaluation (force each), arity check,
 % bind to params (missing optional → null), eval body in extended env.
+% Dispatches on body: `builtin(Name)` routes to eval_builtin/3; otherwise
+% the body is an M expression and we extend the captured env and recurse.
 eval(invoke(Target, Args), Env, Value) :-
     eval(Target, Env, TargetV0),
     force(TargetV0, closure(Params, Body, CEnv)),
-    bind_args(Params, Args, Env, Bindings),
-    eval(Body, [frame(Bindings) | CEnv], Value).
+    ( Body = builtin(Name)
+    -> eval_builtin_args(Args, Env, ArgValues),
+       eval_builtin(Name, ArgValues, Value)
+    ; bind_args(Params, Args, Env, Bindings),
+      eval(Body, [frame(Bindings) | CEnv], Value)
+    ).
+
+% Eagerly evaluate and force each argument for a builtin call.
+eval_builtin_args([], _, []).
+eval_builtin_args([A | As], Env, [V | Vs]) :-
+    eval(A, Env, V0),
+    force(V0, V),
+    eval_builtin_args(As, Env, Vs).
 
 % --- eval-3: list / record / field+item access ---
 
@@ -445,6 +462,246 @@ type_conforms(closure(_,_,_),type_prim(function)).
 type_conforms(type_value(_), type_prim(type)).
 type_conforms(null,          type_nullable(_))       :- !.
 type_conforms(V,             type_nullable(Inner))   :- type_conforms(V, Inner).
+
+% --- eval-6: starter stdlib + intrinsic env ---
+%
+% root_env/1 builds the initial environment containing every stdlib
+% intrinsic plus the two literal constants #nan/#infinity. The diff_eval.sh
+% harness calls this in place of the empty env `[]`.
+
+root_env([frame(Bindings)]) :-
+    Bindings = [
+        ['N','u','m','b','e','r','.','F','r','o','m']
+            - closure([param([v], req, none)], builtin('Number.From'), []),
+        ['T','e','x','t','.','F','r','o','m']
+            - closure([param([v], req, none)], builtin('Text.From'), []),
+        ['T','e','x','t','.','C','o','n','t','a','i','n','s']
+            - closure([param([t], req, none), param([s], req, none)],
+                       builtin('Text.Contains'), []),
+        ['T','e','x','t','.','R','e','p','l','a','c','e']
+            - closure([param([t], req, none), param([o], req, none), param([n], req, none)],
+                       builtin('Text.Replace'), []),
+        ['T','e','x','t','.','T','r','i','m']
+            - closure([param([t], req, none)], builtin('Text.Trim'), []),
+        ['T','e','x','t','.','L','e','n','g','t','h']
+            - closure([param([t], req, none)], builtin('Text.Length'), []),
+        ['T','e','x','t','.','P','o','s','i','t','i','o','n','O','f']
+            - closure([param([t], req, none), param([s], req, none)],
+                       builtin('Text.PositionOf'), []),
+        ['T','e','x','t','.','E','n','d','s','W','i','t','h']
+            - closure([param([t], req, none), param([s], req, none)],
+                       builtin('Text.EndsWith'), []),
+        ['L','i','s','t','.','T','r','a','n','s','f','o','r','m']
+            - closure([param([l], req, none), param([f], req, none)],
+                       builtin('List.Transform'), []),
+        ['L','i','s','t','.','S','e','l','e','c','t']
+            - closure([param([l], req, none), param([p], req, none)],
+                       builtin('List.Select'), []),
+        ['L','i','s','t','.','S','u','m']
+            - closure([param([l], req, none)], builtin('List.Sum'), []),
+        ['L','i','s','t','.','C','o','u','n','t']
+            - closure([param([l], req, none)], builtin('List.Count'), []),
+        ['L','i','s','t','.','M','i','n']
+            - closure([param([l], req, none)], builtin('List.Min'), []),
+        ['L','i','s','t','.','M','a','x']
+            - closure([param([l], req, none)], builtin('List.Max'), []),
+        ['R','e','c','o','r','d','.','F','i','e','l','d']
+            - closure([param([r], req, none), param([n], req, none)],
+                       builtin('Record.Field'), []),
+        ['R','e','c','o','r','d','.','F','i','e','l','d','N','a','m','e','s']
+            - closure([param([r], req, none)], builtin('Record.FieldNames'), []),
+        ['L','o','g','i','c','a','l','.','F','r','o','m']
+            - closure([param([v], req, none)], builtin('Logical.From'), []),
+        ['L','o','g','i','c','a','l','.','F','r','o','m','T','e','x','t']
+            - closure([param([t], req, none)], builtin('Logical.FromText'), []),
+        ['#','n','a','n']      - num('NaN'),
+        ['#','i','n','f','i','n','i','t','y'] - num(inf)
+    ].
+
+% --- eval_builtin/3: one clause per stdlib function ---
+
+% Number.From
+eval_builtin('Number.From', [V], Result) :- builtin_number_from(V, Result).
+builtin_number_from(null, null) :- !.
+builtin_number_from(num(N), num(N)) :- !.
+builtin_number_from(bool(true), num(1.0)) :- !.
+builtin_number_from(bool(false), num(0.0)) :- !.
+builtin_number_from(text(Cs), num(F)) :-
+    !,
+    chars_to_number(Cs, F).
+
+% Text.From
+eval_builtin('Text.From', [V], Result) :- builtin_text_from(V, Result).
+builtin_text_from(null, null) :- !.
+builtin_text_from(text(Cs), text(Cs)) :- !.
+builtin_text_from(num(N), text(Cs)) :-
+    !,
+    number_chars(N, Cs).
+builtin_text_from(bool(true),  text(['t','r','u','e'])) :- !.
+builtin_text_from(bool(false), text(['f','a','l','s','e'])) :- !.
+
+% Text.Contains
+eval_builtin('Text.Contains', [text(Hay), text(Sub)], bool(B)) :-
+    ( contains_subseq(Hay, Sub) -> B = true ; B = false ).
+
+contains_subseq(Hay, Sub) :- append(_, Rest, Hay), append(Sub, _, Rest), !.
+
+% Text.Replace — replace ALL non-overlapping occurrences of Old with New.
+eval_builtin('Text.Replace', [text(Text), text(Old), text(New)], text(Result)) :-
+    replace_all(Text, Old, New, Result).
+
+replace_all([], _, _, []).
+replace_all(Text, Old, New, Result) :-
+    append(Old, Rest, Text), !,
+    replace_all(Rest, Old, New, RestResult),
+    append(New, RestResult, Result).
+replace_all([C | Rest], Old, New, [C | RestResult]) :-
+    replace_all(Rest, Old, New, RestResult).
+
+% Text.Trim — strip whitespace (space, tab, newline, cr) on both ends.
+eval_builtin('Text.Trim', [text(Cs)], text(Trimmed)) :-
+    trim_left(Cs, L),
+    reverse(L, Rev),
+    trim_left(Rev, RevR),
+    reverse(RevR, Trimmed).
+
+trim_left([C | Rest], Out) :- is_ws(C), !, trim_left(Rest, Out).
+trim_left(Cs, Cs).
+
+is_ws(' ').
+is_ws('\t').
+is_ws('\n').
+is_ws('\r').
+
+% Text.Length — char count.
+eval_builtin('Text.Length', [text(Cs)], num(F)) :-
+    length(Cs, L),
+    F is float(L).
+
+% Text.PositionOf — 0-based char index, -1 if missing.
+eval_builtin('Text.PositionOf', [text(Hay), text(Sub)], num(F)) :-
+    ( position_of(Hay, Sub, 0, Idx)
+    -> F is float(Idx)
+    ; F = -1.0
+    ).
+
+position_of(Hay, Sub, Acc, Acc) :- append(Sub, _, Hay), !.
+position_of([_ | Rest], Sub, Acc, Idx) :-
+    Acc1 is Acc + 1,
+    position_of(Rest, Sub, Acc1, Idx).
+
+% Text.EndsWith
+eval_builtin('Text.EndsWith', [text(Text), text(Suffix)], bool(B)) :-
+    ( append(_, Suffix, Text) -> B = true ; B = false ).
+
+% List.Transform — apply closure to each item.
+eval_builtin('List.Transform', [list(Items), closure(P, Body, CEnv)], list(Out)) :-
+    transform_items(Items, closure(P, Body, CEnv), Out).
+
+transform_items([], _, []).
+transform_items([V | Vs], Closure, [W | Ws]) :-
+    invoke_closure(Closure, [V], W),
+    transform_items(Vs, Closure, Ws).
+
+% List.Select — keep items where closure returns true.
+eval_builtin('List.Select', [list(Items), closure(P, Body, CEnv)], list(Out)) :-
+    select_items(Items, closure(P, Body, CEnv), Out).
+
+select_items([], _, []).
+select_items([V | Vs], Closure, Out) :-
+    invoke_closure(Closure, [V], bool(B)),
+    ( B == true
+    -> Out = [V | Rest],
+       select_items(Vs, Closure, Rest)
+    ; select_items(Vs, Closure, Out)
+    ).
+
+% List.Sum — null on empty, sum of numbers otherwise.
+eval_builtin('List.Sum', [list([])], null) :- !.
+eval_builtin('List.Sum', [list(Items)], num(F)) :-
+    sum_nums(Items, 0.0, F).
+
+sum_nums([], Acc, Acc).
+sum_nums([num(N) | Rest], Acc, F) :-
+    Acc1 is Acc + N,
+    sum_nums(Rest, Acc1, F).
+
+% List.Count
+eval_builtin('List.Count', [list(Items)], num(F)) :-
+    length(Items, L),
+    F is float(L).
+
+% List.Min / List.Max — null on empty.
+eval_builtin('List.Min', [list([])], null) :- !.
+eval_builtin('List.Min', [list([num(First) | Rest])], num(F)) :-
+    min_nums(Rest, First, F).
+
+min_nums([], Best, Best).
+min_nums([num(N) | Rest], Best, F) :-
+    ( N < Best -> Curr = N ; Curr = Best ),
+    min_nums(Rest, Curr, F).
+
+eval_builtin('List.Max', [list([])], null) :- !.
+eval_builtin('List.Max', [list([num(First) | Rest])], num(F)) :-
+    max_nums(Rest, First, F).
+
+max_nums([], Best, Best).
+max_nums([num(N) | Rest], Best, F) :-
+    ( N > Best -> Curr = N ; Curr = Best ),
+    max_nums(Rest, Curr, F).
+
+% Record.Field — `r[name]` as a function call.
+eval_builtin('Record.Field', [record(Pairs), text(Name)], Result) :-
+    member(pair(Name, V), Pairs),
+    !,
+    force(V, Result).
+
+% Record.FieldNames — list of text values.
+eval_builtin('Record.FieldNames', [record(Pairs)], list(Texts)) :-
+    pairs_to_text_names(Pairs, Texts).
+
+pairs_to_text_names([], []).
+pairs_to_text_names([pair(N, _) | Rest], [text(N) | RestT]) :-
+    pairs_to_text_names(Rest, RestT).
+
+% Logical.From — coerce per spec.
+eval_builtin('Logical.From', [V], Result) :- builtin_logical_from(V, Result).
+builtin_logical_from(null, null) :- !.
+builtin_logical_from(bool(B), bool(B)) :- !.
+builtin_logical_from(num(N), bool(B)) :-
+    !,
+    ( N =:= 0.0 -> B = false ; B = true ).
+builtin_logical_from(text(Cs), Result) :-
+    !,
+    eval_builtin('Logical.FromText', [text(Cs)], Result).
+
+% Logical.FromText — case-insensitive "true"/"false".
+eval_builtin('Logical.FromText', [text(Cs)], bool(B)) :-
+    maplist(to_lower_char, Cs, Lower),
+    ( Lower = ['t','r','u','e']  -> B = true
+    ; Lower = ['f','a','l','s','e'] -> B = false
+    ).
+
+to_lower_char(C, L) :-
+    ( char_code(C, X), X >= 0'A, X =< 0'Z
+    -> Y is X + 32, char_code(L, Y)
+    ; L = C
+    ).
+
+% Helper: invoke a closure value with a forced-args list. Used by
+% List.Transform / List.Select; mirrors the dispatch logic in eval(invoke,...).
+invoke_closure(closure(Params, Body, CEnv), Args, Value) :-
+    same_length(Params, Args),
+    ( Body = builtin(Name)
+    -> eval_builtin(Name, Args, Value)
+    ; pair_params_args(Params, Args, Bindings),
+      eval(Body, [frame(Bindings) | CEnv], V0),
+      force(V0, Value)
+    ).
+
+pair_params_args([], [], []).
+pair_params_args([param(N, _, _) | Ps], [V | Vs], [N-V | Rest]) :-
+    pair_params_args(Ps, Vs, Rest).
 
 % Deep force — recursively forces thunks inside lists/records. The harness
 % calls this on the top-level result before printing, mirroring the Rust

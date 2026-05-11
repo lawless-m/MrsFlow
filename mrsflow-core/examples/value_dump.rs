@@ -11,7 +11,7 @@
 //!
 //! Usage: value_dump <path>
 
-use mrsflow_core::eval::{deep_force, evaluate, EnvNode, NoIoHost, TypeRep, Value};
+use mrsflow_core::eval::{deep_force, evaluate, root_env, NoIoHost, TypeRep, Value};
 use mrsflow_core::lexer::tokenize;
 use mrsflow_core::parser::parse;
 use std::env;
@@ -35,7 +35,7 @@ fn main() {
         eprintln!("PARSE ERROR: {:?}", e);
         process::exit(3);
     });
-    let env = EnvNode::empty();
+    let env = root_env();
     let host = NoIoHost;
     let value = match evaluate(&ast, &env, &host) {
         Ok(v) => v,
