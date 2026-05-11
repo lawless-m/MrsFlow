@@ -27,19 +27,25 @@
 A Rust crate that:
 - Parses M source per the language spec
 - Evaluates M expressions against in-memory Arrow tables
-- Reads Parquet as input, writes Parquet as output
-- Exposes itself as a CLI binary (`mrsflow`) and as a WASM module sharing the same core
+- Reads Parquet as input (both shells) and live ODBC queries (CLI shell only); writes Parquet as output
+- Exposes itself as a CLI binary (`mrsflow`) and as a WASM module sharing the same core, with the IO surface differing per shell
 
-That's it. No CSV, no JSON, no ODBC, no Web.Contents. Those can be added later if needed; for v1 they aren't.
+That's it. No CSV, no JSON, no Web.Contents, no native database connectors beyond ODBC. Those can be added later if needed; for v1 they aren't.
 
 ## Relationship to the existing `Serious-DBI-Sam` project
 
-The user already maintains a DuckDB extension + .NET gRPC bridge service that exposes legacy DBISAM databases (32-bit Windows ODBC) to modern DuckDB on Linux. That project solves the legacy ingestion problem completely.
+The user maintains a DuckDB extension + .NET gRPC bridge service that exposes legacy DBISAM databases (32-bit Windows ODBC) to DuckDB on Linux. That bridge stays relevant because **Linux has no DBISAM driver at any bit-width** — to query DBISAM data from a Linux mrsflow process, the bridge is the only path.
 
-mrsflow does NOT need an ODBC connector for v1. The pipeline is:
+Two viable shapes for getting DBISAM data into mrsflow:
 
 ```
-DBISAM → bridge (32-bit, Windows) → DuckDB → Parquet → [mrsflow] → Parquet → downstream
+# Pre-staged (bridge produces Parquet, mrsflow consumes via --in):
+DBISAM → bridge (Windows) → DuckDB → Parquet file → [mrsflow --in t=t.parquet] → Parquet
+
+# Live (mrsflow's Odbc.DataSource against a DuckDB instance attached to the bridge):
+M code: Source = Odbc.DataSource("DSN=DuckDB"), Orders = Source{[Name="orders"]}[Data]
 ```
 
-The 32-bit constraint is fully contained inside the existing bridge service. mrsflow stays cleanly 64-bit on Debian and trivially WASM-compilable.
+For *non-DBISAM* databases (Postgres, SQL Server, MySQL, Sage X3, etc.), Linux 64-bit ODBC drivers exist; mrsflow's `Odbc.DataSource` reaches them directly with no bridge needed. (A potential 64-bit DBISAM driver on Windows would also bypass the bridge for the Windows-side workflow, but Linux mrsflow continues to need it.)
+
+mrsflow itself stays cleanly 64-bit on Debian and trivially WASM-compilable. The 32-bit constraint remains fully contained inside the bridge service.

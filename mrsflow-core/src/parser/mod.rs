@@ -597,6 +597,16 @@ impl<'a> Parser<'a> {
             TokenKind::LeftParen => self.parse_parens_or_function(),
             TokenKind::LeftBracket => self.parse_bracketed_primary(),
             TokenKind::LeftBrace => self.parse_list(),
+            // `@<identifier>` — the scoping operator. Per spec it forces a
+            // recursive lookup so a function can reference itself within its
+            // own body. With closures-as-thunks-in-the-same-env (per design
+            // doc §07), this reduces to a regular identifier lookup at
+            // evaluation time, so the AST shape is just `Identifier(name)`.
+            TokenKind::At => {
+                self.advance();
+                let name = self.expect_identifier_name()?;
+                Ok(Expr::Identifier(name))
+            }
             other => Err(ParseError::Unexpected {
                 pos,
                 found: other,
@@ -1512,6 +1522,33 @@ mod tests {
         assert_eq!(
             s("(t) as table [a = number] => t"),
             r#"(fn (("t" req none)) (table-type (record-type (("a" req (ref "number"))) closed)) (ref "t"))"#
+        );
+    }
+
+    #[test]
+    fn at_self_reference_simple() {
+        // `@name` parses as a regular identifier reference — evaluator
+        // handles the recursive scoping at runtime.
+        assert_eq!(s("@foo"), r#"(ref "foo")"#);
+    }
+
+    #[test]
+    fn at_self_reference_in_recursive_function() {
+        // The motivating use case: a function literal that calls itself
+        // through @ to express recursion.
+        assert_eq!(
+            s("(n) => if n = 0 then 1 else n * @factorial(n - 1)"),
+            r#"(fn (("n" req none)) none (if (eq (ref "n") (num "0")) (num "1") (mul (ref "n") (invoke (ref "factorial") ((sub (ref "n") (num "1")))))))"#
+        );
+    }
+
+    #[test]
+    fn at_with_quoted_identifier() {
+        // Per spec, `identifier` includes quoted-identifier — so
+        // `@#"with space"` is a valid recursive reference too.
+        assert_eq!(
+            s(r##"@#"with space""##),
+            r#"(ref "with space")"#
         );
     }
 

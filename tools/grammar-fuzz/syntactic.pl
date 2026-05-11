@@ -309,6 +309,10 @@ primary(ref(NameChars)) -->
 primary(E)          --> [op(lparen)], parens_or_function(E).
 primary(E)          --> [op(lbracket)], bracketed_body(E).
 primary(E)          --> [op(lbrace)], list_body(E).
+% `@<identifier>` — scoping operator. AST shape is just ref(Cs); the
+% recursive lookup semantics are an evaluator concern, not a parser one.
+primary(ref(Cs))    --> [op(at)], [ident(Cs)].
+primary(ref(Cs))    --> [op(at)], [quoted_ident(Cs)].
 
 is_hash_keyword('#binary').
 is_hash_keyword('#date').

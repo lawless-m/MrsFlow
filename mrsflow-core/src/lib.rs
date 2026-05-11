@@ -3,5 +3,6 @@
 //! Layered as: lexer → parser → AST → evaluator → stdlib.
 //! No IO; the CLI and WASM shells layer that on top.
 
+pub mod eval;
 pub mod lexer;
 pub mod parser;

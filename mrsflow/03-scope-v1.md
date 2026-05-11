@@ -2,13 +2,15 @@
 
 ## The scoping principle
 
-**v1 is "M over Parquet."** Inputs are one or more Parquet files bound to named identifiers. Output is a Parquet file. Nothing else.
+**v1 reads Parquet and ODBC, writes Parquet.** Inputs to M are either (a) Parquet files bound to named identifiers via CLI args (works in both CLI and WASM shells) or (b) live ODBC queries via `Odbc.DataSource` / `Odbc.Query` calls inside M code (CLI shell only — ODBC has no browser story). Output is a single Parquet file via CLI arg.
 
-This radically reduces scope versus "implement M":
-- No CSV parsing (locale, headers, type inference are all painful)
-- No JSON, no Excel reading, no SQL connectors, no Web.Contents
-- No ODBC (the existing DBISAM bridge handles legacy data upstream)
-- No type coercion swamp (Parquet has typed schemas; M operates on already-typed data)
+The two channels are complementary: file-based input gives `--in name=path.parquet` ergonomics that don't require an ODBC stack; M-code-driven ODBC matches the shape of Excel-generated M (which calls `Odbc.DataSource(...)` heavily) and unlocks live database access without a Parquet pre-stage.
+
+This still radically reduces scope versus "implement all of M":
+- No CSV parsing at the M level (locale, headers, type inference are all painful — go through DuckDB ODBC if you need CSV)
+- No JSON, no Excel reading, no Web.Contents
+- No native database connectors beyond ODBC (`Sql.Database`, `PostgreSQL.Database`, etc. — use `Odbc.DataSource` against the appropriate DSN instead)
+- No type coercion swamp at the Parquet boundary (Parquet has typed schemas; M operates on already-typed data). ODBC type mapping is a smaller swamp the evaluator handles directly.
 
 ## CLI contract
 
@@ -17,11 +19,21 @@ mrsflow run query.pq --in customers=customers.parquet --in sales=sales.parquet -
 ```
 
 - `query.pq` is an M expression.
-- `--in name=path.parquet` makes the Parquet file available as an M identifier.
+- `--in name=path.parquet` makes the Parquet file available as an M identifier (zero or more occurrences).
 - `--out path.parquet` is where the result is written.
 - Exit code 0 on success, non-zero with structured error on failure.
 
-Composable: chain invocations to build pipelines. Each step is a code-reviewable .pq file plus a CLI command.
+ODBC-driven inputs need no CLI flag — they're expressed in the M source itself:
+
+```
+let
+    Source = Odbc.DataSource("DSN=warehouse"),
+    Orders = Source{[Name="orders"]}[Data]
+in
+    Table.SelectRows(Orders, each [Total] > 100)
+```
+
+Composable: chain invocations to build pipelines. Each step is a code-reviewable .pq file plus a CLI command. ODBC connections are opened per-invocation by default.
 
 ## Language features needed (provisional)
 

@@ -12,6 +12,7 @@ This zip contains the design notes from a conversation scoping out the project.
 4. **`04-test-harness.md`** — How to validate against Microsoft's M as oracle.
 5. **`05-open-questions.md`** — Things to resolve in Claude Code with access to the real query corpus.
 6. **`06-resources.md`** — Links to the language spec, reference parser, relevant crates, prior art.
+7. **`07-evaluator-design.md`** — Load-bearing decisions for the evaluator (laziness, error model, environment, value/number representation), the Prolog evaluator companion as first-class differential, and the slicing plan.
 
 ## Status
 

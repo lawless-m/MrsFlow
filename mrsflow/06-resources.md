@@ -40,6 +40,7 @@ Use the parser as a parser-level oracle — feed both the TS parser and the Rust
 **CLI:**
 - `clap` — argument parsing (https://crates.io/crates/clap)
 - `anyhow` / `thiserror` — error handling at the shell layer (the core has its own error model)
+- `odbc-api` — Rust bindings to native ODBC drivers, used by the CLI shell's `IoHost` to back `Odbc.Query` and `Odbc.DataSource` (https://crates.io/crates/odbc-api)
 
 **WASM:**
 - `wasm-bindgen` — JS interop (https://crates.io/crates/wasm-bindgen)
