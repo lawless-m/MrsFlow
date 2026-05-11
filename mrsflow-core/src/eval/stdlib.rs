@@ -966,8 +966,7 @@ fn table_constructor(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError
             )));
         }
     }
-    let batch = values_to_record_batch(&names, &rows)?;
-    Ok(Value::Table(Table::from_arrow(batch)))
+    Ok(Value::Table(values_to_table(&names, &rows)?))
 }
 
 fn table_column_names(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
@@ -1110,47 +1109,59 @@ fn expect_list_of_lists<'a>(v: &'a Value, ctx: &str) -> Result<Vec<Vec<Value>>, 
     Ok(out)
 }
 
-/// Infer a column type by scanning all cells. Supported variants in this
-/// slice: Number → Float64, Text → Utf8, Logical → Boolean, Null. A column
-/// of all-null produces an Arrow NullArray. Mixed primitive kinds within
-/// one column → MError::Other.
-fn values_to_record_batch(
-    column_names: &[String],
-    rows: &[Vec<Value>],
-) -> Result<RecordBatch, MError> {
+/// Build a Table from column names + row-major cells. Picks the Arrow-backed
+/// representation when every column fits the uniform-column rule; falls back
+/// to a Rows-backed Table when any column is heterogeneous (compound values,
+/// mixed primitives, Binary).
+fn values_to_table(column_names: &[String], rows: &[Vec<Value>]) -> Result<Table, MError> {
     let n_rows = rows.len();
     let n_cols = column_names.len();
 
     // Special case: schema with zero columns isn't constructible via the
-    // standard RecordBatch path. Caller still wants a real Table value
-    // back, so build an empty-schema batch with the correct row count.
+    // standard RecordBatch path. Build an empty-schema Arrow batch with the
+    // correct row count.
     if n_cols == 0 {
         let schema = Arc::new(Schema::empty());
         let options =
             arrow::record_batch::RecordBatchOptions::new().with_row_count(Some(n_rows));
-        return RecordBatch::try_new_with_options(schema, vec![], &options)
-            .map_err(|e| MError::Other(format!("#table: empty-cols rebuild failed: {}", e)));
+        let batch = RecordBatch::try_new_with_options(schema, vec![], &options)
+            .map_err(|e| MError::Other(format!("#table: empty-cols rebuild failed: {}", e)))?;
+        return Ok(Table::from_arrow(batch));
     }
 
+    // First pass: try Arrow encoding for each column. If any column
+    // returns None (heterogeneous), give up the Arrow path and build a
+    // Rows-backed Table from the row data unchanged.
     let mut fields: Vec<Field> = Vec::with_capacity(n_cols);
     let mut columns: Vec<ArrayRef> = Vec::with_capacity(n_cols);
     for col_idx in 0..n_cols {
         let cells: Vec<&Value> = rows.iter().map(|r| &r[col_idx]).collect();
-        let (dtype, array) = infer_cells(&cells)?;
-        let is_nullable =
-            matches!(dtype, DataType::Null) || cells.iter().any(|v| matches!(v, Value::Null));
-        fields.push(Field::new(column_names[col_idx].clone(), dtype, is_nullable));
-        columns.push(array);
+        match infer_cells(&cells)? {
+            Some((dtype, array)) => {
+                let is_nullable = matches!(dtype, DataType::Null)
+                    || cells.iter().any(|v| matches!(v, Value::Null));
+                fields.push(Field::new(column_names[col_idx].clone(), dtype, is_nullable));
+                columns.push(array);
+            }
+            None => {
+                return Ok(Table::from_rows(column_names.to_vec(), rows.to_vec()));
+            }
+        }
     }
     let schema = Arc::new(Schema::new(fields));
-    RecordBatch::try_new(schema, columns)
-        .map_err(|e| MError::Other(format!("#table: build failed: {}", e)))
+    let batch = RecordBatch::try_new(schema, columns)
+        .map_err(|e| MError::Other(format!("#table: build failed: {}", e)))?;
+    Ok(Table::from_arrow(batch))
 }
 
-/// Infer the Arrow type for one column's cells and build the matching
-/// array. Used by both `#table` (per-column scan of rows) and by
-/// `Table.AddColumn` (the freshly-computed cells).
-pub(crate) fn infer_cells(cells: &[&Value]) -> Result<(DataType, ArrayRef), MError> {
+/// Try to infer an Arrow column from a slice of cells.
+/// `Ok(Some(...))` — cells fit Arrow's uniform-column rule.
+/// `Ok(None)` — cells need a Rows-backed fallback (compound values, mixed
+/// primitive types, or Binary). Caller decides what to do with the signal.
+/// `Err(...)` — reserved for genuine internal errors (none currently).
+pub(crate) fn infer_cells(
+    cells: &[&Value],
+) -> Result<Option<(DataType, ArrayRef)>, MError> {
     let n_rows = cells.len();
     // Find first non-null cell to determine column kind.
     let mut kind: Option<&'static str> = None;
@@ -1181,116 +1192,100 @@ pub(crate) fn infer_cells(cells: &[&Value]) -> Result<(DataType, ArrayRef), MErr
                 kind = Some("duration");
                 break;
             }
-            other => {
-                return Err(MError::NotImplemented(match other {
-                    Value::Binary(_) => "binary cells (deferred)",
-                    _ => "non-primitive cell type (deferred)",
-                }));
-            }
+            // Compound or Binary — needs Rows fallback at the table level.
+            _ => return Ok(None),
         }
     }
     match kind {
-        None => Ok((
+        None => Ok(Some((
             DataType::Null,
             Arc::new(NullArray::new(n_rows)) as ArrayRef,
-        )),
+        ))),
         Some("number") => {
-            let values: Vec<Option<f64>> = cells
-                .iter()
-                .map(|v| match v {
-                    Value::Null => Ok(None),
-                    Value::Number(n) => Ok(Some(*n)),
-                    other => Err(MError::Other(format!(
-                        "column: mixed types: number + {}",
-                        super::type_name(other)
-                    ))),
-                })
-                .collect::<Result<_, _>>()?;
-            Ok((DataType::Float64, Arc::new(Float64Array::from(values))))
+            let mut values: Vec<Option<f64>> = Vec::with_capacity(n_rows);
+            for v in cells {
+                match v {
+                    Value::Null => values.push(None),
+                    Value::Number(n) => values.push(Some(*n)),
+                    _ => return Ok(None), // mixed → Rows fallback
+                }
+            }
+            Ok(Some((DataType::Float64, Arc::new(Float64Array::from(values)))))
         }
         Some("text") => {
-            let values: Vec<Option<String>> = cells
-                .iter()
-                .map(|v| match v {
-                    Value::Null => Ok(None),
-                    Value::Text(s) => Ok(Some(s.clone())),
-                    other => Err(MError::Other(format!(
-                        "column: mixed types: text + {}",
-                        super::type_name(other)
-                    ))),
-                })
-                .collect::<Result<_, _>>()?;
-            Ok((DataType::Utf8, Arc::new(StringArray::from(values))))
+            let mut values: Vec<Option<String>> = Vec::with_capacity(n_rows);
+            for v in cells {
+                match v {
+                    Value::Null => values.push(None),
+                    Value::Text(s) => values.push(Some(s.clone())),
+                    _ => return Ok(None),
+                }
+            }
+            Ok(Some((DataType::Utf8, Arc::new(StringArray::from(values)))))
         }
         Some("logical") => {
-            let values: Vec<Option<bool>> = cells
-                .iter()
-                .map(|v| match v {
-                    Value::Null => Ok(None),
-                    Value::Logical(b) => Ok(Some(*b)),
-                    other => Err(MError::Other(format!(
-                        "column: mixed types: logical + {}",
-                        super::type_name(other)
-                    ))),
-                })
-                .collect::<Result<_, _>>()?;
-            Ok((DataType::Boolean, Arc::new(BooleanArray::from(values))))
+            let mut values: Vec<Option<bool>> = Vec::with_capacity(n_rows);
+            for v in cells {
+                match v {
+                    Value::Null => values.push(None),
+                    Value::Logical(b) => values.push(Some(*b)),
+                    _ => return Ok(None),
+                }
+            }
+            Ok(Some((DataType::Boolean, Arc::new(BooleanArray::from(values)))))
         }
         Some("date") => {
             // Date32 stores days since 1970-01-01.
             let epoch = chrono::NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
-            let values: Vec<Option<i32>> = cells
-                .iter()
-                .map(|v| match v {
-                    Value::Null => Ok(None),
-                    Value::Date(d) => Ok(Some(
-                        d.signed_duration_since(epoch).num_days() as i32,
-                    )),
-                    other => Err(MError::Other(format!(
-                        "column: mixed types: date + {}",
-                        super::type_name(other)
-                    ))),
-                })
-                .collect::<Result<_, _>>()?;
-            Ok((DataType::Date32, Arc::new(Date32Array::from(values))))
+            let mut values: Vec<Option<i32>> = Vec::with_capacity(n_rows);
+            for v in cells {
+                match v {
+                    Value::Null => values.push(None),
+                    Value::Date(d) => {
+                        values.push(Some(d.signed_duration_since(epoch).num_days() as i32))
+                    }
+                    _ => return Ok(None),
+                }
+            }
+            Ok(Some((DataType::Date32, Arc::new(Date32Array::from(values)))))
         }
         Some("datetime") => {
             // Timestamp(Microsecond, None): i64 microseconds since unix epoch.
-            let values: Vec<Option<i64>> = cells
-                .iter()
-                .map(|v| match v {
-                    Value::Null => Ok(None),
-                    Value::Datetime(dt) => Ok(Some(dt.and_utc().timestamp_micros())),
-                    other => Err(MError::Other(format!(
-                        "column: mixed types: datetime + {}",
-                        super::type_name(other)
-                    ))),
-                })
-                .collect::<Result<_, _>>()?;
-            Ok((
+            let mut values: Vec<Option<i64>> = Vec::with_capacity(n_rows);
+            for v in cells {
+                match v {
+                    Value::Null => values.push(None),
+                    Value::Datetime(dt) => values.push(Some(dt.and_utc().timestamp_micros())),
+                    _ => return Ok(None),
+                }
+            }
+            Ok(Some((
                 DataType::Timestamp(arrow::datatypes::TimeUnit::Microsecond, None),
                 Arc::new(TimestampMicrosecondArray::from(values)),
-            ))
+            )))
         }
         Some("duration") => {
             // Duration(Microsecond): i64 microseconds.
-            let values: Vec<Option<i64>> = cells
-                .iter()
-                .map(|v| match v {
-                    Value::Null => Ok(None),
-                    Value::Duration(d) => d.num_microseconds().map(Some).ok_or_else(|| {
-                        MError::Other(format!("duration overflows i64 microseconds: {:?}", d))
-                    }),
-                    other => Err(MError::Other(format!(
-                        "column: mixed types: duration + {}",
-                        super::type_name(other)
-                    ))),
-                })
-                .collect::<Result<_, _>>()?;
-            Ok((
+            let mut values: Vec<Option<i64>> = Vec::with_capacity(n_rows);
+            for v in cells {
+                match v {
+                    Value::Null => values.push(None),
+                    Value::Duration(d) => match d.num_microseconds() {
+                        Some(us) => values.push(Some(us)),
+                        None => {
+                            return Err(MError::Other(format!(
+                                "duration overflows i64 microseconds: {:?}",
+                                d
+                            )));
+                        }
+                    },
+                    _ => return Ok(None),
+                }
+            }
+            Ok(Some((
                 DataType::Duration(arrow::datatypes::TimeUnit::Microsecond),
                 Arc::new(DurationMicrosecondArray::from(values)),
-            ))
+            )))
         }
         _ => unreachable!(),
     }
@@ -1519,7 +1514,11 @@ fn table_add_column(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> 
         new_cells.push(v);
     }
     let cell_refs: Vec<&Value> = new_cells.iter().collect();
-    let (inferred_dtype, inferred_array) = infer_cells(&cell_refs)?;
+    let (inferred_dtype, inferred_array) = infer_cells(&cell_refs)?.ok_or(
+        MError::NotImplemented(
+            "Table.AddColumn: heterogeneous result column needs Rows-backed dispatch (slice 3)",
+        ),
+    )?;
 
     // Optional 4th arg: target column type. If supplied (and not `type any`),
     // cast and use its dtype/nullability for the new field; otherwise use the
@@ -1568,8 +1567,7 @@ fn table_from_rows(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> 
             )));
         }
     }
-    let batch = values_to_record_batch(&names, &rows)?;
-    Ok(Value::Table(Table::from_arrow(batch)))
+    Ok(Value::Table(values_to_table(&names, &rows)?))
 }
 
 fn table_promote_headers(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
@@ -1809,7 +1807,11 @@ fn table_transform_columns(args: &[Value], host: &dyn IoHost) -> Result<Value, M
             new_cells.push(v);
         }
         let cell_refs: Vec<&Value> = new_cells.iter().collect();
-        let (inferred_dtype, inferred_array) = infer_cells(&cell_refs)?;
+        let (inferred_dtype, inferred_array) = infer_cells(&cell_refs)?.ok_or(
+            MError::NotImplemented(
+                "Table.TransformColumns: heterogeneous result column needs Rows-backed dispatch (slice 3)",
+            ),
+        )?;
         let (dtype, new_array, nullable) = match type_opt {
             Some(t) if !matches!(t, super::value::TypeRep::Any) => {
                 let (target_dtype, target_nullable) = type_rep_to_datatype(t)?;
@@ -2058,8 +2060,7 @@ fn table_insert_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError>
         rows.push(cells);
     }
 
-    let batch = values_to_record_batch(&names, &rows)?;
-    Ok(Value::Table(Table::from_arrow(batch)))
+    Ok(Value::Table(values_to_table(&names, &rows)?))
 }
 
 fn date_to_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {

@@ -1958,6 +1958,78 @@ mod tests {
     }
 
     #[test]
+    fn table_mixed_primitive_column_falls_back_to_rows() {
+        // text + number in one column was previously an error; now produces
+        // a Rows-backed table.
+        match eval_str(r#"#table({"x"}, {{1}, {"a"}})"#).unwrap() {
+            Value::Table(t) => {
+                assert!(matches!(t.repr, super::TableRepr::Rows { .. }));
+                assert_eq!(t.num_rows(), 2);
+                assert_eq!(t.column_names(), vec!["x".to_string()]);
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_record_cell_falls_back_to_rows() {
+        match eval_str(r#"#table({"r"}, {{[a = 1]}})"#).unwrap() {
+            Value::Table(t) => {
+                assert!(matches!(t.repr, super::TableRepr::Rows { .. }));
+                assert_eq!(t.num_rows(), 1);
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_table_cell_falls_back_to_rows() {
+        match eval_str(r#"#table({"t"}, {{#table({"a"}, {{1}})}})"#).unwrap() {
+            Value::Table(t) => {
+                assert!(matches!(t.repr, super::TableRepr::Rows { .. }));
+                assert_eq!(t.num_rows(), 1);
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn rows_backed_table_row_index_returns_record() {
+        match eval_str(r#"#table({"x", "y"}, {{1, "a"}, {"two", 2}}){1}"#).unwrap() {
+            Value::Record(r) => {
+                assert_eq!(r.fields.len(), 2);
+                assert_eq!(r.fields[0].0, "x");
+                assert!(matches!(&r.fields[0].1, Value::Text(s) if s == "two"));
+                assert_eq!(r.fields[1].0, "y");
+                assert!(matches!(r.fields[1].1, Value::Number(n) if n == 2.0));
+            }
+            other => panic!("expected record, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_insert_rows_with_mixed_callback_result() {
+        // Regression for dogfood-4: callback returns text-or-number; the
+        // resulting column is mixed; Table.InsertRows must build a Rows-
+        // backed table without coercion.
+        match eval_str(
+            r#"let
+                paperTable = #table({"price"}, {}),
+                rows = {[price = ""], [price = 10.5], [price = "call"]},
+                inserted = Table.InsertRows(paperTable, 0, rows)
+            in inserted"#,
+        )
+        .unwrap()
+        {
+            Value::Table(t) => {
+                assert!(matches!(t.repr, super::TableRepr::Rows { .. }));
+                assert_eq!(t.num_rows(), 3);
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn type_intrinsic_int64_type_resolves_to_number_column() {
         // Int64.Type should bind to Value::Type(Number) at root_env, and
         // using it as Table.AddColumn's 4th arg should produce a Float64 column.
