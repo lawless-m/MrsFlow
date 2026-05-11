@@ -60,11 +60,28 @@ pub struct Record {
     pub env: Env,
 }
 
-/// Placeholder type-value — the type-system slice (eval-5) replaces this
-/// with the full type representation.
-#[derive(Debug, Clone)]
+/// Type-values produced by `type X`. Primitive types + the `nullable T`
+/// wrapper land in this slice. Compound types (list-of-T, record-with-fields,
+/// table-of-record, function-type) are deferred per design doc §07 until
+/// the user's corpus shows them being used in `as`/`is`.
+#[derive(Debug, Clone, PartialEq)]
 pub enum TypeRep {
-    Placeholder,
+    Any,
+    AnyNonNull,
+    Null,
+    Logical,
+    Number,
+    Text,
+    Date,
+    Datetime,
+    Duration,
+    Binary,
+    List,
+    Record,
+    Table,
+    Function,
+    Type,
+    Nullable(Box<TypeRep>),
 }
 
 /// State of a lazy thunk: pending evaluation (with the captured expression

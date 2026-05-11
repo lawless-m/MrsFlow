@@ -213,6 +213,28 @@ eval(try(Body, none), _Env, Result) :-
     % Suppress singleton-warning by binding Body in description; not actually used.
     Body = Body.
 
+% --- eval-5: type system ---
+
+% type X — construct a type-value. RHS is in type context, not value context.
+eval(unop(type, Inner), _Env, type_value(T)) :-
+    eval_as_type(Inner, T).
+
+% as X — runtime conformance check. Fails if non-conforming, which matches
+% the Rust side's MError::Other and produces empty stdout for the differential.
+eval(binop(as, L, R), Env, Value) :-
+    eval(L, Env, LV0),
+    force(LV0, LV),
+    eval_as_type(R, T),
+    type_conforms(LV, T),
+    Value = LV.
+
+% is X — runtime type test. Always succeeds with a boolean.
+eval(binop(is, L, R), Env, bool(B)) :-
+    eval(L, Env, LV0),
+    force(LV0, LV),
+    eval_as_type(R, T),
+    ( type_conforms(LV, T) -> B = true ; B = false ).
+
 % try with otherwise — succeeds with body's value on success, with
 % fallback's value on either thrown error or predicate failure.
 eval(try(Body, some(Fallback)), Env, Value) :-
@@ -374,6 +396,56 @@ try_failure_record(ErrRec, record([
     pair("Error",    ErrRec)
 ])).
 
+% --- eval-5 helpers ---
+
+% Interpret an AST term as a type representation. Mirror of Rust's
+% evaluate_as_type. The `null` keyword reaches the parser as the atom
+% `null` (parser produces `primary(null)`), so we handle that explicitly
+% in addition to the ref(Chars) path.
+eval_as_type(null, type_prim(null)).
+eval_as_type(ref(Cs), type_prim(Name)) :-
+    primitive_type_name(Cs, Name).
+eval_as_type(unop(nullable, Inner), type_nullable(T)) :-
+    eval_as_type(Inner, T).
+% Compound type expressions (list_type/_, record_type/_, table_type/_,
+% function_type/_) are deferred per design doc — they simply fail here,
+% which propagates as empty stdout for the differential.
+
+primitive_type_name([a,n,y],                                    any).
+primitive_type_name([a,n,y,n,o,n,n,u,l,l],                      anynonnull).
+primitive_type_name([n,u,l,l],                                  null).
+primitive_type_name([l,o,g,i,c,a,l],                            logical).
+primitive_type_name([n,u,m,b,e,r],                              number).
+primitive_type_name([t,e,x,t],                                  text).
+primitive_type_name([d,a,t,e],                                  date).
+primitive_type_name([d,a,t,e,t,i,m,e],                          datetime).
+primitive_type_name([d,u,r,a,t,i,o,n],                          duration).
+primitive_type_name([b,i,n,a,r,y],                              binary).
+primitive_type_name([l,i,s,t],                                  list).
+primitive_type_name([r,e,c,o,r,d],                              record).
+primitive_type_name([t,a,b,l,e],                                table).
+primitive_type_name([f,u,n,c,t,i,o,n],                          function).
+primitive_type_name([t,y,p,e],                                  type).
+
+% Conformance test between a value term and a type representation.
+type_conforms(_,             type_prim(any))         :- !.
+type_conforms(V,             type_prim(anynonnull))  :- !, V \= null.
+type_conforms(null,          type_prim(null))        :- !.
+type_conforms(bool(_),       type_prim(logical)).
+type_conforms(num(_),        type_prim(number)).
+type_conforms(text(_),       type_prim(text)).
+type_conforms(date(_),       type_prim(date)).
+type_conforms(datetime(_),   type_prim(datetime)).
+type_conforms(duration(_),   type_prim(duration)).
+type_conforms(binary(_),     type_prim(binary)).
+type_conforms(list(_),       type_prim(list)).
+type_conforms(record(_),     type_prim(record)).
+type_conforms(table(_),      type_prim(table)).
+type_conforms(closure(_,_,_),type_prim(function)).
+type_conforms(type_value(_), type_prim(type)).
+type_conforms(null,          type_nullable(_))       :- !.
+type_conforms(V,             type_nullable(Inner))   :- type_conforms(V, Inner).
+
 % Deep force — recursively forces thunks inside lists/records. The harness
 % calls this on the top-level result before printing, mirroring the Rust
 % `deep_force` helper used by `value_dump.rs`.
@@ -508,8 +580,24 @@ print_value(closure(_, _, _)) :-
     % printing isn't well-defined. Both sides emit `(function ...)` as a
     % placeholder.
     format("(function ...)", []).
+print_value(type_value(type_prim(Name))) :-
+    !,
+    format("(type-value ~w)", [Name]).
+print_value(type_value(type_nullable(T))) :-
+    !,
+    format("(type-value (nullable ", []),
+    print_type_inner(T),
+    format("))", []).
 print_value(type_value(_)) :-
+    % Fallback for any future TypeRep variants not yet handled — keeps the
+    % differential noticing divergence rather than silently emitting nothing.
     format("(type-value ...)", []).
+
+print_type_inner(type_prim(Name)) :- format("~w", [Name]).
+print_type_inner(type_nullable(T)) :-
+    format("(nullable ", []),
+    print_type_inner(T),
+    format(")", []).
 print_value(thunk(_, _)) :-
     % Forcing should happen before printing — if a thunk reaches the printer
     % unforced, that's a bug somewhere. Emit a marker for visibility.

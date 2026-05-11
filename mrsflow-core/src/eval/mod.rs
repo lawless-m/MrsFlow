@@ -42,7 +42,20 @@ pub fn evaluate(ast: &Expr, env: &Env, host: &dyn IoHost) -> Result<Value, MErro
             force(value, &mut |e, env| evaluate(e, env, host))
         }
 
-        // --- Unary ---
+        // --- Type construction: intercept `type X` BEFORE evaluating the
+        //     inner expression, since the operand is in TYPE context not
+        //     VALUE context (`type number` doesn't look up `number`). ---
+        Expr::Unary(UnaryOp::Type, inner) => {
+            let t = evaluate_as_type(inner)?;
+            Ok(Value::Type(t))
+        }
+
+        // --- `nullable T` is only meaningful inside a type expression. ---
+        Expr::Unary(UnaryOp::Nullable, _) => Err(MError::Other(
+            "`nullable` is only valid in a type expression".into(),
+        )),
+
+        // --- Other unary ---
         Expr::Unary(op, inner) => {
             let v = evaluate(inner, env, host)?;
             apply_unary(*op, v)
@@ -87,6 +100,27 @@ pub fn evaluate(ast: &Expr, env: &Env, host: &dyn IoHost) -> Result<Value, MErro
                     expected: "logical",
                     found: type_name(&other),
                 }),
+            }
+        }
+        // --- Type tests: RHS is a type expression, not a value expression. ---
+        Expr::Binary(BinaryOp::Is, l, r) => {
+            let lv = evaluate(l, env, host)?;
+            let lv = force(lv, &mut |e, env| evaluate(e, env, host))?;
+            let t = evaluate_as_type(r)?;
+            Ok(Value::Logical(type_conforms(&lv, &t)))
+        }
+        Expr::Binary(BinaryOp::As, l, r) => {
+            let lv = evaluate(l, env, host)?;
+            let lv = force(lv, &mut |e, env| evaluate(e, env, host))?;
+            let t = evaluate_as_type(r)?;
+            if type_conforms(&lv, &t) {
+                Ok(lv)
+            } else {
+                Err(MError::Other(format!(
+                    "value of type {} does not conform to {}",
+                    type_name(&lv),
+                    type_rep_name(&t)
+                )))
             }
         }
         Expr::Binary(op, l, r) => {
@@ -426,6 +460,93 @@ fn try_failure_record(error_record: Value) -> Value {
     })
 }
 
+/// Interpret an Expr in TYPE context. `type X`, `X as Y`, `X is Y` all
+/// route their type-position operand through this rather than `evaluate`,
+/// since the operand names a type and shouldn't be looked up as a value.
+fn evaluate_as_type(expr: &Expr) -> Result<TypeRep, MError> {
+    match expr {
+        // The `null` keyword reaches the parser as Expr::NullLit even in
+        // type-position contexts; map it to the null type here.
+        Expr::NullLit => Ok(TypeRep::Null),
+        Expr::Identifier(name) => match name.as_str() {
+            "any" => Ok(TypeRep::Any),
+            "anynonnull" => Ok(TypeRep::AnyNonNull),
+            "null" => Ok(TypeRep::Null),
+            "logical" => Ok(TypeRep::Logical),
+            "number" => Ok(TypeRep::Number),
+            "text" => Ok(TypeRep::Text),
+            "date" => Ok(TypeRep::Date),
+            "datetime" => Ok(TypeRep::Datetime),
+            "duration" => Ok(TypeRep::Duration),
+            "binary" => Ok(TypeRep::Binary),
+            "list" => Ok(TypeRep::List),
+            "record" => Ok(TypeRep::Record),
+            "table" => Ok(TypeRep::Table),
+            "function" => Ok(TypeRep::Function),
+            "type" => Ok(TypeRep::Type),
+            other => Err(MError::Other(format!("unknown primitive type: {}", other))),
+        },
+        Expr::Unary(UnaryOp::Nullable, inner) => {
+            let t = evaluate_as_type(inner)?;
+            Ok(TypeRep::Nullable(Box::new(t)))
+        }
+        Expr::ListType(_)
+        | Expr::RecordType { .. }
+        | Expr::TableType(_)
+        | Expr::FunctionType { .. } => Err(MError::NotImplemented(
+            "compound type expressions deferred until corpus drives them",
+        )),
+        _ => Err(MError::Other(
+            "expression is not a type expression".into(),
+        )),
+    }
+}
+
+/// Conformance test between a value and a type. Matches the Prolog
+/// type_conforms/2; both sides must agree byte-for-byte on the boolean.
+fn type_conforms(v: &Value, t: &TypeRep) -> bool {
+    match t {
+        TypeRep::Any => true,
+        TypeRep::AnyNonNull => !matches!(v, Value::Null),
+        TypeRep::Null => matches!(v, Value::Null),
+        TypeRep::Logical => matches!(v, Value::Logical(_)),
+        TypeRep::Number => matches!(v, Value::Number(_)),
+        TypeRep::Text => matches!(v, Value::Text(_)),
+        TypeRep::Date => matches!(v, Value::Date(_)),
+        TypeRep::Datetime => matches!(v, Value::Datetime(_)),
+        TypeRep::Duration => matches!(v, Value::Duration(_)),
+        TypeRep::Binary => matches!(v, Value::Binary(_)),
+        TypeRep::List => matches!(v, Value::List(_)),
+        TypeRep::Record => matches!(v, Value::Record(_)),
+        TypeRep::Table => matches!(v, Value::Table(_)),
+        TypeRep::Function => matches!(v, Value::Function(_)),
+        TypeRep::Type => matches!(v, Value::Type(_)),
+        TypeRep::Nullable(inner) => matches!(v, Value::Null) || type_conforms(v, inner),
+    }
+}
+
+/// Human-readable name of a TypeRep, used in error messages.
+fn type_rep_name(t: &TypeRep) -> String {
+    match t {
+        TypeRep::Any => "any".into(),
+        TypeRep::AnyNonNull => "anynonnull".into(),
+        TypeRep::Null => "null".into(),
+        TypeRep::Logical => "logical".into(),
+        TypeRep::Number => "number".into(),
+        TypeRep::Text => "text".into(),
+        TypeRep::Date => "date".into(),
+        TypeRep::Datetime => "datetime".into(),
+        TypeRep::Duration => "duration".into(),
+        TypeRep::Binary => "binary".into(),
+        TypeRep::List => "list".into(),
+        TypeRep::Record => "record".into(),
+        TypeRep::Table => "table".into(),
+        TypeRep::Function => "function".into(),
+        TypeRep::Type => "type".into(),
+        TypeRep::Nullable(inner) => format!("nullable {}", type_rep_name(inner)),
+    }
+}
+
 /// Lift an internal MError into a user-visible M error record so `try` can
 /// surface it as a Value. User-raised errors pass through their inner record.
 fn error_to_record(err: MError) -> Value {
@@ -515,8 +636,11 @@ fn apply_unary(op: UnaryOp, v: Value) -> Result<Value, MError> {
                 found: type_name(&other),
             }),
         },
-        UnaryOp::Type | UnaryOp::Nullable => Err(MError::NotImplemented(
-            "type / nullable unary deferred to eval-5",
+        // Type and Nullable are intercepted in `evaluate` before reaching
+        // here — their operands are in type-expression context, not value
+        // context. If we get here, something routed wrong.
+        UnaryOp::Type | UnaryOp::Nullable => Err(MError::Other(
+            "internal: type/nullable should be intercepted in evaluate".into(),
         )),
     }
 }
@@ -542,8 +666,11 @@ fn apply_binary(op: BinaryOp, lv: Value, rv: Value) -> Result<Value, MError> {
         BinaryOp::Equal => Ok(Value::Logical(values_equal(&lv, &rv))),
         BinaryOp::NotEqual => Ok(Value::Logical(!values_equal(&lv, &rv))),
         BinaryOp::And | BinaryOp::Or => unreachable!("short-circuited above"),
-        BinaryOp::As | BinaryOp::Is | BinaryOp::Meta => Err(MError::NotImplemented(
-            "type relation / meta deferred to eval-5",
+        BinaryOp::As | BinaryOp::Is => unreachable!(
+            "as/is intercepted in evaluate (RHS is in type context)"
+        ),
+        BinaryOp::Meta => Err(MError::NotImplemented(
+            "meta operator deferred to a later eval slice",
         )),
     }
 }
@@ -970,11 +1097,17 @@ mod tests {
 
     #[test]
     fn deferred_form_returns_not_implemented() {
-        // Type-expression forms aren't in slices 1-4 — eval-5 lands them.
-        // Build the AST directly because they only appear inside `type X`
-        // contexts that aren't ergonomically reachable from source.
+        // `meta` and compound type expressions remain deferred after eval-5.
+        // Build the AST directly: ListType only appears inside `type {T}`
+        // contexts, and we route it to evaluate_as_type which currently
+        // returns NotImplemented for compound type expressions.
         use crate::parser::Expr;
-        let ast = Expr::ListType(Box::new(Expr::NumberLit("1".into())));
+        // `type {number}` constructs a list-type — which evaluate_as_type
+        // bounces with NotImplemented (compound types deferred).
+        let ast = Expr::Unary(
+            UnaryOp::Type,
+            Box::new(Expr::ListType(Box::new(Expr::Identifier("number".into())))),
+        );
         let env = EnvNode::empty();
         match evaluate(&ast, &env, &NoIoHost) {
             Err(MError::NotImplemented(_)) => {}
@@ -1460,6 +1593,102 @@ mod tests {
         // To test nested-error propagation, we need the outer try's body
         // itself to raise. Use: `try error "outer" otherwise 7` = 7.
         assert_eq!(eval_number(r#"try error "outer" otherwise 7"#), 7.0);
+    }
+
+    // --- Type system: type / as / is (eval-5) ---
+
+    #[test]
+    fn type_construction_primitive() {
+        match eval_str("type number").unwrap() {
+            Value::Type(TypeRep::Number) => {}
+            other => panic!("expected Type(Number), got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn type_construction_nullable() {
+        match eval_str("type nullable number").unwrap() {
+            Value::Type(TypeRep::Nullable(inner)) => match *inner {
+                TypeRep::Number => {}
+                other => panic!("expected Nullable(Number), got {:?}", other),
+            },
+            other => panic!("expected Type(Nullable(...)), got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn type_construction_any() {
+        match eval_str("type any").unwrap() {
+            Value::Type(TypeRep::Any) => {}
+            other => panic!("expected Type(Any), got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn is_tests_true() {
+        assert_eq!(eval_bool("1 is number"), true);
+        assert_eq!(eval_bool(r#""x" is text"#), true);
+        assert_eq!(eval_bool("true is logical"), true);
+        assert_eq!(eval_bool("null is null"), true);
+        assert_eq!(eval_bool("null is nullable number"), true);
+        assert_eq!(eval_bool("1 is nullable number"), true);
+        assert_eq!(eval_bool("1 is any"), true);
+        assert_eq!(eval_bool("null is any"), true);
+    }
+
+    #[test]
+    fn is_tests_false() {
+        assert_eq!(eval_bool("1 is text"), false);
+        assert_eq!(eval_bool("null is number"), false);
+        assert_eq!(eval_bool("null is anynonnull"), false);
+        assert_eq!(eval_bool("1 is logical"), false);
+    }
+
+    #[test]
+    fn as_success_returns_value() {
+        assert_eq!(eval_number("1 as number"), 1.0);
+        assert!(matches!(eval_str("null as nullable number").unwrap(), Value::Null));
+        assert!(matches!(eval_str("null as null").unwrap(), Value::Null));
+        assert_eq!(eval_number("1 as any"), 1.0);
+    }
+
+    #[test]
+    fn as_failure_errors() {
+        match eval_str(r#"1 as text"#) {
+            Err(MError::Other(msg)) => assert!(msg.contains("does not conform"), "got: {}", msg),
+            other => panic!("expected conformance error, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn unknown_type_name_errors() {
+        match eval_str("1 is foo") {
+            Err(MError::Other(msg)) => assert!(msg.contains("unknown primitive type"), "got: {}", msg),
+            other => panic!("expected unknown-type error, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn bare_nullable_outside_type_context_errors() {
+        // `nullable` is only valid in a type expression; bare use errors.
+        // We test by constructing the AST directly because the parser
+        // won't emit a bare Unary(Nullable, ...) in source — it's only
+        // produced inside primary_type.
+        use crate::parser::Expr;
+        let ast = Expr::Unary(UnaryOp::Nullable, Box::new(Expr::NumberLit("1".into())));
+        let env = EnvNode::empty();
+        match evaluate(&ast, &env, &NoIoHost) {
+            Err(MError::Other(msg)) => {
+                assert!(msg.contains("nullable"), "got: {}", msg);
+            }
+            other => panic!("expected bare-nullable error, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn list_is_list_record_is_record() {
+        assert_eq!(eval_bool("{1, 2, 3} is list"), true);
+        assert_eq!(eval_bool("[a = 1] is record"), true);
     }
 
     #[test]

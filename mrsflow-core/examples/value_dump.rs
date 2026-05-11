@@ -11,7 +11,7 @@
 //!
 //! Usage: value_dump <path>
 
-use mrsflow_core::eval::{deep_force, evaluate, EnvNode, NoIoHost, Value};
+use mrsflow_core::eval::{deep_force, evaluate, EnvNode, NoIoHost, TypeRep, Value};
 use mrsflow_core::lexer::tokenize;
 use mrsflow_core::parser::parse;
 use std::env;
@@ -115,8 +115,37 @@ fn write_value(out: &mut String, v: &Value) {
         }
         Value::Table(_) => out.push_str("(table ...)"),
         Value::Function(_) => out.push_str("(function ...)"),
-        Value::Type(_) => out.push_str("(type-value ...)"),
+        Value::Type(t) => {
+            out.push_str("(type-value ");
+            write_type(out, t);
+            out.push(')');
+        }
         Value::Thunk(_) => out.push_str("(thunk ...)"),
+    }
+}
+
+fn write_type(out: &mut String, t: &TypeRep) {
+    match t {
+        TypeRep::Any => out.push_str("any"),
+        TypeRep::AnyNonNull => out.push_str("anynonnull"),
+        TypeRep::Null => out.push_str("null"),
+        TypeRep::Logical => out.push_str("logical"),
+        TypeRep::Number => out.push_str("number"),
+        TypeRep::Text => out.push_str("text"),
+        TypeRep::Date => out.push_str("date"),
+        TypeRep::Datetime => out.push_str("datetime"),
+        TypeRep::Duration => out.push_str("duration"),
+        TypeRep::Binary => out.push_str("binary"),
+        TypeRep::List => out.push_str("list"),
+        TypeRep::Record => out.push_str("record"),
+        TypeRep::Table => out.push_str("table"),
+        TypeRep::Function => out.push_str("function"),
+        TypeRep::Type => out.push_str("type"),
+        TypeRep::Nullable(inner) => {
+            out.push_str("(nullable ");
+            write_type(out, inner);
+            out.push(')');
+        }
     }
 }
 

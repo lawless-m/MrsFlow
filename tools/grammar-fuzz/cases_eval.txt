@@ -93,3 +93,24 @@ try error [Reason = "X", Message = "Y", Detail = null]
 try (let bad = missing_name in 1) otherwise 99
 try (error "x" + 1) otherwise 99
 try error "outer" otherwise 7
+type number
+type nullable number
+type any
+1 is number
+"x" is text
+true is logical
+null is null
+null is nullable number
+1 is nullable number
+1 is any
+null is any
+1 is text
+null is number
+null is anynonnull
+1 is logical
+1 as number
+null as nullable number
+null as null
+1 as any
+{1, 2, 3} is list
+[a = 1] is record
