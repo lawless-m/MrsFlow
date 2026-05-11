@@ -1678,6 +1678,90 @@ mod tests {
         assert_eq!(eval_bool("null is nullable date"), true);
     }
 
+    // --- Table.* expansion (eval-7d) ---
+
+    #[test]
+    fn table_select_columns_basic() {
+        match eval_str(
+            r#"Table.SelectColumns(#table({"a","b","c"}, {{1,2,3}}), {"b","a"})"#,
+        )
+        .unwrap()
+        {
+            Value::Table(t) => {
+                let names: Vec<String> = t
+                    .batch
+                    .schema()
+                    .fields()
+                    .iter()
+                    .map(|f| f.name().clone())
+                    .collect();
+                assert_eq!(names, vec!["b".to_string(), "a".to_string()]);
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_select_rows_filters_by_predicate() {
+        match eval_str(
+            r#"Table.SelectRows(#table({"n"}, {{1},{2},{3}}), each [n] > 1)"#,
+        )
+        .unwrap()
+        {
+            Value::Table(t) => assert_eq!(t.batch.num_rows(), 2),
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_add_column_computes_new_cells() {
+        match eval_str(
+            r#"Table.AddColumn(#table({"n"}, {{10},{20}}), "doubled", each [n] * 2)"#,
+        )
+        .unwrap()
+        {
+            Value::Table(t) => {
+                assert_eq!(t.batch.num_columns(), 2);
+                assert_eq!(t.batch.schema().field(1).name(), "doubled");
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_from_rows_basic() {
+        match eval_str(r#"Table.FromRows({{1,2},{3,4}}, {"a","b"})"#).unwrap() {
+            Value::Table(t) => {
+                assert_eq!(t.batch.num_rows(), 2);
+                assert_eq!(t.batch.num_columns(), 2);
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_promote_headers_basic() {
+        // Headers in row 0 (text), data in rows 1+ (text — to share a column type).
+        match eval_str(
+            r#"Table.PromoteHeaders(#table({"c1","c2"}, {{"a","b"}, {"r1c1","r1c2"}}))"#,
+        )
+        .unwrap()
+        {
+            Value::Table(t) => {
+                let names: Vec<String> = t
+                    .batch
+                    .schema()
+                    .fields()
+                    .iter()
+                    .map(|f| f.name().clone())
+                    .collect();
+                assert_eq!(names, vec!["a".to_string(), "b".to_string()]);
+                assert_eq!(t.batch.num_rows(), 1);
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
     // --- Tables (eval-7a) ---
 
     #[test]

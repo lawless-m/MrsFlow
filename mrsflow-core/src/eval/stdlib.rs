@@ -19,7 +19,7 @@ use crate::parser::Param;
 
 use super::env::{Env, EnvNode, EnvOps};
 use super::iohost::IoHost;
-use super::value::{BuiltinFn, Closure, FnBody, MError, Table, Value};
+use super::value::{BuiltinFn, Closure, FnBody, MError, Record, Table, Value};
 
 /// Build the initial environment containing every stdlib intrinsic plus
 /// the two literal constants `#nan` and `#infinity`. Tests and shells pass
@@ -134,6 +134,15 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
             duration_constructor,
         ),
         ("Parquet.Document", one("path"), parquet_document),
+        ("Table.SelectColumns", two("table", "names"), table_select_columns),
+        ("Table.SelectRows", two("table", "predicate"), table_select_rows),
+        (
+            "Table.AddColumn",
+            three("table", "name", "transform"),
+            table_add_column,
+        ),
+        ("Table.FromRows", two("rows", "columns"), table_from_rows),
+        ("Table.PromoteHeaders", one("table"), table_promote_headers),
     ]
 }
 
@@ -610,8 +619,10 @@ fn values_to_record_batch(
     let mut fields: Vec<Field> = Vec::with_capacity(n_cols);
     let mut columns: Vec<ArrayRef> = Vec::with_capacity(n_cols);
     for col_idx in 0..n_cols {
-        let (dtype, array) = infer_column(rows, col_idx, n_rows)?;
-        let is_nullable = matches!(dtype, DataType::Null) || column_has_null(rows, col_idx);
+        let cells: Vec<&Value> = rows.iter().map(|r| &r[col_idx]).collect();
+        let (dtype, array) = infer_cells(&cells)?;
+        let is_nullable =
+            matches!(dtype, DataType::Null) || cells.iter().any(|v| matches!(v, Value::Null));
         fields.push(Field::new(column_names[col_idx].clone(), dtype, is_nullable));
         columns.push(array);
     }
@@ -620,19 +631,15 @@ fn values_to_record_batch(
         .map_err(|e| MError::Other(format!("#table: build failed: {}", e)))
 }
 
-fn column_has_null(rows: &[Vec<Value>], col: usize) -> bool {
-    rows.iter().any(|r| matches!(r[col], Value::Null))
-}
-
-fn infer_column(
-    rows: &[Vec<Value>],
-    col: usize,
-    n_rows: usize,
-) -> Result<(DataType, ArrayRef), MError> {
+/// Infer the Arrow type for one column's cells and build the matching
+/// array. Used by both `#table` (per-column scan of rows) and by
+/// `Table.AddColumn` (the freshly-computed cells).
+pub(crate) fn infer_cells(cells: &[&Value]) -> Result<(DataType, ArrayRef), MError> {
+    let n_rows = cells.len();
     // Find first non-null cell to determine column kind.
     let mut kind: Option<&'static str> = None;
-    for r in rows {
-        match &r[col] {
+    for v in cells {
+        match v {
             Value::Null => {}
             Value::Number(_) => {
                 kind = Some("number");
@@ -663,14 +670,13 @@ fn infer_column(
             Arc::new(NullArray::new(n_rows)) as ArrayRef,
         )),
         Some("number") => {
-            let values: Vec<Option<f64>> = rows
+            let values: Vec<Option<f64>> = cells
                 .iter()
-                .map(|r| match &r[col] {
+                .map(|v| match v {
                     Value::Null => Ok(None),
                     Value::Number(n) => Ok(Some(*n)),
                     other => Err(MError::Other(format!(
-                        "#table: column {} mixed types: number + {}",
-                        col,
+                        "column: mixed types: number + {}",
                         super::type_name(other)
                     ))),
                 })
@@ -678,14 +684,13 @@ fn infer_column(
             Ok((DataType::Float64, Arc::new(Float64Array::from(values))))
         }
         Some("text") => {
-            let values: Vec<Option<String>> = rows
+            let values: Vec<Option<String>> = cells
                 .iter()
-                .map(|r| match &r[col] {
+                .map(|v| match v {
                     Value::Null => Ok(None),
                     Value::Text(s) => Ok(Some(s.clone())),
                     other => Err(MError::Other(format!(
-                        "#table: column {} mixed types: text + {}",
-                        col,
+                        "column: mixed types: text + {}",
                         super::type_name(other)
                     ))),
                 })
@@ -693,14 +698,13 @@ fn infer_column(
             Ok((DataType::Utf8, Arc::new(StringArray::from(values))))
         }
         Some("logical") => {
-            let values: Vec<Option<bool>> = rows
+            let values: Vec<Option<bool>> = cells
                 .iter()
-                .map(|r| match &r[col] {
+                .map(|v| match v {
                     Value::Null => Ok(None),
                     Value::Logical(b) => Ok(Some(*b)),
                     other => Err(MError::Other(format!(
-                        "#table: column {} mixed types: logical + {}",
-                        col,
+                        "column: mixed types: logical + {}",
                         super::type_name(other)
                     ))),
                 })
@@ -813,4 +817,208 @@ fn parquet_document(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> 
     host.parquet_read(path).map_err(|e| {
         MError::Other(format!("Parquet.Document({:?}): {:?}", path, e))
     })
+}
+
+// --- Table.* expansion (eval-7d) ---
+//
+// Five more Table.* ops by corpus frequency. SelectRows and AddColumn
+// invoke an M closure with a row-as-record value, matching the
+// `each [ColumnName]` access pattern users write.
+
+fn table_select_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let names = expect_text_list(&args[1], "Table.SelectColumns: names")?;
+    let schema = table.batch.schema();
+    let existing: Vec<String> = schema.fields().iter().map(|f| f.name().clone()).collect();
+    // Look up each requested name; preserve the requested order.
+    let mut indices: Vec<usize> = Vec::with_capacity(names.len());
+    for n in &names {
+        match existing.iter().position(|e| e == n) {
+            Some(i) => indices.push(i),
+            None => {
+                return Err(MError::Other(format!(
+                    "Table.SelectColumns: column not found: {}",
+                    n
+                )));
+            }
+        }
+    }
+    let new_fields: Vec<Field> = indices.iter().map(|&i| schema.field(i).clone()).collect();
+    let new_schema = Arc::new(Schema::new(new_fields));
+    let new_columns: Vec<ArrayRef> = indices
+        .iter()
+        .map(|&i| table.batch.column(i).clone())
+        .collect();
+    let new_batch = RecordBatch::try_new(new_schema, new_columns)
+        .map_err(|e| MError::Other(format!("Table.SelectColumns: rebuild failed: {}", e)))?;
+    Ok(Value::Table(Table { batch: new_batch }))
+}
+
+fn table_select_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let predicate = expect_function(&args[1])?;
+    let n_rows = table.batch.num_rows();
+    let mut keep: Vec<u32> = Vec::new();
+    for row in 0..n_rows {
+        let record = row_to_record(&table.batch, row)?;
+        let result = invoke_callback_with_host(predicate, vec![record], host)?;
+        match result {
+            Value::Logical(true) => keep.push(row as u32),
+            Value::Logical(false) => {}
+            other => {
+                return Err(MError::TypeMismatch {
+                    expected: "logical (from row predicate)",
+                    found: super::type_name(&other),
+                });
+            }
+        }
+    }
+    let indices = arrow::array::UInt32Array::from(keep);
+    let new_columns: Vec<ArrayRef> = table
+        .batch
+        .columns()
+        .iter()
+        .map(|c| {
+            arrow::compute::take(c.as_ref(), &indices, None)
+                .map_err(|e| MError::Other(format!("Table.SelectRows: take failed: {}", e)))
+        })
+        .collect::<Result<_, _>>()?;
+    let new_batch = RecordBatch::try_new(table.batch.schema(), new_columns)
+        .map_err(|e| MError::Other(format!("Table.SelectRows: rebuild failed: {}", e)))?;
+    Ok(Value::Table(Table { batch: new_batch }))
+}
+
+fn table_add_column(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let new_name = expect_text(&args[1])?.to_string();
+    let transform = expect_function(&args[2])?;
+    let n_rows = table.batch.num_rows();
+    let mut new_cells: Vec<Value> = Vec::with_capacity(n_rows);
+    for row in 0..n_rows {
+        let record = row_to_record(&table.batch, row)?;
+        let v = invoke_callback_with_host(transform, vec![record], host)?;
+        new_cells.push(v);
+    }
+    let cell_refs: Vec<&Value> = new_cells.iter().collect();
+    let (dtype, new_array) = infer_cells(&cell_refs)?;
+
+    let schema = table.batch.schema();
+    let mut fields: Vec<Field> = schema.fields().iter().map(|f| (**f).clone()).collect();
+    fields.push(Field::new(
+        new_name,
+        dtype.clone(),
+        matches!(dtype, DataType::Null) || new_cells.iter().any(|v| matches!(v, Value::Null)),
+    ));
+    let new_schema = Arc::new(Schema::new(fields));
+    let mut new_columns: Vec<ArrayRef> = table.batch.columns().to_vec();
+    new_columns.push(new_array);
+    let new_batch = RecordBatch::try_new(new_schema, new_columns)
+        .map_err(|e| MError::Other(format!("Table.AddColumn: rebuild failed: {}", e)))?;
+    Ok(Value::Table(Table { batch: new_batch }))
+}
+
+fn table_from_rows(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    // Same as #table but with arg order (rows, columns).
+    let rows = expect_list_of_lists(&args[0], "Table.FromRows: rows")?;
+    let names = expect_text_list(&args[1], "Table.FromRows: columns")?;
+    for (i, row) in rows.iter().enumerate() {
+        if row.len() != names.len() {
+            return Err(MError::Other(format!(
+                "Table.FromRows: row {} has {} cells, expected {}",
+                i,
+                row.len(),
+                names.len()
+            )));
+        }
+    }
+    let batch = values_to_record_batch(&names, &rows)?;
+    Ok(Value::Table(Table { batch }))
+}
+
+fn table_promote_headers(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    if table.batch.num_rows() == 0 {
+        return Err(MError::Other(
+            "Table.PromoteHeaders: table has no header row".into(),
+        ));
+    }
+    // Read row 0 as the new names; every cell must be text.
+    let mut new_names: Vec<String> = Vec::with_capacity(table.batch.num_columns());
+    for col in 0..table.batch.num_columns() {
+        match cell_to_value(&table.batch, col, 0)? {
+            Value::Text(s) => new_names.push(s),
+            other => {
+                return Err(MError::Other(format!(
+                    "Table.PromoteHeaders: header cell in column {} is not text: {}",
+                    col,
+                    super::type_name(&other)
+                )));
+            }
+        }
+    }
+    // Slice every column from row 1 to end. The column types are preserved
+    // as-is from the existing schema — we are NOT re-inferring from data
+    // rows. If users want different types after promotion, they call
+    // Table.TransformColumnTypes (eval-7e).
+    let n_remaining = table.batch.num_rows() - 1;
+    let new_columns: Vec<ArrayRef> = table
+        .batch
+        .columns()
+        .iter()
+        .map(|c| c.slice(1, n_remaining))
+        .collect();
+    let schema = table.batch.schema();
+    let new_fields: Vec<Field> = schema
+        .fields()
+        .iter()
+        .zip(new_names.iter())
+        .map(|(f, n)| Field::new(n.clone(), f.data_type().clone(), f.is_nullable()))
+        .collect();
+    let new_schema = Arc::new(Schema::new(new_fields));
+    let new_batch = RecordBatch::try_new(new_schema, new_columns)
+        .map_err(|e| MError::Other(format!("Table.PromoteHeaders: rebuild failed: {}", e)))?;
+    Ok(Value::Table(Table { batch: new_batch }))
+}
+
+/// Build a record Value from one row of a RecordBatch — column name → cell.
+fn row_to_record(batch: &RecordBatch, row: usize) -> Result<Value, MError> {
+    let schema = batch.schema();
+    let mut fields: Vec<(String, Value)> = Vec::with_capacity(batch.num_columns());
+    for col in 0..batch.num_columns() {
+        let name = schema.field(col).name().clone();
+        let value = cell_to_value(batch, col, row)?;
+        fields.push((name, value));
+    }
+    Ok(Value::Record(Record {
+        fields,
+        env: EnvNode::empty(),
+    }))
+}
+
+/// Like `invoke_builtin_callback` but threads the real host through. Used
+/// when a Table.* op invokes its callback in a context where the original
+/// host should propagate (so an Odbc-using row predicate could in theory
+/// work — though none of slice 7d's tests exercise that).
+fn invoke_callback_with_host(
+    closure: &Closure,
+    args: Vec<Value>,
+    host: &dyn IoHost,
+) -> Result<Value, MError> {
+    if args.len() != closure.params.len() {
+        return Err(MError::Other(format!(
+            "callback: arity mismatch: expected {}, got {}",
+            closure.params.len(),
+            args.len()
+        )));
+    }
+    match &closure.body {
+        FnBody::Builtin(f) => f(&args, host),
+        FnBody::M(body) => {
+            let mut call_env = closure.env.clone();
+            for (param, value) in closure.params.iter().zip(args.into_iter()) {
+                call_env = call_env.extend(param.name.clone(), value);
+            }
+            super::evaluate(body, &call_env, host)
+        }
+    }
 }

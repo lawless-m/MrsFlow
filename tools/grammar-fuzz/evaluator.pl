@@ -536,6 +536,20 @@ root_env([frame(Bindings)]) :-
             - closure([param([d], req, none), param([h], req, none),
                        param([mi], req, none), param([s], req, none)],
                        builtin('#duration'), []),
+        ['T','a','b','l','e','.','S','e','l','e','c','t','C','o','l','u','m','n','s']
+            - closure([param([t], req, none), param([n], req, none)],
+                       builtin('Table.SelectColumns'), []),
+        ['T','a','b','l','e','.','S','e','l','e','c','t','R','o','w','s']
+            - closure([param([t], req, none), param([p], req, none)],
+                       builtin('Table.SelectRows'), []),
+        ['T','a','b','l','e','.','A','d','d','C','o','l','u','m','n']
+            - closure([param([t], req, none), param([n], req, none), param([f], req, none)],
+                       builtin('Table.AddColumn'), []),
+        ['T','a','b','l','e','.','F','r','o','m','R','o','w','s']
+            - closure([param([r], req, none), param([c], req, none)],
+                       builtin('Table.FromRows'), []),
+        ['T','a','b','l','e','.','P','r','o','m','o','t','e','H','e','a','d','e','r','s']
+            - closure([param([t], req, none)], builtin('Table.PromoteHeaders'), []),
         ['#','n','a','n']      - num('NaN'),
         ['#','i','n','f','i','n','i','t','y'] - num(inf)
     ].
@@ -806,6 +820,87 @@ filter_rows_by_indices([], _, []).
 filter_rows_by_indices([Row | Rest], Indices, [NewRow | RestNew]) :-
     filter_by_indices(Row, Indices, NewRow),
     filter_rows_by_indices(Rest, Indices, RestNew).
+
+% --- Table.* expansion (eval-7d) ---
+
+% Table.SelectColumns(table(Cols, Rows), Names) — keep listed columns
+% in the order given (not the original schema order).
+eval_builtin('Table.SelectColumns',
+             [table(Cols, Rows), list(NameTexts)],
+             table(NewCols, NewRows)) :-
+    extract_col_names(NameTexts, Keep),
+    all_columns_present(Keep, Cols),
+    keep_indices_in_order(Keep, Cols, Indices),
+    filter_by_indices(Cols, Indices, NewCols),
+    filter_rows_by_indices(Rows, Indices, NewRows).
+
+% For each requested name, find its index in Cols. Preserves the order
+% of `Keep` (which is what the caller asked for).
+keep_indices_in_order([], _, []).
+keep_indices_in_order([N | Rest], Cols, [I | RestI]) :-
+    nth0(I, Cols, N),
+    keep_indices_in_order(Rest, Cols, RestI).
+
+% Table.SelectRows(table(Cols, Rows), Closure) — filter via per-row
+% record predicate.
+eval_builtin('Table.SelectRows',
+             [table(Cols, Rows), closure(P, Body, CEnv)],
+             table(Cols, NewRows)) :-
+    filter_rows_by_predicate(Rows, Cols, closure(P, Body, CEnv), NewRows).
+
+filter_rows_by_predicate([], _, _, []).
+filter_rows_by_predicate([Row | Rest], Cols, Closure, Out) :-
+    row_to_record(Cols, Row, Record),
+    invoke_closure(Closure, [Record], bool(B)),
+    ( B == true
+    -> Out = [Row | RestOut],
+       filter_rows_by_predicate(Rest, Cols, Closure, RestOut)
+    ; filter_rows_by_predicate(Rest, Cols, Closure, Out)
+    ).
+
+row_to_record(Cols, Row, record(Pairs)) :-
+    pair_cols_row(Cols, Row, Pairs).
+
+pair_cols_row([], [], []).
+pair_cols_row([Name | NRest], [Cell | CRest], [pair(Name, Cell) | PRest]) :-
+    pair_cols_row(NRest, CRest, PRest).
+
+% Table.AddColumn(table(Cols, Rows), text(NewName), Closure) — append a
+% computed column. The cell for each row is the result of invoking the
+% closure with the row-as-record.
+eval_builtin('Table.AddColumn',
+             [table(Cols, Rows), text(NewName), closure(P, Body, CEnv)],
+             table(NewCols, NewRows)) :-
+    append(Cols, [NewName], NewCols),
+    add_column_cells(Rows, Cols, closure(P, Body, CEnv), NewRows).
+
+add_column_cells([], _, _, []).
+add_column_cells([Row | Rest], Cols, Closure, [NewRow | RestNew]) :-
+    row_to_record(Cols, Row, Record),
+    invoke_closure(Closure, [Record], Cell),
+    append(Row, [Cell], NewRow),
+    add_column_cells(Rest, Cols, Closure, RestNew).
+
+% Table.FromRows(rows, columns) — same as `#table(columns, rows)` with
+% the argument order swapped.
+eval_builtin('Table.FromRows',
+             [list(RowLists), list(ColTexts)],
+             table(Cols, Rows)) :-
+    extract_col_names(ColTexts, Cols),
+    extract_rows(RowLists, Rows),
+    length(Cols, NC),
+    rows_have_arity(Rows, NC).
+
+% Table.PromoteHeaders(table(_, [FirstRow | Rest])) — first row's text
+% cells become the new column names, drop the first row.
+eval_builtin('Table.PromoteHeaders',
+             [table(_, [FirstRow | RestRows])],
+             table(NewCols, RestRows)) :-
+    promote_header_cells(FirstRow, NewCols).
+
+promote_header_cells([], []).
+promote_header_cells([text(Cs) | Rest], [Cs | RestCols]) :-
+    promote_header_cells(Rest, RestCols).
 
 % --- chrono constructors (eval-7b) ---
 

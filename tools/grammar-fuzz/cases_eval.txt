@@ -155,3 +155,8 @@ Table.RemoveColumns(#table({"a", "b"}, {{1, 2}}), {"a"})
 #duration(1, 0, 0, 0) is duration
 #date(2024, 1, 15) is datetime
 null is nullable date
+Table.SelectColumns(#table({"a","b","c"}, {{1,2,3}}), {"b","a"})
+Table.SelectRows(#table({"n"}, {{1},{2},{3}}), each [n] > 1)
+Table.AddColumn(#table({"n"}, {{10},{20}}), "doubled", each [n] * 2)
+Table.FromRows({{1,2},{3,4}}, {"a","b"})
+Table.PromoteHeaders(#table({"c1","c2"}, {{"a","b"}, {"r1c1","r1c2"}}))
