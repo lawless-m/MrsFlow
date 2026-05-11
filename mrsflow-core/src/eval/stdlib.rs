@@ -302,6 +302,26 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
             table_expand_table_column,
         ),
         (
+            "Table.Unpivot",
+            vec![
+                Param { name: "table".into(),           optional: false, type_annotation: None },
+                Param { name: "pivotColumns".into(),    optional: false, type_annotation: None },
+                Param { name: "attributeColumn".into(), optional: false, type_annotation: None },
+                Param { name: "valueColumn".into(),     optional: false, type_annotation: None },
+            ],
+            table_unpivot,
+        ),
+        (
+            "Table.UnpivotOtherColumns",
+            vec![
+                Param { name: "table".into(),           optional: false, type_annotation: None },
+                Param { name: "pivotColumns".into(),    optional: false, type_annotation: None },
+                Param { name: "attributeColumn".into(), optional: false, type_annotation: None },
+                Param { name: "valueColumn".into(),     optional: false, type_annotation: None },
+            ],
+            table_unpivot_other_columns,
+        ),
+        (
             "Table.NestedJoin",
             vec![
                 Param { name: "table1".into(),        optional: false, type_annotation: None },
@@ -2332,6 +2352,76 @@ fn table_expand_table_column(args: &[Value], _host: &dyn IoHost) -> Result<Value
                     super::type_name(other)
                 )));
             }
+        }
+    }
+    Ok(Value::Table(values_to_table(&out_names, &out_rows)?))
+}
+
+fn table_unpivot(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let pivot_columns = expect_text_list(&args[1], "Table.Unpivot: pivotColumns")?;
+    let attribute_column = expect_text(&args[2])?.to_string();
+    let value_column = expect_text(&args[3])?.to_string();
+    do_unpivot(table, &pivot_columns, &attribute_column, &value_column, "Table.Unpivot")
+}
+
+fn table_unpivot_other_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let keep_columns = expect_text_list(&args[1], "Table.UnpivotOtherColumns: pivotColumns")?;
+    let attribute_column = expect_text(&args[2])?.to_string();
+    let value_column = expect_text(&args[3])?.to_string();
+    // "Other" form: pivotColumns is the set to KEEP; everything else gets unpivoted.
+    let all_names = table.column_names();
+    let pivot_columns: Vec<String> = all_names
+        .into_iter()
+        .filter(|n| !keep_columns.contains(n))
+        .collect();
+    do_unpivot(
+        table,
+        &pivot_columns,
+        &attribute_column,
+        &value_column,
+        "Table.UnpivotOtherColumns",
+    )
+}
+
+/// Shared core for both Unpivot variants. For each input row, for each
+/// pivot column, emit one output row: [non-pivoted columns..., attribute, value].
+fn do_unpivot(
+    table: &Table,
+    pivot_columns: &[String],
+    attribute_column: &str,
+    value_column: &str,
+    ctx: &str,
+) -> Result<Value, MError> {
+    let (names, rows) = table_to_rows(table)?;
+    // Resolve pivot indices and validate.
+    let pivot_indices: Vec<usize> = pivot_columns
+        .iter()
+        .map(|p| {
+            names
+                .iter()
+                .position(|n| n == p)
+                .ok_or_else(|| MError::Other(format!("{}: column not found: {}", ctx, p)))
+        })
+        .collect::<Result<_, _>>()?;
+    let keep_indices: Vec<usize> = (0..names.len())
+        .filter(|i| !pivot_indices.contains(i))
+        .collect();
+
+    // Output columns: kept columns (in original order) + attribute + value.
+    let mut out_names: Vec<String> = keep_indices.iter().map(|&i| names[i].clone()).collect();
+    out_names.push(attribute_column.to_string());
+    out_names.push(value_column.to_string());
+
+    let mut out_rows: Vec<Vec<Value>> = Vec::new();
+    for row in &rows {
+        let kept: Vec<Value> = keep_indices.iter().map(|&i| row[i].clone()).collect();
+        for &p_idx in &pivot_indices {
+            let mut new_row = kept.clone();
+            new_row.push(Value::Text(names[p_idx].clone()));
+            new_row.push(row[p_idx].clone());
+            out_rows.push(new_row);
         }
     }
     Ok(Value::Table(values_to_table(&out_names, &out_rows)?))

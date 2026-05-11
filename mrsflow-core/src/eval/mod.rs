@@ -2135,6 +2135,56 @@ mod tests {
         }
     }
 
+    #[test]
+    fn table_unpivot_basic() {
+        // 2 rows × 2 pivot cols → 4 rows; "id" kept; pivot col names land in "attr".
+        let src = r#"
+            let t = #table({"id", "q1", "q2"}, {{1, 10, 20}, {2, 30, 40}})
+            in Table.Unpivot(t, {"q1", "q2"}, "attr", "val")
+        "#;
+        match eval_str(src).unwrap() {
+            Value::Table(t) => {
+                assert_eq!(t.column_names(), vec!["id", "attr", "val"]);
+                assert_eq!(t.num_rows(), 4);
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_unpivot_other_columns_basic() {
+        // Keep "id"; everything else (q1, q2) gets unpivoted.
+        let src = r#"
+            let t = #table({"id", "q1", "q2"}, {{1, 10, 20}, {2, 30, 40}})
+            in Table.UnpivotOtherColumns(t, {"id"}, "attr", "val")
+        "#;
+        match eval_str(src).unwrap() {
+            Value::Table(t) => {
+                assert_eq!(t.column_names(), vec!["id", "attr", "val"]);
+                assert_eq!(t.num_rows(), 4);
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_unpivot_mixed_value_types() {
+        // Pivot columns hold mixed text+number cells — result's "val" column
+        // must be heterogeneous (Rows-backed).
+        let src = r#"
+            let t = #table({"id", "a", "b"}, {{1, 10, "x"}, {2, "y", 20}})
+            in Table.Unpivot(t, {"a", "b"}, "attr", "val")
+        "#;
+        match eval_str(src).unwrap() {
+            Value::Table(t) => {
+                assert_eq!(t.column_names(), vec!["id", "attr", "val"]);
+                assert_eq!(t.num_rows(), 4);
+                assert!(matches!(t.repr, super::TableRepr::Rows { .. }));
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
     // --- het-cell slice 3: ops dispatch on TableRepr ---
 
     fn rows_backed_two_col_table() -> &'static str {
