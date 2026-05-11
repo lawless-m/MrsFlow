@@ -1962,6 +1962,61 @@ mod tests {
     }
 
     #[test]
+    fn table_skip_count() {
+        match eval_str(
+            r#"Table.Skip(#table({"n"}, {{1},{2},{3},{4}}), 2)"#,
+        )
+        .unwrap()
+        {
+            Value::Table(t) => {
+                use arrow::array::Float64Array;
+                assert_eq!(t.batch.num_rows(), 2);
+                let col = t
+                    .batch
+                    .column(0)
+                    .as_any()
+                    .downcast_ref::<Float64Array>()
+                    .expect("Float64");
+                let vals: Vec<f64> = (0..col.len()).map(|i| col.value(i)).collect();
+                assert_eq!(vals, vec![3.0, 4.0]);
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_reorder_columns_partial_order() {
+        // Only "c" and "a" specified; "b" should land last in original order.
+        match eval_str(
+            r#"Table.ReorderColumns(#table({"a","b","c"}, {{1,2,3}}), {"c","a"})"#,
+        )
+        .unwrap()
+        {
+            Value::Table(t) => {
+                let names: Vec<String> = t
+                    .batch
+                    .schema()
+                    .fields()
+                    .iter()
+                    .map(|f| f.name().clone())
+                    .collect();
+                assert_eq!(names, vec!["c", "a", "b"]);
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_reorder_columns_missing_errors() {
+        match eval_str(
+            r#"Table.ReorderColumns(#table({"a","b"}, {{1,2}}), {"a","missing"})"#,
+        ) {
+            Err(MError::Other(msg)) => assert!(msg.contains("column not found"), "got: {}", msg),
+            other => panic!("expected error, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn record_field_values_basic() {
         match eval_str(r#"Record.FieldValues([a = 1, b = "two", c = true])"#).unwrap() {
             Value::List(xs) => {

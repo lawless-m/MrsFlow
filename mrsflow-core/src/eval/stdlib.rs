@@ -234,6 +234,8 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
             table_transform_columns,
         ),
         ("Table.Combine", one("tables"), table_combine),
+        ("Table.Skip", two("table", "countOrCondition"), table_skip),
+        ("Table.ReorderColumns", two("table", "columnOrder"), table_reorder_columns),
         ("Table.TransformRows", two("table", "transform"), table_transform_rows),
         ("Table.InsertRows", three("table", "offset", "rows"), table_insert_rows),
         ("Date.FromText", one("text"), date_from_text),
@@ -1854,6 +1856,71 @@ fn parse_col_fn_pairs<'a>(
         out.push((name, closure, type_opt));
     }
     Ok(out)
+}
+
+fn table_skip(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let count = match &args[1] {
+        Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
+        Value::Function(_) => {
+            return Err(MError::NotImplemented(
+                "Table.Skip: predicate (skip-while) form not yet supported",
+            ));
+        }
+        other => return Err(type_mismatch("non-negative integer", other)),
+    };
+    let n_rows = table.batch.num_rows();
+    let skip = count.min(n_rows);
+    let remaining = n_rows - skip;
+    let new_columns: Vec<ArrayRef> = table
+        .batch
+        .columns()
+        .iter()
+        .map(|c| c.slice(skip, remaining))
+        .collect();
+    let new_batch = RecordBatch::try_new(table.batch.schema(), new_columns)
+        .map_err(|e| MError::Other(format!("Table.Skip: rebuild failed: {}", e)))?;
+    Ok(Value::Table(Table { batch: new_batch }))
+}
+
+fn table_reorder_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let order = expect_text_list(&args[1], "Table.ReorderColumns: columnOrder")?;
+    let schema = table.batch.schema();
+
+    let mut new_indices: Vec<usize> = Vec::with_capacity(schema.fields().len());
+    let mut used = vec![false; schema.fields().len()];
+
+    // First: the explicitly named columns in the requested order.
+    for name in &order {
+        let idx = schema.index_of(name).map_err(|_| {
+            MError::Other(format!(
+                "Table.ReorderColumns: column not found: {}",
+                name
+            ))
+        })?;
+        new_indices.push(idx);
+        used[idx] = true;
+    }
+    // Then: any unspecified columns, in original order.
+    for (idx, used_flag) in used.iter().enumerate() {
+        if !used_flag {
+            new_indices.push(idx);
+        }
+    }
+
+    let new_fields: Vec<Field> = new_indices
+        .iter()
+        .map(|&i| (*schema.field(i)).clone())
+        .collect();
+    let new_columns: Vec<ArrayRef> = new_indices
+        .iter()
+        .map(|&i| table.batch.column(i).clone())
+        .collect();
+    let new_schema = Arc::new(Schema::new(new_fields));
+    let new_batch = RecordBatch::try_new(new_schema, new_columns)
+        .map_err(|e| MError::Other(format!("Table.ReorderColumns: rebuild failed: {}", e)))?;
+    Ok(Value::Table(Table { batch: new_batch }))
 }
 
 fn table_combine(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
