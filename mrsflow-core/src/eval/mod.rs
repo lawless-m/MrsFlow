@@ -2752,6 +2752,32 @@ mod tests {
     }
 
     #[test]
+    fn table_distinct_dedupes_rows() {
+        let src = r#"
+            #table({"a", "b"}, {{1, "x"}, {2, "y"}, {1, "x"}, {3, "z"}})
+        "#;
+        match eval_str(&format!("Table.Distinct({})", src)).unwrap() {
+            Value::Table(t) => {
+                assert_eq!(t.num_rows(), 3);
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_first_n_caps_rows() {
+        let src = r#"
+            #table({"a"}, {{1}, {2}, {3}, {4}, {5}})
+        "#;
+        match eval_str(&format!("Table.FirstN({}, 2)", src)).unwrap() {
+            Value::Table(t) => {
+                assert_eq!(t.num_rows(), 2);
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn table_column_round_trip() {
         let src = r#"
             let t = #table({"a", "b"}, {{1, "x"}, {2, "y"}, {3, "z"}})

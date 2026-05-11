@@ -385,6 +385,15 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ("Table.Column", two("table", "columnName"), table_column),
         ("Table.IsEmpty", one("table"), table_is_empty),
         (
+            "Table.Distinct",
+            vec![
+                Param { name: "table".into(),            optional: false, type_annotation: None },
+                Param { name: "equationCriteria".into(), optional: true,  type_annotation: None },
+            ],
+            table_distinct,
+        ),
+        ("Table.FirstN", two("table", "countOrCondition"), table_first_n),
+        (
             "Table.AddIndexColumn",
             vec![
                 Param { name: "table".into(),         optional: false, type_annotation: None },
@@ -1798,6 +1807,60 @@ fn table_select_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError>
             Ok(Value::Table(Table::from_rows(columns.clone(), new_rows)))
         }
     }
+}
+
+fn table_distinct(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    if !matches!(args.get(1), Some(Value::Null) | None) {
+        return Err(MError::NotImplemented(
+            "Table.Distinct: equationCriteria not yet supported",
+        ));
+    }
+    let (names, rows) = table_to_rows(table)?;
+    let mut kept: Vec<Vec<Value>> = Vec::new();
+    for row in rows {
+        let mut dup = false;
+        for k in &kept {
+            let mut all_eq = true;
+            for (a, b) in row.iter().zip(k.iter()) {
+                if !values_equal_primitive(a, b)? {
+                    all_eq = false;
+                    break;
+                }
+            }
+            if all_eq {
+                dup = true;
+                break;
+            }
+        }
+        if !dup {
+            kept.push(row);
+        }
+    }
+    Ok(Value::Table(values_to_table(&names, &kept)?))
+}
+
+fn table_first_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let n = match &args[1] {
+        Value::Number(n) => {
+            if !n.is_finite() || *n < 0.0 {
+                return Err(MError::Other(
+                    "Table.FirstN: count must be a non-negative integer".into(),
+                ));
+            }
+            *n as usize
+        }
+        Value::Function(_) => {
+            return Err(MError::NotImplemented(
+                "Table.FirstN: predicate (take-while) form not yet supported",
+            ));
+        }
+        other => return Err(type_mismatch("number or function", other)),
+    };
+    let (names, rows) = table_to_rows(table)?;
+    let kept: Vec<Vec<Value>> = rows.into_iter().take(n).collect();
+    Ok(Value::Table(values_to_table(&names, &kept)?))
 }
 
 fn table_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
