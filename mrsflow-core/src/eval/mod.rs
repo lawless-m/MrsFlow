@@ -11,11 +11,13 @@
 
 mod env;
 mod iohost;
+mod sexpr;
 mod stdlib;
 mod value;
 
 pub use env::{Env, EnvNode, EnvOps};
 pub use iohost::{IoError, IoHost, NoIoHost};
+pub use sexpr::{value_to_sexpr, write_value as write_sexpr};
 pub use stdlib::{cell_to_value, root_env};
 pub use value::{BuiltinFn, Closure, FnBody, MError, Record, Table, ThunkState, TypeRep, Value};
 
@@ -231,7 +233,7 @@ pub fn evaluate(ast: &Expr, env: &Env, host: &dyn IoHost) -> Result<Value, MErro
                     }
                     evaluate(body, &call_env, host)
                 }
-                FnBody::Builtin(f) => f(&arg_values),
+                FnBody::Builtin(f) => f(&arg_values, host),
             }
         }
 

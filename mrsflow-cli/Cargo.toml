@@ -1,0 +1,23 @@
+[package]
+name = "mrsflow-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Command-line shell for mrsflow — Parquet IO via IoHost, M source as input"
+
+[lints]
+workspace = true
+
+[dependencies]
+mrsflow-core = { path = "../mrsflow-core" }
+arrow = { version = "53", default-features = false, features = ["ipc"] }
+parquet = { version = "53", default-features = false, features = ["arrow", "snap"] }
+
+[[bin]]
+name = "mrsflow"
+path = "src/main.rs"
+
+[dev-dependencies]
+arrow = { version = "53", default-features = false, features = ["ipc"] }
+parquet = { version = "53", default-features = false, features = ["arrow", "snap"] }

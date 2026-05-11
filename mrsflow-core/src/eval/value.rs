@@ -13,6 +13,7 @@ use std::rc::{Rc, Weak};
 use crate::parser::{Expr, Param};
 
 use super::env::{Env, EnvNode};
+use super::iohost::IoHost;
 
 #[derive(Debug, Clone)]
 pub enum Value {
@@ -66,10 +67,10 @@ impl std::fmt::Debug for FnBody {
     }
 }
 
-/// Signature for an intrinsic. Pure functions only at eval-6; IoHost-mediated
-/// intrinsics (Parquet, ODBC, Web, …) land in later slices with a different
-/// signature.
-pub type BuiltinFn = fn(&[Value]) -> Result<Value, MError>;
+/// Signature for an intrinsic. The host gives IO-mediated builtins (Parquet,
+/// ODBC, Web, …) access to the shell. Pure builtins ignore the second
+/// argument.
+pub type BuiltinFn = fn(&[Value], &dyn IoHost) -> Result<Value, MError>;
 
 #[derive(Debug, Clone)]
 pub struct Record {

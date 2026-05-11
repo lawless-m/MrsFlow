@@ -18,6 +18,7 @@ use arrow::record_batch::RecordBatch;
 use crate::parser::Param;
 
 use super::env::{Env, EnvNode, EnvOps};
+use super::iohost::IoHost;
 use super::value::{BuiltinFn, Closure, FnBody, MError, Table, Value};
 
 /// Build the initial environment containing every stdlib intrinsic plus
@@ -132,6 +133,7 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
             ],
             duration_constructor,
         ),
+        ("Parquet.Document", one("path"), parquet_document),
     ]
 }
 
@@ -144,7 +146,7 @@ fn type_mismatch(expected: &'static str, found: &Value) -> MError {
 
 // --- Number.* ---
 
-fn number_from(args: &[Value]) -> Result<Value, MError> {
+fn number_from(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let v = &args[0];
     match v {
         Value::Null => Ok(Value::Null),
@@ -161,7 +163,7 @@ fn number_from(args: &[Value]) -> Result<Value, MError> {
 
 // --- Text.* ---
 
-fn text_from(args: &[Value]) -> Result<Value, MError> {
+fn text_from(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let v = &args[0];
     match v {
         Value::Null => Ok(Value::Null),
@@ -177,31 +179,31 @@ fn text_from(args: &[Value]) -> Result<Value, MError> {
     }
 }
 
-fn text_contains(args: &[Value]) -> Result<Value, MError> {
+fn text_contains(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     let sub = expect_text(&args[1])?;
     Ok(Value::Logical(text.contains(sub)))
 }
 
-fn text_replace(args: &[Value]) -> Result<Value, MError> {
+fn text_replace(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     let old = expect_text(&args[1])?;
     let new = expect_text(&args[2])?;
     Ok(Value::Text(text.replace(old, new)))
 }
 
-fn text_trim(args: &[Value]) -> Result<Value, MError> {
+fn text_trim(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     Ok(Value::Text(text.trim().to_string()))
 }
 
-fn text_length(args: &[Value]) -> Result<Value, MError> {
+fn text_length(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     // M counts characters, not bytes — use char count.
     Ok(Value::Number(text.chars().count() as f64))
 }
 
-fn text_position_of(args: &[Value]) -> Result<Value, MError> {
+fn text_position_of(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     let sub = expect_text(&args[1])?;
     // Per spec: -1 when not found, byte offset on miss... but for parity
@@ -216,7 +218,7 @@ fn text_position_of(args: &[Value]) -> Result<Value, MError> {
     }))
 }
 
-fn text_ends_with(args: &[Value]) -> Result<Value, MError> {
+fn text_ends_with(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     let suffix = expect_text(&args[1])?;
     Ok(Value::Logical(text.ends_with(suffix)))
@@ -231,7 +233,7 @@ fn expect_text(v: &Value) -> Result<&str, MError> {
 
 // --- List.* ---
 
-fn list_transform(args: &[Value]) -> Result<Value, MError> {
+fn list_transform(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     let f = expect_function(&args[1])?;
     let mut out = Vec::with_capacity(list.len());
@@ -242,7 +244,7 @@ fn list_transform(args: &[Value]) -> Result<Value, MError> {
     Ok(Value::List(out))
 }
 
-fn list_select(args: &[Value]) -> Result<Value, MError> {
+fn list_select(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     let pred = expect_function(&args[1])?;
     let mut out = Vec::new();
@@ -257,7 +259,7 @@ fn list_select(args: &[Value]) -> Result<Value, MError> {
     Ok(Value::List(out))
 }
 
-fn list_sum(args: &[Value]) -> Result<Value, MError> {
+fn list_sum(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     if list.is_empty() {
         return Ok(Value::Null);
@@ -272,12 +274,12 @@ fn list_sum(args: &[Value]) -> Result<Value, MError> {
     Ok(Value::Number(total))
 }
 
-fn list_count(args: &[Value]) -> Result<Value, MError> {
+fn list_count(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     Ok(Value::Number(list.len() as f64))
 }
 
-fn list_min(args: &[Value]) -> Result<Value, MError> {
+fn list_min(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     if list.is_empty() {
         return Ok(Value::Null);
@@ -296,7 +298,7 @@ fn list_min(args: &[Value]) -> Result<Value, MError> {
     Ok(Value::Number(best.unwrap()))
 }
 
-fn list_max(args: &[Value]) -> Result<Value, MError> {
+fn list_max(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     if list.is_empty() {
         return Ok(Value::Null);
@@ -345,21 +347,26 @@ fn invoke_builtin_callback(closure: &Closure, args: Vec<Value>) -> Result<Value,
             args.len()
         )));
     }
+    // Callbacks from List.Transform/Select can't reach the original host
+    // — pass NoIoHost so IO-using callbacks fail loudly rather than picking
+    // up some unrelated environment. If a future stdlib function needs to
+    // thread the real host through callbacks, refactor this signature.
+    let host = super::NoIoHost;
     match &closure.body {
-        FnBody::Builtin(f) => f(&args),
+        FnBody::Builtin(f) => f(&args, &host),
         FnBody::M(body) => {
             let mut call_env = closure.env.clone();
             for (param, value) in closure.params.iter().zip(args.into_iter()) {
                 call_env = call_env.extend(param.name.clone(), value);
             }
-            super::evaluate(body, &call_env, &super::NoIoHost)
+            super::evaluate(body, &call_env, &host)
         }
     }
 }
 
 // --- Record.* ---
 
-fn record_field(args: &[Value]) -> Result<Value, MError> {
+fn record_field(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let record = match &args[0] {
         Value::Record(r) => r,
         other => return Err(type_mismatch("record", other)),
@@ -373,7 +380,7 @@ fn record_field(args: &[Value]) -> Result<Value, MError> {
     }
 }
 
-fn record_field_names(args: &[Value]) -> Result<Value, MError> {
+fn record_field_names(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let record = match &args[0] {
         Value::Record(r) => r,
         other => return Err(type_mismatch("record", other)),
@@ -388,18 +395,18 @@ fn record_field_names(args: &[Value]) -> Result<Value, MError> {
 
 // --- Logical.* ---
 
-fn logical_from(args: &[Value]) -> Result<Value, MError> {
+fn logical_from(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let v = &args[0];
     match v {
         Value::Null => Ok(Value::Null),
         Value::Logical(b) => Ok(Value::Logical(*b)),
         Value::Number(n) => Ok(Value::Logical(*n != 0.0)),
-        Value::Text(_) => logical_from_text(args),
+        Value::Text(_) => logical_from_text(args, host),
         other => Err(type_mismatch("text/number/logical/null", other)),
     }
 }
 
-fn logical_from_text(args: &[Value]) -> Result<Value, MError> {
+fn logical_from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     match text.to_ascii_lowercase().as_str() {
         "true" => Ok(Value::Logical(true)),
@@ -419,7 +426,7 @@ fn logical_from_text(args: &[Value]) -> Result<Value, MError> {
 // this slice — only a list of text column names. Date/Datetime/Duration/
 // Binary cells land in eval-7b alongside chrono.
 
-fn table_constructor(args: &[Value]) -> Result<Value, MError> {
+fn table_constructor(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let names = expect_text_list(&args[0], "#table: columns")?;
     let rows = expect_list_of_lists(&args[1], "#table: rows")?;
     for (i, row) in rows.iter().enumerate() {
@@ -436,7 +443,7 @@ fn table_constructor(args: &[Value]) -> Result<Value, MError> {
     Ok(Value::Table(Table { batch }))
 }
 
-fn table_column_names(args: &[Value]) -> Result<Value, MError> {
+fn table_column_names(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let names: Vec<Value> = table
         .batch
@@ -448,7 +455,7 @@ fn table_column_names(args: &[Value]) -> Result<Value, MError> {
     Ok(Value::List(names))
 }
 
-fn table_rename_columns(args: &[Value]) -> Result<Value, MError> {
+fn table_rename_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let renames = expect_list(&args[1])?;
     let mut pairs: Vec<(String, String)> = Vec::new();
@@ -503,7 +510,7 @@ fn table_rename_columns(args: &[Value]) -> Result<Value, MError> {
     Ok(Value::Table(Table { batch: new_batch }))
 }
 
-fn table_remove_columns(args: &[Value]) -> Result<Value, MError> {
+fn table_remove_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let names = expect_text_list(&args[1], "Table.RemoveColumns: names")?;
     let schema = table.batch.schema();
@@ -745,7 +752,7 @@ pub fn cell_to_value(batch: &RecordBatch, col: usize, row: usize) -> Result<Valu
 // #date(y,m,d), #datetime(y,m,d,h,m,s), #duration(d,h,m,s). All operands
 // must be whole-numbered f64s; non-integer or out-of-range values error.
 
-fn date_constructor(args: &[Value]) -> Result<Value, MError> {
+fn date_constructor(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let y = expect_int(&args[0], "#date: year")?;
     let mo = expect_int(&args[1], "#date: month")?;
     let d = expect_int(&args[2], "#date: day")?;
@@ -754,7 +761,7 @@ fn date_constructor(args: &[Value]) -> Result<Value, MError> {
         .ok_or_else(|| MError::Other(format!("#date: invalid date {}-{:02}-{:02}", y, mo, d)))
 }
 
-fn datetime_constructor(args: &[Value]) -> Result<Value, MError> {
+fn datetime_constructor(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let y = expect_int(&args[0], "#datetime: year")?;
     let mo = expect_int(&args[1], "#datetime: month")?;
     let d = expect_int(&args[2], "#datetime: day")?;
@@ -768,7 +775,7 @@ fn datetime_constructor(args: &[Value]) -> Result<Value, MError> {
     Ok(Value::Datetime(chrono::NaiveDateTime::new(date, time)))
 }
 
-fn duration_constructor(args: &[Value]) -> Result<Value, MError> {
+fn duration_constructor(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let d = expect_int(&args[0], "#duration: days")?;
     let h = expect_int(&args[1], "#duration: hours")?;
     let mn = expect_int(&args[2], "#duration: minutes")?;
@@ -792,4 +799,18 @@ fn expect_int(v: &Value, ctx: &str) -> Result<i64, MError> {
         }
         other => Err(type_mismatch("number", other)),
     }
+}
+
+// --- Parquet IO (eval-7c) ---
+//
+// The pure evaluator core can't open files; Parquet.Document just delegates
+// to the shell's IoHost. CliIoHost in mrsflow-cli decodes the file via the
+// `parquet` crate; NoIoHost (default in unit tests) errors. WASM shell will
+// similarly error or proxy through DuckDB-Wasm later.
+
+fn parquet_document(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+    let path = expect_text(&args[0])?;
+    host.parquet_read(path).map_err(|e| {
+        MError::Other(format!("Parquet.Document({:?}): {:?}", path, e))
+    })
 }
