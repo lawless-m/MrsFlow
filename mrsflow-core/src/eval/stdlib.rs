@@ -204,6 +204,10 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ("Table.TransformRows", two("table", "transform"), table_transform_rows),
         ("Table.InsertRows", three("table", "offset", "rows"), table_insert_rows),
         ("Date.FromText", one("text"), date_from_text),
+        ("Date.From", one("value"), date_from),
+        ("Date.Year", one("date"), date_year),
+        ("Date.Month", one("date"), date_month),
+        ("Date.Day", one("date"), date_day),
         (
             "Date.ToText",
             vec![
@@ -1696,6 +1700,43 @@ fn date_to_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         Some(other) => return Err(type_mismatch("text or null", other)),
     };
     Ok(Value::Text(d.format(chrono_fmt).to_string()))
+}
+
+fn date_from(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+    match &args[0] {
+        Value::Null => Ok(Value::Null),
+        Value::Date(d) => Ok(Value::Date(*d)),
+        Value::Datetime(dt) => Ok(Value::Date(dt.date())),
+        Value::Text(_) => date_from_text(args, host),
+        other => Err(type_mismatch("date/datetime/text/null", other)),
+    }
+}
+
+fn date_year(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    use chrono::Datelike;
+    match &args[0] {
+        Value::Null => Ok(Value::Null),
+        Value::Date(d) => Ok(Value::Number(d.year() as f64)),
+        other => Err(type_mismatch("date", other)),
+    }
+}
+
+fn date_month(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    use chrono::Datelike;
+    match &args[0] {
+        Value::Null => Ok(Value::Null),
+        Value::Date(d) => Ok(Value::Number(d.month() as f64)),
+        other => Err(type_mismatch("date", other)),
+    }
+}
+
+fn date_day(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    use chrono::Datelike;
+    match &args[0] {
+        Value::Null => Ok(Value::Null),
+        Value::Date(d) => Ok(Value::Number(d.day() as f64)),
+        other => Err(type_mismatch("date", other)),
+    }
 }
 
 fn date_from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {

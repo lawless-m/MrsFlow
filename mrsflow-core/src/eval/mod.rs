@@ -2003,6 +2003,42 @@ mod tests {
     }
 
     #[test]
+    fn date_from_passthrough_and_datetime_drop() {
+        match eval_str("Date.From(#date(2024, 3, 15))").unwrap() {
+            Value::Date(d) => assert_eq!(d.to_string(), "2024-03-15"),
+            other => panic!("expected date, got {:?}", other),
+        }
+        match eval_str("Date.From(#datetime(2024, 3, 15, 10, 30, 45))").unwrap() {
+            Value::Date(d) => assert_eq!(d.to_string(), "2024-03-15"),
+            other => panic!("expected date, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn date_year_extract() {
+        match eval_str("Date.Year(#date(2024, 3, 15))").unwrap() {
+            Value::Number(n) => assert_eq!(n, 2024.0),
+            other => panic!("expected number, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn date_month_extract() {
+        match eval_str("Date.Month(#date(2024, 3, 15))").unwrap() {
+            Value::Number(n) => assert_eq!(n, 3.0),
+            other => panic!("expected number, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn date_day_extract() {
+        match eval_str("Date.Day(#date(2024, 3, 15))").unwrap() {
+            Value::Number(n) => assert_eq!(n, 15.0),
+            other => panic!("expected number, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn date_from_text_iso_and_uk() {
         match eval_str(r#"Date.FromText("2024-01-15")"#).unwrap() {
             Value::Date(d) => assert_eq!(d.to_string(), "2024-01-15"),
