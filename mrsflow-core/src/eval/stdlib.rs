@@ -206,6 +206,16 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
             ],
             list_numbers,
         ),
+        (
+            "List.PositionOf",
+            vec![
+                Param { name: "list".into(),             optional: false, type_annotation: None },
+                Param { name: "value".into(),            optional: false, type_annotation: None },
+                Param { name: "occurrence".into(),       optional: true,  type_annotation: None },
+                Param { name: "equationCriteria".into(), optional: true,  type_annotation: None },
+            ],
+            list_position_of,
+        ),
         ("List.FirstN", two("list", "countOrCondition"), list_first_n),
         ("List.Skip", two("list", "countOrCondition"), list_skip),
         ("List.Distinct", one("list"), list_distinct),
@@ -675,6 +685,27 @@ fn list_sum(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 fn list_count(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     Ok(Value::Number(list.len() as f64))
+}
+
+fn list_position_of(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let list = expect_list(&args[0])?;
+    let target = &args[1];
+    if !matches!(args.get(2), Some(Value::Null) | None) {
+        return Err(MError::NotImplemented(
+            "List.PositionOf: occurrence arg not yet supported",
+        ));
+    }
+    if !matches!(args.get(3), Some(Value::Null) | None) {
+        return Err(MError::NotImplemented(
+            "List.PositionOf: equationCriteria not yet supported",
+        ));
+    }
+    for (i, v) in list.iter().enumerate() {
+        if values_equal_primitive(v, target)? {
+            return Ok(Value::Number(i as f64));
+        }
+    }
+    Ok(Value::Number(-1.0))
 }
 
 fn list_numbers(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {

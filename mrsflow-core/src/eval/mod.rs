@@ -2752,6 +2752,22 @@ mod tests {
     }
 
     #[test]
+    fn list_position_of_found() {
+        match eval_str("List.PositionOf({\"a\", \"b\", \"c\"}, \"b\")").unwrap() {
+            Value::Number(n) => assert_eq!(n, 1.0),
+            other => panic!("expected number, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn list_position_of_not_found() {
+        match eval_str("List.PositionOf({1, 2, 3}, 99)").unwrap() {
+            Value::Number(n) => assert_eq!(n, -1.0),
+            other => panic!("expected number, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn list_numbers_default_increment() {
         match eval_str("List.Numbers(1, 5)").unwrap() {
             Value::List(xs) => {
