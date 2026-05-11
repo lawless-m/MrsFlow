@@ -140,8 +140,18 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ("Table.SelectRows", two("table", "predicate"), table_select_rows),
         (
             "Table.AddColumn",
-            three("table", "name", "transform"),
+            vec![
+                Param { name: "table".into(),     optional: false, type_annotation: None },
+                Param { name: "name".into(),      optional: false, type_annotation: None },
+                Param { name: "transform".into(), optional: false, type_annotation: None },
+                Param { name: "type".into(),      optional: true,  type_annotation: None },
+            ],
             table_add_column,
+        ),
+        (
+            "List.Accumulate",
+            three("list", "seed", "accumulator"),
+            list_accumulate,
         ),
         ("Table.FromRows", two("rows", "columns"), table_from_rows),
         ("Table.PromoteHeaders", one("table"), table_promote_headers),
@@ -355,6 +365,16 @@ fn list_max(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         });
     }
     Ok(Value::Number(best.unwrap()))
+}
+
+fn list_accumulate(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+    let list = expect_list(&args[0])?;
+    let mut acc = args[1].clone();
+    let f = expect_function(&args[2])?;
+    for item in list {
+        acc = invoke_callback_with_host(f, vec![acc, item.clone()], host)?;
+    }
+    Ok(acc)
 }
 
 fn expect_list(v: &Value) -> Result<&Vec<Value>, MError> {
@@ -931,15 +951,32 @@ fn table_add_column(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> 
         new_cells.push(v);
     }
     let cell_refs: Vec<&Value> = new_cells.iter().collect();
-    let (dtype, new_array) = infer_cells(&cell_refs)?;
+    let (inferred_dtype, inferred_array) = infer_cells(&cell_refs)?;
+
+    // Optional 4th arg: target column type. If supplied, cast and use its
+    // dtype/nullability for the new field; otherwise use the inferred shape.
+    let (dtype, new_array, nullable) = match args.get(3) {
+        Some(Value::Type(t)) => {
+            let (target_dtype, target_nullable) = type_rep_to_datatype(t)?;
+            let cast = arrow::compute::cast(&inferred_array, &target_dtype).map_err(|e| {
+                MError::Other(format!(
+                    "Table.AddColumn: cast {} to {:?} failed: {}",
+                    new_name, target_dtype, e
+                ))
+            })?;
+            (target_dtype, cast, target_nullable)
+        }
+        Some(Value::Null) | None => {
+            let nullable = matches!(inferred_dtype, DataType::Null)
+                || new_cells.iter().any(|v| matches!(v, Value::Null));
+            (inferred_dtype, inferred_array, nullable)
+        }
+        Some(other) => return Err(type_mismatch("type or null", other)),
+    };
 
     let schema = table.batch.schema();
     let mut fields: Vec<Field> = schema.fields().iter().map(|f| (**f).clone()).collect();
-    fields.push(Field::new(
-        new_name,
-        dtype.clone(),
-        matches!(dtype, DataType::Null) || new_cells.iter().any(|v| matches!(v, Value::Null)),
-    ));
+    fields.push(Field::new(new_name, dtype, nullable));
     let new_schema = Arc::new(Schema::new(fields));
     let mut new_columns: Vec<ArrayRef> = table.batch.columns().to_vec();
     new_columns.push(new_array);

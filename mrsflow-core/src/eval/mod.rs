@@ -1826,6 +1826,40 @@ mod tests {
     }
 
     #[test]
+    fn list_accumulate_sums() {
+        // List.Accumulate is a left-fold: ((seed + 1) + 2) + 3 = 6.
+        match eval_str(r#"List.Accumulate({1, 2, 3}, 0, (acc, x) => acc + x)"#).unwrap() {
+            Value::Number(n) => assert_eq!(n, 6.0),
+            other => panic!("expected number, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn list_accumulate_empty_returns_seed() {
+        match eval_str(r#"List.Accumulate({}, 42, (acc, x) => acc + x)"#).unwrap() {
+            Value::Number(n) => assert_eq!(n, 42.0),
+            other => panic!("expected number, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_add_column_with_optional_type() {
+        // 4th arg casts the inferred-Float64 column to a typed column.
+        // Corpus addColumns.m relies on this.
+        match eval_str(
+            r#"Table.AddColumn(#table({"a"}, {{1}}), "b", each "x", type text)"#,
+        )
+        .unwrap()
+        {
+            Value::Table(t) => {
+                use arrow::datatypes::DataType;
+                assert_eq!(t.batch.schema().field(1).data_type(), &DataType::Utf8);
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn text_trim_end_and_start() {
         assert!(matches!(
             eval_str(r#"Text.TrimEnd("hello  ")"#).unwrap(),

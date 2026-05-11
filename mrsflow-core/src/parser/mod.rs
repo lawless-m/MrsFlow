@@ -69,6 +69,10 @@ impl<'a> Parser<'a> {
         self.peek().map(|t| &t.kind)
     }
 
+    fn peek_kind_at(&self, offset: usize) -> Option<&TokenKind> {
+        self.tokens.get(self.pos + offset).map(|t| &t.kind)
+    }
+
     fn advance(&mut self) -> Option<&'a Token> {
         let t = self.tokens.get(self.pos)?;
         self.pos += 1;
@@ -247,12 +251,26 @@ impl<'a> Parser<'a> {
             return Ok(Expr::Unary(UnaryOp::Nullable, Box::new(inner)));
         }
         if self.peek_is_contextual_identifier("table") {
-            self.advance();
-            let row_type = self.parse_primary_type()?;
-            return Ok(Expr::TableType(Box::new(row_type)));
+            // `table T` only when a row-type follows; otherwise `table` is a
+            // bare primitive-type identifier (resolves to TypeRep::Table).
+            // Without this peek the corpus `(x as table, ...)` form errors.
+            if self
+                .peek_kind_at(1)
+                .map(token_starts_type)
+                .unwrap_or(false)
+            {
+                self.advance();
+                let row_type = self.parse_primary_type()?;
+                return Ok(Expr::TableType(Box::new(row_type)));
+            }
+            // fall through: parse_primary picks up `table` as an identifier
         }
         if self.peek_is_contextual_identifier("function") {
-            return self.parse_function_type();
+            // Same treatment: `function(...)` only when `(` follows.
+            if matches!(self.peek_kind_at(1), Some(TokenKind::LeftParen)) {
+                return self.parse_function_type();
+            }
+            // fall through: `function` parses as a bare primitive-type ident
         }
 
         // Syntactic shapes.
@@ -816,6 +834,18 @@ impl<'a> Parser<'a> {
         self.expect(TokenKind::RightBrace, "`}`")?;
         Ok(Expr::List(items))
     }
+}
+
+/// Whether `kind` could plausibly start a type expression — used for the
+/// `table` / `function` contextual prefix disambiguation.
+fn token_starts_type(kind: &TokenKind) -> bool {
+    matches!(
+        kind,
+        TokenKind::LeftBracket
+            | TokenKind::LeftBrace
+            | TokenKind::LeftParen
+            | TokenKind::Identifier(_)
+    )
 }
 
 #[cfg(test)]
@@ -1492,6 +1522,21 @@ mod tests {
         assert_eq!(
             s("type function (x as number, optional y as text) as nullable text"),
             r#"(type (function-type (("x" req (ref "number")) ("y" opt (ref "text"))) (nullable (ref "text"))))"#
+        );
+    }
+
+    #[test]
+    fn type_bare_table_function_in_param_position() {
+        // Corpus regression: `(tab as table, cols as list) => ...` — `table`
+        // followed by `,` should be a bare primitive-type ref, not `table T`.
+        assert_eq!(
+            s("(tab as table, cols as list) => tab"),
+            r#"(fn (("tab" req (ref "table")) ("cols" req (ref "list"))) none (ref "tab"))"#
+        );
+        // Likewise `function` followed by `,` is the bare type, not `function(...)`.
+        assert_eq!(
+            s("(f as function, x as number) => x"),
+            r#"(fn (("f" req (ref "function")) ("x" req (ref "number"))) none (ref "x"))"#
         );
     }
 
