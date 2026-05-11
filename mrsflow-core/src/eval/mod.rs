@@ -2752,6 +2752,41 @@ mod tests {
     }
 
     #[test]
+    fn table_from_records_basic() {
+        let src = r#"
+            Table.FromRecords({
+                [a = 1, b = "x"],
+                [a = 2, b = "y"]
+            })
+        "#;
+        match eval_str(src).unwrap() {
+            Value::Table(t) => {
+                assert_eq!(t.column_names(), vec!["a", "b"]);
+                assert_eq!(t.num_rows(), 2);
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_records_round_trip() {
+        // FromRecords ∘ ToRecords preserves shape and basic cell values.
+        let src = r#"
+            let
+                t = #table({"a", "b"}, {{1, "x"}, {2, "y"}}),
+                back = Table.FromRecords(Table.ToRecords(t))
+            in back
+        "#;
+        match eval_str(src).unwrap() {
+            Value::Table(t) => {
+                assert_eq!(t.column_names(), vec!["a", "b"]);
+                assert_eq!(t.num_rows(), 2);
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn table_distinct_dedupes_rows() {
         let src = r#"
             #table({"a", "b"}, {{1, "x"}, {2, "y"}, {1, "x"}, {3, "z"}})

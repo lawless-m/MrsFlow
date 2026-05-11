@@ -393,6 +393,8 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
             table_distinct,
         ),
         ("Table.FirstN", two("table", "countOrCondition"), table_first_n),
+        ("Table.FromRecords", one("records"), table_from_records),
+        ("Table.ToRecords", one("table"), table_to_records),
         (
             "Table.AddIndexColumn",
             vec![
@@ -1807,6 +1809,50 @@ fn table_select_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError>
             Ok(Value::Table(Table::from_rows(columns.clone(), new_rows)))
         }
     }
+}
+
+fn table_from_records(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+    let records = expect_list(&args[0])?;
+    if records.is_empty() {
+        return Ok(Value::Table(values_to_table(&[], &[])?));
+    }
+    // Take column names from the first record (insertion order).
+    let first = match &records[0] {
+        Value::Record(r) => r,
+        other => return Err(type_mismatch("record (in list)", other)),
+    };
+    let names: Vec<String> = first.fields.iter().map(|(n, _)| n.clone()).collect();
+
+    let mut rows: Vec<Vec<Value>> = Vec::with_capacity(records.len());
+    for rec_v in records {
+        let rec = match rec_v {
+            Value::Record(r) => r,
+            other => return Err(type_mismatch("record (in list)", other)),
+        };
+        let mut row: Vec<Value> = Vec::with_capacity(names.len());
+        for name in &names {
+            let raw = rec
+                .fields
+                .iter()
+                .find(|(n, _)| n == name)
+                .map(|(_, v)| v.clone())
+                .unwrap_or(Value::Null);
+            let forced = super::force(raw, &mut |e, env| super::evaluate(e, env, host))?;
+            row.push(forced);
+        }
+        rows.push(row);
+    }
+    Ok(Value::Table(values_to_table(&names, &rows)?))
+}
+
+fn table_to_records(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let n = table.num_rows();
+    let mut out: Vec<Value> = Vec::with_capacity(n);
+    for row in 0..n {
+        out.push(row_to_record(table, row)?);
+    }
+    Ok(Value::List(out))
 }
 
 fn table_distinct(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
