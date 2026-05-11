@@ -154,6 +154,37 @@ eval(invoke(Target, Args), Env, Value) :-
     bind_args(Params, Args, Env, Bindings),
     eval(Body, [frame(Bindings) | CEnv], Value).
 
+% --- eval-3: list / record / field+item access ---
+
+% List literal — items are eager (only records have per-field laziness).
+% Range items expand to inclusive integer sequences.
+eval(list(Items), Env, list(Values)) :-
+    eval_list_items(Items, Env, Values).
+
+% Record literal — each field becomes a thunk in a shared env so sibling
+% fields can reference one another (same self-referential term-sharing
+% pattern as extend_lazy_bindings for let).
+eval(record(Fields), Env, record(Pairs)) :-
+    NewEnv = [frame(Frame) | Env],
+    build_record_frame(Fields, NewEnv, Pairs, Frame).
+
+% Field access — r[name] (required) or r[name]? (optional).
+eval(field_access(Target, Name, Opt), Env, Value) :-
+    eval(Target, Env, T0),
+    force(T0, record(Pairs)),
+    field_lookup(Pairs, Name, Opt, Value).
+
+% Item access — list-only for slice 3. Index must be a non-negative integer.
+eval(item_access(Target, Index, Opt), Env, Value) :-
+    eval(Target, Env, T0),
+    force(T0, list(Items)),
+    eval(Index, Env, I0),
+    force(I0, num(IF)),
+    IInt is truncate(IF),
+    IF =:= IInt,
+    IInt >= 0,
+    list_index_opt(Items, IInt, Opt, Value).
+
 % --- force/2: thunk → forced value ---
 %
 % Slice-1 recomputes; memoisation TBD when a real workload shows it matters.
@@ -215,6 +246,82 @@ bind_args_([param(Name, opt, _) | PRest], [], CallerEnv,
 % Required param + no more args fails (arity mismatch).
 % Extra args (more args than params) also fails — the base case ([], [], ...)
 % doesn't match and no other clause does.
+
+% --- eval-3 helpers ---
+
+% List-item evaluation. Singles are eagerly evaluated and forced; ranges
+% expand to integer sequences with strict integer bounds and s <= e.
+eval_list_items([], _, []).
+eval_list_items([single(E) | Rest], Env, [V | VRest]) :-
+    eval(E, Env, V0),
+    force(V0, V),
+    eval_list_items(Rest, Env, VRest).
+eval_list_items([range(SE, EE) | Rest], Env, Values) :-
+    eval(SE, Env, SV0), force(SV0, num(SF)),
+    eval(EE, Env, EV0), force(EV0, num(EF)),
+    SI is truncate(SF), EI is truncate(EF),
+    SF =:= SI, EF =:= EI,
+    SI =< EI,
+    range_values(SI, EI, RangeValues),
+    eval_list_items(Rest, Env, RestValues),
+    append(RangeValues, RestValues, Values).
+
+range_values(I, End, []) :- I > End, !.
+range_values(I, End, [num(F) | Rest]) :-
+    F is float(I),
+    Next is I + 1,
+    range_values(Next, End, Rest).
+
+% Record-frame construction. Builds both the pair list (for the record
+% value) and the env frame entries (for sibling resolution). Each value
+% slot is a thunk capturing the new env via term sharing.
+build_record_frame([], _, [], []).
+build_record_frame([pair(Name, Expr) | RestFields], Env,
+                   [pair(Name, thunk(Expr, Env)) | RestPairs],
+                   [Name-thunk(Expr, Env) | RestFrame]) :-
+    build_record_frame(RestFields, Env, RestPairs, RestFrame).
+
+% Record field lookup. Optional+missing → null; required+missing → fail
+% (matching Rust's field-not-found error, which produces empty stdout in
+% the differential).
+field_lookup(Pairs, Name, _Opt, Forced) :-
+    member(pair(Name, V), Pairs),
+    !,
+    force(V, Forced).
+field_lookup(_, _, opt, null).
+
+% List item access. nth0 succeeds when index is in range; on miss we fall
+% through to opt → null or fail (required missing).
+list_index_opt(Items, Idx, _Opt, Forced) :-
+    nth0(Idx, Items, V),
+    !,
+    force(V, Forced).
+list_index_opt(_, _, opt, null).
+
+% Deep force — recursively forces thunks inside lists/records. The harness
+% calls this on the top-level result before printing, mirroring the Rust
+% `deep_force` helper used by `value_dump.rs`.
+deep_force(thunk(Expr, Env), Forced) :-
+    !,
+    eval(Expr, Env, V0),
+    deep_force(V0, Forced).
+deep_force(list(Items), list(Forced)) :-
+    !,
+    deep_force_list(Items, Forced).
+deep_force(record(Pairs), record(ForcedPairs)) :-
+    !,
+    deep_force_pairs(Pairs, ForcedPairs).
+deep_force(V, V).
+
+deep_force_list([], []).
+deep_force_list([V | Vs], [F | Fs]) :-
+    deep_force(V, F),
+    deep_force_list(Vs, Fs).
+
+deep_force_pairs([], []).
+deep_force_pairs([pair(N, V) | Rest], [pair(N, F) | RestF]) :-
+    deep_force(V, F),
+    deep_force_pairs(Rest, RestF).
 
 % --- helpers ---
 

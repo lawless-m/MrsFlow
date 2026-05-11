@@ -29,7 +29,10 @@ pub enum Value {
     Binary(Vec<u8>),
     List(Vec<Value>),
     /// Records preserve insertion order per spec — `Vec` not `HashMap`.
-    Record(Vec<(String, Value)>),
+    /// The `env` field keeps the per-record thunk env alive so sibling-field
+    /// references resolve correctly when fields are forced after the record
+    /// has escaped its construction scope.
+    Record(Record),
     /// Placeholder — `arrow::RecordBatch` when the Arrow dep lands in eval-7.
     Table(Table),
     Function(Closure),
@@ -43,6 +46,17 @@ pub enum Value {
 pub struct Closure {
     pub params: Vec<Param>,
     pub body: Box<Expr>,
+    pub env: Env,
+}
+
+#[derive(Debug, Clone)]
+pub struct Record {
+    pub fields: Vec<(String, Value)>,
+    /// Strong reference to the per-record thunk env. Each thunk in `fields`
+    /// holds a `Weak<EnvNode>` back at this env (to break the env↔thunk
+    /// reference cycle); this `Rc` keeps the env alive until the record is
+    /// dropped, so field thunks remain forceable after the record escapes
+    /// its construction scope.
     pub env: Env,
 }
 

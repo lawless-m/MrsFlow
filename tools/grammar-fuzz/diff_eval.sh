@@ -32,7 +32,7 @@ while IFS= read -r line <&3; do
 
     rust_out=$("$RUST_BIN" "$tmp" 2>/dev/null)
     prolog_out=$(scryer-prolog -f --no-add-history \
-        -g "use_module(library(pio)), phrase_from_file(tokens(T), \"$tmp\"), parse(T, A), eval(A, [], V), force(V, Forced), print_value(Forced), nl, halt" \
+        -g "use_module(library(pio)), phrase_from_file(tokens(T), \"$tmp\"), parse(T, A), eval(A, [], V), deep_force(V, Forced), print_value(Forced), nl, halt" \
         "$LEX_DCG" "$UCD" "$SYN_DCG" "$EVAL_DCG" </dev/null 2>/dev/null)
 
     if [ "$rust_out" = "$prolog_out" ]; then

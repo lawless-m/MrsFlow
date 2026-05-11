@@ -11,7 +11,7 @@
 //!
 //! Usage: value_dump <path>
 
-use mrsflow_core::eval::{evaluate, EnvNode, NoIoHost, Value};
+use mrsflow_core::eval::{deep_force, evaluate, EnvNode, NoIoHost, Value};
 use mrsflow_core::lexer::tokenize;
 use mrsflow_core::parser::parse;
 use std::env;
@@ -37,8 +37,15 @@ fn main() {
     });
     let env = EnvNode::empty();
     let host = NoIoHost;
-    match evaluate(&ast, &env, &host) {
-        Ok(value) => println!("{}", value_to_sexpr(&value)),
+    let value = match evaluate(&ast, &env, &host) {
+        Ok(v) => v,
+        Err(e) => {
+            eprintln!("EVAL ERROR: {:?}", e);
+            process::exit(4);
+        }
+    };
+    match deep_force(value, &host) {
+        Ok(forced) => println!("{}", value_to_sexpr(&forced)),
         Err(e) => {
             eprintln!("EVAL ERROR: {:?}", e);
             process::exit(4);
@@ -92,9 +99,9 @@ fn write_value(out: &mut String, v: &Value) {
             }
             out.push_str("))");
         }
-        Value::Record(fields) => {
+        Value::Record(record) => {
             out.push_str("(record (");
-            for (i, (name, value)) in fields.iter().enumerate() {
+            for (i, (name, value)) in record.fields.iter().enumerate() {
                 if i > 0 {
                     out.push(' ');
                 }

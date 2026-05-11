@@ -15,11 +15,11 @@ mod value;
 
 pub use env::{Env, EnvNode, EnvOps};
 pub use iohost::{IoError, IoHost, NoIoHost};
-pub use value::{Closure, MError, Table, ThunkState, TypeRep, Value};
+pub use value::{Closure, MError, Record, Table, ThunkState, TypeRep, Value};
 
 use std::rc::Rc;
 
-use crate::parser::{BinaryOp, Expr, Param, UnaryOp};
+use crate::parser::{BinaryOp, Expr, ListItem, Param, UnaryOp};
 
 /// Evaluate an M AST against the given environment, using `host` for any
 /// IO-doing stdlib calls. Returns the resulting Value or an `MError`.
@@ -193,19 +193,184 @@ pub fn evaluate(ast: &Expr, env: &Env, host: &dyn IoHost) -> Result<Value, MErro
             evaluate(&closure.body, &call_env, host)
         }
 
-        // --- Forms not in slice 1 or 2 ---
-        Expr::FieldAccess { .. }
-        | Expr::ItemAccess { .. }
-        | Expr::Try { .. }
+        // --- List literal: items are eagerly evaluated (only records have
+        //     per-field laziness per spec). Range items expand to inclusive
+        //     integer sequences. ---
+        Expr::List(items) => {
+            let mut values = Vec::with_capacity(items.len());
+            for item in items {
+                match item {
+                    ListItem::Single(e) => {
+                        let v = evaluate(e, env, host)?;
+                        let v = force(v, &mut |e, env| evaluate(e, env, host))?;
+                        values.push(v);
+                    }
+                    ListItem::Range(start, end) => {
+                        let sv = evaluate(start, env, host)?;
+                        let sv = force(sv, &mut |e, env| evaluate(e, env, host))?;
+                        let ev = evaluate(end, env, host)?;
+                        let ev = force(ev, &mut |e, env| evaluate(e, env, host))?;
+                        let s = expect_number(&sv)?;
+                        let e = expect_number(&ev)?;
+                        if s.fract() != 0.0 || e.fract() != 0.0 {
+                            return Err(MError::Other(format!(
+                                "range bounds must be integers, got {} and {}",
+                                s, e
+                            )));
+                        }
+                        if s > e {
+                            return Err(MError::Other(format!(
+                                "range start must be <= end, got {}..{}",
+                                s, e
+                            )));
+                        }
+                        let mut i = s as i64;
+                        let end_i = e as i64;
+                        while i <= end_i {
+                            values.push(Value::Number(i as f64));
+                            i += 1;
+                        }
+                    }
+                }
+            }
+            Ok(Value::List(values))
+        }
+
+        // --- Record literal: each field is a thunk in a shared env so
+        //     siblings can reference one another. The record holds the env
+        //     strongly so its thunks remain forceable after the record
+        //     escapes its construction scope. ---
+        Expr::Record(fields) => {
+            let lazy: Vec<(String, Expr)> = fields
+                .iter()
+                .map(|(name, expr)| (name.clone(), expr.clone()))
+                .collect();
+            let record_env = env.extend_lazy(lazy);
+            let record_fields: Vec<(String, Value)> = fields
+                .iter()
+                .map(|(name, _)| {
+                    let v = record_env
+                        .lookup(name)
+                        .expect("just bound by extend_lazy");
+                    (name.clone(), v)
+                })
+                .collect();
+            Ok(Value::Record(Record {
+                fields: record_fields,
+                env: record_env,
+            }))
+        }
+
+        // --- Field access: r[name] (required) or r[name]? (optional). ---
+        Expr::FieldAccess {
+            target,
+            field,
+            optional,
+        } => {
+            let t = evaluate(target, env, host)?;
+            let t = force(t, &mut |e, env| evaluate(e, env, host))?;
+            let record = match t {
+                Value::Record(r) => r,
+                other => {
+                    return Err(MError::TypeMismatch {
+                        expected: "record",
+                        found: type_name(&other),
+                    });
+                }
+            };
+            match record.fields.iter().find(|(n, _)| n == field) {
+                Some((_, v)) => force(v.clone(), &mut |e, env| evaluate(e, env, host)),
+                None => {
+                    if *optional {
+                        Ok(Value::Null)
+                    } else {
+                        Err(MError::Other(format!("field not found: {}", field)))
+                    }
+                }
+            }
+        }
+
+        // --- Item access: list-only for slice 3. r{i} (required) or r{i}? (optional). ---
+        Expr::ItemAccess {
+            target,
+            index,
+            optional,
+        } => {
+            let t = evaluate(target, env, host)?;
+            let t = force(t, &mut |e, env| evaluate(e, env, host))?;
+            let idx_v = evaluate(index, env, host)?;
+            let idx_v = force(idx_v, &mut |e, env| evaluate(e, env, host))?;
+            match t {
+                Value::List(items) => {
+                    let i = expect_number(&idx_v)?;
+                    if i.fract() != 0.0 || i < 0.0 {
+                        return Err(MError::Other(format!(
+                            "list index must be non-negative integer, got {}",
+                            i
+                        )));
+                    }
+                    let idx = i as usize;
+                    if idx >= items.len() {
+                        if *optional {
+                            Ok(Value::Null)
+                        } else {
+                            Err(MError::Other(format!(
+                                "list index out of bounds: {} (len {})",
+                                idx,
+                                items.len()
+                            )))
+                        }
+                    } else {
+                        force(items[idx].clone(), &mut |e, env| evaluate(e, env, host))
+                    }
+                }
+                Value::Record(_) | Value::Table(_) => Err(MError::NotImplemented(
+                    "record/table item access deferred to a later slice",
+                )),
+                other => Err(MError::TypeMismatch {
+                    expected: "list",
+                    found: type_name(&other),
+                }),
+            }
+        }
+
+        // --- Forms not yet implemented ---
+        Expr::Try { .. }
         | Expr::Error(_)
-        | Expr::Record(_)
-        | Expr::List(_)
         | Expr::ListType(_)
         | Expr::RecordType { .. }
         | Expr::TableType(_)
         | Expr::FunctionType { .. } => Err(MError::NotImplemented(
             "expression form deferred to a later eval slice",
         )),
+    }
+}
+
+/// Recursively force every thunk in a value tree. Internal thunks aren't
+/// part of the user-visible value model — `value_dump`-style serializers
+/// must walk and force lists/records before printing.
+pub fn deep_force(value: Value, host: &dyn IoHost) -> Result<Value, MError> {
+    let value = force(value, &mut |e, env| evaluate(e, env, host))?;
+    match value {
+        Value::List(items) => {
+            let forced: Result<Vec<Value>, MError> = items
+                .into_iter()
+                .map(|v| deep_force(v, host))
+                .collect();
+            Ok(Value::List(forced?))
+        }
+        Value::Record(record) => {
+            let fields: Result<Vec<(String, Value)>, MError> = record
+                .fields
+                .into_iter()
+                .map(|(name, v)| Ok((name, deep_force(v, host)?)))
+                .collect();
+            Ok(Value::Record(Record {
+                fields: fields?,
+                env: record.env,
+            }))
+        }
+        other => Ok(other),
     }
 }
 
@@ -701,8 +866,8 @@ mod tests {
 
     #[test]
     fn deferred_form_returns_not_implemented() {
-        // Records aren't in slice 1 — should error with NotImplemented, not panic.
-        match eval_str("[a = 1]") {
+        // `try` isn't in slices 1-3 — should error with NotImplemented, not panic.
+        match eval_str("try 1") {
             Err(MError::NotImplemented(_)) => {}
             other => panic!("expected NotImplemented, got {:?}", other),
         }
@@ -906,6 +1071,159 @@ mod tests {
             ),
             true
         );
+    }
+
+    // --- Lists, records, field/item access (eval-3) ---
+
+    fn eval_list_len(src: &str) -> usize {
+        match eval_str(src).expect("eval") {
+            Value::List(xs) => xs.len(),
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn empty_list() {
+        assert_eq!(eval_list_len("{}"), 0);
+    }
+
+    #[test]
+    fn single_item_list() {
+        match eval_str("{42}").unwrap() {
+            Value::List(xs) => match xs.as_slice() {
+                [Value::Number(n)] => assert_eq!(*n, 42.0),
+                other => panic!("unexpected items: {:?}", other),
+            },
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn multi_item_list() {
+        assert_eq!(eval_list_len("{1, 2, 3, 4, 5}"), 5);
+    }
+
+    #[test]
+    fn range_expands_to_inclusive_integers() {
+        match eval_str("{1..3}").unwrap() {
+            Value::List(xs) => {
+                let nums: Vec<f64> = xs
+                    .iter()
+                    .map(|v| match v {
+                        Value::Number(n) => *n,
+                        other => panic!("expected number, got {:?}", other),
+                    })
+                    .collect();
+                assert_eq!(nums, vec![1.0, 2.0, 3.0]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn range_with_non_integer_bounds_errors() {
+        assert!(eval_str("{1.5..3}").is_err());
+    }
+
+    #[test]
+    fn range_descending_errors() {
+        assert!(eval_str("{5..1}").is_err());
+    }
+
+    #[test]
+    fn empty_record() {
+        match eval_str("[]").unwrap() {
+            Value::Record(r) => assert!(r.fields.is_empty()),
+            other => panic!("expected record, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn record_field_access() {
+        assert_eq!(eval_number("[a = 1, b = 2][b]"), 2.0);
+    }
+
+    #[test]
+    fn record_sibling_reference() {
+        // b references a — possible because both are thunks in the same env.
+        assert_eq!(eval_number("[a = 1, b = a + 1][b]"), 2.0);
+    }
+
+    #[test]
+    fn record_lazy_unused_error_field() {
+        // bad would error if forced (missing_name is unbound), but [good] never
+        // touches it. Laziness applies per-field for records.
+        assert_eq!(
+            eval_number("[bad = missing_name, good = 1][good]"),
+            1.0
+        );
+    }
+
+    #[test]
+    fn field_access_optional_missing_is_null() {
+        match eval_str("[a = 1][missing]?").unwrap() {
+            Value::Null => {}
+            other => panic!("expected null, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn field_access_optional_present_returns_value() {
+        assert_eq!(eval_number("[a = 1][a]?"), 1.0);
+    }
+
+    #[test]
+    fn field_access_required_missing_errors() {
+        match eval_str("[a = 1][missing]") {
+            Err(MError::Other(msg)) => assert!(msg.contains("field not found"), "got: {}", msg),
+            other => panic!("expected field-not-found error, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn item_access_on_list() {
+        assert_eq!(eval_number("{10, 20, 30}{1}"), 20.0);
+    }
+
+    #[test]
+    fn item_access_zero_index() {
+        assert_eq!(eval_number("{10, 20, 30}{0}"), 10.0);
+    }
+
+    #[test]
+    fn item_access_out_of_bounds_optional() {
+        match eval_str("{10, 20}{99}?").unwrap() {
+            Value::Null => {}
+            other => panic!("expected null, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn item_access_out_of_bounds_required_errors() {
+        assert!(eval_str("{10, 20}{99}").is_err());
+    }
+
+    #[test]
+    fn record_in_let_then_field_access() {
+        assert_eq!(
+            eval_number("let r = [a = 1, b = a + 10] in r[b]"),
+            11.0
+        );
+    }
+
+    #[test]
+    fn implicit_underscore_access_in_lambda() {
+        // `[name]` as a primary desugars to `_[name]` — the lambda's _ param
+        // is the record we're accessing.
+        match eval_str(r#"(each [name])([name = "ok"])"#).unwrap() {
+            Value::Text(s) => assert_eq!(s, "ok"),
+            other => panic!("expected text, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn nested_list_access() {
+        assert_eq!(eval_number("{{1, 2}, {3, 4}}{0}{1}"), 2.0);
     }
 
     #[test]
