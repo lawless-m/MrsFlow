@@ -382,6 +382,8 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
             table_pivot,
         ),
         ("Table.ReorderColumns", two("table", "columnOrder"), table_reorder_columns),
+        ("Table.Column", two("table", "columnName"), table_column),
+        ("Table.IsEmpty", one("table"), table_is_empty),
         (
             "Table.AddIndexColumn",
             vec![
@@ -1796,6 +1798,27 @@ fn table_select_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError>
             Ok(Value::Table(Table::from_rows(columns.clone(), new_rows)))
         }
     }
+}
+
+fn table_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let name = expect_text(&args[1])?;
+    let col_idx = table
+        .column_names()
+        .iter()
+        .position(|n| n == name)
+        .ok_or_else(|| MError::Other(format!("Table.Column: column not found: {}", name)))?;
+    let n = table.num_rows();
+    let mut out: Vec<Value> = Vec::with_capacity(n);
+    for row in 0..n {
+        out.push(cell_to_value(table, col_idx, row)?);
+    }
+    Ok(Value::List(out))
+}
+
+fn table_is_empty(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    Ok(Value::Logical(table.num_rows() == 0))
 }
 
 fn table_add_index_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {

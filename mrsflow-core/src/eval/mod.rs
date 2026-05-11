@@ -2752,6 +2752,36 @@ mod tests {
     }
 
     #[test]
+    fn table_column_round_trip() {
+        let src = r#"
+            let t = #table({"a", "b"}, {{1, "x"}, {2, "y"}, {3, "z"}})
+            in Table.Column(t, "b")
+        "#;
+        match eval_str(src).unwrap() {
+            Value::List(xs) => {
+                let texts: Vec<&str> = xs.iter().map(|v| match v {
+                    Value::Text(s) => s.as_str(),
+                    _ => panic!(),
+                }).collect();
+                assert_eq!(texts, vec!["x", "y", "z"]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_is_empty_true_and_false() {
+        match eval_str("Table.IsEmpty(#table({\"a\"}, {}))").unwrap() {
+            Value::Logical(b) => assert!(b),
+            other => panic!("expected logical, got {:?}", other),
+        }
+        match eval_str("Table.IsEmpty(#table({\"a\"}, {{1}}))").unwrap() {
+            Value::Logical(b) => assert!(!b),
+            other => panic!("expected logical, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn table_add_index_column_default() {
         let src = r#"
             let t = #table({"name"}, {{"a"}, {"b"}, {"c"}})
