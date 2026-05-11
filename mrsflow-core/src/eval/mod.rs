@@ -1962,6 +1962,23 @@ mod tests {
     }
 
     #[test]
+    fn type_intrinsic_int64_type_resolves_to_number_column() {
+        // Int64.Type should bind to Value::Type(Number) at root_env, and
+        // using it as Table.AddColumn's 4th arg should produce a Float64 column.
+        match eval_str(
+            r#"Table.AddColumn(#table({"a"}, {{1}}), "b", each 1, Int64.Type)"#,
+        )
+        .unwrap()
+        {
+            Value::Table(t) => {
+                use arrow::datatypes::DataType;
+                assert_eq!(t.batch.schema().field(1).data_type(), &DataType::Float64);
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn table_skip_count() {
         match eval_str(
             r#"Table.Skip(#table({"n"}, {{1},{2},{3},{4}}), 2)"#,

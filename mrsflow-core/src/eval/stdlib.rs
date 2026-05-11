@@ -39,6 +39,35 @@ pub fn root_env() -> Env {
     }
     env = env.extend("#nan".into(), Value::Number(f64::NAN));
     env = env.extend("#infinity".into(), Value::Number(f64::INFINITY));
+
+    // Type intrinsics (dotted-name values). Power Query exposes these as
+    // type values; the corpus uses them in Table.AddColumn type args and
+    // Table.TransformColumnTypes pairs. Several numeric intrinsics collapse
+    // to TypeRep::Number for v1 (we have only f64 underlying) — the type
+    // ascription path still works because TypeRep::Number → DataType::Float64.
+    use super::value::TypeRep;
+    for (name, tr) in [
+        ("Number.Type",   TypeRep::Number),
+        ("Int64.Type",    TypeRep::Number),
+        ("Int32.Type",    TypeRep::Number),
+        ("Int16.Type",    TypeRep::Number),
+        ("Int8.Type",     TypeRep::Number),
+        ("Currency.Type", TypeRep::Number),
+        ("Decimal.Type",  TypeRep::Number),
+        ("Single.Type",   TypeRep::Number),
+        ("Double.Type",   TypeRep::Number),
+        ("Percentage.Type", TypeRep::Number),
+        ("Text.Type",     TypeRep::Text),
+        ("Logical.Type",  TypeRep::Logical),
+        ("Date.Type",     TypeRep::Date),
+        ("DateTime.Type", TypeRep::Datetime),
+        ("Duration.Type", TypeRep::Duration),
+        ("Binary.Type",   TypeRep::Binary),
+        ("Null.Type",     TypeRep::Null),
+        ("Any.Type",      TypeRep::Any),
+    ] {
+        env = env.extend(name.to_string(), Value::Type(tr));
+    }
     env
 }
 
