@@ -311,6 +311,84 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
             three("table", "column", "aggregations"),
             table_aggregate_table_column,
         ),
+        // --- Slice #161: row mutation ---
+        (
+            "Table.RemoveFirstN",
+            vec![
+                Param { name: "table".into(),            optional: false, type_annotation: None },
+                Param { name: "countOrCondition".into(), optional: true,  type_annotation: None },
+            ],
+            table_remove_first_n,
+        ),
+        (
+            "Table.RemoveLastN",
+            vec![
+                Param { name: "table".into(),            optional: false, type_annotation: None },
+                Param { name: "countOrCondition".into(), optional: true,  type_annotation: None },
+            ],
+            table_remove_last_n,
+        ),
+        (
+            "Table.RemoveRows",
+            vec![
+                Param { name: "table".into(),  optional: false, type_annotation: None },
+                Param { name: "offset".into(), optional: false, type_annotation: None },
+                Param { name: "count".into(),  optional: true,  type_annotation: None },
+            ],
+            table_remove_rows,
+        ),
+        (
+            "Table.RemoveMatchingRows",
+            vec![
+                Param { name: "table".into(),            optional: false, type_annotation: None },
+                Param { name: "rows".into(),             optional: false, type_annotation: None },
+                Param { name: "equationCriteria".into(), optional: true,  type_annotation: None },
+            ],
+            table_remove_matching_rows,
+        ),
+        (
+            "Table.RemoveRowsWithErrors",
+            vec![
+                Param { name: "table".into(),   optional: false, type_annotation: None },
+                Param { name: "columns".into(), optional: true,  type_annotation: None },
+            ],
+            table_remove_rows_with_errors,
+        ),
+        (
+            "Table.ReplaceMatchingRows",
+            vec![
+                Param { name: "table".into(),            optional: false, type_annotation: None },
+                Param { name: "replacements".into(),     optional: false, type_annotation: None },
+                Param { name: "equationCriteria".into(), optional: true,  type_annotation: None },
+            ],
+            table_replace_matching_rows,
+        ),
+        (
+            "Table.ReplaceRows",
+            vec![
+                Param { name: "table".into(),  optional: false, type_annotation: None },
+                Param { name: "offset".into(), optional: false, type_annotation: None },
+                Param { name: "count".into(),  optional: false, type_annotation: None },
+                Param { name: "rows".into(),   optional: false, type_annotation: None },
+            ],
+            table_replace_rows,
+        ),
+        (
+            "Table.ReplaceValue",
+            vec![
+                Param { name: "table".into(),            optional: false, type_annotation: None },
+                Param { name: "oldValue".into(),         optional: false, type_annotation: None },
+                Param { name: "newValue".into(),         optional: false, type_annotation: None },
+                Param { name: "replacer".into(),         optional: false, type_annotation: None },
+                Param { name: "columnsToSearch".into(),  optional: false, type_annotation: None },
+            ],
+            table_replace_value,
+        ),
+        (
+            "Table.ReplaceErrorValues",
+            two("table", "errorReplacement"),
+            table_replace_error_values,
+        ),
     ]
 }
 
@@ -2890,6 +2968,256 @@ fn table_aggregate_table_column(args: &[Value], host: &dyn IoHost) -> Result<Val
         new_rows.push(new_row);
     }
     Ok(Value::Table(values_to_table(&new_names, &new_rows)?))
+}
+
+// --- Slice #161: row mutation ---
+
+/// Parse an optional count-or-condition arg into a non-negative integer.
+/// Function-shaped (predicate) forms aren't supported in v1.
+fn parse_optional_count(arg: Option<&Value>, default: usize, ctx: &str) -> Result<usize, MError> {
+    match arg {
+        None | Some(Value::Null) => Ok(default),
+        Some(Value::Number(n)) if n.is_finite() && *n >= 0.0 && n.fract() == 0.0 => {
+            Ok(*n as usize)
+        }
+        Some(Value::Function(_)) => Err(MError::NotImplemented(
+            "Table row mutation: predicate (count-or-condition) form not yet supported",
+        )),
+        Some(other) => Err(MError::Other(format!(
+            "{}: expected number, got {}",
+            ctx,
+            super::super::type_name(other)
+        ))),
+    }
+}
+
+fn table_remove_first_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let n = parse_optional_count(args.get(1), 1, "Table.RemoveFirstN: count")?;
+    let (names, rows) = table_to_rows(table)?;
+    let kept: Vec<Vec<Value>> = rows.into_iter().skip(n).collect();
+    Ok(Value::Table(values_to_table(&names, &kept)?))
+}
+
+fn table_remove_last_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let n = parse_optional_count(args.get(1), 1, "Table.RemoveLastN: count")?;
+    let (names, mut rows) = table_to_rows(table)?;
+    let n = n.min(rows.len());
+    rows.truncate(rows.len() - n);
+    Ok(Value::Table(values_to_table(&names, &rows)?))
+}
+
+fn table_remove_rows(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let offset = expect_int(&args[1], "Table.RemoveRows: offset")?;
+    if offset < 0 {
+        return Err(MError::Other("Table.RemoveRows: offset must be non-negative".into()));
+    }
+    let count = parse_optional_count(args.get(2), 1, "Table.RemoveRows: count")?;
+    let offset = offset as usize;
+    let (names, mut rows) = table_to_rows(table)?;
+    let off = offset.min(rows.len());
+    let end = (off + count).min(rows.len());
+    rows.drain(off..end);
+    Ok(Value::Table(values_to_table(&names, &rows)?))
+}
+
+/// Match a (possibly partial) record against a full row, where the `record`
+/// fields take their values from the corresponding column. Used by Remove/
+/// ReplaceMatchingRows. Field values may be thunks — force before compare.
+fn row_matches_full_record(
+    names: &[String],
+    row: &[Value],
+    needle: &Record,
+) -> Result<bool, MError> {
+    for (n, expected) in &needle.fields {
+        let col = match names.iter().position(|h| h == n) {
+            Some(i) => i,
+            None => return Ok(false),
+        };
+        let expected = super::super::force(expected.clone(), &mut |e, env| {
+            super::super::evaluate(e, env, &super::super::NoIoHost)
+        })?;
+        if !values_equal_primitive(&row[col], &expected)? {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
+fn table_remove_matching_rows(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let needles = expect_list(&args[1])?;
+    if !matches!(args.get(2), Some(Value::Null) | None) {
+        return Err(MError::NotImplemented(
+            "Table.RemoveMatchingRows: equationCriteria not yet supported",
+        ));
+    }
+    let (names, rows) = table_to_rows(table)?;
+    let mut kept: Vec<Vec<Value>> = Vec::with_capacity(rows.len());
+    'row: for row in rows {
+        for n in needles {
+            let needle = match n {
+                Value::Record(r) => r,
+                other => return Err(type_mismatch("record (in list)", other)),
+            };
+            if row_matches_full_record(&names, &row, needle)? {
+                continue 'row;
+            }
+        }
+        kept.push(row);
+    }
+    Ok(Value::Table(values_to_table(&names, &kept)?))
+}
+
+fn table_remove_rows_with_errors(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    // v1: cells don't carry per-cell error state, so this is a no-op.
+    let _ = expect_table(&args[0])?;
+    Ok(args[0].clone())
+}
+
+fn table_replace_matching_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let pairs = expect_list(&args[1])?;
+    if !matches!(args.get(2), Some(Value::Null) | None) {
+        return Err(MError::NotImplemented(
+            "Table.ReplaceMatchingRows: equationCriteria not yet supported",
+        ));
+    }
+    // Parse pairs: each is a list with two records (old, new).
+    struct Pair {
+        old: Record,
+        new: Record,
+    }
+    let mut owned: Vec<Pair> = Vec::with_capacity(pairs.len());
+    for p in pairs {
+        let xs = match p {
+            Value::List(xs) => xs,
+            other => return Err(type_mismatch("list (replacement pair)", other)),
+        };
+        if xs.len() != 2 {
+            return Err(MError::Other(format!(
+                "Table.ReplaceMatchingRows: pair must have 2 elements, got {}",
+                xs.len()
+            )));
+        }
+        let old = match &xs[0] {
+            Value::Record(r) => r.clone(),
+            other => return Err(type_mismatch("record (old)", other)),
+        };
+        let new = match &xs[1] {
+            Value::Record(r) => r.clone(),
+            other => return Err(type_mismatch("record (new)", other)),
+        };
+        owned.push(Pair { old, new });
+    }
+    let (names, rows) = table_to_rows(table)?;
+    let mut out: Vec<Vec<Value>> = Vec::with_capacity(rows.len());
+    for row in rows {
+        let mut replaced = false;
+        for p in &owned {
+            if row_matches_full_record(&names, &row, &p.old)? {
+                // Build replacement row from new record, falling back to original
+                // cell when a column is not mentioned in `new`.
+                let mut new_row: Vec<Value> = Vec::with_capacity(names.len());
+                for (i, n) in names.iter().enumerate() {
+                    match p.new.fields.iter().find(|(fn_, _)| fn_ == n) {
+                        Some((_, v)) => {
+                            let forced = super::super::force(v.clone(), &mut |e, env| {
+                                super::super::evaluate(e, env, host)
+                            })?;
+                            new_row.push(forced);
+                        }
+                        None => new_row.push(row[i].clone()),
+                    }
+                }
+                out.push(new_row);
+                replaced = true;
+                break;
+            }
+        }
+        if !replaced {
+            out.push(row);
+        }
+    }
+    Ok(Value::Table(values_to_table(&names, &out)?))
+}
+
+fn table_replace_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let offset = expect_int(&args[1], "Table.ReplaceRows: offset")?;
+    let count = expect_int(&args[2], "Table.ReplaceRows: count")?;
+    if offset < 0 || count < 0 {
+        return Err(MError::Other(
+            "Table.ReplaceRows: offset/count must be non-negative".into(),
+        ));
+    }
+    let new_records = expect_list(&args[3])?;
+    let (names, mut rows) = table_to_rows(table)?;
+    let off = (offset as usize).min(rows.len());
+    let cnt = (count as usize).min(rows.len() - off);
+    let mut new_rows: Vec<Vec<Value>> = Vec::with_capacity(new_records.len());
+    for rv in new_records {
+        let rec = match rv {
+            Value::Record(r) => r,
+            other => return Err(type_mismatch("record (in rows)", other)),
+        };
+        let mut row: Vec<Value> = Vec::with_capacity(names.len());
+        for n in &names {
+            let v = rec
+                .fields
+                .iter()
+                .find(|(fn_, _)| fn_ == n)
+                .map(|(_, v)| v.clone())
+                .unwrap_or(Value::Null);
+            let forced = super::super::force(v, &mut |e, env| {
+                super::super::evaluate(e, env, host)
+            })?;
+            row.push(forced);
+        }
+        new_rows.push(row);
+    }
+    rows.splice(off..off + cnt, new_rows);
+    Ok(Value::Table(values_to_table(&names, &rows)?))
+}
+
+fn table_replace_value(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let old_value = args[1].clone();
+    let new_value = args[2].clone();
+    let replacer = expect_function(&args[3])?;
+    let cols_to_search = match &args[4] {
+        Value::Text(s) => vec![s.clone()],
+        Value::List(_) => expect_text_list(&args[4], "Table.ReplaceValue: columnsToSearch")?,
+        other => return Err(type_mismatch("text or list of text", other)),
+    };
+    let (names, mut rows) = table_to_rows(table)?;
+    let mut col_indices: Vec<usize> = Vec::with_capacity(cols_to_search.len());
+    for n in &cols_to_search {
+        let idx = names
+            .iter()
+            .position(|h| h == n)
+            .ok_or_else(|| MError::Other(format!("Table.ReplaceValue: column not found: {}", n)))?;
+        col_indices.push(idx);
+    }
+    for row in rows.iter_mut() {
+        for &col in &col_indices {
+            let new_cell = invoke_callback_with_host(
+                replacer,
+                vec![row[col].clone(), old_value.clone(), new_value.clone()],
+                host,
+            )?;
+            row[col] = new_cell;
+        }
+    }
+    Ok(Value::Table(values_to_table(&names, &rows)?))
+}
+
+fn table_replace_error_values(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    // v1: cells don't carry per-cell error state, so this is a no-op.
+    let _ = expect_table(&args[0])?;
+    Ok(args[0].clone())
 }
 
 fn type_matches(t: &super::super::value::TypeRep, v: &Value) -> bool {

@@ -5342,6 +5342,108 @@ mod tests {
     }
 
     #[test]
+    fn table_remove_first_n_default_drops_one() {
+        let src = r#"
+            let
+                t = #table({"n"}, {{1}, {2}, {3}, {4}}),
+                r1 = Table.RemoveFirstN(t),
+                r2 = Table.RemoveFirstN(t, 2)
+            in
+                {Table.Column(r1, "n"), Table.Column(r2, "n")}
+        "#;
+        match eval_str(src).unwrap() {
+            Value::List(xs) => {
+                let nums = |v: &Value| -> Vec<f64> {
+                    match v {
+                        Value::List(xs) => xs.iter().map(|x| match x {
+                            Value::Number(n) => *n,
+                            _ => panic!(),
+                        }).collect(),
+                        _ => panic!(),
+                    }
+                };
+                assert_eq!(nums(&xs[0]), vec![2.0, 3.0, 4.0]);
+                assert_eq!(nums(&xs[1]), vec![3.0, 4.0]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_remove_rows_slice() {
+        let src = r#"
+            let
+                t = #table({"n"}, {{1}, {2}, {3}, {4}, {5}}),
+                r = Table.RemoveRows(t, 1, 2)
+            in Table.Column(r, "n")
+        "#;
+        match eval_str(src).unwrap() {
+            Value::List(xs) => {
+                let nums: Vec<f64> = xs.iter().map(|v| match v {
+                    Value::Number(n) => *n,
+                    _ => panic!(),
+                }).collect();
+                assert_eq!(nums, vec![1.0, 4.0, 5.0]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_replace_value_with_replace_text() {
+        // Replace "o" with "0" in column "s".
+        let src = r#"
+            let
+                t = #table({"s"}, {{"foo"}, {"bar"}, {"boo"}}),
+                r = Table.ReplaceValue(t, "o", "0", Replacer.ReplaceText(), {"s"})
+            in Table.Column(r, "s")
+        "#;
+        match eval_str(src).unwrap() {
+            Value::List(xs) => {
+                let texts: Vec<&str> = xs.iter().map(|v| match v {
+                    Value::Text(s) => s.as_str(),
+                    _ => panic!(),
+                }).collect();
+                assert_eq!(texts, vec!["f00", "bar", "b00"]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_replace_matching_rows_swaps_values() {
+        // Replace row [a=2] with [a=99, b="z"]; the b field carries through.
+        let src = r#"
+            let
+                t = #table({"a", "b"}, {{1, "x"}, {2, "y"}, {3, "z"}}),
+                r = Table.ReplaceMatchingRows(t, {{[a = 2], [a = 99, b = "qq"]}})
+            in
+                {Table.Column(r, "a"), Table.Column(r, "b")}
+        "#;
+        match eval_str(src).unwrap() {
+            Value::List(cols) => {
+                let nums = match &cols[0] {
+                    Value::List(xs) => xs.iter().map(|v| match v {
+                        Value::Number(n) => *n,
+                        _ => panic!(),
+                    }).collect::<Vec<_>>(),
+                    _ => panic!(),
+                };
+                let texts = match &cols[1] {
+                    Value::List(xs) => xs.iter().map(|v| match v {
+                        Value::Text(s) => s.clone(),
+                        _ => panic!(),
+                    }).collect::<Vec<_>>(),
+                    _ => panic!(),
+                };
+                assert_eq!(nums, vec![1.0, 99.0, 3.0]);
+                assert_eq!(texts, vec!["x", "qq", "z"]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn table_min_returns_min_row() {
         let src = r#"
             let
