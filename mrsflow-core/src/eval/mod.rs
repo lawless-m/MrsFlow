@@ -2940,6 +2940,30 @@ mod tests {
     }
 
     #[test]
+    fn text_clean_strips_control_char() {
+        match eval_str("Text.Clean(\"a\u{0001}b\u{007F}c\")").unwrap() {
+            Value::Text(s) => assert_eq!(s, "abc"),
+            other => panic!("expected text, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn text_format_positional() {
+        match eval_str(r##"Text.Format("hello #{0}, you are #{1}", {"world", 42})"##).unwrap() {
+            Value::Text(s) => assert_eq!(s, "hello world, you are 42"),
+            other => panic!("expected text, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn text_format_named() {
+        match eval_str(r##"Text.Format("#{name} = #{val}", [name = "x", val = 7])"##).unwrap() {
+            Value::Text(s) => assert_eq!(s, "x = 7"),
+            other => panic!("expected text, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn text_split_any_basic() {
         match eval_str(r#"Text.SplitAny("a,b;c|d", ",;|")"#).unwrap() {
             Value::List(xs) => {

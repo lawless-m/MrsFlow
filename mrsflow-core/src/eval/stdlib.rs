@@ -286,6 +286,16 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
             text_between_delimiters,
         ),
         ("Text.InferNumberType", one("text"), text_infer_number_type),
+        ("Text.Clean", one("text"), text_clean),
+        (
+            "Text.Format",
+            vec![
+                Param { name: "formatString".into(), optional: false, type_annotation: None },
+                Param { name: "arguments".into(),    optional: false, type_annotation: None },
+                Param { name: "culture".into(),      optional: true,  type_annotation: None },
+            ],
+            text_format,
+        ),
         ("Text.Start", two("text", "count"), text_start),
         (
             "Text.Middle",
@@ -1201,6 +1211,87 @@ fn text_between_delimiters(args: &[Value], _host: &dyn IoHost) -> Result<Value, 
         Some(&b) => Ok(Value::Text(rest[..b].to_string())),
         None => Ok(Value::Text(String::new())),
     }
+}
+
+fn text_clean(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let text = expect_text(&args[0])?;
+    Ok(Value::Text(
+        text.chars()
+            .filter(|c| !(c.is_control() && *c != '\n' && *c != '\r' && *c != '\t'))
+            .filter(|c| !c.is_control())
+            .collect(),
+    ))
+}
+
+/// Stringify a value for Text.Format substitution.
+fn format_arg_to_text(v: &Value) -> String {
+    match v {
+        Value::Null => "".into(),
+        Value::Text(s) => s.clone(),
+        Value::Number(n) => {
+            if n.is_finite() && n.fract() == 0.0 && n.abs() < 1e16 {
+                format!("{}", *n as i64)
+            } else {
+                n.to_string()
+            }
+        }
+        Value::Logical(b) => if *b { "true".into() } else { "false".into() },
+        Value::Date(d) => d.to_string(),
+        Value::Datetime(dt) => dt.to_string(),
+        Value::Duration(d) => format!("{}", d),
+        other => format!("{:?}", other),
+    }
+}
+
+fn text_format(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+    let fmt = expect_text(&args[0])?;
+    let mut out = String::with_capacity(fmt.len());
+    let mut chars = fmt.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '#' && chars.peek() == Some(&'{') {
+            chars.next(); // consume '{'
+            let mut key = String::new();
+            let mut closed = false;
+            for kc in chars.by_ref() {
+                if kc == '}' {
+                    closed = true;
+                    break;
+                }
+                key.push(kc);
+            }
+            if !closed {
+                return Err(MError::Other(
+                    "Text.Format: unterminated #{...} placeholder".into(),
+                ));
+            }
+            let value = match &args[1] {
+                Value::List(xs) => {
+                    let idx: usize = key.parse().map_err(|_| MError::Other(format!(
+                        "Text.Format: index {:?} not a number for list arguments", key
+                    )))?;
+                    xs.get(idx).cloned().ok_or_else(|| MError::Other(format!(
+                        "Text.Format: index {} out of range", idx
+                    )))?
+                }
+                Value::Record(r) => {
+                    let raw = r
+                        .fields
+                        .iter()
+                        .find(|(n, _)| n == &key)
+                        .map(|(_, v)| v.clone())
+                        .ok_or_else(|| MError::Other(format!(
+                            "Text.Format: field {:?} not in arguments record", key
+                        )))?;
+                    super::force(raw, &mut |e, env| super::evaluate(e, env, host))?
+                }
+                other => return Err(type_mismatch("list or record (arguments)", other)),
+            };
+            out.push_str(&format_arg_to_text(&value));
+        } else {
+            out.push(c);
+        }
+    }
+    Ok(Value::Text(out))
 }
 
 fn text_infer_number_type(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
