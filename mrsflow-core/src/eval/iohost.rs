@@ -73,6 +73,13 @@ pub trait IoHost {
     /// `folder_contents` but folders are descended-into and not emitted
     /// as rows.
     fn folder_files(&self, path: &str) -> Result<Value, IoError>;
+    /// Caller-injected workbook parameters — backs `Excel.CurrentWorkbook`.
+    /// Returns a Table with columns `Name, Content` where each Content
+    /// cell is a 1-row Table `[Value=…]`. The shell (`mrsflow-cli`) builds
+    /// this from `--param NAME=VALUE` flags. Hosts with no parameter
+    /// mechanism return `IoError::NotSupported` so `try … otherwise …`
+    /// catches in queries that depend on it.
+    fn current_workbook(&self) -> Result<Value, IoError>;
 }
 
 /// Always-fail IoHost — for evaluator unit tests on pure expressions where
@@ -117,6 +124,9 @@ impl IoHost for NoIoHost {
         Err(IoError::NotSupported)
     }
     fn folder_files(&self, _: &str) -> Result<Value, IoError> {
+        Err(IoError::NotSupported)
+    }
+    fn current_workbook(&self) -> Result<Value, IoError> {
         Err(IoError::NotSupported)
     }
 }

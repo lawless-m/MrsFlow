@@ -163,11 +163,21 @@ fn value_kind(v: &Value) -> &'static str {
     }
 }
 
-pub struct CliIoHost;
+pub struct CliIoHost {
+    /// Named parameters injected via `--param NAME=VALUE`. Surface to M
+    /// queries via `Excel.CurrentWorkbook()` (the only PQ idiom for
+    /// query-time parameters). Values are always text — the corpus calls
+    /// `Text.From` on numeric uses so this is fine.
+    params: Vec<(String, String)>,
+}
 
 impl CliIoHost {
     pub fn new() -> Self {
-        Self
+        Self { params: Vec::new() }
+    }
+
+    pub fn with_params(params: Vec<(String, String)>) -> Self {
+        Self { params }
     }
 }
 
@@ -314,6 +324,28 @@ impl IoHost for CliIoHost {
 
     fn folder_files(&self, path: &str) -> Result<Value, IoError> {
         folder_impl(path, /* recursive */ true)
+    }
+
+    fn current_workbook(&self) -> Result<Value, IoError> {
+        // Build a Table with columns Name, Content. Each Content cell is a
+        // 1-row Table with a single "Value" column. Matches PQ's
+        // Excel.CurrentWorkbook(){[Name="..."]}[Content]{0}[Value] chain.
+        let value_cols: Vec<String> = vec!["Value".into()];
+        let rows: Vec<Vec<Value>> = self
+            .params
+            .iter()
+            .map(|(k, v)| {
+                let inner = Table::from_rows(
+                    value_cols.clone(),
+                    vec![vec![Value::Text(v.clone())]],
+                );
+                vec![Value::Text(k.clone()), Value::Table(inner)]
+            })
+            .collect();
+        Ok(Value::Table(Table::from_rows(
+            vec!["Name".into(), "Content".into()],
+            rows,
+        )))
     }
 }
 

@@ -11,6 +11,11 @@
 //!
 //! `--sexpr` and `--out`/`--out-dir` are mutually exclusive. One of them
 //! must be given.
+//!
+//!   --param NAME=VALUE   (repeatable)
+//!     Inject a named parameter. Surfaces in M code as
+//!     `Excel.CurrentWorkbook(){[Name="NAME"]}[Content]{0}[Value]` —
+//!     matching how Excel-hosted PQ queries pick up workbook parameters.
 
 use std::env;
 use std::fs;
@@ -36,6 +41,7 @@ struct CliArgs {
     out_names: Vec<String>,
     out_dir: Option<String>,
     sexpr: bool,
+    params: Vec<(String, String)>,
 }
 
 fn parse_args(raw: Vec<String>) -> CliArgs {
@@ -63,6 +69,21 @@ fn parse_args(raw: Vec<String>) -> CliArgs {
             }
             "--sexpr" => {
                 a.sexpr = true;
+            }
+            "--param" => {
+                i += 1;
+                if i >= raw.len() {
+                    usage_and_exit();
+                }
+                match raw[i].split_once('=') {
+                    Some((k, v)) if !k.is_empty() => {
+                        a.params.push((k.to_string(), v.to_string()));
+                    }
+                    _ => {
+                        eprintln!("ERROR: --param expects NAME=VALUE, got {:?}", raw[i]);
+                        process::exit(64);
+                    }
+                }
             }
             other if other.starts_with('-') => {
                 eprintln!("ERROR: unknown flag {other}");
@@ -103,7 +124,7 @@ fn main() {
             process::exit(64);
         }
         let inputs: Vec<PathBuf> = cli.inputs.into_iter().map(PathBuf::from).collect();
-        let host = CliIoHost::new();
+        let host = CliIoHost::with_params(cli.params.clone());
         match run_multi_query(&inputs, &cli.out_names, &PathBuf::from(&out_dir), &host) {
             Ok(written) => {
                 for p in written {
@@ -146,7 +167,7 @@ fn main() {
     });
 
     let env = root_env();
-    let host = CliIoHost::new();
+    let host = CliIoHost::with_params(cli.params);
     let value = match evaluate(&ast, &env, &host) {
         Ok(v) => v,
         Err(e) => {

@@ -8,15 +8,23 @@ use super::super::value::{BuiltinFn, MError, Value};
 use super::common::type_mismatch;
 
 pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
-    vec![(
-        "Excel.Workbook",
-        vec![
-            Param { name: "workbook".into(),   optional: false, type_annotation: None },
-            Param { name: "useHeaders".into(), optional: true,  type_annotation: None },
-            Param { name: "delayTypes".into(), optional: true,  type_annotation: None },
-        ],
-        workbook,
-    )]
+    vec![
+        (
+            "Excel.Workbook",
+            vec![
+                Param { name: "workbook".into(),   optional: false, type_annotation: None },
+                Param { name: "useHeaders".into(), optional: true,  type_annotation: None },
+                Param { name: "delayTypes".into(), optional: true,  type_annotation: None },
+            ],
+            workbook,
+        ),
+        ("Excel.CurrentWorkbook", vec![], current_workbook),
+    ]
+}
+
+fn current_workbook(_args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+    host.current_workbook()
+        .map_err(|e| MError::Other(format!("Excel.CurrentWorkbook: {e:?}")))
 }
 
 fn workbook(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {

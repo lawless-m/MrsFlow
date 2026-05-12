@@ -148,6 +148,63 @@ fn constructor(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
+/// Translate an M `Date.ToText` format string into a chrono `format!`
+/// spec. Tokens are matched longest-first so `yyyy` doesn't eat as two
+/// `yy`s and `MMM` doesn't collide with `MM`. Unrecognised characters
+/// pass through literally; an unrecognised letter run raises an error
+/// so a typo fails loud rather than producing garbage.
+fn translate_m_date_format(m_fmt: &str) -> Result<String, MError> {
+    let mut out = String::with_capacity(m_fmt.len());
+    let bytes = m_fmt.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        let c = bytes[i];
+        // Match runs of the same letter — M format tokens are runs.
+        if c.is_ascii_alphabetic() {
+            let mut j = i;
+            while j < bytes.len() && bytes[j] == c {
+                j += 1;
+            }
+            let run = &m_fmt[i..j];
+            let token = match run {
+                "yyyy" => "%Y",
+                "yy"   => "%y",
+                "MMMM" => "%B", // full month name
+                "MMM"  => "%b", // abbreviated month
+                "MM"   => "%m",
+                "M"    => "%-m",
+                "dddd" => "%A", // full weekday
+                "ddd"  => "%a", // abbreviated weekday
+                "dd"   => "%d",
+                "d"    => "%-d",
+                "HH"   => "%H",
+                "H"    => "%-H",
+                "hh"   => "%I",
+                "h"    => "%-I",
+                "mm"   => "%M",
+                "ss"   => "%S",
+                "tt"   => "%p",
+                other => {
+                    return Err(MError::Other(format!(
+                        "Date.ToText: unsupported format token {other:?} in {m_fmt:?}"
+                    )));
+                }
+            };
+            out.push_str(token);
+            i = j;
+        } else {
+            // Literal character — chrono needs `%%` for a literal `%`.
+            if c == b'%' {
+                out.push_str("%%");
+            } else {
+                out.push(c as char);
+            }
+            i += 1;
+        }
+    }
+    Ok(out)
+}
+
 fn to_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let d = match &args[0] {
         Value::Null => return Ok(Value::Null),
@@ -155,22 +212,11 @@ fn to_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         other => return Err(type_mismatch("date", other)),
     };
     let chrono_fmt = match args.get(1) {
-        Some(Value::Null) | None => "%Y-%m-%d",
-        Some(Value::Text(s)) => match s.as_str() {
-            "yyyy-MM-dd" => "%Y-%m-%d",
-            "dd/MM/yyyy" => "%d/%m/%Y",
-            "dd-MM-yyyy" => "%d-%m-%Y",
-            "MM/dd/yyyy" => "%m/%d/%Y",
-            "yyyy/MM/dd" => "%Y/%m/%d",
-            other => {
-                return Err(MError::Other(format!(
-                    "Date.ToText: unsupported format {other:?}; supported: yyyy-MM-dd, dd/MM/yyyy, dd-MM-yyyy, MM/dd/yyyy, yyyy/MM/dd"
-                )));
-            }
-        },
+        Some(Value::Null) | None => "%Y-%m-%d".to_string(),
+        Some(Value::Text(s)) => translate_m_date_format(s)?,
         Some(other) => return Err(type_mismatch("text or null", other)),
     };
-    Ok(Value::Text(d.format(chrono_fmt).to_string()))
+    Ok(Value::Text(d.format(&chrono_fmt).to_string()))
 }
 
 

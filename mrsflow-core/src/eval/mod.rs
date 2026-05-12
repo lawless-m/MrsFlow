@@ -2090,6 +2090,9 @@ mod tests {
         fn folder_files(&self, _: &str) -> Result<Value, IoError> {
             Err(IoError::NotSupported)
         }
+        fn current_workbook(&self) -> Result<Value, IoError> {
+            Err(IoError::NotSupported)
+        }
     }
 
     #[test]
@@ -4799,8 +4802,14 @@ mod tests {
 
     #[test]
     fn date_to_text_unknown_format_errors() {
-        match eval_str(r#"Date.ToText(#date(2024, 1, 15), "yyyy.MM.dd")"#) {
-            Err(MError::Other(msg)) => assert!(msg.contains("unsupported format"), "got: {msg}"),
+        // Date.ToText now translates M format tokens generally
+        // (yyyy/MM/dd/HH/mm/ss/MMM/MMMM/ddd/dddd/etc.), so previously-
+        // rejected combos like "yyyy.MM.dd" are accepted. Genuine
+        // unknowns — an unrecognised letter run — still error.
+        match eval_str(r#"Date.ToText(#date(2024, 1, 15), "qqqq")"#) {
+            Err(MError::Other(msg)) => {
+                assert!(msg.contains("unsupported format token"), "got: {msg}");
+            }
             other => panic!("expected error, got {other:?}"),
         }
     }
