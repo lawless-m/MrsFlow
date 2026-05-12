@@ -246,6 +246,46 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ("Text.Repeat", two("text", "count"), text_repeat),
         ("Text.Select", two("text", "selectChars"), text_select),
         ("Text.ToList", one("text"), text_to_list),
+        ("Text.SplitAny", two("text", "separators"), text_split_any),
+        (
+            "Text.PositionOfAny",
+            vec![
+                Param { name: "text".into(),       optional: false, type_annotation: None },
+                Param { name: "characters".into(), optional: false, type_annotation: None },
+                Param { name: "occurrence".into(), optional: true,  type_annotation: None },
+            ],
+            text_position_of_any,
+        ),
+        (
+            "Text.BeforeDelimiter",
+            vec![
+                Param { name: "text".into(),      optional: false, type_annotation: None },
+                Param { name: "delimiter".into(), optional: false, type_annotation: None },
+                Param { name: "index".into(),     optional: true,  type_annotation: None },
+            ],
+            text_before_delimiter,
+        ),
+        (
+            "Text.AfterDelimiter",
+            vec![
+                Param { name: "text".into(),      optional: false, type_annotation: None },
+                Param { name: "delimiter".into(), optional: false, type_annotation: None },
+                Param { name: "index".into(),     optional: true,  type_annotation: None },
+            ],
+            text_after_delimiter,
+        ),
+        (
+            "Text.BetweenDelimiters",
+            vec![
+                Param { name: "text".into(),           optional: false, type_annotation: None },
+                Param { name: "startDelimiter".into(), optional: false, type_annotation: None },
+                Param { name: "endDelimiter".into(),   optional: false, type_annotation: None },
+                Param { name: "startIndex".into(),     optional: true,  type_annotation: None },
+                Param { name: "endIndex".into(),       optional: true,  type_annotation: None },
+            ],
+            text_between_delimiters,
+        ),
+        ("Text.InferNumberType", one("text"), text_infer_number_type),
         ("Text.Start", two("text", "count"), text_start),
         (
             "Text.Middle",
@@ -1033,6 +1073,146 @@ fn text_select(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 fn text_to_list(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     Ok(Value::List(text.chars().map(|c| Value::Text(c.to_string())).collect()))
+}
+
+fn text_split_any(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let text = expect_text(&args[0])?;
+    let seps_text = expect_text(&args[1])?;
+    let seps: Vec<char> = seps_text.chars().collect();
+    let parts: Vec<Value> = text
+        .split(|c: char| seps.contains(&c))
+        .map(|s| Value::Text(s.to_string()))
+        .collect();
+    Ok(Value::List(parts))
+}
+
+fn text_position_of_any(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let text = expect_text(&args[0])?;
+    let chars = chars_from_arg(&args[1], "Text.PositionOfAny")?;
+    if !matches!(args.get(2), Some(Value::Null) | None) {
+        return Err(MError::NotImplemented(
+            "Text.PositionOfAny: occurrence arg not yet supported",
+        ));
+    }
+    let idx = text
+        .char_indices()
+        .find(|(_, c)| chars.contains(c))
+        .map(|(byte_idx, _)| text[..byte_idx].chars().count());
+    Ok(Value::Number(match idx {
+        Some(i) => i as f64,
+        None => -1.0,
+    }))
+}
+
+/// Find the byte offsets of every occurrence of `delim` in `text`.
+fn delimiter_byte_offsets(text: &str, delim: &str) -> Vec<usize> {
+    if delim.is_empty() {
+        return Vec::new();
+    }
+    let mut out = Vec::new();
+    let mut start = 0;
+    while let Some(i) = text[start..].find(delim) {
+        let abs = start + i;
+        out.push(abs);
+        start = abs + delim.len();
+    }
+    out
+}
+
+fn pick_delimiter_index(args_index: Option<&Value>, ctx: &str) -> Result<(usize, bool), MError> {
+    // Returns (index, from_end). `from_end` true means count from the right.
+    match args_index {
+        Some(Value::Number(n)) if n.fract() == 0.0 && *n >= 0.0 => Ok((*n as usize, false)),
+        Some(Value::List(xs)) if xs.len() == 2 => {
+            // {index, RelativePosition.FromEnd=1 or FromStart=0}
+            let i = match &xs[0] {
+                Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
+                other => return Err(MError::Other(format!(
+                    "{}: index list element 0 must be non-negative integer (got {})",
+                    ctx, super::type_name(other)
+                ))),
+            };
+            let from_end = matches!(&xs[1], Value::Number(n) if *n == 1.0);
+            Ok((i, from_end))
+        }
+        Some(Value::Null) | None => Ok((0, false)),
+        Some(other) => Err(type_mismatch("non-negative integer or {index, direction} list", other)),
+    }
+}
+
+fn text_before_delimiter(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let text = expect_text(&args[0])?;
+    let delim = expect_text(&args[1])?;
+    let (index, from_end) = pick_delimiter_index(args.get(2), "Text.BeforeDelimiter")?;
+    let offsets = delimiter_byte_offsets(text, delim);
+    let pick = if from_end {
+        offsets.get(offsets.len().wrapping_sub(1).wrapping_sub(index))
+    } else {
+        offsets.get(index)
+    };
+    match pick {
+        Some(&byte_idx) => Ok(Value::Text(text[..byte_idx].to_string())),
+        None => Ok(Value::Text(String::new())),
+    }
+}
+
+fn text_after_delimiter(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let text = expect_text(&args[0])?;
+    let delim = expect_text(&args[1])?;
+    let (index, from_end) = pick_delimiter_index(args.get(2), "Text.AfterDelimiter")?;
+    let offsets = delimiter_byte_offsets(text, delim);
+    let pick = if from_end {
+        offsets.get(offsets.len().wrapping_sub(1).wrapping_sub(index))
+    } else {
+        offsets.get(index)
+    };
+    match pick {
+        Some(&byte_idx) => Ok(Value::Text(text[byte_idx + delim.len()..].to_string())),
+        None => Ok(Value::Text(String::new())),
+    }
+}
+
+fn text_between_delimiters(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let text = expect_text(&args[0])?;
+    let start_delim = expect_text(&args[1])?;
+    let end_delim = expect_text(&args[2])?;
+    let (start_index, start_from_end) =
+        pick_delimiter_index(args.get(3), "Text.BetweenDelimiters")?;
+    let (end_index, end_from_end) =
+        pick_delimiter_index(args.get(4), "Text.BetweenDelimiters")?;
+    let start_offsets = delimiter_byte_offsets(text, start_delim);
+    let start_pick = if start_from_end {
+        start_offsets.get(start_offsets.len().wrapping_sub(1).wrapping_sub(start_index))
+    } else {
+        start_offsets.get(start_index)
+    };
+    let start_byte = match start_pick {
+        Some(&b) => b + start_delim.len(),
+        None => return Ok(Value::Text(String::new())),
+    };
+    let rest = &text[start_byte..];
+    let end_offsets = delimiter_byte_offsets(rest, end_delim);
+    let end_pick = if end_from_end {
+        end_offsets.get(end_offsets.len().wrapping_sub(1).wrapping_sub(end_index))
+    } else {
+        end_offsets.get(end_index)
+    };
+    match end_pick {
+        Some(&b) => Ok(Value::Text(rest[..b].to_string())),
+        None => Ok(Value::Text(String::new())),
+    }
+}
+
+fn text_infer_number_type(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let text = expect_text(&args[0])?;
+    if text.trim().parse::<f64>().is_ok() {
+        Ok(Value::Type(super::value::TypeRep::Number))
+    } else {
+        Err(MError::Other(format!(
+            "Text.InferNumberType: cannot infer numeric type from {:?}",
+            text
+        )))
+    }
 }
 
 fn text_trim_start(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {

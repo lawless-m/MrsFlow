@@ -2940,6 +2940,44 @@ mod tests {
     }
 
     #[test]
+    fn text_split_any_basic() {
+        match eval_str(r#"Text.SplitAny("a,b;c|d", ",;|")"#).unwrap() {
+            Value::List(xs) => {
+                let parts: Vec<&str> = xs.iter().map(|v| match v {
+                    Value::Text(s) => s.as_str(),
+                    _ => panic!(),
+                }).collect();
+                assert_eq!(parts, vec!["a", "b", "c", "d"]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn text_before_delimiter_first() {
+        match eval_str(r#"Text.BeforeDelimiter("a.b.c", ".")"#).unwrap() {
+            Value::Text(s) => assert_eq!(s, "a"),
+            other => panic!("expected text, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn text_after_delimiter_first() {
+        match eval_str(r#"Text.AfterDelimiter("a.b.c", ".")"#).unwrap() {
+            Value::Text(s) => assert_eq!(s, "b.c"),
+            other => panic!("expected text, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn text_between_delimiters_basic() {
+        match eval_str(r#"Text.BetweenDelimiters("(hello) (world)", "(", ")")"#).unwrap() {
+            Value::Text(s) => assert_eq!(s, "hello"),
+            other => panic!("expected text, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn text_range_basic() {
         match eval_str(r#"Text.Range("hello world", 6, 5)"#).unwrap() {
             Value::Text(s) => assert_eq!(s, "world"),
