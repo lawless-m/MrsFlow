@@ -30,9 +30,18 @@ while IFS= read -r line <&3; do
     tmp=$(mktemp /tmp/mrsflow-eval-XXXXXX.m)
     printf '%s' "$line" > "$tmp"
 
+    # scryer-prolog on Windows is a native binary that can't read git-bash's
+    # /tmp/... paths; convert to a mixed-mode (C:/...) path when cygpath is
+    # available. POSIX systems fall through and use $tmp directly.
+    if command -v cygpath >/dev/null 2>&1; then
+        tmp_for_prolog=$(cygpath -m "$tmp")
+    else
+        tmp_for_prolog="$tmp"
+    fi
+
     rust_out=$("$RUST_BIN" "$tmp" 2>/dev/null)
     prolog_out=$(scryer-prolog -f --no-add-history \
-        -g "use_module(library(pio)), phrase_from_file(tokens(T), \"$tmp\"), parse(T, A), root_env(E), eval(A, E, V), deep_force(V, Forced), print_value(Forced), nl, halt" \
+        -g "use_module(library(pio)), phrase_from_file(tokens(T), \"$tmp_for_prolog\"), parse(T, A), root_env(E), eval(A, E, V), deep_force(V, Forced), print_value(Forced), nl, halt" \
         "$LEX_DCG" "$UCD" "$SYN_DCG" "$EVAL_DCG" </dev/null 2>/dev/null)
 
     if [ "$rust_out" = "$prolog_out" ]; then
