@@ -5342,6 +5342,82 @@ mod tests {
     }
 
     #[test]
+    fn table_min_returns_min_row() {
+        let src = r#"
+            let
+                t = #table({"n"}, {{5}, {2}, {9}, {1}, {7}})
+            in Table.Min(t, "n")
+        "#;
+        match eval_str(src).unwrap() {
+            Value::Record(r) => {
+                assert_eq!(r.fields.len(), 1);
+                assert!(matches!(r.fields[0].1, Value::Number(n) if n == 1.0));
+            }
+            other => panic!("expected record, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_max_n_returns_top_n_descending() {
+        let src = r#"
+            let
+                t = #table({"n"}, {{5}, {2}, {9}, {1}, {7}}),
+                top3 = Table.MaxN(t, 3, "n")
+            in Table.Column(top3, "n")
+        "#;
+        match eval_str(src).unwrap() {
+            Value::List(xs) => {
+                let nums: Vec<f64> = xs.iter().map(|v| match v {
+                    Value::Number(n) => *n,
+                    _ => panic!(),
+                }).collect();
+                assert_eq!(nums, vec![9.0, 7.0, 5.0]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_min_on_text_column() {
+        // Text comparisons use lexicographic ordering.
+        let src = r#"
+            let
+                t = #table({"s"}, {{"banana"}, {"apple"}, {"cherry"}})
+            in Table.Min(t, "s")
+        "#;
+        match eval_str(src).unwrap() {
+            Value::Record(r) => {
+                assert!(matches!(&r.fields[0].1, Value::Text(s) if s == "apple"));
+            }
+            other => panic!("expected record, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_aggregate_table_column_sums_nested() {
+        // Build an outer table with a nested Table column, then aggregate by
+        // summing the nested values into a new column.
+        let src = r#"
+            let
+                inner1 = #table({"v"}, {{1}, {2}, {3}}),
+                inner2 = #table({"v"}, {{10}, {20}}),
+                outer = #table({"k", "data"}, {{"a", inner1}, {"b", inner2}}),
+                out = Table.AggregateTableColumn(outer, "data", {{"v", List.Sum, "vSum"}})
+            in Table.Column(out, "vSum")
+        "#;
+        match eval_str(src).unwrap() {
+            Value::List(xs) => {
+                let nums: Vec<f64> = xs.iter().map(|v| match v {
+                    Value::Number(n) => *n,
+                    _ => panic!("expected number, got {:?}", v),
+                }).collect();
+                assert_eq!(nums, vec![6.0, 30.0]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn table_sort_by_single_column_ascending() {
         let src = r#"
             let

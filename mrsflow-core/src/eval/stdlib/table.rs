@@ -277,6 +277,40 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ),
         ("Table.Repeat", two("table", "count"), table_repeat),
         ("Table.SingleRow", one("table"), table_single_row),
+        // --- Slice #160: aggregations ---
+        (
+            "Table.Min",
+            vec![
+                Param { name: "table".into(),               optional: false, type_annotation: None },
+                Param { name: "comparisonCriteria".into(), optional: false, type_annotation: None },
+                Param { name: "default".into(),             optional: true,  type_annotation: None },
+            ],
+            table_min,
+        ),
+        (
+            "Table.Max",
+            vec![
+                Param { name: "table".into(),               optional: false, type_annotation: None },
+                Param { name: "comparisonCriteria".into(), optional: false, type_annotation: None },
+                Param { name: "default".into(),             optional: true,  type_annotation: None },
+            ],
+            table_max,
+        ),
+        (
+            "Table.MinN",
+            three("table", "countOrCondition", "comparisonCriteria"),
+            table_min_n,
+        ),
+        (
+            "Table.MaxN",
+            three("table", "countOrCondition", "comparisonCriteria"),
+            table_max_n,
+        ),
+        (
+            "Table.AggregateTableColumn",
+            three("table", "column", "aggregations"),
+            table_aggregate_table_column,
+        ),
     ]
 }
 
@@ -2676,6 +2710,186 @@ fn table_single_row(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError>
         )));
     }
     row_to_record(table, 0)
+}
+
+// --- Slice #160: aggregations ---
+
+/// Parse the simple `comparisonCriteria` form — a column name text — into a
+/// column index. More complex forms (functions, paired with order) are
+/// rejected as NotImplemented.
+fn parse_min_max_criteria(arg: &Value, names: &[String], ctx: &str) -> Result<usize, MError> {
+    match arg {
+        Value::Text(name) => names
+            .iter()
+            .position(|n| n == name)
+            .ok_or_else(|| MError::Other(format!("{}: column not found: {}", ctx, name))),
+        _ => Err(MError::NotImplemented(
+            "Table.Min/Max: comparisonCriteria must be a text column name in v1",
+        )),
+    }
+}
+
+fn table_min(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let names = table.column_names();
+    if table.num_rows() == 0 {
+        return Ok(args.get(2).cloned().unwrap_or(Value::Null));
+    }
+    let col = parse_min_max_criteria(&args[1], &names, "Table.Min")?;
+    let mut best: usize = 0;
+    for row in 1..table.num_rows() {
+        let a = cell_to_value(table, col, best)?;
+        let b = cell_to_value(table, col, row)?;
+        if compare_cells(&b, &a) == std::cmp::Ordering::Less {
+            best = row;
+        }
+    }
+    row_to_record(table, best)
+}
+
+fn table_max(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let names = table.column_names();
+    if table.num_rows() == 0 {
+        return Ok(args.get(2).cloned().unwrap_or(Value::Null));
+    }
+    let col = parse_min_max_criteria(&args[1], &names, "Table.Max")?;
+    let mut best: usize = 0;
+    for row in 1..table.num_rows() {
+        let a = cell_to_value(table, col, best)?;
+        let b = cell_to_value(table, col, row)?;
+        if compare_cells(&b, &a) == std::cmp::Ordering::Greater {
+            best = row;
+        }
+    }
+    row_to_record(table, best)
+}
+
+fn min_max_n_count(arg: &Value, ctx: &str) -> Result<usize, MError> {
+    match arg {
+        Value::Number(n) if n.is_finite() && *n >= 0.0 && n.fract() == 0.0 => Ok(*n as usize),
+        _ => Err(MError::Other(format!(
+            "{}: countOrCondition must be a non-negative integer in v1",
+            ctx
+        ))),
+    }
+}
+
+fn table_min_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let n = min_max_n_count(&args[1], "Table.MinN")?;
+    let names = table.column_names();
+    let col = parse_min_max_criteria(&args[2], &names, "Table.MinN")?;
+    let (names_owned, mut rows) = table_to_rows(table)?;
+    rows.sort_by(|a, b| compare_cells(&a[col], &b[col]));
+    let kept: Vec<Vec<Value>> = rows.into_iter().take(n).collect();
+    Ok(Value::Table(values_to_table(&names_owned, &kept)?))
+}
+
+fn table_max_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let n = min_max_n_count(&args[1], "Table.MaxN")?;
+    let names = table.column_names();
+    let col = parse_min_max_criteria(&args[2], &names, "Table.MaxN")?;
+    let (names_owned, mut rows) = table_to_rows(table)?;
+    rows.sort_by(|a, b| compare_cells(&b[col], &a[col])); // descending
+    let kept: Vec<Vec<Value>> = rows.into_iter().take(n).collect();
+    Ok(Value::Table(values_to_table(&names_owned, &kept)?))
+}
+
+fn table_aggregate_table_column(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let col_name = expect_text(&args[1])?.to_string();
+    let agg_list = expect_list(&args[2])?;
+    let names = table.column_names();
+    let target_idx = names
+        .iter()
+        .position(|n| n == &col_name)
+        .ok_or_else(|| {
+            MError::Other(format!(
+                "Table.AggregateTableColumn: column not found: {}",
+                col_name
+            ))
+        })?;
+
+    // Parse the aggregation list into (inner_col, agg_fn, new_col_name) triples.
+    struct AggSpec {
+        old_col: String,
+        agg: Closure,
+        new_col: String,
+    }
+    let mut specs: Vec<AggSpec> = Vec::with_capacity(agg_list.len());
+    for entry in agg_list {
+        let xs = match entry {
+            Value::List(xs) => xs,
+            other => return Err(type_mismatch("list (aggregation triple)", other)),
+        };
+        if xs.len() != 3 {
+            return Err(MError::Other(format!(
+                "Table.AggregateTableColumn: each aggregation must have 3 elements, got {}",
+                xs.len()
+            )));
+        }
+        let old_col = expect_text(&xs[0])?.to_string();
+        let agg = expect_function(&xs[1])?.clone();
+        let new_col = expect_text(&xs[2])?.to_string();
+        specs.push(AggSpec { old_col, agg, new_col });
+    }
+
+    // Build the new column list and the row data.
+    let mut new_names: Vec<String> = Vec::with_capacity(names.len() - 1 + specs.len());
+    for (i, n) in names.iter().enumerate() {
+        if i == target_idx {
+            for s in &specs {
+                new_names.push(s.new_col.clone());
+            }
+        } else {
+            new_names.push(n.clone());
+        }
+    }
+
+    let (_, rows) = table_to_rows(table)?;
+    let mut new_rows: Vec<Vec<Value>> = Vec::with_capacity(rows.len());
+    for row in &rows {
+        let nested = match &row[target_idx] {
+            Value::Table(t) => t,
+            other => {
+                return Err(type_mismatch("table (nested in column)", other));
+            }
+        };
+        let mut new_row: Vec<Value> = Vec::with_capacity(new_names.len());
+        for (i, cell) in row.iter().enumerate() {
+            if i == target_idx {
+                // Run each aggregation against the column values of the nested table.
+                let nested_names = nested.column_names();
+                for s in &specs {
+                    let inner_col = nested_names
+                        .iter()
+                        .position(|n| n == &s.old_col)
+                        .ok_or_else(|| {
+                            MError::Other(format!(
+                                "Table.AggregateTableColumn: inner column not found: {}",
+                                s.old_col
+                            ))
+                        })?;
+                    let mut col_values: Vec<Value> = Vec::with_capacity(nested.num_rows());
+                    for r in 0..nested.num_rows() {
+                        col_values.push(cell_to_value(nested, inner_col, r)?);
+                    }
+                    let agg_result = invoke_callback_with_host(
+                        &s.agg,
+                        vec![Value::List(col_values)],
+                        host,
+                    )?;
+                    new_row.push(agg_result);
+                }
+            } else {
+                new_row.push(cell.clone());
+            }
+        }
+        new_rows.push(new_row);
+    }
+    Ok(Value::Table(values_to_table(&new_names, &new_rows)?))
 }
 
 fn type_matches(t: &super::super::value::TypeRep, v: &Value) -> bool {
