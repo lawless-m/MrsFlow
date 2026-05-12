@@ -2084,6 +2084,12 @@ mod tests {
         ) -> Result<Vec<u8>, IoError> {
             Err(IoError::NotSupported)
         }
+        fn folder_contents(&self, _: &str) -> Result<Value, IoError> {
+            Err(IoError::NotSupported)
+        }
+        fn folder_files(&self, _: &str) -> Result<Value, IoError> {
+            Err(IoError::NotSupported)
+        }
     }
 
     #[test]

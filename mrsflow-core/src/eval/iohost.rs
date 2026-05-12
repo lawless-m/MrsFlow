@@ -64,6 +64,15 @@ pub trait IoHost {
         manual_status: &[u16],
         content: Option<&[u8]>,
     ) -> Result<Vec<u8>, IoError>;
+    /// Immediate directory contents — backs `Folder.Contents`. Returns a
+    /// Table with columns `Content, Name, Extension, Date accessed,
+    /// Date modified, Date created, Attributes, Folder Path`. Folder
+    /// entries have `Content = null` and `Attributes.Kind = "Folder"`.
+    fn folder_contents(&self, path: &str) -> Result<Value, IoError>;
+    /// Recursive file walk — backs `Folder.Files`. Same column shape as
+    /// `folder_contents` but folders are descended-into and not emitted
+    /// as rows.
+    fn folder_files(&self, path: &str) -> Result<Value, IoError>;
 }
 
 /// Always-fail IoHost — for evaluator unit tests on pure expressions where
@@ -102,6 +111,12 @@ impl IoHost for NoIoHost {
         _: &[u16],
         _: Option<&[u8]>,
     ) -> Result<Vec<u8>, IoError> {
+        Err(IoError::NotSupported)
+    }
+    fn folder_contents(&self, _: &str) -> Result<Value, IoError> {
+        Err(IoError::NotSupported)
+    }
+    fn folder_files(&self, _: &str) -> Result<Value, IoError> {
         Err(IoError::NotSupported)
     }
 }

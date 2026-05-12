@@ -307,6 +307,146 @@ impl IoHost for CliIoHost {
     ) -> Result<Vec<u8>, IoError> {
         web_contents_impl(url, headers, manual_status, content)
     }
+
+    fn folder_contents(&self, path: &str) -> Result<Value, IoError> {
+        folder_impl(path, /* recursive */ false)
+    }
+
+    fn folder_files(&self, path: &str) -> Result<Value, IoError> {
+        folder_impl(path, /* recursive */ true)
+    }
+}
+
+/// Build a `Folder.*` result table. When `recursive`, walks subdirectories
+/// and emits file rows only; otherwise emits one row per immediate child
+/// (including subdirectories, whose Content is null).
+fn folder_impl(path: &str, recursive: bool) -> Result<Value, IoError> {
+    use mrsflow_core::eval::Record;
+
+    let root = Path::new(path);
+    if !root.is_dir() {
+        return Err(IoError::Other(format!(
+            "Folder.* expects a directory, got {path:?}"
+        )));
+    }
+
+    let mut rows: Vec<Vec<Value>> = Vec::new();
+
+    let mut emit = |entry_path: &Path| -> Result<(), IoError> {
+        let md = std::fs::metadata(entry_path)
+            .map_err(|e| IoError::Other(format!("metadata {}: {e}", entry_path.display())))?;
+        let is_dir = md.is_dir();
+
+        let name = entry_path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .ok_or_else(|| IoError::Other(format!("non-utf8 name: {}", entry_path.display())))?
+            .to_string();
+
+        let extension = if is_dir {
+            String::new()
+        } else {
+            entry_path
+                .extension()
+                .and_then(|e| e.to_str())
+                .map(|e| format!(".{e}"))
+                .unwrap_or_default()
+        };
+
+        let parent = entry_path
+            .parent()
+            .and_then(|p| p.to_str())
+            .unwrap_or("")
+            .to_string();
+        // PQ convention: trailing separator on folder paths.
+        let folder_path = if parent.is_empty() {
+            String::new()
+        } else if parent.ends_with('/') || parent.ends_with('\\') {
+            parent
+        } else {
+            format!("{parent}/")
+        };
+
+        let content = if is_dir {
+            Value::Null
+        } else {
+            // Eager read. Big-dir cost noted in stdlib::folder.
+            let bytes = std::fs::read(entry_path)
+                .map_err(|e| IoError::Other(format!("read {}: {e}", entry_path.display())))?;
+            Value::Binary(bytes)
+        };
+
+        let modified = systime_to_datetime(md.modified().ok());
+        let accessed = systime_to_datetime(md.accessed().ok());
+        let created = systime_to_datetime(md.created().ok());
+
+        // Hidden: Linux convention is dotfile prefix. Windows attribute
+        // bits aren't reachable through std::fs::metadata; if/when we
+        // need them, switch to a platform-cfg'd path.
+        let hidden = name.starts_with('.');
+        let kind = if is_dir { "Folder" } else { "File" };
+        let attrs = Value::Record(Record {
+            fields: vec![
+                ("Kind".into(), Value::Text(kind.into())),
+                ("Size".into(), Value::Number(md.len() as f64)),
+                ("Hidden".into(), Value::Logical(hidden)),
+                ("Directory".into(), Value::Logical(is_dir)),
+            ],
+            env: mrsflow_core::eval::EnvNode::empty(),
+        });
+
+        rows.push(vec![
+            content,
+            Value::Text(name),
+            Value::Text(extension),
+            accessed,
+            modified,
+            created,
+            attrs,
+            Value::Text(folder_path),
+        ]);
+        Ok(())
+    };
+
+    if recursive {
+        for entry in walkdir::WalkDir::new(root).follow_links(false) {
+            let entry = entry
+                .map_err(|e| IoError::Other(format!("walk {path}: {e}")))?;
+            if entry.file_type().is_file() {
+                emit(entry.path())?;
+            }
+        }
+    } else {
+        let read_dir = std::fs::read_dir(root)
+            .map_err(|e| IoError::Other(format!("read_dir {path}: {e}")))?;
+        for entry in read_dir {
+            let entry = entry
+                .map_err(|e| IoError::Other(format!("read_dir {path}: {e}")))?;
+            emit(&entry.path())?;
+        }
+    }
+
+    let columns = vec![
+        "Content".into(),
+        "Name".into(),
+        "Extension".into(),
+        "Date accessed".into(),
+        "Date modified".into(),
+        "Date created".into(),
+        "Attributes".into(),
+        "Folder Path".into(),
+    ];
+    Ok(Value::Table(Table::from_rows(columns, rows)))
+}
+
+fn systime_to_datetime(t: Option<std::time::SystemTime>) -> Value {
+    match t {
+        Some(st) => {
+            let dt: chrono::DateTime<chrono::Utc> = st.into();
+            Value::Datetime(dt.naive_utc())
+        }
+        None => Value::Null,
+    }
 }
 
 fn web_contents_impl(

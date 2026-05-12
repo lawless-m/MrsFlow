@@ -25,6 +25,7 @@ parquet = { version = "53", default-features = false, features = ["arrow", "snap
 # feature comes from File.Modified's need to read filesystem mtimes.
 chrono = { version = "0.4", default-features = false, features = ["alloc", "clock"] }
 calamine = { version = "0.35", default-features = false, features = ["chrono"] }
+walkdir = "2"
 # rustls-tls so we don't need OpenSSL on the host. `blocking` to match
 # the synchronous IoHost call path (no tokio runtime to bootstrap).
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls"] }
