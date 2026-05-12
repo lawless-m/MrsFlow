@@ -2940,6 +2940,22 @@ mod tests {
     }
 
     #[test]
+    fn int32_from_text() {
+        match eval_str("Int32.From(\"42\")").unwrap() {
+            Value::Number(n) => assert_eq!(n, 42.0),
+            other => panic!("expected number, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn decimal_from_logical() {
+        match eval_str("Decimal.From(true)").unwrap() {
+            Value::Number(n) => assert_eq!(n, 1.0),
+            other => panic!("expected number, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn date_add_days_positive() {
         match eval_str("Date.AddDays(#date(2024, 1, 30), 5)").unwrap() {
             Value::Date(d) => {

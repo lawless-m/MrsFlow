@@ -129,6 +129,16 @@ fn three(a: &str, b: &str, c: &str) -> Vec<Param> {
 fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
     vec![
         ("Number.From", one("value"), number_from),
+        ("Byte.From", one("value"), number_from),
+        ("Currency.From", one("value"), number_from),
+        ("Decimal.From", one("value"), number_from),
+        ("Double.From", one("value"), number_from),
+        ("Int8.From", one("value"), number_from),
+        ("Int16.From", one("value"), number_from),
+        ("Int32.From", one("value"), number_from),
+        ("Int64.From", one("value"), number_from),
+        ("Percentage.From", one("value"), number_from),
+        ("Single.From", one("value"), number_from),
         (
             "Number.FromText",
             vec![
