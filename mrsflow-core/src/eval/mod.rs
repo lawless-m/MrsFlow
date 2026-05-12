@@ -1114,6 +1114,81 @@ mod tests {
         }
     }
 
+    /// Property: every binary operator with a `Value.X` stdlib twin must
+    /// agree with that twin across every pair of representative values.
+    /// Either both succeed with equal results, or both fail. This is the
+    /// structural defence against the bug fixed in 91af3f0 (date - date
+    /// hit `arithmetic` instead of `Value.Subtract`'s logic).
+    #[test]
+    fn binary_ops_agree_with_value_stdlib() {
+        // One literal per type the operators might encounter.
+        let catalogue = [
+            "0",
+            "1",
+            "-2.5",
+            r#""""#,
+            r#""hi""#,
+            "true",
+            "false",
+            "null",
+            "#date(2024, 1, 1)",
+            "#date(2024, 6, 15)",
+            "#datetime(2024, 1, 1, 12, 0, 0)",
+            "#time(9, 30, 0)",
+            "#duration(1, 0, 0, 0)",
+            "#duration(0, 6, 0, 0)",
+            "{1, 2, 3}",
+            "[a = 1]",
+        ];
+        // (operator, stdlib twin). Arithmetic only for now — `=` vs
+        // `Value.Equals` have two known divergences not yet fixed:
+        //   1. binary `=` returns false for date/datetime/time/duration/list/
+        //      record pairs that `Value.Equals` correctly considers equal
+        //      (`values_equal` in this file only handles primitives).
+        //   2. `Value.Equals(prim, compound)` errors NotImplemented while
+        //      binary `=` returns false.
+        // Add `("=", "Value.Equals")` here once both are fixed.
+        let ops: &[(&str, &str)] = &[
+            ("+", "Value.Add"),
+            ("-", "Value.Subtract"),
+            ("*", "Value.Multiply"),
+            ("/", "Value.Divide"),
+        ];
+
+        for (op, stdlib) in ops {
+            for a in &catalogue {
+                for b in &catalogue {
+                    let op_src = format!("({a}) {op} ({b})");
+                    let stdlib_src = format!("{stdlib}({a}, {b})");
+                    let op_res = eval_str(&op_src);
+                    let stdlib_res = eval_str(&stdlib_src);
+
+                    // Structural compare via Debug — covers every Value variant
+                    // and treats NaN-vs-NaN as equal, which is what we want here:
+                    // "do the two code paths produce the same Value?", not "is
+                    // that Value equal to itself per IEEE 754".
+                    match (&op_res, &stdlib_res) {
+                        (Ok(lv), Ok(rv)) => {
+                            let ld = format!("{lv:?}");
+                            let rd = format!("{rv:?}");
+                            assert_eq!(
+                                ld, rd,
+                                "divergence: `{op_src}` = {ld} but `{stdlib_src}` = {rd}"
+                            );
+                        }
+                        (Err(_), Err(_)) => {}
+                        (Ok(v), Err(e)) => panic!(
+                            "divergence: `{op_src}` = {v:?} but `{stdlib_src}` errored: {e:?}"
+                        ),
+                        (Err(e), Ok(v)) => panic!(
+                            "divergence: `{op_src}` errored: {e:?} but `{stdlib_src}` = {v:?}"
+                        ),
+                    }
+                }
+            }
+        }
+    }
+
     // --- Concat ---
 
     #[test]
