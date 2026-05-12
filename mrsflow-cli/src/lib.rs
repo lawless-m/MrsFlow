@@ -276,6 +276,70 @@ impl IoHost for CliIoHost {
         let utc: chrono::DateTime<chrono::Utc> = modified.into();
         Ok(utc.with_timezone(&chrono::FixedOffset::east_opt(0).unwrap()))
     }
+
+    fn excel_workbook(&self, bytes: &[u8]) -> Result<Value, IoError> {
+        excel_workbook_impl(bytes)
+    }
+}
+
+fn excel_workbook_impl(bytes: &[u8]) -> Result<Value, IoError> {
+    use std::io::Cursor;
+    use calamine::{open_workbook_from_rs, Reader, Xlsx};
+
+    // calamine wants an owned `Read + Seek`. Cloning the bytes is cheap
+    // compared to parsing the XLSX — fine for v1.
+    let cursor = Cursor::new(bytes.to_vec());
+    let mut wb: Xlsx<_> = open_workbook_from_rs(cursor)
+        .map_err(|e| IoError::Other(format!("open xlsx: {e}")))?;
+
+    let sheet_names: Vec<String> = wb.sheet_names();
+    let mut sheet_rows: Vec<Vec<Value>> = Vec::with_capacity(sheet_names.len());
+    for name in &sheet_names {
+        let range = wb
+            .worksheet_range(name)
+            .map_err(|e| IoError::Other(format!("read sheet {name:?}: {e}")))?;
+        let (_, width) = range.get_size();
+        let columns: Vec<String> = (1..=width).map(|i| format!("Column{i}")).collect();
+        let data_rows: Vec<Vec<Value>> = range
+            .rows()
+            .map(|row| row.iter().map(cell_to_value).collect())
+            .collect();
+        let data_table = Table::from_rows(columns, data_rows);
+        sheet_rows.push(vec![
+            Value::Text(name.clone()),       // Name
+            Value::Table(data_table),         // Data
+            Value::Text(name.clone()),       // Item — same as Name for sheets
+            Value::Text("Sheet".into()),      // Kind
+            Value::Logical(false),            // Hidden — calamine doesn't expose this in 0.35
+        ]);
+    }
+
+    Ok(Value::Table(Table::from_rows(
+        vec![
+            "Name".into(),
+            "Data".into(),
+            "Item".into(),
+            "Kind".into(),
+            "Hidden".into(),
+        ],
+        sheet_rows,
+    )))
+}
+
+fn cell_to_value(cell: &calamine::Data) -> Value {
+    use calamine::Data;
+    match cell {
+        Data::Empty => Value::Null,
+        Data::String(s) => Value::Text(s.clone()),
+        Data::Float(f) => Value::Number(*f),
+        Data::Int(i) => Value::Number(*i as f64),
+        Data::Bool(b) => Value::Logical(*b),
+        // delayTypes=true: dates stay as their Excel-serial float; downstream
+        // M code can decode via Date.From or similar if needed.
+        Data::DateTime(d) => Value::Number(d.as_f64()),
+        Data::DateTimeIso(s) | Data::DurationIso(s) => Value::Text(s.clone()),
+        Data::Error(_) => Value::Null,
+    }
 }
 
 /// Concatenate multiple `RecordBatch`es with the same schema into one.

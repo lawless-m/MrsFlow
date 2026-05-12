@@ -38,6 +38,10 @@ pub trait IoHost {
         &self,
         path: &str,
     ) -> Result<chrono::DateTime<chrono::FixedOffset>, IoError>;
+    /// Parse XLSX bytes into M's Excel.Workbook shape — a Table of sheets
+    /// with columns `Name, Data, Item, Kind, Hidden`. Each `Data` cell is a
+    /// nested Table with default `Column1, Column2, …` headers.
+    fn excel_workbook(&self, bytes: &[u8]) -> Result<Value, IoError>;
 }
 
 /// Always-fail IoHost — for evaluator unit tests on pure expressions where
@@ -64,6 +68,9 @@ impl IoHost for NoIoHost {
         &self,
         _: &str,
     ) -> Result<chrono::DateTime<chrono::FixedOffset>, IoError> {
+        Err(IoError::NotSupported)
+    }
+    fn excel_workbook(&self, _: &[u8]) -> Result<Value, IoError> {
         Err(IoError::NotSupported)
     }
 }

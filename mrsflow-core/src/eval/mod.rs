@@ -1984,6 +1984,9 @@ mod tests {
         ) -> Result<chrono::DateTime<chrono::FixedOffset>, IoError> {
             Err(IoError::NotSupported)
         }
+        fn excel_workbook(&self, _: &[u8]) -> Result<Value, IoError> {
+            Err(IoError::NotSupported)
+        }
     }
 
     #[test]
