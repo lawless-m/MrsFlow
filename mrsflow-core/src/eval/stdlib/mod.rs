@@ -44,6 +44,7 @@ mod json;
 mod file;
 mod excel;
 mod web;
+mod csv;
 
 // External callers of the old `stdlib::*` API expect these names at this path.
 // `table_to_rows` is only reached from #[cfg(test)] code in eval::mod, hence
@@ -160,6 +161,14 @@ pub fn root_env() -> Env {
     ] {
         env = env.extend(name.to_string(), Value::Number(n));
     }
+
+    // QuoteStyle.* constants — Csv.Document QuoteStyle option.
+    for (name, n) in [
+        ("QuoteStyle.None", 0.0),
+        ("QuoteStyle.Csv",  1.0),
+    ] {
+        env = env.extend(name.to_string(), Value::Number(n));
+    }
     env
 }
 
@@ -196,6 +205,7 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         file::bindings(),
         excel::bindings(),
         web::bindings(),
+        csv::bindings(),
     ] {
         all.extend(slice);
     }

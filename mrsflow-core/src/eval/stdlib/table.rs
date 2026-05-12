@@ -41,7 +41,18 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
             add_column,
         ),
         ("Table.FromRows", two("rows", "columns"), from_rows),
-        ("Table.PromoteHeaders", one("table"), promote_headers),
+        (
+            "Table.PromoteHeaders",
+            vec![
+                Param { name: "table".into(),   optional: false, type_annotation: None },
+                // PQ's options record: PromoteAllScalars (default false).
+                // Our impl coerces every header cell to text via Text.From
+                // semantics already, so the flag is effectively a no-op for
+                // v1 — accept the record so corpus calls don't error.
+                Param { name: "options".into(), optional: true,  type_annotation: None },
+            ],
+            promote_headers,
+        ),
         (
             "Table.TransformColumnTypes",
             two("table", "transforms"),
@@ -1350,26 +1361,58 @@ fn from_rows(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn promote_headers(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn promote_headers(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     if table.num_rows() == 0 {
         return Err(MError::Other(
             "Table.PromoteHeaders: table has no header row".into(),
         ));
     }
-    // Read row 0 as the new names; every cell must be text.
+    // Parse PromoteAllScalars from the optional options record. Default
+    // false per M spec; when true, coerce non-text scalar header cells
+    // to text via Text.From-style rules instead of erroring.
+    let promote_scalars = match args.get(1) {
+        None | Some(Value::Null) => false,
+        Some(Value::Record(r)) => {
+            let mut flag = false;
+            for (k, v) in &r.fields {
+                if k == "PromoteAllScalars" {
+                    let v = super::super::force(v.clone(), &mut |e, env| {
+                        super::super::evaluate(e, env, host)
+                    })?;
+                    flag = matches!(v, Value::Logical(true));
+                }
+            }
+            flag
+        }
+        Some(other) => {
+            return Err(MError::TypeMismatch {
+                expected: "record or null",
+                found: super::super::type_name(other),
+            });
+        }
+    };
+    // Read row 0 as the new names.
     let mut new_names: Vec<String> = Vec::with_capacity(table.num_columns());
     for col in 0..table.num_columns() {
-        match cell_to_value(table, col, 0)? {
-            Value::Text(s) => new_names.push(s),
-            other => {
+        let cell = cell_to_value(table, col, 0)?;
+        let name = match (&cell, promote_scalars) {
+            (Value::Text(s), _) => s.clone(),
+            // PromoteAllScalars=true: coerce numbers/logicals to text.
+            // Null cells fall back to the existing `Column<n>` name so
+            // the column doesn't get an empty string header.
+            (Value::Number(n), true) => format!("{n:?}"),
+            (Value::Logical(b), true) => if *b { "true" } else { "false" }.to_string(),
+            (Value::Null, true) => table.column_names()[col].clone(),
+            (other, _) => {
                 return Err(MError::Other(format!(
                     "Table.PromoteHeaders: header cell in column {} is not text: {}",
                     col,
-                    super::super::type_name(&other)
+                    super::super::type_name(other)
                 )));
             }
-        }
+        };
+        new_names.push(name);
     }
     // Drop row 0 from every column, keeping the existing column types.
     // Users who want a different type after promotion call TransformColumnTypes.

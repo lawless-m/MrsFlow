@@ -29,6 +29,23 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ("Guid.From", one("value"), guid_from),
         ("Text.NewGuid", vec![], new_guid),
         ("Text.From", one("value"), from),
+        (
+            "Text.FromBinary",
+            vec![
+                Param { name: "binary".into(),   optional: false, type_annotation: None },
+                Param { name: "encoding".into(), optional: true,  type_annotation: None },
+            ],
+            from_binary,
+        ),
+        (
+            "Text.ToBinary",
+            vec![
+                Param { name: "text".into(),                 optional: false, type_annotation: None },
+                Param { name: "encoding".into(),             optional: true,  type_annotation: None },
+                Param { name: "includeByteOrderMark".into(), optional: true,  type_annotation: None },
+            ],
+            to_binary,
+        ),
         ("Text.Contains", two("text", "substring"), contains),
         ("Text.Replace", three("text", "old", "new"), replace),
         ("Text.Trim", one("text"), trim),
@@ -250,6 +267,45 @@ fn new_guid(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(Value::Text(s))
 }
 
+
+fn from_binary(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let bytes = match &args[0] {
+        Value::Binary(b) => b,
+        Value::Null => return Ok(Value::Null),
+        other => return Err(type_mismatch("binary", other)),
+    };
+    // encoding: only UTF-8 (65001) or null/missing accepted. Other code
+    // pages would silently mis-decode without a fallback library, so we
+    // refuse rather than guess. PQ's `TextEncoding.Utf8` is 65001.
+    check_utf8_encoding(args.get(1), "Text.FromBinary")?;
+    let s = std::str::from_utf8(bytes).map_err(|e| {
+        MError::Other(format!("Text.FromBinary: invalid UTF-8: {e}"))
+    })?;
+    Ok(Value::Text(s.to_string()))
+}
+
+fn to_binary(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let s = match &args[0] {
+        Value::Text(s) => s,
+        Value::Null => return Ok(Value::Null),
+        other => return Err(type_mismatch("text", other)),
+    };
+    check_utf8_encoding(args.get(1), "Text.ToBinary")?;
+    // includeByteOrderMark (args.get(2)) is accepted but ignored: we
+    // never emit a BOM. M's default is false anyway.
+    Ok(Value::Binary(s.as_bytes().to_vec()))
+}
+
+fn check_utf8_encoding(arg: Option<&Value>, fname: &str) -> Result<(), MError> {
+    match arg {
+        None | Some(Value::Null) => Ok(()),
+        Some(Value::Number(n)) if *n == 65001.0 => Ok(()),
+        Some(Value::Number(n)) => Err(MError::Other(format!(
+            "{fname}: Encoding={n} not supported (only 65001/UTF-8)"
+        ))),
+        Some(other) => Err(type_mismatch("number or null", other)),
+    }
+}
 
 fn from(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let v = &args[0];
