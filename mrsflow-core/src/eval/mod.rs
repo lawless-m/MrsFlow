@@ -5239,6 +5239,61 @@ mod tests {
     }
 
     #[test]
+    fn uri_escape_data_string_basic() {
+        // Reserved characters get percent-encoded; unreserved pass through.
+        assert_eq!(eval_text(r#"Uri.EscapeDataString("hello world!")"#), "hello%20world%21");
+        assert_eq!(eval_text(r#"Uri.EscapeDataString("abc-_.~")"#), "abc-_.~");
+    }
+
+    #[test]
+    fn uri_combine_relative_path() {
+        assert_eq!(
+            eval_text(r#"Uri.Combine("https://example.com/a/", "b/c")"#),
+            "https://example.com/a/b/c"
+        );
+        // Absolute relativeUri overrides base.
+        assert_eq!(
+            eval_text(r#"Uri.Combine("https://example.com/a", "https://other/z")"#),
+            "https://other/z"
+        );
+    }
+
+    #[test]
+    fn uri_build_query_string_record() {
+        // Keys and values are both percent-encoded; "?" prefix included.
+        let src = r#"Uri.BuildQueryString([a = "x y", b = 42])"#;
+        assert_eq!(eval_text(src), "?a=x%20y&b=42");
+    }
+
+    #[test]
+    fn uri_parts_full_decomposition() {
+        let src = r#"Uri.Parts("https://user:pass@example.com:8080/p/q?k=v#frag")"#;
+        match eval_str(src).unwrap() {
+            Value::Record(r) => {
+                let get = |name: &str| -> Value {
+                    r.fields.iter().find(|(n, _)| n == name).map(|(_, v)| v.clone()).unwrap()
+                };
+                assert!(matches!(get("Scheme"), Value::Text(s) if s == "https"));
+                assert!(matches!(get("Host"), Value::Text(s) if s == "example.com"));
+                assert!(matches!(get("Port"), Value::Number(n) if n == 8080.0));
+                assert!(matches!(get("Path"), Value::Text(s) if s == "/p/q"));
+                assert!(matches!(get("Fragment"), Value::Text(s) if s == "frag"));
+                assert!(matches!(get("UserName"), Value::Text(s) if s == "user"));
+                assert!(matches!(get("Password"), Value::Text(s) if s == "pass"));
+                match get("Query") {
+                    Value::Record(qr) => {
+                        assert_eq!(qr.fields.len(), 1);
+                        assert_eq!(qr.fields[0].0, "k");
+                        assert!(matches!(&qr.fields[0].1, Value::Text(s) if s == "v"));
+                    }
+                    other => panic!("Query should be record, got {:?}", other),
+                }
+            }
+            other => panic!("expected record, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn comparer_equals_wraps_comparer() {
         // Comparer.Equals returns true iff comparer(x,y) == 0.
         assert_eq!(eval_bool(r#"Comparer.Equals(Comparer.OrdinalIgnoreCase(), "ABC", "abc")"#), true);
