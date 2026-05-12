@@ -13,18 +13,19 @@ workspace = true
 default = []
 # Pulls in the `odbc-api` crate. Requires libodbc / unixODBC (`libodbc-dev`
 # on Debian) at build and runtime. Off by default so the workspace builds
-# cleanly without an ODBC driver manager present. `chrono` rides along
-# for parsing driver-returned date/timestamp text into typed Arrow arrays.
-odbc = ["dep:odbc-api", "dep:chrono"]
+# cleanly without an ODBC driver manager present.
+odbc = ["dep:odbc-api"]
 
 [dependencies]
 mrsflow-core = { path = "../mrsflow-core" }
 arrow = { version = "53", default-features = false, features = ["ipc"] }
 parquet = { version = "53", default-features = false, features = ["arrow", "snap"] }
+# `chrono` is non-optional (File.Modified needs it for SystemTime → DateTime
+# conversion, ODBC path uses it for date/timestamp parsing). The `clock`
+# feature comes from File.Modified's need to read filesystem mtimes.
 chrono = { version = "0.4", default-features = false, features = ["alloc", "clock"] }
 calamine = { version = "0.35", default-features = false }
 odbc-api = { version = "13", optional = true }
-chrono = { version = "0.4", default-features = false, features = ["alloc"], optional = true }
 
 [[bin]]
 name = "mrsflow"
