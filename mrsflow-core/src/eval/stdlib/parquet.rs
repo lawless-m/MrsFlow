@@ -24,11 +24,11 @@ use super::common::{
 
 pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
     vec![
-        ("Parquet.Document", one("path"), parquet_document),
+        ("Parquet.Document", one("path"), document),
     ]
 }
 
-fn parquet_document(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+fn document(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let path = expect_text(&args[0])?;
     host.parquet_read(path).map_err(|e| {
         MError::Other(format!("Parquet.Document({:?}): {:?}", path, e))

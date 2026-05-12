@@ -10,37 +10,37 @@ use super::common::{expect_function, expect_list, invoke_callback_with_host, one
 
 pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
     vec![
-        ("Function.From", two("functionType", "function"), function_from),
-        ("Function.Invoke", two("function", "args"), function_invoke),
-        ("Function.InvokeAfter", two("function", "delay"), function_invoke_after),
+        ("Function.From", two("functionType", "function"), from),
+        ("Function.Invoke", two("function", "args"), invoke),
+        ("Function.InvokeAfter", two("function", "delay"), invoke_after),
         (
             "Function.InvokeWithErrorContext",
             two("function", "errorContext"),
-            function_invoke_with_error_context,
+            invoke_with_error_context,
         ),
-        ("Function.IsDataSource", one("function"), function_is_data_source),
+        ("Function.IsDataSource", one("function"), is_data_source),
         (
             "Function.ScalarVector",
             two("scalarFunction", "vectorFunction"),
-            function_scalar_vector,
+            scalar_vector,
         ),
     ]
 }
 
-fn function_from(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn from(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     // v1: signature/type info isn't tracked on functions — ignore arg 0.
     let _ = &args[0];
     let _ = expect_function(&args[1])?;
     Ok(args[1].clone())
 }
 
-fn function_invoke(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+fn invoke(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let f = expect_function(&args[0])?;
     let xs = expect_list(&args[1])?;
     invoke_callback_with_host(f, xs.clone(), host)
 }
 
-fn function_invoke_after(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+fn invoke_after(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     // v1: we have no async runtime — fire immediately. The `delay` value
     // (a Duration) is accepted but ignored.
     let f = expect_function(&args[0])?;
@@ -50,7 +50,7 @@ fn function_invoke_after(args: &[Value], host: &dyn IoHost) -> Result<Value, MEr
     invoke_callback_with_host(f, Vec::new(), host)
 }
 
-fn function_invoke_with_error_context(
+fn invoke_with_error_context(
     args: &[Value],
     host: &dyn IoHost,
 ) -> Result<Value, MError> {
@@ -61,13 +61,13 @@ fn function_invoke_with_error_context(
     invoke_callback_with_host(f, Vec::new(), host)
 }
 
-fn function_is_data_source(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn is_data_source(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     // v1: no data-source tagging on functions.
     let _ = expect_function(&args[0])?;
     Ok(Value::Logical(false))
 }
 
-fn function_scalar_vector(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn scalar_vector(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     // v1: no query folding — always pick the vector (runtime) function.
     let _ = expect_function(&args[0])?;
     let _ = expect_function(&args[1])?;

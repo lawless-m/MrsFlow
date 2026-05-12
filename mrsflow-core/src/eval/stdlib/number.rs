@@ -24,7 +24,7 @@ use super::common::{
 
 pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
     vec![
-        ("Number.From", one("value"), number_from),
+        ("Number.From", one("value"), from),
         (
             "Number.Mod",
             vec![
@@ -32,7 +32,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "divisor".into(),   optional: false, type_annotation: None },
                 Param { name: "precision".into(), optional: true,  type_annotation: None },
             ],
-            number_mod,
+            mod_,
         ),
         (
             "Number.IntegerDivide",
@@ -41,20 +41,20 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "divisor".into(),   optional: false, type_annotation: None },
                 Param { name: "precision".into(), optional: true,  type_annotation: None },
             ],
-            number_integer_divide,
+            integer_divide,
         ),
-        ("Number.IsNaN", one("number"), number_is_nan),
-        ("Number.IsOdd", one("number"), number_is_odd),
-        ("Number.IsEven", one("number"), number_is_even),
-        ("Number.Random", vec![], number_random),
-        ("Number.RandomBetween", two("bottom", "top"), number_random_between),
+        ("Number.IsNaN", one("number"), is_nan),
+        ("Number.IsOdd", one("number"), is_odd),
+        ("Number.IsEven", one("number"), is_even),
+        ("Number.Random", vec![], random),
+        ("Number.RandomBetween", two("bottom", "top"), random_between),
         (
             "Number.RoundUp",
             vec![
                 Param { name: "number".into(), optional: false, type_annotation: None },
                 Param { name: "digits".into(), optional: true,  type_annotation: None },
             ],
-            number_round_up,
+            round_up,
         ),
         (
             "Number.RoundDown",
@@ -62,7 +62,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "number".into(), optional: false, type_annotation: None },
                 Param { name: "digits".into(), optional: true,  type_annotation: None },
             ],
-            number_round_down,
+            round_down,
         ),
         (
             "Number.RoundTowardZero",
@@ -70,7 +70,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "number".into(), optional: false, type_annotation: None },
                 Param { name: "digits".into(), optional: true,  type_annotation: None },
             ],
-            number_round_toward_zero,
+            round_toward_zero,
         ),
         (
             "Number.RoundAwayFromZero",
@@ -78,55 +78,55 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "number".into(), optional: false, type_annotation: None },
                 Param { name: "digits".into(), optional: true,  type_annotation: None },
             ],
-            number_round_away_from_zero,
+            round_away_from_zero,
         ),
-        ("Number.Acos", one("number"), number_acos),
-        ("Number.Asin", one("number"), number_asin),
-        ("Number.Atan", one("number"), number_atan),
-        ("Number.Atan2", two("y", "x"), number_atan2),
-        ("Number.Cos", one("number"), number_cos),
-        ("Number.Cosh", one("number"), number_cosh),
-        ("Number.Sin", one("number"), number_sin),
-        ("Number.Sinh", one("number"), number_sinh),
-        ("Number.Tan", one("number"), number_tan),
-        ("Number.Tanh", one("number"), number_tanh),
-        ("Number.Exp", one("number"), number_exp),
-        ("Number.Ln", one("number"), number_ln),
+        ("Number.Acos", one("number"), acos),
+        ("Number.Asin", one("number"), asin),
+        ("Number.Atan", one("number"), atan),
+        ("Number.Atan2", two("y", "x"), atan2),
+        ("Number.Cos", one("number"), cos),
+        ("Number.Cosh", one("number"), cosh),
+        ("Number.Sin", one("number"), sin),
+        ("Number.Sinh", one("number"), sinh),
+        ("Number.Tan", one("number"), tan),
+        ("Number.Tanh", one("number"), tanh),
+        ("Number.Exp", one("number"), exp),
+        ("Number.Ln", one("number"), ln),
         (
             "Number.Log",
             vec![
                 Param { name: "number".into(), optional: false, type_annotation: None },
                 Param { name: "base".into(),   optional: true,  type_annotation: None },
             ],
-            number_log,
+            log,
         ),
-        ("Number.Log10", one("number"), number_log10),
-        ("Number.Factorial", one("number"), number_factorial),
-        ("Number.Combinations", two("setSize", "combinationSize"), number_combinations),
-        ("Number.Permutations", two("setSize", "combinationSize"), number_permutations),
-        ("Number.BitwiseAnd", two("a", "b"), number_bitwise_and),
-        ("Number.BitwiseOr", two("a", "b"), number_bitwise_or),
-        ("Number.BitwiseXor", two("a", "b"), number_bitwise_xor),
-        ("Number.BitwiseNot", one("a"), number_bitwise_not),
-        ("Number.BitwiseShiftLeft", two("a", "n"), number_bitwise_shift_left),
-        ("Number.BitwiseShiftRight", two("a", "n"), number_bitwise_shift_right),
-        ("Byte.From", one("value"), number_from),
-        ("Currency.From", one("value"), number_from),
-        ("Decimal.From", one("value"), number_from),
-        ("Double.From", one("value"), number_from),
-        ("Int8.From", one("value"), number_from),
-        ("Int16.From", one("value"), number_from),
-        ("Int32.From", one("value"), number_from),
-        ("Int64.From", one("value"), number_from),
-        ("Percentage.From", one("value"), number_from),
-        ("Single.From", one("value"), number_from),
+        ("Number.Log10", one("number"), log10),
+        ("Number.Factorial", one("number"), factorial),
+        ("Number.Combinations", two("setSize", "combinationSize"), combinations),
+        ("Number.Permutations", two("setSize", "combinationSize"), permutations),
+        ("Number.BitwiseAnd", two("a", "b"), bitwise_and),
+        ("Number.BitwiseOr", two("a", "b"), bitwise_or),
+        ("Number.BitwiseXor", two("a", "b"), bitwise_xor),
+        ("Number.BitwiseNot", one("a"), bitwise_not),
+        ("Number.BitwiseShiftLeft", two("a", "n"), bitwise_shift_left),
+        ("Number.BitwiseShiftRight", two("a", "n"), bitwise_shift_right),
+        ("Byte.From", one("value"), from),
+        ("Currency.From", one("value"), from),
+        ("Decimal.From", one("value"), from),
+        ("Double.From", one("value"), from),
+        ("Int8.From", one("value"), from),
+        ("Int16.From", one("value"), from),
+        ("Int32.From", one("value"), from),
+        ("Int64.From", one("value"), from),
+        ("Percentage.From", one("value"), from),
+        ("Single.From", one("value"), from),
         (
             "Number.FromText",
             vec![
                 Param { name: "text".into(),    optional: false, type_annotation: None },
                 Param { name: "culture".into(), optional: true,  type_annotation: None },
             ],
-            number_from_text,
+            from_text,
         ),
         (
             "Number.Round",
@@ -134,9 +134,9 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "number".into(), optional: false, type_annotation: None },
                 Param { name: "digits".into(), optional: true,  type_annotation: None },
             ],
-            number_round,
+            round,
         ),
-        ("Number.Abs", one("number"), number_abs),
+        ("Number.Abs", one("number"), abs),
         (
             "Number.ToText",
             vec![
@@ -144,15 +144,15 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "format".into(),  optional: true,  type_annotation: None },
                 Param { name: "culture".into(), optional: true,  type_annotation: None },
             ],
-            number_to_text,
+            to_text,
         ),
-        ("Number.Sign", one("number"), number_sign),
-        ("Number.Power", two("base", "exponent"), number_power),
-        ("Number.Sqrt", one("number"), number_sqrt),
+        ("Number.Sign", one("number"), sign),
+        ("Number.Power", two("base", "exponent"), power),
+        ("Number.Sqrt", one("number"), sqrt),
     ]
 }
 
-fn number_mod(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn mod_(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let a = match &args[0] {
         Value::Number(n) => *n,
         Value::Null => return Ok(Value::Null),
@@ -171,7 +171,7 @@ fn number_mod(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn number_integer_divide(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn integer_divide(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let a = match &args[0] {
         Value::Number(n) => *n,
         Value::Null => return Ok(Value::Null),
@@ -189,7 +189,7 @@ fn number_integer_divide(args: &[Value], _host: &dyn IoHost) -> Result<Value, ME
 }
 
 
-fn number_is_nan(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn is_nan(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     match &args[0] {
         Value::Null => Ok(Value::Null),
         Value::Number(n) => Ok(Value::Logical(n.is_nan())),
@@ -198,7 +198,7 @@ fn number_is_nan(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn number_is_odd(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn is_odd(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     match &args[0] {
         Value::Null => Ok(Value::Null),
         Value::Number(n) => {
@@ -214,7 +214,7 @@ fn number_is_odd(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn number_is_even(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn is_even(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     match &args[0] {
         Value::Null => Ok(Value::Null),
         Value::Number(n) => {
@@ -241,46 +241,46 @@ fn int_arg(v: &Value, ctx: &str) -> Result<i64, MError> {
 }
 
 
-fn number_bitwise_and(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn bitwise_and(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(Value::Number((int_arg(&args[0], "Number.BitwiseAnd")?
         & int_arg(&args[1], "Number.BitwiseAnd")?) as f64))
 }
 
-fn number_bitwise_or(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn bitwise_or(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(Value::Number((int_arg(&args[0], "Number.BitwiseOr")?
         | int_arg(&args[1], "Number.BitwiseOr")?) as f64))
 }
 
-fn number_bitwise_xor(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn bitwise_xor(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(Value::Number((int_arg(&args[0], "Number.BitwiseXor")?
         ^ int_arg(&args[1], "Number.BitwiseXor")?) as f64))
 }
 
-fn number_bitwise_not(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn bitwise_not(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(Value::Number((!int_arg(&args[0], "Number.BitwiseNot")?) as f64))
 }
 
-fn number_bitwise_shift_left(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn bitwise_shift_left(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let a = int_arg(&args[0], "Number.BitwiseShiftLeft")?;
     let n = int_arg(&args[1], "Number.BitwiseShiftLeft")?;
     Ok(Value::Number((a.wrapping_shl(n as u32)) as f64))
 }
 
-fn number_bitwise_shift_right(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn bitwise_shift_right(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let a = int_arg(&args[0], "Number.BitwiseShiftRight")?;
     let n = int_arg(&args[1], "Number.BitwiseShiftRight")?;
     Ok(Value::Number((a.wrapping_shr(n as u32)) as f64))
 }
 
 
-fn number_exp(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> { unary_f64(args, f64::exp) }
+fn exp(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> { unary_f64(args, f64::exp) }
 
-fn number_ln(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> { unary_f64(args, f64::ln) }
+fn ln(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> { unary_f64(args, f64::ln) }
 
-fn number_log10(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> { unary_f64(args, f64::log10) }
+fn log10(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> { unary_f64(args, f64::log10) }
 
 
-fn number_log(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn log(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let n = match &args[0] {
         Value::Null => return Ok(Value::Null),
         Value::Number(n) => *n,
@@ -313,7 +313,7 @@ fn factorial_f64(n: f64) -> Result<f64, MError> {
 }
 
 
-fn number_factorial(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn factorial(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let n = match &args[0] {
         Value::Null => return Ok(Value::Null),
         Value::Number(n) => *n,
@@ -323,7 +323,7 @@ fn number_factorial(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError>
 }
 
 
-fn number_combinations(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn combinations(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let n = match &args[0] {
         Value::Number(n) => *n,
         other => return Err(type_mismatch("number", other)),
@@ -341,7 +341,7 @@ fn number_combinations(args: &[Value], _host: &dyn IoHost) -> Result<Value, MErr
 }
 
 
-fn number_permutations(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn permutations(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let n = match &args[0] {
         Value::Number(n) => *n,
         other => return Err(type_mismatch("number", other)),
@@ -368,26 +368,26 @@ fn unary_f64(args: &[Value], f: fn(f64) -> f64) -> Result<Value, MError> {
 }
 
 
-fn number_acos(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> { unary_f64(args, f64::acos) }
+fn acos(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> { unary_f64(args, f64::acos) }
 
-fn number_asin(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> { unary_f64(args, f64::asin) }
+fn asin(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> { unary_f64(args, f64::asin) }
 
-fn number_atan(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> { unary_f64(args, f64::atan) }
+fn atan(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> { unary_f64(args, f64::atan) }
 
-fn number_cos(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> { unary_f64(args, f64::cos) }
+fn cos(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> { unary_f64(args, f64::cos) }
 
-fn number_cosh(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> { unary_f64(args, f64::cosh) }
+fn cosh(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> { unary_f64(args, f64::cosh) }
 
-fn number_sin(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> { unary_f64(args, f64::sin) }
+fn sin(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> { unary_f64(args, f64::sin) }
 
-fn number_sinh(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> { unary_f64(args, f64::sinh) }
+fn sinh(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> { unary_f64(args, f64::sinh) }
 
-fn number_tan(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> { unary_f64(args, f64::tan) }
+fn tan(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> { unary_f64(args, f64::tan) }
 
-fn number_tanh(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> { unary_f64(args, f64::tanh) }
+fn tanh(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> { unary_f64(args, f64::tanh) }
 
 
-fn number_atan2(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn atan2(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let y = match &args[0] {
         Value::Null => return Ok(Value::Null),
         Value::Number(n) => *n,
@@ -421,34 +421,34 @@ fn apply_round_mode(args: &[Value], ctx: &str, mode: fn(f64) -> f64) -> Result<V
 }
 
 
-fn number_round_up(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn round_up(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     apply_round_mode(args, "Number.RoundUp", f64::ceil)
 }
 
 
-fn number_round_down(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn round_down(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     apply_round_mode(args, "Number.RoundDown", f64::floor)
 }
 
 
-fn number_round_toward_zero(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn round_toward_zero(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     apply_round_mode(args, "Number.RoundTowardZero", f64::trunc)
 }
 
 
-fn number_round_away_from_zero(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn round_away_from_zero(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     apply_round_mode(args, "Number.RoundAwayFromZero", |x| {
         if x >= 0.0 { (x + 0.5).floor() } else { (x - 0.5).ceil() }
     })
 }
 
 
-fn number_random(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn random(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(Value::Number(rand::random::<f64>()))
 }
 
 
-fn number_random_between(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn random_between(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let bottom = match &args[0] {
         Value::Number(n) => *n,
         other => return Err(type_mismatch("number", other)),
@@ -466,7 +466,7 @@ fn number_random_between(args: &[Value], _host: &dyn IoHost) -> Result<Value, ME
 }
 
 
-fn number_from(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn from(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let v = &args[0];
     match v {
         Value::Null => Ok(Value::Null),
@@ -482,7 +482,7 @@ fn number_from(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn number_from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     match &args[0] {
         Value::Null => Ok(Value::Null),
         Value::Text(s) => s
@@ -495,7 +495,7 @@ fn number_from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError>
 }
 
 
-fn number_to_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn to_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     match &args[0] {
         Value::Null => Ok(Value::Null),
         Value::Number(n) => {
@@ -517,7 +517,7 @@ fn number_to_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn number_abs(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn abs(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     match &args[0] {
         Value::Null => Ok(Value::Null),
         Value::Number(n) => Ok(Value::Number(n.abs())),
@@ -526,7 +526,7 @@ fn number_abs(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn number_sign(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn sign(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     match &args[0] {
         Value::Null => Ok(Value::Null),
         Value::Number(n) => Ok(Value::Number(if *n > 0.0 {
@@ -541,7 +541,7 @@ fn number_sign(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn number_power(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn power(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let base = match &args[0] {
         Value::Null => return Ok(Value::Null),
         Value::Number(n) => *n,
@@ -556,7 +556,7 @@ fn number_power(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn number_sqrt(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn sqrt(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     match &args[0] {
         Value::Null => Ok(Value::Null),
         Value::Number(n) => Ok(Value::Number(n.sqrt())),
@@ -565,7 +565,7 @@ fn number_sqrt(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn number_round(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn round(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let n = match &args[0] {
         Value::Null => return Ok(Value::Null),
         Value::Number(n) => *n,

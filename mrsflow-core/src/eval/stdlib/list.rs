@@ -24,29 +24,29 @@ use super::common::{
 
 pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
     vec![
-        ("List.Transform", two("list", "transform"), list_transform),
-        ("List.Select", two("list", "selection"), list_select),
-        ("List.Sum", one("list"), list_sum),
+        ("List.Transform", two("list", "transform"), transform),
+        ("List.Select", two("list", "selection"), select),
+        ("List.Sum", one("list"), sum),
         (
             "List.Average",
             vec![
                 Param { name: "list".into(),      optional: false, type_annotation: None },
                 Param { name: "precision".into(), optional: true,  type_annotation: None },
             ],
-            list_average,
+            average,
         ),
-        ("List.Count", one("list"), list_count),
-        ("List.Min", one("list"), list_min),
-        ("List.Max", one("list"), list_max),
-        ("List.Combine", one("lists"), list_combine),
-        ("List.IsEmpty", one("list"), list_is_empty),
+        ("List.Count", one("list"), count),
+        ("List.Min", one("list"), min),
+        ("List.Max", one("list"), max),
+        ("List.Combine", one("lists"), combine),
+        ("List.IsEmpty", one("list"), is_empty),
         (
             "List.First",
             vec![
                 Param { name: "list".into(),    optional: false, type_annotation: None },
                 Param { name: "default".into(), optional: true,  type_annotation: None },
             ],
-            list_first,
+            first,
         ),
         (
             "List.Last",
@@ -54,9 +54,9 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "list".into(),    optional: false, type_annotation: None },
                 Param { name: "default".into(), optional: true,  type_annotation: None },
             ],
-            list_last,
+            last,
         ),
-        ("List.Reverse", one("list"), list_reverse),
+        ("List.Reverse", one("list"), reverse),
         (
             "List.Numbers",
             vec![
@@ -64,7 +64,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "count".into(),     optional: false, type_annotation: None },
                 Param { name: "increment".into(), optional: true,  type_annotation: None },
             ],
-            list_numbers,
+            numbers,
         ),
         (
             "List.PositionOf",
@@ -74,7 +74,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "occurrence".into(),       optional: true,  type_annotation: None },
                 Param { name: "equationCriteria".into(), optional: true,  type_annotation: None },
             ],
-            list_position_of,
+            position_of,
         ),
         (
             "List.RemoveFirstN",
@@ -82,40 +82,40 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "list".into(),             optional: false, type_annotation: None },
                 Param { name: "countOrCondition".into(), optional: true,  type_annotation: None },
             ],
-            list_remove_first_n,
+            remove_first_n,
         ),
-        ("List.RemoveItems", two("list", "list2"), list_remove_items),
-        ("List.Zip", one("lists"), list_zip),
-        ("List.FirstN", two("list", "countOrCondition"), list_first_n),
+        ("List.RemoveItems", two("list", "list2"), remove_items),
+        ("List.Zip", one("lists"), zip),
+        ("List.FirstN", two("list", "countOrCondition"), first_n),
         (
             "List.LastN",
             vec![
                 Param { name: "list".into(),             optional: false, type_annotation: None },
                 Param { name: "countOrCondition".into(), optional: true,  type_annotation: None },
             ],
-            list_last_n,
+            last_n,
         ),
-        ("List.Skip", two("list", "countOrCondition"), list_skip),
-        ("List.Distinct", one("list"), list_distinct),
+        ("List.Skip", two("list", "countOrCondition"), skip),
+        ("List.Distinct", one("list"), distinct),
         (
             "List.Sort",
             vec![
                 Param { name: "list".into(),               optional: false, type_annotation: None },
                 Param { name: "comparisonCriteria".into(), optional: true,  type_annotation: None },
             ],
-            list_sort,
+            sort,
         ),
         (
             "List.RemoveMatchingItems",
             two("list", "items"),
-            list_remove_matching_items,
+            remove_matching_items,
         ),
-        ("List.AnyTrue", one("list"), list_any_true),
-        ("List.AllTrue", one("list"), list_all_true),
+        ("List.AnyTrue", one("list"), any_true),
+        ("List.AllTrue", one("list"), all_true),
         (
             "List.Accumulate",
             three("list", "seed", "accumulator"),
-            list_accumulate,
+            accumulate,
         ),
         (
             "List.Contains",
@@ -124,7 +124,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "value".into(),            optional: false, type_annotation: None },
                 Param { name: "equationCriteria".into(), optional: true,  type_annotation: None },
             ],
-            list_contains,
+            contains,
         ),
         (
             "List.ContainsAll",
@@ -133,7 +133,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "values".into(),           optional: false, type_annotation: None },
                 Param { name: "equationCriteria".into(), optional: true,  type_annotation: None },
             ],
-            list_contains_all,
+            contains_all,
         ),
         (
             "List.ContainsAny",
@@ -142,7 +142,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "values".into(),           optional: false, type_annotation: None },
                 Param { name: "equationCriteria".into(), optional: true,  type_annotation: None },
             ],
-            list_contains_any,
+            contains_any,
         ),
         (
             "List.IsDistinct",
@@ -150,11 +150,11 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "list".into(),             optional: false, type_annotation: None },
                 Param { name: "equationCriteria".into(), optional: true,  type_annotation: None },
             ],
-            list_is_distinct,
+            is_distinct,
         ),
-        ("List.MatchesAll", two("list", "condition"), list_matches_all),
-        ("List.MatchesAny", two("list", "condition"), list_matches_any),
-        ("List.FindText", two("list", "text"), list_find_text),
+        ("List.MatchesAll", two("list", "condition"), matches_all),
+        ("List.MatchesAny", two("list", "condition"), matches_any),
+        ("List.FindText", two("list", "text"), find_text),
         (
             "List.PositionOfAny",
             vec![
@@ -163,9 +163,9 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "occurrence".into(),       optional: true,  type_annotation: None },
                 Param { name: "equationCriteria".into(), optional: true,  type_annotation: None },
             ],
-            list_position_of_any,
+            position_of_any,
         ),
-        ("List.Positions", one("list"), list_positions),
+        ("List.Positions", one("list"), positions),
         (
             "List.Range",
             vec![
@@ -173,7 +173,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "offset".into(), optional: false, type_annotation: None },
                 Param { name: "count".into(),  optional: true,  type_annotation: None },
             ],
-            list_range,
+            range,
         ),
         (
             "List.RemoveLastN",
@@ -181,9 +181,9 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "list".into(),             optional: false, type_annotation: None },
                 Param { name: "countOrCondition".into(), optional: true,  type_annotation: None },
             ],
-            list_remove_last_n,
+            remove_last_n,
         ),
-        ("List.RemoveNulls", one("list"), list_remove_nulls),
+        ("List.RemoveNulls", one("list"), remove_nulls),
         (
             "List.RemoveRange",
             vec![
@@ -191,10 +191,10 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "offset".into(), optional: false, type_annotation: None },
                 Param { name: "count".into(),  optional: true,  type_annotation: None },
             ],
-            list_remove_range,
+            remove_range,
         ),
-        ("List.InsertRange", three("list", "offset", "values"), list_insert_range),
-        ("List.ReplaceMatchingItems", two("list", "replacements"), list_replace_matching_items),
+        ("List.InsertRange", three("list", "offset", "values"), insert_range),
+        ("List.ReplaceMatchingItems", two("list", "replacements"), replace_matching_items),
         (
             "List.ReplaceRange",
             vec![
@@ -203,7 +203,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "count".into(),     optional: false, type_annotation: None },
                 Param { name: "newValues".into(), optional: false, type_annotation: None },
             ],
-            list_replace_range,
+            replace_range,
         ),
         (
             "List.ReplaceValue",
@@ -213,12 +213,12 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "newValue".into(), optional: false, type_annotation: None },
                 Param { name: "replacer".into(), optional: false, type_annotation: None },
             ],
-            list_replace_value,
+            replace_value,
         ),
-        ("List.Repeat", two("list", "count"), list_repeat),
-        ("List.Alternate", four_with_opts("list", "count", "repeatInterval", "offset"), list_alternate),
-        ("List.Split", two("list", "pageSize"), list_split),
-        ("List.Buffer", one("list"), list_buffer),
+        ("List.Repeat", two("list", "count"), repeat),
+        ("List.Alternate", four_with_opts("list", "count", "repeatInterval", "offset"), alternate),
+        ("List.Split", two("list", "pageSize"), split),
+        ("List.Buffer", one("list"), buffer),
         (
             "List.Difference",
             vec![
@@ -226,7 +226,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "list2".into(),            optional: false, type_annotation: None },
                 Param { name: "equationCriteria".into(), optional: true,  type_annotation: None },
             ],
-            list_difference,
+            difference,
         ),
         (
             "List.Intersect",
@@ -234,7 +234,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "lists".into(),            optional: false, type_annotation: None },
                 Param { name: "equationCriteria".into(), optional: true,  type_annotation: None },
             ],
-            list_intersect,
+            intersect,
         ),
         (
             "List.Union",
@@ -242,25 +242,25 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "lists".into(),            optional: false, type_annotation: None },
                 Param { name: "equationCriteria".into(), optional: true,  type_annotation: None },
             ],
-            list_union,
+            union_,
         ),
-        ("List.Single", one("list"), list_single),
+        ("List.Single", one("list"), single),
         (
             "List.SingleOrDefault",
             vec![
                 Param { name: "list".into(),    optional: false, type_annotation: None },
                 Param { name: "default".into(), optional: true,  type_annotation: None },
             ],
-            list_single_or_default,
+            single_or_default,
         ),
-        ("List.Median", one("list"), list_median),
+        ("List.Median", one("list"), median),
         (
             "List.Mode",
             vec![
                 Param { name: "list".into(),             optional: false, type_annotation: None },
                 Param { name: "equationCriteria".into(), optional: true,  type_annotation: None },
             ],
-            list_mode,
+            mode,
         ),
         (
             "List.Modes",
@@ -268,7 +268,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "list".into(),             optional: false, type_annotation: None },
                 Param { name: "equationCriteria".into(), optional: true,  type_annotation: None },
             ],
-            list_modes,
+            modes,
         ),
         (
             "List.Product",
@@ -276,7 +276,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "list".into(),      optional: false, type_annotation: None },
                 Param { name: "precision".into(), optional: true,  type_annotation: None },
             ],
-            list_product,
+            product,
         ),
         (
             "List.MaxN",
@@ -286,7 +286,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "comparisonCriteria".into(),  optional: true,  type_annotation: None },
                 Param { name: "includeNulls".into(),        optional: true,  type_annotation: None },
             ],
-            list_max_n,
+            max_n,
         ),
         (
             "List.MinN",
@@ -296,11 +296,11 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "comparisonCriteria".into(),  optional: true,  type_annotation: None },
                 Param { name: "includeNulls".into(),        optional: true,  type_annotation: None },
             ],
-            list_min_n,
+            min_n,
         ),
-        ("List.NonNullCount", one("list"), list_non_null_count),
-        ("List.StandardDeviation", one("list"), list_standard_deviation),
-        ("List.Covariance", two("list1", "list2"), list_covariance),
+        ("List.NonNullCount", one("list"), non_null_count),
+        ("List.StandardDeviation", one("list"), standard_deviation),
+        ("List.Covariance", two("list1", "list2"), covariance),
         (
             "List.Percentile",
             vec![
@@ -308,7 +308,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "percentile".into(), optional: false, type_annotation: None },
                 Param { name: "options".into(),    optional: true,  type_annotation: None },
             ],
-            list_percentile,
+            percentile,
         ),
         (
             "List.Random",
@@ -316,12 +316,12 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "count".into(), optional: false, type_annotation: None },
                 Param { name: "seed".into(),  optional: true,  type_annotation: None },
             ],
-            list_random,
+            random,
         ),
         (
             "List.TransformMany",
             three("list", "collectionTransform", "resultTransform"),
-            list_transform_many,
+            transform_many,
         ),
         (
             "List.Generate",
@@ -331,12 +331,12 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "next".into(),      optional: false, type_annotation: None },
                 Param { name: "selector".into(),  optional: true,  type_annotation: None },
             ],
-            list_generate,
+            generate,
         ),
-        ("List.Dates", three("start", "count", "step"), list_dates),
-        ("List.DateTimes", three("start", "count", "step"), list_datetimes),
-        ("List.DateTimeZones", three("start", "count", "step"), list_datetimezones),
-        ("List.Durations", three("start", "count", "step"), list_durations),
+        ("List.Dates", three("start", "count", "step"), dates),
+        ("List.DateTimes", three("start", "count", "step"), datetimes),
+        ("List.DateTimeZones", three("start", "count", "step"), datetimezones),
+        ("List.Durations", three("start", "count", "step"), durations),
     ]
 }
 
@@ -349,7 +349,7 @@ fn four_with_opts(a: &str, b: &str, c: &str, d: &str) -> Vec<Param> {
     ]
 }
 
-fn list_transform(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn transform(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     let f = expect_function(&args[1])?;
     let mut out = Vec::with_capacity(list.len());
@@ -361,7 +361,7 @@ fn list_transform(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn list_select(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn select(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     let pred = expect_function(&args[1])?;
     let mut out = Vec::new();
@@ -377,7 +377,7 @@ fn list_select(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn list_sum(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn sum(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     if list.is_empty() {
         return Ok(Value::Null);
@@ -393,7 +393,7 @@ fn list_sum(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn list_average(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn average(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     let mut total = 0.0f64;
     let mut n = 0usize;
@@ -415,13 +415,13 @@ fn list_average(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn list_count(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn count(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     Ok(Value::Number(list.len() as f64))
 }
 
 
-fn list_zip(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn zip(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let lists = expect_list(&args[0])?;
     let inner: Vec<&Vec<Value>> = lists
         .iter()
@@ -440,7 +440,7 @@ fn list_zip(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn list_remove_first_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn remove_first_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     let n = match args.get(1) {
         Some(Value::Number(n)) => {
@@ -463,7 +463,7 @@ fn list_remove_first_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MErr
 }
 
 
-fn list_remove_items(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn remove_items(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     let drop = expect_list(&args[1])?;
     let mut out: Vec<Value> = Vec::with_capacity(list.len());
@@ -483,7 +483,7 @@ fn list_remove_items(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError
 }
 
 
-fn list_position_of(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn position_of(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     let target = &args[1];
     if !matches!(args.get(2), Some(Value::Null) | None) {
@@ -505,7 +505,7 @@ fn list_position_of(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError>
 }
 
 
-fn list_numbers(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn numbers(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let start = match &args[0] {
         Value::Number(n) => *n,
         other => return Err(type_mismatch("number", other)),
@@ -532,7 +532,7 @@ fn list_numbers(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn list_min(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn min(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     if list.is_empty() {
         return Ok(Value::Null);
@@ -552,7 +552,7 @@ fn list_min(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn list_max(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn max(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     if list.is_empty() {
         return Ok(Value::Null);
@@ -572,13 +572,13 @@ fn list_max(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn list_is_empty(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn is_empty(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     Ok(Value::Logical(list.is_empty()))
 }
 
 
-fn list_first(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn first(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     if let Some(first) = list.first() {
         Ok(first.clone())
@@ -588,7 +588,7 @@ fn list_first(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn list_last(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn last(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     if let Some(last) = list.last() {
         Ok(last.clone())
@@ -598,7 +598,7 @@ fn list_last(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn list_sort(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn sort(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     if !matches!(args.get(1), Some(Value::Null) | None) {
         return Err(MError::NotImplemented(
@@ -637,7 +637,7 @@ fn list_sort(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn list_reverse(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn reverse(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     let mut out = list.clone();
     out.reverse();
@@ -645,7 +645,7 @@ fn list_reverse(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn list_first_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn first_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     // Power Query also accepts a predicate (take-while) form; not yet supported.
     let count = match &args[1] {
@@ -661,7 +661,7 @@ fn list_first_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn list_last_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn last_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     let count = match args.get(1) {
         Some(Value::Number(n)) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
@@ -682,7 +682,7 @@ fn list_last_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 /// null, date, datetime, duration. Compound values (list/record/table/function/
 /// type/thunk/binary) error out; the caller wraps the error.
 
-fn list_any_true(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn any_true(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     for v in list {
         match v {
@@ -698,7 +698,7 @@ fn list_any_true(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn list_all_true(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn all_true(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     for v in list {
         match v {
@@ -714,7 +714,7 @@ fn list_all_true(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn list_remove_matching_items(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn remove_matching_items(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     let items = expect_list(&args[1])?;
     let mut out: Vec<Value> = Vec::with_capacity(list.len());
@@ -734,7 +734,7 @@ fn list_remove_matching_items(args: &[Value], _host: &dyn IoHost) -> Result<Valu
 }
 
 
-fn list_distinct(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn distinct(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     let mut out: Vec<Value> = Vec::with_capacity(list.len());
     for v in list {
@@ -753,7 +753,7 @@ fn list_distinct(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn list_skip(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn skip(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     let count = match &args[1] {
         Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
@@ -768,7 +768,7 @@ fn list_skip(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn list_combine(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn combine(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let lists = expect_list(&args[0])?;
     let mut out: Vec<Value> = Vec::new();
     for v in lists {
@@ -781,7 +781,7 @@ fn list_combine(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn list_accumulate(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+fn accumulate(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     let mut acc = args[1].clone();
     let f = expect_function(&args[2])?;
@@ -791,7 +791,7 @@ fn list_accumulate(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     Ok(acc)
 }
 
-fn list_contains(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn contains(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     let target = &args[1];
     if !matches!(args.get(2), Some(Value::Null) | None) {
@@ -805,7 +805,7 @@ fn list_contains(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(Value::Logical(false))
 }
 
-fn list_contains_all(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn contains_all(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     let values = expect_list(&args[1])?;
     if !matches!(args.get(2), Some(Value::Null) | None) {
@@ -821,7 +821,7 @@ fn list_contains_all(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError
     Ok(Value::Logical(true))
 }
 
-fn list_contains_any(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn contains_any(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     let values = expect_list(&args[1])?;
     if !matches!(args.get(2), Some(Value::Null) | None) {
@@ -835,7 +835,7 @@ fn list_contains_any(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError
     Ok(Value::Logical(false))
 }
 
-fn list_is_distinct(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn is_distinct(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     if !matches!(args.get(1), Some(Value::Null) | None) {
         return Err(MError::NotImplemented("List.IsDistinct: equationCriteria not yet supported"));
@@ -850,7 +850,7 @@ fn list_is_distinct(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError>
     Ok(Value::Logical(true))
 }
 
-fn list_matches_all(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+fn matches_all(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     let predicate = expect_function(&args[1])?;
     for v in list {
@@ -864,7 +864,7 @@ fn list_matches_all(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> 
     Ok(Value::Logical(true))
 }
 
-fn list_matches_any(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+fn matches_any(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     let predicate = expect_function(&args[1])?;
     for v in list {
@@ -878,7 +878,7 @@ fn list_matches_any(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> 
     Ok(Value::Logical(false))
 }
 
-fn list_find_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn find_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     let needle = expect_text(&args[1])?;
     let mut out: Vec<Value> = Vec::new();
@@ -892,7 +892,7 @@ fn list_find_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(Value::List(out))
 }
 
-fn list_position_of_any(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn position_of_any(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     let values = expect_list(&args[1])?;
     if !matches!(args.get(2), Some(Value::Null) | None) {
@@ -911,12 +911,12 @@ fn list_position_of_any(args: &[Value], _host: &dyn IoHost) -> Result<Value, MEr
     Ok(Value::Number(-1.0))
 }
 
-fn list_positions(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn positions(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     Ok(Value::List((0..list.len()).map(|i| Value::Number(i as f64)).collect()))
 }
 
-fn list_range(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn range(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     let offset = match &args[1] {
         Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
@@ -932,7 +932,7 @@ fn list_range(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(Value::List(list[start..end].to_vec()))
 }
 
-fn list_remove_last_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn remove_last_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     let n = match args.get(1) {
         Some(Value::Number(n)) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
@@ -946,12 +946,12 @@ fn list_remove_last_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MErro
     Ok(Value::List(list[..keep].to_vec()))
 }
 
-fn list_remove_nulls(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn remove_nulls(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     Ok(Value::List(list.iter().filter(|v| !matches!(v, Value::Null)).cloned().collect()))
 }
 
-fn list_remove_range(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn remove_range(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     let offset = match &args[1] {
         Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
@@ -971,7 +971,7 @@ fn list_remove_range(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError
     Ok(Value::List(out))
 }
 
-fn list_insert_range(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn insert_range(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     let offset = match &args[1] {
         Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
@@ -988,7 +988,7 @@ fn list_insert_range(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError
     Ok(Value::List(out))
 }
 
-fn list_replace_matching_items(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn replace_matching_items(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     let replacements = expect_list(&args[1])?;
     // Build a (old, new) lookup. Each replacement is a 2-elem list.
@@ -1016,7 +1016,7 @@ fn list_replace_matching_items(args: &[Value], _host: &dyn IoHost) -> Result<Val
     Ok(Value::List(out))
 }
 
-fn list_replace_range(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn replace_range(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     let offset = match &args[1] {
         Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
@@ -1040,7 +1040,7 @@ fn list_replace_range(args: &[Value], _host: &dyn IoHost) -> Result<Value, MErro
     Ok(Value::List(out))
 }
 
-fn list_replace_value(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+fn replace_value(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     let old_value = &args[1];
     let new_value = &args[2];
@@ -1057,7 +1057,7 @@ fn list_replace_value(args: &[Value], host: &dyn IoHost) -> Result<Value, MError
     Ok(Value::List(out))
 }
 
-fn list_repeat(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn repeat(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     let count = match &args[1] {
         Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
@@ -1070,7 +1070,7 @@ fn list_repeat(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(Value::List(out))
 }
 
-fn list_alternate(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn alternate(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     let count = match &args[1] {
         Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
@@ -1105,7 +1105,7 @@ fn list_alternate(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(Value::List(out))
 }
 
-fn list_split(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn split(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     let page = match &args[1] {
         Value::Number(n) if n.fract() == 0.0 && *n > 0.0 => *n as usize,
@@ -1118,12 +1118,12 @@ fn list_split(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(Value::List(chunks))
 }
 
-fn list_buffer(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn buffer(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     Ok(Value::List(list.clone()))
 }
 
-fn list_difference(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn difference(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list1 = expect_list(&args[0])?;
     let list2 = expect_list(&args[1])?;
     if !matches!(args.get(2), Some(Value::Null) | None) {
@@ -1147,7 +1147,7 @@ fn list_difference(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> 
     Ok(Value::List(out))
 }
 
-fn list_intersect(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn intersect(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let lists = expect_list(&args[0])?;
     if !matches!(args.get(1), Some(Value::Null) | None) {
         return Err(MError::NotImplemented("List.Intersect: equationCriteria not yet supported"));
@@ -1176,7 +1176,7 @@ fn list_intersect(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(Value::List(out))
 }
 
-fn list_dates(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn dates(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let start = match &args[0] {
         Value::Date(d) => *d,
         other => return Err(type_mismatch("date (start)", other)),
@@ -1199,7 +1199,7 @@ fn list_dates(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(Value::List(out))
 }
 
-fn list_datetimes(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn datetimes(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let start = match &args[0] {
         Value::Datetime(dt) => *dt,
         other => return Err(type_mismatch("datetime (start)", other)),
@@ -1222,7 +1222,7 @@ fn list_datetimes(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(Value::List(out))
 }
 
-fn list_datetimezones(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn datetimezones(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let start = match &args[0] {
         Value::Datetimezone(dt) => *dt,
         other => return Err(type_mismatch("datetimezone (start)", other)),
@@ -1245,7 +1245,7 @@ fn list_datetimezones(args: &[Value], _host: &dyn IoHost) -> Result<Value, MErro
     Ok(Value::List(out))
 }
 
-fn list_durations(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn durations(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let start = match &args[0] {
         Value::Duration(d) => *d,
         other => return Err(type_mismatch("duration (start)", other)),
@@ -1268,7 +1268,7 @@ fn list_durations(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(Value::List(out))
 }
 
-fn list_transform_many(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+fn transform_many(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     let collection_fn = expect_function(&args[1])?;
     let result_fn = expect_function(&args[2])?;
@@ -1294,7 +1294,7 @@ fn list_transform_many(args: &[Value], host: &dyn IoHost) -> Result<Value, MErro
     Ok(Value::List(out))
 }
 
-fn list_generate(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+fn generate(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let initial_fn = expect_function(&args[0])?;
     let condition_fn = expect_function(&args[1])?;
     let next_fn = expect_function(&args[2])?;
@@ -1341,7 +1341,7 @@ fn numbers_only(list: &[Value], ctx: &str) -> Result<Vec<f64>, MError> {
     Ok(out)
 }
 
-fn list_single(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn single(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     match list.len() {
         0 => Err(MError::Other("List.Single: list is empty".into())),
@@ -1350,7 +1350,7 @@ fn list_single(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     }
 }
 
-fn list_single_or_default(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn single_or_default(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     match list.len() {
         0 => Ok(args.get(1).cloned().unwrap_or(Value::Null)),
@@ -1359,7 +1359,7 @@ fn list_single_or_default(args: &[Value], _host: &dyn IoHost) -> Result<Value, M
     }
 }
 
-fn list_median(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn median(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     let mut nums = numbers_only(list, "List.Median")?;
     if nums.is_empty() {
@@ -1375,7 +1375,7 @@ fn list_median(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(Value::Number(median))
 }
 
-fn list_mode(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn mode(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     if !matches!(args.get(1), Some(Value::Null) | None) {
         return Err(MError::NotImplemented("List.Mode: equationCriteria not yet supported"));
@@ -1403,7 +1403,7 @@ fn list_mode(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(v)
 }
 
-fn list_modes(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn modes(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     if !matches!(args.get(1), Some(Value::Null) | None) {
         return Err(MError::NotImplemented("List.Modes: equationCriteria not yet supported"));
@@ -1433,7 +1433,7 @@ fn list_modes(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(Value::List(out))
 }
 
-fn list_product(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn product(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     let nums = numbers_only(list, "List.Product")?;
     if nums.is_empty() {
@@ -1479,7 +1479,7 @@ fn sort_numeric_or_text(list: &[Value], ctx: &str, descending: bool) -> Result<V
     Ok(out)
 }
 
-fn list_max_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn max_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     let n = match &args[1] {
         Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
@@ -1489,7 +1489,7 @@ fn list_max_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(Value::List(sorted.into_iter().take(n).collect()))
 }
 
-fn list_min_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn min_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     let n = match &args[1] {
         Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
@@ -1499,13 +1499,13 @@ fn list_min_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(Value::List(sorted.into_iter().take(n).collect()))
 }
 
-fn list_non_null_count(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn non_null_count(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     let n = list.iter().filter(|v| !matches!(v, Value::Null)).count();
     Ok(Value::Number(n as f64))
 }
 
-fn list_standard_deviation(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn standard_deviation(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     let nums = numbers_only(list, "List.StandardDeviation")?;
     if nums.len() < 2 {
@@ -1516,7 +1516,7 @@ fn list_standard_deviation(args: &[Value], _host: &dyn IoHost) -> Result<Value, 
     Ok(Value::Number(var.sqrt()))
 }
 
-fn list_covariance(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn covariance(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let xs = numbers_only(expect_list(&args[0])?, "List.Covariance: list1")?;
     let ys = numbers_only(expect_list(&args[1])?, "List.Covariance: list2")?;
     if xs.len() != ys.len() {
@@ -1533,7 +1533,7 @@ fn list_covariance(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> 
     Ok(Value::Number(cov))
 }
 
-fn list_percentile(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn percentile(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     let mut nums = numbers_only(list, "List.Percentile")?;
     let p = match &args[1] {
@@ -1558,7 +1558,7 @@ fn list_percentile(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> 
     Ok(Value::Number(nums[lo] + frac * (nums[hi] - nums[lo])))
 }
 
-fn list_random(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn random(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let count = match &args[0] {
         Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
         other => return Err(type_mismatch("non-negative integer", other)),
@@ -1570,7 +1570,7 @@ fn list_random(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(Value::List(out))
 }
 
-fn list_union(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn union_(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let lists = expect_list(&args[0])?;
     if !matches!(args.get(1), Some(Value::Null) | None) {
         return Err(MError::NotImplemented("List.Union: equationCriteria not yet supported"));

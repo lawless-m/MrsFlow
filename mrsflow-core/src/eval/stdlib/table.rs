@@ -24,12 +24,12 @@ use super::common::{
 
 pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
     vec![
-        ("#table", two("columns", "rows"), table_constructor),
-        ("Table.ColumnNames", one("table"), table_column_names),
-        ("Table.RenameColumns", two("table", "renames"), table_rename_columns),
-        ("Table.RemoveColumns", two("table", "names"), table_remove_columns),
-        ("Table.SelectColumns", two("table", "names"), table_select_columns),
-        ("Table.SelectRows", two("table", "predicate"), table_select_rows),
+        ("#table", two("columns", "rows"), constructor),
+        ("Table.ColumnNames", one("table"), column_names),
+        ("Table.RenameColumns", two("table", "renames"), rename_columns),
+        ("Table.RemoveColumns", two("table", "names"), remove_columns),
+        ("Table.SelectColumns", two("table", "names"), select_columns),
+        ("Table.SelectRows", two("table", "predicate"), select_rows),
         (
             "Table.AddColumn",
             vec![
@@ -38,22 +38,22 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "transform".into(), optional: false, type_annotation: None },
                 Param { name: "type".into(),      optional: true,  type_annotation: None },
             ],
-            table_add_column,
+            add_column,
         ),
-        ("Table.FromRows", two("rows", "columns"), table_from_rows),
-        ("Table.PromoteHeaders", one("table"), table_promote_headers),
+        ("Table.FromRows", two("rows", "columns"), from_rows),
+        ("Table.PromoteHeaders", one("table"), promote_headers),
         (
             "Table.TransformColumnTypes",
             two("table", "transforms"),
-            table_transform_column_types,
+            transform_column_types,
         ),
         (
             "Table.TransformColumns",
             two("table", "transforms"),
-            table_transform_columns,
+            transform_columns,
         ),
-        ("Table.Combine", one("tables"), table_combine),
-        ("Table.Skip", two("table", "countOrCondition"), table_skip),
+        ("Table.Combine", one("tables"), combine),
+        ("Table.Skip", two("table", "countOrCondition"), skip),
         (
             "Table.ExpandRecordColumn",
             vec![
@@ -62,12 +62,12 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "fieldNames".into(),     optional: false, type_annotation: None },
                 Param { name: "newColumnNames".into(), optional: true,  type_annotation: None },
             ],
-            table_expand_record_column,
+            expand_record_column,
         ),
         (
             "Table.ExpandListColumn",
             two("table", "column"),
-            table_expand_list_column,
+            expand_list_column,
         ),
         (
             "Table.ExpandTableColumn",
@@ -77,7 +77,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "columnNames".into(),    optional: false, type_annotation: None },
                 Param { name: "newColumnNames".into(), optional: true,  type_annotation: None },
             ],
-            table_expand_table_column,
+            expand_table_column,
         ),
         (
             "Table.Unpivot",
@@ -87,7 +87,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "attributeColumn".into(), optional: false, type_annotation: None },
                 Param { name: "valueColumn".into(),     optional: false, type_annotation: None },
             ],
-            table_unpivot,
+            unpivot,
         ),
         (
             "Table.UnpivotOtherColumns",
@@ -97,7 +97,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "attributeColumn".into(), optional: false, type_annotation: None },
                 Param { name: "valueColumn".into(),     optional: false, type_annotation: None },
             ],
-            table_unpivot_other_columns,
+            unpivot_other_columns,
         ),
         (
             "Table.NestedJoin",
@@ -109,7 +109,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "newColumnName".into(), optional: false, type_annotation: None },
                 Param { name: "joinKind".into(),      optional: true,  type_annotation: None },
             ],
-            table_nested_join,
+            nested_join,
         ),
         (
             "Table.Pivot",
@@ -120,22 +120,22 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "valueColumn".into(),         optional: false, type_annotation: None },
                 Param { name: "aggregationFunction".into(), optional: true,  type_annotation: None },
             ],
-            table_pivot,
+            pivot,
         ),
-        ("Table.ReorderColumns", two("table", "columnOrder"), table_reorder_columns),
-        ("Table.Column", two("table", "columnName"), table_column),
-        ("Table.IsEmpty", one("table"), table_is_empty),
+        ("Table.ReorderColumns", two("table", "columnOrder"), reorder_columns),
+        ("Table.Column", two("table", "columnName"), column),
+        ("Table.IsEmpty", one("table"), is_empty),
         (
             "Table.Distinct",
             vec![
                 Param { name: "table".into(),            optional: false, type_annotation: None },
                 Param { name: "equationCriteria".into(), optional: true,  type_annotation: None },
             ],
-            table_distinct,
+            distinct,
         ),
-        ("Table.FirstN", two("table", "countOrCondition"), table_first_n),
-        ("Table.FromRecords", one("records"), table_from_records),
-        ("Table.ToRecords", one("table"), table_to_records),
+        ("Table.FirstN", two("table", "countOrCondition"), first_n),
+        ("Table.FromRecords", one("records"), from_records),
+        ("Table.ToRecords", one("table"), to_records),
         (
             "Table.Join",
             vec![
@@ -147,7 +147,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "joinAlgorithm".into(),         optional: true,  type_annotation: None },
                 Param { name: "keyEqualityComparers".into(),  optional: true,  type_annotation: None },
             ],
-            table_join,
+            join,
         ),
         (
             "Table.AddIndexColumn",
@@ -157,10 +157,10 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "initialValue".into(),  optional: true,  type_annotation: None },
                 Param { name: "increment".into(),     optional: true,  type_annotation: None },
             ],
-            table_add_index_column,
+            add_index_column,
         ),
-        ("Table.TransformRows", two("table", "transform"), table_transform_rows),
-        ("Table.InsertRows", three("table", "offset", "rows"), table_insert_rows),
+        ("Table.TransformRows", two("table", "transform"), transform_rows),
+        ("Table.InsertRows", three("table", "offset", "rows"), insert_rows),
         // --- Accessors + predicates batch (slice #158) ---
         (
             "Table.First",
@@ -168,7 +168,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "table".into(),   optional: false, type_annotation: None },
                 Param { name: "default".into(), optional: true,  type_annotation: None },
             ],
-            table_first,
+            first,
         ),
         (
             "Table.Last",
@@ -176,7 +176,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "table".into(),   optional: false, type_annotation: None },
                 Param { name: "default".into(), optional: true,  type_annotation: None },
             ],
-            table_last,
+            last,
         ),
         (
             "Table.FirstValue",
@@ -184,11 +184,11 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "table".into(),   optional: false, type_annotation: None },
                 Param { name: "default".into(), optional: true,  type_annotation: None },
             ],
-            table_first_value,
+            first_value,
         ),
-        ("Table.RowCount", one("table"), table_row_count),
-        ("Table.ColumnCount", one("table"), table_column_count),
-        ("Table.ApproximateRowCount", one("table"), table_row_count),
+        ("Table.RowCount", one("table"), row_count),
+        ("Table.ColumnCount", one("table"), column_count),
+        ("Table.ApproximateRowCount", one("table"), row_count),
         (
             "Table.Range",
             vec![
@@ -196,7 +196,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "offset".into(), optional: false, type_annotation: None },
                 Param { name: "count".into(),  optional: true,  type_annotation: None },
             ],
-            table_range,
+            range,
         ),
         (
             "Table.Contains",
@@ -205,7 +205,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "row".into(),              optional: false, type_annotation: None },
                 Param { name: "equationCriteria".into(), optional: true,  type_annotation: None },
             ],
-            table_contains,
+            contains,
         ),
         (
             "Table.ContainsAll",
@@ -214,7 +214,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "rows".into(),             optional: false, type_annotation: None },
                 Param { name: "equationCriteria".into(), optional: true,  type_annotation: None },
             ],
-            table_contains_all,
+            contains_all,
         ),
         (
             "Table.ContainsAny",
@@ -223,7 +223,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "rows".into(),             optional: false, type_annotation: None },
                 Param { name: "equationCriteria".into(), optional: true,  type_annotation: None },
             ],
-            table_contains_any,
+            contains_any,
         ),
         (
             "Table.IsDistinct",
@@ -231,12 +231,12 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "table".into(),              optional: false, type_annotation: None },
                 Param { name: "comparisonCriteria".into(), optional: true,  type_annotation: None },
             ],
-            table_is_distinct,
+            is_distinct,
         ),
-        ("Table.HasColumns", two("table", "columns"), table_has_columns),
-        ("Table.MatchesAllRows", two("table", "condition"), table_matches_all_rows),
-        ("Table.MatchesAnyRows", two("table", "condition"), table_matches_any_rows),
-        ("Table.FindText", two("table", "text"), table_find_text),
+        ("Table.HasColumns", two("table", "columns"), has_columns),
+        ("Table.MatchesAllRows", two("table", "condition"), matches_all_rows),
+        ("Table.MatchesAnyRows", two("table", "condition"), matches_any_rows),
+        ("Table.FindText", two("table", "text"), find_text),
         (
             "Table.PositionOf",
             vec![
@@ -245,7 +245,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "occurrence".into(),       optional: true,  type_annotation: None },
                 Param { name: "equationCriteria".into(), optional: true,  type_annotation: None },
             ],
-            table_position_of,
+            position_of,
         ),
         (
             "Table.PositionOfAny",
@@ -255,16 +255,16 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "occurrence".into(),       optional: true,  type_annotation: None },
                 Param { name: "equationCriteria".into(), optional: true,  type_annotation: None },
             ],
-            table_position_of_any,
+            position_of_any,
         ),
-        ("Table.Keys", one("table"), table_keys),
-        ("Table.ColumnsOfType", two("table", "listOfTypes"), table_columns_of_type),
+        ("Table.Keys", one("table"), keys),
+        ("Table.ColumnsOfType", two("table", "listOfTypes"), columns_of_type),
         // --- Slice #159: sort/fill/reverse ---
-        ("Table.Sort", two("table", "comparisonCriteria"), table_sort),
-        ("Table.FillUp", two("table", "columns"), table_fill_up),
-        ("Table.FillDown", two("table", "columns"), table_fill_down),
-        ("Table.ReverseRows", one("table"), table_reverse_rows),
-        ("Table.SplitAt", two("table", "index"), table_split_at),
+        ("Table.Sort", two("table", "comparisonCriteria"), sort),
+        ("Table.FillUp", two("table", "columns"), fill_up),
+        ("Table.FillDown", two("table", "columns"), fill_down),
+        ("Table.ReverseRows", one("table"), reverse_rows),
+        ("Table.SplitAt", two("table", "index"), split_at),
         (
             "Table.AlternateRows",
             vec![
@@ -273,10 +273,10 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "skip".into(),   optional: false, type_annotation: None },
                 Param { name: "take".into(),   optional: false, type_annotation: None },
             ],
-            table_alternate_rows,
+            alternate_rows,
         ),
-        ("Table.Repeat", two("table", "count"), table_repeat),
-        ("Table.SingleRow", one("table"), table_single_row),
+        ("Table.Repeat", two("table", "count"), repeat),
+        ("Table.SingleRow", one("table"), single_row),
         // --- Slice #160: aggregations ---
         (
             "Table.Min",
@@ -285,7 +285,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "comparisonCriteria".into(), optional: false, type_annotation: None },
                 Param { name: "default".into(),             optional: true,  type_annotation: None },
             ],
-            table_min,
+            min,
         ),
         (
             "Table.Max",
@@ -294,22 +294,22 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "comparisonCriteria".into(), optional: false, type_annotation: None },
                 Param { name: "default".into(),             optional: true,  type_annotation: None },
             ],
-            table_max,
+            max,
         ),
         (
             "Table.MinN",
             three("table", "countOrCondition", "comparisonCriteria"),
-            table_min_n,
+            min_n,
         ),
         (
             "Table.MaxN",
             three("table", "countOrCondition", "comparisonCriteria"),
-            table_max_n,
+            max_n,
         ),
         (
             "Table.AggregateTableColumn",
             three("table", "column", "aggregations"),
-            table_aggregate_table_column,
+            aggregate_table_column,
         ),
         // --- Slice #161: row mutation ---
         (
@@ -318,7 +318,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "table".into(),            optional: false, type_annotation: None },
                 Param { name: "countOrCondition".into(), optional: true,  type_annotation: None },
             ],
-            table_remove_first_n,
+            remove_first_n,
         ),
         (
             "Table.RemoveLastN",
@@ -326,7 +326,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "table".into(),            optional: false, type_annotation: None },
                 Param { name: "countOrCondition".into(), optional: true,  type_annotation: None },
             ],
-            table_remove_last_n,
+            remove_last_n,
         ),
         (
             "Table.RemoveRows",
@@ -335,7 +335,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "offset".into(), optional: false, type_annotation: None },
                 Param { name: "count".into(),  optional: true,  type_annotation: None },
             ],
-            table_remove_rows,
+            remove_rows,
         ),
         (
             "Table.RemoveMatchingRows",
@@ -344,7 +344,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "rows".into(),             optional: false, type_annotation: None },
                 Param { name: "equationCriteria".into(), optional: true,  type_annotation: None },
             ],
-            table_remove_matching_rows,
+            remove_matching_rows,
         ),
         (
             "Table.RemoveRowsWithErrors",
@@ -352,7 +352,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "table".into(),   optional: false, type_annotation: None },
                 Param { name: "columns".into(), optional: true,  type_annotation: None },
             ],
-            table_remove_rows_with_errors,
+            remove_rows_with_errors,
         ),
         (
             "Table.ReplaceMatchingRows",
@@ -361,7 +361,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "replacements".into(),     optional: false, type_annotation: None },
                 Param { name: "equationCriteria".into(), optional: true,  type_annotation: None },
             ],
-            table_replace_matching_rows,
+            replace_matching_rows,
         ),
         (
             "Table.ReplaceRows",
@@ -371,7 +371,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "count".into(),  optional: false, type_annotation: None },
                 Param { name: "rows".into(),   optional: false, type_annotation: None },
             ],
-            table_replace_rows,
+            replace_rows,
         ),
         (
             "Table.ReplaceValue",
@@ -382,12 +382,12 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "replacer".into(),         optional: false, type_annotation: None },
                 Param { name: "columnsToSearch".into(),  optional: false, type_annotation: None },
             ],
-            table_replace_value,
+            replace_value,
         ),
         (
             "Table.ReplaceErrorValues",
             two("table", "errorReplacement"),
-            table_replace_error_values,
+            replace_error_values,
         ),
         // --- Slice #162: column mutation ---
         (
@@ -398,20 +398,20 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "combiner".into(),      optional: false, type_annotation: None },
                 Param { name: "newColumnName".into(), optional: false, type_annotation: None },
             ],
-            table_combine_columns,
+            combine_columns,
         ),
         (
             "Table.CombineColumnsToRecord",
             three("table", "newColumnName", "sourceColumns"),
-            table_combine_columns_to_record,
+            combine_columns_to_record,
         ),
-        ("Table.DemoteHeaders", one("table"), table_demote_headers),
+        ("Table.DemoteHeaders", one("table"), demote_headers),
         (
             "Table.DuplicateColumn",
             three("table", "columnName", "newColumnName"),
-            table_duplicate_column,
+            duplicate_column,
         ),
-        ("Table.PrefixColumns", two("table", "prefix"), table_prefix_columns),
+        ("Table.PrefixColumns", two("table", "prefix"), prefix_columns),
         (
             "Table.SplitColumn",
             vec![
@@ -422,7 +422,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "default".into(),              optional: true,  type_annotation: None },
                 Param { name: "extraValues".into(),          optional: true,  type_annotation: None },
             ],
-            table_split_column,
+            split_column,
         ),
         (
             "Table.TransformColumnNames",
@@ -431,9 +431,9 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "nameGenerator".into(), optional: false, type_annotation: None },
                 Param { name: "options".into(),       optional: true,  type_annotation: None },
             ],
-            table_transform_column_names,
+            transform_column_names,
         ),
-        ("Table.Transpose", one("table"), table_transpose),
+        ("Table.Transpose", one("table"), transpose),
         (
             "Table.AddJoinColumn",
             vec![
@@ -443,7 +443,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "key2".into(),          optional: false, type_annotation: None },
                 Param { name: "newColumnName".into(), optional: false, type_annotation: None },
             ],
-            table_add_join_column,
+            add_join_column,
         ),
         // --- Slice #163: format converters ---
         (
@@ -452,7 +452,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "lists".into(),       optional: false, type_annotation: None },
                 Param { name: "columnNames".into(), optional: true,  type_annotation: None },
             ],
-            table_from_columns,
+            from_columns,
         ),
         (
             "Table.FromList",
@@ -463,7 +463,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "default".into(),     optional: true,  type_annotation: None },
                 Param { name: "extraValues".into(), optional: true,  type_annotation: None },
             ],
-            table_from_list,
+            from_list,
         ),
         (
             "Table.FromValue",
@@ -471,26 +471,26 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "value".into(),   optional: false, type_annotation: None },
                 Param { name: "options".into(), optional: true,  type_annotation: None },
             ],
-            table_from_value,
+            from_value,
         ),
-        ("Table.ToColumns", one("table"), table_to_columns),
+        ("Table.ToColumns", one("table"), to_columns),
         (
             "Table.ToList",
             vec![
                 Param { name: "table".into(),    optional: false, type_annotation: None },
                 Param { name: "combiner".into(), optional: true,  type_annotation: None },
             ],
-            table_to_list,
+            to_list,
         ),
-        ("Table.ToRows", one("table"), table_to_rows_value),
-        ("Table.Schema", one("table"), table_schema),
+        ("Table.ToRows", one("table"), to_rows_value),
+        ("Table.Schema", one("table"), schema),
         (
             "Table.Profile",
             vec![
                 Param { name: "table".into(),                optional: false, type_annotation: None },
                 Param { name: "additionalAggregates".into(), optional: true,  type_annotation: None },
             ],
-            table_profile,
+            profile,
         ),
         // --- Slice #164: Group + AddRankColumn + Split + Buffer ---
         (
@@ -502,7 +502,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "groupKind".into(),          optional: true,  type_annotation: None },
                 Param { name: "comparisonCriteria".into(), optional: true,  type_annotation: None },
             ],
-            table_group,
+            group,
         ),
         (
             "Table.AddRankColumn",
@@ -512,10 +512,10 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "comparisonCriteria".into(), optional: false, type_annotation: None },
                 Param { name: "options".into(),            optional: true,  type_annotation: None },
             ],
-            table_add_rank_column,
+            add_rank_column,
         ),
-        ("Table.Split", two("table", "pageSize"), table_split),
-        ("Table.Buffer", one("table"), table_buffer),
+        ("Table.Split", two("table", "pageSize"), split),
+        ("Table.Buffer", one("table"), buffer),
         // --- Slice #165: partitioning + miscellaneous tail ---
         (
             "Table.Partition",
@@ -525,18 +525,18 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "groups".into(), optional: false, type_annotation: None },
                 Param { name: "hash".into(),   optional: false, type_annotation: None },
             ],
-            table_partition,
+            partition,
         ),
-        ("Table.PartitionKey", one("table"), table_partition_key),
-        ("Table.PartitionValues", one("table"), table_partition_values),
-        ("Table.ReplacePartitionKey", two("table", "key"), table_identity_passthrough),
+        ("Table.PartitionKey", one("table"), partition_key),
+        ("Table.PartitionValues", one("table"), partition_values),
+        ("Table.ReplacePartitionKey", two("table", "key"), identity_passthrough),
         (
             "Table.FilterWithDataTable",
             vec![
                 Param { name: "table".into(),     optional: false, type_annotation: None },
                 Param { name: "dataTable".into(), optional: false, type_annotation: None },
             ],
-            table_filter_with_data_table,
+            filter_with_data_table,
         ),
         (
             "Table.FromPartitions",
@@ -544,22 +544,22 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "partitions".into(), optional: false, type_annotation: None },
                 Param { name: "columnInfo".into(), optional: true,  type_annotation: None },
             ],
-            table_from_partitions,
+            from_partitions,
         ),
-        ("Table.AddKey", three("table", "columns", "isPrimary"), table_identity_passthrough),
-        ("Table.ReplaceKeys", two("table", "keys"), table_identity_passthrough),
-        ("Table.ConformToPageReader", one("table"), table_identity_passthrough_one),
-        ("Table.StopFolding", one("table"), table_identity_passthrough_one),
-        ("Table.ReplaceRelationshipIdentity", two("table", "identity"), table_identity_passthrough),
+        ("Table.AddKey", three("table", "columns", "isPrimary"), identity_passthrough),
+        ("Table.ReplaceKeys", two("table", "keys"), identity_passthrough),
+        ("Table.ConformToPageReader", one("table"), identity_passthrough_one),
+        ("Table.StopFolding", one("table"), identity_passthrough_one),
+        ("Table.ReplaceRelationshipIdentity", two("table", "identity"), identity_passthrough),
         (
             "Table.SelectRowsWithErrors",
             vec![
                 Param { name: "table".into(),   optional: false, type_annotation: None },
                 Param { name: "columns".into(), optional: true,  type_annotation: None },
             ],
-            table_select_rows_with_errors,
+            select_rows_with_errors,
         ),
-        ("Table.WithErrorContext", two("table", "errorContext"), table_identity_passthrough),
+        ("Table.WithErrorContext", two("table", "errorContext"), identity_passthrough),
         // --- Slice #166: fuzzy + view stubs ---
         (
             "Table.AddFuzzyClusterColumn",
@@ -569,7 +569,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "newColumnName".into(), optional: false, type_annotation: None },
                 Param { name: "options".into(),       optional: true,  type_annotation: None },
             ],
-            table_fuzzy_not_implemented,
+            fuzzy_not_implemented,
         ),
         (
             "Table.FuzzyGroup",
@@ -579,7 +579,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "aggregatedColumns".into(), optional: false, type_annotation: None },
                 Param { name: "options".into(),           optional: true,  type_annotation: None },
             ],
-            table_fuzzy_not_implemented,
+            fuzzy_not_implemented,
         ),
         (
             "Table.FuzzyJoin",
@@ -591,7 +591,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "joinKind".into(),  optional: true,  type_annotation: None },
                 Param { name: "options".into(),   optional: true,  type_annotation: None },
             ],
-            table_fuzzy_not_implemented,
+            fuzzy_not_implemented,
         ),
         (
             "Table.FuzzyNestedJoin",
@@ -604,15 +604,15 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "joinKind".into(),      optional: true,  type_annotation: None },
                 Param { name: "options".into(),       optional: true,  type_annotation: None },
             ],
-            table_fuzzy_not_implemented,
+            fuzzy_not_implemented,
         ),
-        ("Table.View", two("table", "handlers"), table_view_identity),
-        ("Table.ViewError", one("record"), table_view_error_identity),
-        ("Table.ViewFunction", one("function"), table_view_function_identity),
+        ("Table.View", two("table", "handlers"), view_identity),
+        ("Table.ViewError", one("record"), view_error_identity),
+        ("Table.ViewFunction", one("function"), view_function_identity),
     ]
 }
 
-fn table_constructor(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn constructor(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let names = expect_text_list(&args[0], "#table: columns")?;
     let rows = expect_list_of_lists(&args[1], "#table: rows")?;
     for (i, row) in rows.iter().enumerate() {
@@ -629,7 +629,7 @@ fn table_constructor(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError
 }
 
 
-fn table_column_names(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn column_names(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let names: Vec<Value> = table
         .column_names()
@@ -640,7 +640,7 @@ fn table_column_names(args: &[Value], _host: &dyn IoHost) -> Result<Value, MErro
 }
 
 
-fn table_rename_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn rename_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let renames = expect_list(&args[1])?;
     let mut pairs: Vec<(String, String)> = Vec::new();
@@ -708,7 +708,7 @@ fn table_rename_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MEr
 }
 
 
-fn table_remove_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn remove_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let names = expect_text_list(&args[1], "Table.RemoveColumns: names")?;
     let existing = table.column_names();
@@ -1043,7 +1043,7 @@ pub fn cell_to_value(table: &Table, col: usize, row: usize) -> Result<Value, MEr
 // must be whole-numbered f64s; non-integer or out-of-range values error.
 
 
-fn table_select_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn select_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let names = expect_text_list(&args[1], "Table.SelectColumns: names")?;
     let existing = table.column_names();
@@ -1063,7 +1063,7 @@ fn table_select_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MEr
 }
 
 
-fn table_select_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+fn select_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let predicate = expect_function(&args[1])?;
     let n_rows = table.num_rows();
@@ -1107,7 +1107,7 @@ fn table_select_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError>
 }
 
 
-fn table_from_records(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+fn from_records(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let records = expect_list(&args[0])?;
     if records.is_empty() {
         return Ok(Value::Table(values_to_table(&[], &[])?));
@@ -1142,7 +1142,7 @@ fn table_from_records(args: &[Value], host: &dyn IoHost) -> Result<Value, MError
 }
 
 
-fn table_to_records(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn to_records(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let n = table.num_rows();
     let mut out: Vec<Value> = Vec::with_capacity(n);
@@ -1153,7 +1153,7 @@ fn table_to_records(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError>
 }
 
 
-fn table_distinct(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn distinct(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     if !matches!(args.get(1), Some(Value::Null) | None) {
         return Err(MError::NotImplemented(
@@ -1185,7 +1185,7 @@ fn table_distinct(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn table_first_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn first_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let n = match &args[1] {
         Value::Number(n) => {
@@ -1209,7 +1209,7 @@ fn table_first_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn table_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let name = expect_text(&args[1])?;
     let col_idx = table
@@ -1226,13 +1226,13 @@ fn table_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn table_is_empty(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn is_empty(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     Ok(Value::Logical(table.num_rows() == 0))
 }
 
 
-fn table_add_index_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn add_index_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let new_name = expect_text(&args[1])?.to_string();
     let initial = match args.get(2) {
@@ -1260,7 +1260,7 @@ fn table_add_index_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, M
 }
 
 
-fn table_add_column(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+fn add_column(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let new_name = expect_text(&args[1])?.to_string();
     let transform = expect_function(&args[2])?;
@@ -1331,7 +1331,7 @@ fn table_add_column(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> 
 }
 
 
-fn table_from_rows(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn from_rows(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     // Same as #table but with arg order (rows, columns).
     let rows = expect_list_of_lists(&args[0], "Table.FromRows: rows")?;
     let names = expect_text_list(&args[1], "Table.FromRows: columns")?;
@@ -1349,7 +1349,7 @@ fn table_from_rows(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> 
 }
 
 
-fn table_promote_headers(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn promote_headers(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     if table.num_rows() == 0 {
         return Err(MError::Other(
@@ -1418,7 +1418,7 @@ pub(crate) fn row_to_record(table: &Table, row: usize) -> Result<Value, MError> 
 /// host should propagate (so an Odbc-using row predicate could in theory
 /// work — though none of slice 7d's tests exercise that).
 
-fn table_transform_column_types(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn transform_column_types(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let transforms = expect_list(&args[1])?;
     // Auto-wrap single `{name, type}` pair to match Power Query leniency.
@@ -1598,7 +1598,7 @@ fn type_rep_to_datatype(t: &super::super::value::TypeRep) -> Result<(DataType, b
 }
 
 
-fn table_transform_columns(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+fn transform_columns(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let transforms = expect_list(&args[1])?;
     // Real Power Query accepts both `{name, fn}` (single pair) and
@@ -1742,7 +1742,7 @@ fn parse_col_fn_pairs<'a>(
 }
 
 
-fn table_skip(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn skip(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let count = match &args[1] {
         Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
@@ -1772,7 +1772,7 @@ fn table_skip(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn table_reorder_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn reorder_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let order = expect_text_list(&args[1], "Table.ReorderColumns: columnOrder")?;
     let existing = table.column_names();
@@ -1802,7 +1802,7 @@ fn table_reorder_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, ME
 }
 
 
-fn table_expand_record_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn expand_record_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let column = expect_text(&args[1])?.to_string();
     let field_names = expect_text_list(&args[2], "Table.ExpandRecordColumn: fieldNames")?;
@@ -1868,7 +1868,7 @@ fn table_expand_record_column(args: &[Value], _host: &dyn IoHost) -> Result<Valu
 }
 
 
-fn table_expand_list_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn expand_list_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let column = expect_text(&args[1])?.to_string();
     let (names, rows) = table_to_rows(table)?;
@@ -1907,7 +1907,7 @@ fn table_expand_list_column(args: &[Value], _host: &dyn IoHost) -> Result<Value,
 }
 
 
-fn table_expand_table_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn expand_table_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let column = expect_text(&args[1])?.to_string();
     let column_names = expect_text_list(&args[2], "Table.ExpandTableColumn: columnNames")?;
@@ -1990,7 +1990,7 @@ fn table_expand_table_column(args: &[Value], _host: &dyn IoHost) -> Result<Value
 }
 
 
-fn table_unpivot(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn unpivot(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let pivot_columns = expect_text_list(&args[1], "Table.Unpivot: pivotColumns")?;
     let attribute_column = expect_text(&args[2])?.to_string();
@@ -1999,7 +1999,7 @@ fn table_unpivot(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn table_unpivot_other_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn unpivot_other_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let keep_columns = expect_text_list(&args[1], "Table.UnpivotOtherColumns: pivotColumns")?;
     let attribute_column = expect_text(&args[2])?.to_string();
@@ -2070,7 +2070,7 @@ fn do_unpivot(
 /// optional aggregationFunction; otherwise default to the *last* matching
 /// value (PQ's documented default).
 
-fn table_pivot(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+fn pivot(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let pivot_values = expect_text_list(&args[1], "Table.Pivot: pivotValues")?;
     let attribute_column = expect_text(&args[2])?.to_string();
@@ -2173,7 +2173,7 @@ fn table_pivot(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
 /// single output row whose columns are the union of both tables'. The
 /// right-side key column is dropped.
 
-fn table_join(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn join(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table1 = expect_table(&args[0])?;
     let key1 = match &args[1] {
         Value::Text(s) => s.clone(),
@@ -2250,7 +2250,7 @@ fn table_join(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn table_nested_join(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn nested_join(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table1 = expect_table(&args[0])?;
     let key1 = match &args[1] {
         Value::Text(s) => s.clone(),
@@ -2340,7 +2340,7 @@ fn table_nested_join(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError
 }
 
 
-fn table_combine(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn combine(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let tables_list = expect_list(&args[0])?;
     if tables_list.is_empty() {
         return Err(MError::Other("Table.Combine: empty table list".into()));
@@ -2399,7 +2399,7 @@ fn table_combine(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn table_transform_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+fn transform_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let transform = expect_function(&args[1])?;
     let n_rows = table.num_rows();
@@ -2412,7 +2412,7 @@ fn table_transform_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MErr
 }
 
 
-fn table_insert_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+fn insert_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let offset = match &args[1] {
         Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
@@ -2472,7 +2472,7 @@ fn table_insert_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError>
 
 // --- Slice #158: accessors + predicates batch ---
 
-fn table_first(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn first(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     if table.num_rows() == 0 {
         return Ok(args.get(1).cloned().unwrap_or(Value::Null));
@@ -2480,7 +2480,7 @@ fn table_first(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     row_to_record(table, 0)
 }
 
-fn table_last(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn last(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let n = table.num_rows();
     if n == 0 {
@@ -2489,7 +2489,7 @@ fn table_last(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     row_to_record(table, n - 1)
 }
 
-fn table_first_value(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn first_value(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     if table.num_rows() == 0 || table.num_columns() == 0 {
         return Ok(args.get(1).cloned().unwrap_or(Value::Null));
@@ -2497,17 +2497,17 @@ fn table_first_value(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError
     cell_to_value(table, 0, 0)
 }
 
-fn table_row_count(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn row_count(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     Ok(Value::Number(table.num_rows() as f64))
 }
 
-fn table_column_count(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn column_count(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     Ok(Value::Number(table.num_columns() as f64))
 }
 
-fn table_range(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn range(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let offset = expect_int(&args[1], "Table.Range: offset")?;
     if offset < 0 {
@@ -2549,7 +2549,7 @@ fn row_matches_record(table: &Table, row: usize, needle: &Record) -> Result<bool
     Ok(true)
 }
 
-fn table_contains(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn contains(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let needle = match &args[1] {
         Value::Record(r) => r,
@@ -2568,7 +2568,7 @@ fn table_contains(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(Value::Logical(false))
 }
 
-fn table_contains_all(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn contains_all(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let needles = expect_list(&args[1])?;
     if !matches!(args.get(2), Some(Value::Null) | None) {
@@ -2595,7 +2595,7 @@ fn table_contains_all(args: &[Value], _host: &dyn IoHost) -> Result<Value, MErro
     Ok(Value::Logical(true))
 }
 
-fn table_contains_any(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn contains_any(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let needles = expect_list(&args[1])?;
     if !matches!(args.get(2), Some(Value::Null) | None) {
@@ -2617,7 +2617,7 @@ fn table_contains_any(args: &[Value], _host: &dyn IoHost) -> Result<Value, MErro
     Ok(Value::Logical(false))
 }
 
-fn table_is_distinct(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn is_distinct(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     if !matches!(args.get(1), Some(Value::Null) | None) {
         return Err(MError::NotImplemented(
@@ -2642,7 +2642,7 @@ fn table_is_distinct(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError
     Ok(Value::Logical(true))
 }
 
-fn table_has_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn has_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let names = match &args[1] {
         Value::Text(s) => vec![s.clone()],
@@ -2654,7 +2654,7 @@ fn table_has_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError
     Ok(Value::Logical(all_present))
 }
 
-fn table_matches_all_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+fn matches_all_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let cond = expect_function(&args[1])?;
     for row in 0..table.num_rows() {
@@ -2669,7 +2669,7 @@ fn table_matches_all_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, ME
     Ok(Value::Logical(true))
 }
 
-fn table_matches_any_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+fn matches_any_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let cond = expect_function(&args[1])?;
     for row in 0..table.num_rows() {
@@ -2684,7 +2684,7 @@ fn table_matches_any_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, ME
     Ok(Value::Logical(false))
 }
 
-fn table_find_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn find_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let needle = expect_text(&args[1])?;
     let (names, rows) = table_to_rows(table)?;
@@ -2700,7 +2700,7 @@ fn table_find_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> 
     Ok(Value::Table(values_to_table(&names, &kept)?))
 }
 
-fn table_position_of(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn position_of(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let needle = match &args[1] {
         Value::Record(r) => r,
@@ -2724,7 +2724,7 @@ fn table_position_of(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError
     Ok(Value::Number(-1.0))
 }
 
-fn table_position_of_any(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn position_of_any(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let needles_v = expect_list(&args[1])?;
     if !matches!(args.get(2), Some(Value::Null) | None) {
@@ -2751,13 +2751,13 @@ fn table_position_of_any(args: &[Value], _host: &dyn IoHost) -> Result<Value, ME
     Ok(Value::Number(-1.0))
 }
 
-fn table_keys(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn keys(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     // v1: we don't track key metadata — return an empty list.
     let _ = expect_table(&args[0])?;
     Ok(Value::List(Vec::new()))
 }
 
-fn table_columns_of_type(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn columns_of_type(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let type_list = expect_list(&args[1])?;
     let mut targets: Vec<super::super::value::TypeRep> = Vec::with_capacity(type_list.len());
@@ -2825,7 +2825,7 @@ fn compare_cells(a: &Value, b: &Value) -> std::cmp::Ordering {
     }
 }
 
-fn table_sort(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn sort(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let names = table.column_names();
     // Parse criteria into a list of (column_index, descending) tuples.
@@ -2895,7 +2895,7 @@ fn parse_fill_columns(arg: &Value, names: &[String], ctx: &str) -> Result<Vec<us
     Ok(out)
 }
 
-fn table_fill_down(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn fill_down(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let (names, mut rows) = table_to_rows(table)?;
     let cols = parse_fill_columns(&args[1], &names, "Table.FillDown")?;
@@ -2914,7 +2914,7 @@ fn table_fill_down(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> 
     Ok(Value::Table(values_to_table(&names, &rows)?))
 }
 
-fn table_fill_up(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn fill_up(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let (names, mut rows) = table_to_rows(table)?;
     let cols = parse_fill_columns(&args[1], &names, "Table.FillUp")?;
@@ -2933,14 +2933,14 @@ fn table_fill_up(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(Value::Table(values_to_table(&names, &rows)?))
 }
 
-fn table_reverse_rows(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn reverse_rows(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let (names, mut rows) = table_to_rows(table)?;
     rows.reverse();
     Ok(Value::Table(values_to_table(&names, &rows)?))
 }
 
-fn table_split_at(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn split_at(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let index = expect_int(&args[1], "Table.SplitAt: index")?;
     if index < 0 {
@@ -2957,7 +2957,7 @@ fn table_split_at(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     ]))
 }
 
-fn table_alternate_rows(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn alternate_rows(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let offset = expect_int(&args[1], "Table.AlternateRows: offset")?;
     let skip = expect_int(&args[2], "Table.AlternateRows: skip")?;
@@ -2985,7 +2985,7 @@ fn table_alternate_rows(args: &[Value], _host: &dyn IoHost) -> Result<Value, MEr
     Ok(Value::Table(values_to_table(&names, &kept)?))
 }
 
-fn table_repeat(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn repeat(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let count = expect_int(&args[1], "Table.Repeat: count")?;
     if count < 0 {
@@ -3001,7 +3001,7 @@ fn table_repeat(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(Value::Table(values_to_table(&names, &out)?))
 }
 
-fn table_single_row(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn single_row(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     if table.num_rows() != 1 {
         return Err(MError::Other(format!(
@@ -3029,7 +3029,7 @@ fn parse_min_max_criteria(arg: &Value, names: &[String], ctx: &str) -> Result<us
     }
 }
 
-fn table_min(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn min(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let names = table.column_names();
     if table.num_rows() == 0 {
@@ -3047,7 +3047,7 @@ fn table_min(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     row_to_record(table, best)
 }
 
-fn table_max(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn max(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let names = table.column_names();
     if table.num_rows() == 0 {
@@ -3075,7 +3075,7 @@ fn min_max_n_count(arg: &Value, ctx: &str) -> Result<usize, MError> {
     }
 }
 
-fn table_min_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn min_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let n = min_max_n_count(&args[1], "Table.MinN")?;
     let names = table.column_names();
@@ -3086,7 +3086,7 @@ fn table_min_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(Value::Table(values_to_table(&names_owned, &kept)?))
 }
 
-fn table_max_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn max_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let n = min_max_n_count(&args[1], "Table.MaxN")?;
     let names = table.column_names();
@@ -3097,7 +3097,7 @@ fn table_max_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(Value::Table(values_to_table(&names_owned, &kept)?))
 }
 
-fn table_aggregate_table_column(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+fn aggregate_table_column(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let col_name = expect_text(&args[1])?.to_string();
     let agg_list = expect_list(&args[2])?;
@@ -3213,7 +3213,7 @@ fn parse_optional_count(arg: Option<&Value>, default: usize, ctx: &str) -> Resul
     }
 }
 
-fn table_remove_first_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn remove_first_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let n = parse_optional_count(args.get(1), 1, "Table.RemoveFirstN: count")?;
     let (names, rows) = table_to_rows(table)?;
@@ -3221,7 +3221,7 @@ fn table_remove_first_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MEr
     Ok(Value::Table(values_to_table(&names, &kept)?))
 }
 
-fn table_remove_last_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn remove_last_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let n = parse_optional_count(args.get(1), 1, "Table.RemoveLastN: count")?;
     let (names, mut rows) = table_to_rows(table)?;
@@ -3230,7 +3230,7 @@ fn table_remove_last_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MErr
     Ok(Value::Table(values_to_table(&names, &rows)?))
 }
 
-fn table_remove_rows(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn remove_rows(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let offset = expect_int(&args[1], "Table.RemoveRows: offset")?;
     if offset < 0 {
@@ -3268,7 +3268,7 @@ fn row_matches_full_record(
     Ok(true)
 }
 
-fn table_remove_matching_rows(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn remove_matching_rows(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let needles = expect_list(&args[1])?;
     if !matches!(args.get(2), Some(Value::Null) | None) {
@@ -3293,13 +3293,13 @@ fn table_remove_matching_rows(args: &[Value], _host: &dyn IoHost) -> Result<Valu
     Ok(Value::Table(values_to_table(&names, &kept)?))
 }
 
-fn table_remove_rows_with_errors(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn remove_rows_with_errors(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     // v1: cells don't carry per-cell error state, so this is a no-op.
     let _ = expect_table(&args[0])?;
     Ok(args[0].clone())
 }
 
-fn table_replace_matching_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+fn replace_matching_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let pairs = expect_list(&args[1])?;
     if !matches!(args.get(2), Some(Value::Null) | None) {
@@ -3366,7 +3366,7 @@ fn table_replace_matching_rows(args: &[Value], host: &dyn IoHost) -> Result<Valu
     Ok(Value::Table(values_to_table(&names, &out)?))
 }
 
-fn table_replace_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+fn replace_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let offset = expect_int(&args[1], "Table.ReplaceRows: offset")?;
     let count = expect_int(&args[2], "Table.ReplaceRows: count")?;
@@ -3404,7 +3404,7 @@ fn table_replace_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError
     Ok(Value::Table(values_to_table(&names, &rows)?))
 }
 
-fn table_replace_value(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+fn replace_value(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let old_value = args[1].clone();
     let new_value = args[2].clone();
@@ -3436,7 +3436,7 @@ fn table_replace_value(args: &[Value], host: &dyn IoHost) -> Result<Value, MErro
     Ok(Value::Table(values_to_table(&names, &rows)?))
 }
 
-fn table_replace_error_values(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn replace_error_values(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     // v1: cells don't carry per-cell error state, so this is a no-op.
     let _ = expect_table(&args[0])?;
     Ok(args[0].clone())
@@ -3444,7 +3444,7 @@ fn table_replace_error_values(args: &[Value], _host: &dyn IoHost) -> Result<Valu
 
 // --- Slice #162: column mutation ---
 
-fn table_combine_columns(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+fn combine_columns(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let sources = expect_text_list(&args[1], "Table.CombineColumns: sourceColumns")?;
     let combiner = expect_function(&args[2])?;
@@ -3473,7 +3473,7 @@ fn table_combine_columns(args: &[Value], host: &dyn IoHost) -> Result<Value, MEr
     Ok(Value::Table(values_to_table(&out_names, &out_rows)?))
 }
 
-fn table_combine_columns_to_record(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn combine_columns_to_record(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let new_name = expect_text(&args[1])?.to_string();
     let sources = expect_text_list(&args[2], "Table.CombineColumnsToRecord: sourceColumns")?;
@@ -3508,7 +3508,7 @@ fn table_combine_columns_to_record(args: &[Value], _host: &dyn IoHost) -> Result
     Ok(Value::Table(values_to_table(&out_names, &out_rows)?))
 }
 
-fn table_demote_headers(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn demote_headers(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let names = table.column_names();
     let n_cols = names.len();
@@ -3521,7 +3521,7 @@ fn table_demote_headers(args: &[Value], _host: &dyn IoHost) -> Result<Value, MEr
     Ok(Value::Table(values_to_table(&new_names, &rows)?))
 }
 
-fn table_duplicate_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn duplicate_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let src = expect_text(&args[1])?.to_string();
     let new_name = expect_text(&args[2])?.to_string();
@@ -3547,7 +3547,7 @@ fn table_duplicate_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, M
     Ok(Value::Table(values_to_table(&out_names, &out_rows)?))
 }
 
-fn table_prefix_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn prefix_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let prefix = expect_text(&args[1])?;
     let (names, rows) = table_to_rows(table)?;
@@ -3555,7 +3555,7 @@ fn table_prefix_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MEr
     Ok(Value::Table(values_to_table(&new_names, &rows)?))
 }
 
-fn table_split_column(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+fn split_column(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let source = expect_text(&args[1])?.to_string();
     let splitter = expect_function(&args[2])?;
@@ -3646,7 +3646,7 @@ fn table_split_column(args: &[Value], host: &dyn IoHost) -> Result<Value, MError
     Ok(Value::Table(values_to_table(&out_names, &out_rows)?))
 }
 
-fn table_transform_column_names(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+fn transform_column_names(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let gen = expect_function(&args[1])?;
     if !matches!(args.get(2), Some(Value::Null) | None) {
@@ -3666,7 +3666,7 @@ fn table_transform_column_names(args: &[Value], host: &dyn IoHost) -> Result<Val
     Ok(Value::Table(values_to_table(&new_names, &rows)?))
 }
 
-fn table_transpose(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn transpose(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let n_cols = table.num_columns();
     let n_rows = table.num_rows();
@@ -3683,7 +3683,7 @@ fn table_transpose(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> 
     Ok(Value::Table(values_to_table(&new_names, &new_rows)?))
 }
 
-fn table_add_join_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn add_join_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table1 = expect_table(&args[0])?;
     let key1 = expect_text(&args[1])?.to_string();
     let table2 = expect_table(&args[2])?;
@@ -3720,7 +3720,7 @@ fn table_add_join_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, ME
 
 // --- Slice #163: format converters ---
 
-fn table_from_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn from_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let cols = expect_list(&args[0])?;
     // Each column is a list. Their lengths must match.
     let col_lists: Vec<&Vec<Value>> = cols
@@ -3758,7 +3758,7 @@ fn table_from_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MErro
     Ok(Value::Table(values_to_table(&names, &rows)?))
 }
 
-fn table_from_list(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+fn from_list(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let items = expect_list(&args[0])?;
     let splitter = match args.get(1) {
         Some(Value::Function(c)) => Some(c),
@@ -3802,7 +3802,7 @@ fn table_from_list(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     Ok(Value::Table(values_to_table(&names, &rows)?))
 }
 
-fn table_from_value(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn from_value(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     if !matches!(args.get(1), Some(Value::Null) | None) {
         return Err(MError::NotImplemented(
             "Table.FromValue: options not yet supported",
@@ -3813,7 +3813,7 @@ fn table_from_value(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError>
     Ok(Value::Table(values_to_table(&names, &rows)?))
 }
 
-fn table_to_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn to_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let n_cols = table.num_columns();
     let n_rows = table.num_rows();
@@ -3828,7 +3828,7 @@ fn table_to_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError>
     Ok(Value::List(out))
 }
 
-fn table_to_list(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+fn to_list(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let combiner = match args.get(1) {
         Some(Value::Function(c)) => Some(c),
@@ -3868,7 +3868,7 @@ fn table_to_list(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     Ok(Value::List(out))
 }
 
-fn table_to_rows_value(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn to_rows_value(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let (_, rows) = table_to_rows(table)?;
     let out: Vec<Value> = rows.into_iter().map(Value::List).collect();
@@ -3899,7 +3899,7 @@ fn typename_of(v: &Value) -> &'static str {
     }
 }
 
-fn table_schema(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn schema(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let names = table.column_names();
     let n_rows = table.num_rows();
@@ -3939,7 +3939,7 @@ fn table_schema(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     )?))
 }
 
-fn table_profile(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn profile(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     if !matches!(args.get(1), Some(Value::Null) | None) {
         return Err(MError::NotImplemented(
@@ -3986,7 +3986,7 @@ fn table_profile(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 
 // --- Slice #164: Group + AddRankColumn + Split + Buffer ---
 
-fn table_group(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+fn group(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let keys: Vec<String> = match &args[1] {
         Value::Text(s) => vec![s.clone()],
@@ -4080,7 +4080,7 @@ fn table_group(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     Ok(Value::Table(values_to_table(&out_names, &out_rows)?))
 }
 
-fn table_add_rank_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn add_rank_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let new_col = expect_text(&args[1])?.to_string();
     let crit = &args[2];
@@ -4147,7 +4147,7 @@ fn table_add_rank_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, ME
     Ok(Value::Table(values_to_table(&out_names, &out_rows)?))
 }
 
-fn table_split(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn split(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let page_size = expect_int(&args[1], "Table.Split: pageSize")?;
     if page_size <= 0 {
@@ -4162,14 +4162,14 @@ fn table_split(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(Value::List(out))
 }
 
-fn table_buffer(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn buffer(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let _ = expect_table(&args[0])?;
     Ok(args[0].clone())
 }
 
 // --- Slice #165: partitioning + miscellaneous tail ---
 
-fn table_partition(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+fn partition(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let col_name = expect_text(&args[1])?.to_string();
     let groups = expect_int(&args[2], "Table.Partition: groups")?;
@@ -4201,36 +4201,36 @@ fn table_partition(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     Ok(Value::List(out))
 }
 
-fn table_partition_key(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn partition_key(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     // v1: no partition key tracking.
     let _ = expect_table(&args[0])?;
     Ok(Value::List(Vec::new()))
 }
 
-fn table_partition_values(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn partition_values(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     // v1: no partition key tracking.
     let _ = expect_table(&args[0])?;
     Ok(Value::List(Vec::new()))
 }
 
-fn table_identity_passthrough(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn identity_passthrough(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let _ = expect_table(&args[0])?;
     Ok(args[0].clone())
 }
 
-fn table_identity_passthrough_one(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn identity_passthrough_one(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let _ = expect_table(&args[0])?;
     Ok(args[0].clone())
 }
 
-fn table_filter_with_data_table(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn filter_with_data_table(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     // v1: this is a query-folding hint with no semantic effect off-cloud.
     let _ = expect_table(&args[0])?;
     let _ = expect_table(&args[1])?;
     Ok(args[0].clone())
 }
 
-fn table_from_partitions(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn from_partitions(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let parts = expect_list(&args[0])?;
     if !matches!(args.get(1), Some(Value::Null) | None) {
         return Err(MError::NotImplemented(
@@ -4265,7 +4265,7 @@ fn table_from_partitions(args: &[Value], _host: &dyn IoHost) -> Result<Value, ME
     Ok(Value::Table(values_to_table(&names.unwrap(), &rows)?))
 }
 
-fn table_select_rows_with_errors(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn select_rows_with_errors(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     // v1: cells don't carry per-cell error state — no rows are "errored".
     let table = expect_table(&args[0])?;
     let (names, _rows) = table_to_rows(table)?;
@@ -4274,25 +4274,25 @@ fn table_select_rows_with_errors(args: &[Value], _host: &dyn IoHost) -> Result<V
 
 // --- Slice #166: fuzzy + view stubs ---
 
-fn table_fuzzy_not_implemented(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn fuzzy_not_implemented(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Err(MError::NotImplemented(
         "Table.Fuzzy*: fuzzy-match functions require similarity infra not built in v1",
     ))
 }
 
-fn table_view_identity(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn view_identity(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     // v1: View is purely a folding hook with no off-cloud effect.
     let _ = expect_table(&args[0])?;
     Ok(args[0].clone())
 }
 
-fn table_view_error_identity(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn view_error_identity(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     // Pass the supplied record back; without metadata machinery we can't
     // attach the view-error tag, but the value is preserved.
     Ok(args[0].clone())
 }
 
-fn table_view_function_identity(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn view_function_identity(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(args[0].clone())
 }
 

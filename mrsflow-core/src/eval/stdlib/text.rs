@@ -27,29 +27,29 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ("Character.FromNumber", one("number"), character_from_number),
         ("Character.ToNumber", one("text"), character_to_number),
         ("Guid.From", one("value"), guid_from),
-        ("Text.NewGuid", vec![], text_new_guid),
-        ("Text.From", one("value"), text_from),
-        ("Text.Contains", two("text", "substring"), text_contains),
-        ("Text.Replace", three("text", "old", "new"), text_replace),
-        ("Text.Trim", one("text"), text_trim),
-        ("Text.Lower", one("text"), text_lower),
-        ("Text.Upper", one("text"), text_upper),
-        ("Text.Length", one("text"), text_length),
-        ("Text.PositionOf", two("text", "substring"), text_position_of),
-        ("Text.EndsWith", two("text", "suffix"), text_ends_with),
-        ("Text.StartsWith", two("text", "prefix"), text_starts_with),
-        ("Text.TrimEnd", one("text"), text_trim_end),
+        ("Text.NewGuid", vec![], new_guid),
+        ("Text.From", one("value"), from),
+        ("Text.Contains", two("text", "substring"), contains),
+        ("Text.Replace", three("text", "old", "new"), replace),
+        ("Text.Trim", one("text"), trim),
+        ("Text.Lower", one("text"), lower),
+        ("Text.Upper", one("text"), upper),
+        ("Text.Length", one("text"), length),
+        ("Text.PositionOf", two("text", "substring"), position_of),
+        ("Text.EndsWith", two("text", "suffix"), ends_with),
+        ("Text.StartsWith", two("text", "prefix"), starts_with),
+        ("Text.TrimEnd", one("text"), trim_end),
         (
             "Text.TrimStart",
             vec![
                 Param { name: "text".into(), optional: false, type_annotation: None },
                 Param { name: "trim".into(), optional: true,  type_annotation: None },
             ],
-            text_trim_start,
+            trim_start,
         ),
-        ("Text.Reverse", one("text"), text_reverse),
-        ("Text.Proper", one("text"), text_proper),
-        ("Text.At", two("text", "index"), text_at),
+        ("Text.Reverse", one("text"), reverse),
+        ("Text.Proper", one("text"), proper),
+        ("Text.At", two("text", "index"), at),
         (
             "Text.Range",
             vec![
@@ -57,9 +57,9 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "offset".into(), optional: false, type_annotation: None },
                 Param { name: "count".into(),  optional: true,  type_annotation: None },
             ],
-            text_range,
+            range,
         ),
-        ("Text.Remove", two("text", "removeChars"), text_remove),
+        ("Text.Remove", two("text", "removeChars"), remove),
         (
             "Text.RemoveRange",
             vec![
@@ -67,9 +67,9 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "offset".into(), optional: false, type_annotation: None },
                 Param { name: "count".into(),  optional: true,  type_annotation: None },
             ],
-            text_remove_range,
+            remove_range,
         ),
-        ("Text.Insert", three("text", "offset", "newText"), text_insert),
+        ("Text.Insert", three("text", "offset", "newText"), insert),
         (
             "Text.ReplaceRange",
             vec![
@@ -78,7 +78,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "count".into(),   optional: false, type_annotation: None },
                 Param { name: "newText".into(), optional: false, type_annotation: None },
             ],
-            text_replace_range,
+            replace_range,
         ),
         (
             "Text.PadStart",
@@ -87,7 +87,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "count".into(),     optional: false, type_annotation: None },
                 Param { name: "character".into(), optional: true,  type_annotation: None },
             ],
-            text_pad_start,
+            pad_start,
         ),
         (
             "Text.PadEnd",
@@ -96,12 +96,12 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "count".into(),     optional: false, type_annotation: None },
                 Param { name: "character".into(), optional: true,  type_annotation: None },
             ],
-            text_pad_end,
+            pad_end,
         ),
-        ("Text.Repeat", two("text", "count"), text_repeat),
-        ("Text.Select", two("text", "selectChars"), text_select),
-        ("Text.ToList", one("text"), text_to_list),
-        ("Text.SplitAny", two("text", "separators"), text_split_any),
+        ("Text.Repeat", two("text", "count"), repeat),
+        ("Text.Select", two("text", "selectChars"), select),
+        ("Text.ToList", one("text"), to_list),
+        ("Text.SplitAny", two("text", "separators"), split_any),
         (
             "Text.PositionOfAny",
             vec![
@@ -109,7 +109,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "characters".into(), optional: false, type_annotation: None },
                 Param { name: "occurrence".into(), optional: true,  type_annotation: None },
             ],
-            text_position_of_any,
+            position_of_any,
         ),
         (
             "Text.BeforeDelimiter",
@@ -118,7 +118,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "delimiter".into(), optional: false, type_annotation: None },
                 Param { name: "index".into(),     optional: true,  type_annotation: None },
             ],
-            text_before_delimiter,
+            before_delimiter,
         ),
         (
             "Text.AfterDelimiter",
@@ -127,7 +127,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "delimiter".into(), optional: false, type_annotation: None },
                 Param { name: "index".into(),     optional: true,  type_annotation: None },
             ],
-            text_after_delimiter,
+            after_delimiter,
         ),
         (
             "Text.BetweenDelimiters",
@@ -138,10 +138,10 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "startIndex".into(),     optional: true,  type_annotation: None },
                 Param { name: "endIndex".into(),       optional: true,  type_annotation: None },
             ],
-            text_between_delimiters,
+            between_delimiters,
         ),
-        ("Text.InferNumberType", one("text"), text_infer_number_type),
-        ("Text.Clean", one("text"), text_clean),
+        ("Text.InferNumberType", one("text"), infer_number_type),
+        ("Text.Clean", one("text"), clean),
         (
             "Text.Format",
             vec![
@@ -149,9 +149,9 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "arguments".into(),    optional: false, type_annotation: None },
                 Param { name: "culture".into(),      optional: true,  type_annotation: None },
             ],
-            text_format,
+            format,
         ),
-        ("Text.Start", two("text", "count"), text_start),
+        ("Text.Start", two("text", "count"), start),
         (
             "Text.Middle",
             vec![
@@ -159,17 +159,17 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "offset".into(), optional: false, type_annotation: None },
                 Param { name: "count".into(),  optional: true,  type_annotation: None },
             ],
-            text_middle,
+            middle,
         ),
-        ("Text.End", two("text", "count"), text_end),
-        ("Text.Split", two("text", "separator"), text_split),
+        ("Text.End", two("text", "count"), end),
+        ("Text.Split", two("text", "separator"), split),
         (
             "Text.Combine",
             vec![
                 Param { name: "texts".into(),     optional: false, type_annotation: None },
                 Param { name: "separator".into(), optional: true,  type_annotation: None },
             ],
-            text_combine,
+            combine,
         ),
     ]
 }
@@ -235,7 +235,7 @@ fn guid_from(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn text_new_guid(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn new_guid(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     use rand::RngCore;
     let mut bytes = [0u8; 16];
     rand::thread_rng().fill_bytes(&mut bytes);
@@ -253,7 +253,7 @@ fn text_new_guid(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn text_from(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn from(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let v = &args[0];
     match v {
         Value::Null => Ok(Value::Null),
@@ -270,14 +270,14 @@ fn text_from(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn text_contains(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn contains(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     let sub = expect_text(&args[1])?;
     Ok(Value::Logical(text.contains(sub)))
 }
 
 
-fn text_replace(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn replace(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     let old = expect_text(&args[1])?;
     let new = expect_text(&args[2])?;
@@ -285,32 +285,32 @@ fn text_replace(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn text_trim(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn trim(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     Ok(Value::Text(text.trim().to_string()))
 }
 
 
-fn text_lower(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn lower(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     Ok(Value::Text(text.to_lowercase()))
 }
 
 
-fn text_upper(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn upper(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     Ok(Value::Text(text.to_uppercase()))
 }
 
 
-fn text_length(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn length(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     // M counts characters, not bytes — use char count.
     Ok(Value::Number(text.chars().count() as f64))
 }
 
 
-fn text_position_of(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn position_of(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     let sub = expect_text(&args[1])?;
     // Per spec: -1 when not found, byte offset on miss... but for parity
@@ -326,21 +326,21 @@ fn text_position_of(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError>
 }
 
 
-fn text_ends_with(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn ends_with(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     let suffix = expect_text(&args[1])?;
     Ok(Value::Logical(text.ends_with(suffix)))
 }
 
 
-fn text_starts_with(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn starts_with(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     let prefix = expect_text(&args[1])?;
     Ok(Value::Logical(text.starts_with(prefix)))
 }
 
 
-fn text_trim_end(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn trim_end(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     Ok(Value::Text(text.trim_end().to_string()))
 }
@@ -368,7 +368,7 @@ fn chars_from_arg(v: &Value, ctx: &'static str) -> Result<Vec<char>, MError> {
 }
 
 
-fn text_at(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn at(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     let idx = match &args[1] {
         Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
@@ -381,7 +381,7 @@ fn text_at(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn text_range(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn range(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     let chars: Vec<char> = text.chars().collect();
     let offset = match &args[1] {
@@ -401,14 +401,14 @@ fn text_range(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn text_remove(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn remove(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     let drop = chars_from_arg(&args[1], "Text.Remove")?;
     Ok(Value::Text(text.chars().filter(|c| !drop.contains(c)).collect()))
 }
 
 
-fn text_remove_range(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn remove_range(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     let chars: Vec<char> = text.chars().collect();
     let offset = match &args[1] {
@@ -430,7 +430,7 @@ fn text_remove_range(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError
 }
 
 
-fn text_insert(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn insert(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     let chars: Vec<char> = text.chars().collect();
     let offset = match &args[1] {
@@ -448,7 +448,7 @@ fn text_insert(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn text_replace_range(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn replace_range(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     let chars: Vec<char> = text.chars().collect();
     let offset = match &args[1] {
@@ -471,7 +471,7 @@ fn text_replace_range(args: &[Value], _host: &dyn IoHost) -> Result<Value, MErro
 }
 
 
-fn text_pad_start(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn pad_start(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     let target = match &args[1] {
         Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
@@ -494,7 +494,7 @@ fn text_pad_start(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn text_pad_end(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn pad_end(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     let target = match &args[1] {
         Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
@@ -517,7 +517,7 @@ fn text_pad_end(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn text_repeat(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn repeat(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     let count = match &args[1] {
         Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
@@ -527,20 +527,20 @@ fn text_repeat(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn text_select(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn select(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     let keep = chars_from_arg(&args[1], "Text.Select")?;
     Ok(Value::Text(text.chars().filter(|c| keep.contains(c)).collect()))
 }
 
 
-fn text_to_list(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn to_list(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     Ok(Value::List(text.chars().map(|c| Value::Text(c.to_string())).collect()))
 }
 
 
-fn text_split_any(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn split_any(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     let seps_text = expect_text(&args[1])?;
     let seps: Vec<char> = seps_text.chars().collect();
@@ -552,7 +552,7 @@ fn text_split_any(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn text_position_of_any(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn position_of_any(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     let chars = chars_from_arg(&args[1], "Text.PositionOfAny")?;
     if !matches!(args.get(2), Some(Value::Null) | None) {
@@ -609,7 +609,7 @@ fn pick_delimiter_index(args_index: Option<&Value>, ctx: &str) -> Result<(usize,
 }
 
 
-fn text_before_delimiter(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn before_delimiter(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     let delim = expect_text(&args[1])?;
     let (index, from_end) = pick_delimiter_index(args.get(2), "Text.BeforeDelimiter")?;
@@ -626,7 +626,7 @@ fn text_before_delimiter(args: &[Value], _host: &dyn IoHost) -> Result<Value, ME
 }
 
 
-fn text_after_delimiter(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn after_delimiter(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     let delim = expect_text(&args[1])?;
     let (index, from_end) = pick_delimiter_index(args.get(2), "Text.AfterDelimiter")?;
@@ -643,7 +643,7 @@ fn text_after_delimiter(args: &[Value], _host: &dyn IoHost) -> Result<Value, MEr
 }
 
 
-fn text_between_delimiters(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn between_delimiters(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     let start_delim = expect_text(&args[1])?;
     let end_delim = expect_text(&args[2])?;
@@ -675,7 +675,7 @@ fn text_between_delimiters(args: &[Value], _host: &dyn IoHost) -> Result<Value, 
 }
 
 
-fn text_clean(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn clean(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     Ok(Value::Text(
         text.chars()
@@ -707,7 +707,7 @@ fn format_arg_to_text(v: &Value) -> String {
 }
 
 
-fn text_format(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+fn format(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let fmt = expect_text(&args[0])?;
     let mut out = String::with_capacity(fmt.len());
     let mut chars = fmt.chars().peekable();
@@ -759,7 +759,7 @@ fn text_format(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn text_infer_number_type(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn infer_number_type(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     if text.trim().parse::<f64>().is_ok() {
         Ok(Value::Type(super::super::value::TypeRep::Number))
@@ -772,7 +772,7 @@ fn text_infer_number_type(args: &[Value], _host: &dyn IoHost) -> Result<Value, M
 }
 
 
-fn text_trim_start(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn trim_start(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     match args.get(1) {
         Some(Value::Null) | None => Ok(Value::Text(text.trim_start().to_string())),
@@ -795,13 +795,13 @@ fn text_trim_start(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> 
 }
 
 
-fn text_reverse(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn reverse(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     Ok(Value::Text(text.chars().rev().collect()))
 }
 
 
-fn text_proper(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn proper(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     let mut out = String::with_capacity(text.len());
     let mut start_of_word = true;
@@ -820,7 +820,7 @@ fn text_proper(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn text_combine(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn combine(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let texts = expect_list(&args[0])?;
     let sep = match args.get(1) {
         Some(Value::Text(s)) => s.as_str(),
@@ -838,7 +838,7 @@ fn text_combine(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn text_start(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn start(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     let count = match &args[1] {
         Value::Number(n) => *n as isize,
@@ -851,7 +851,7 @@ fn text_start(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn text_end(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn end(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     let count = match &args[1] {
         Value::Number(n) => *n as isize,
@@ -866,7 +866,7 @@ fn text_end(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn text_middle(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn middle(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     let offset = match &args[1] {
         Value::Number(n) => *n as isize,
@@ -891,7 +891,7 @@ fn text_middle(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn text_split(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn split(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     let sep = expect_text(&args[1])?;
     // Power Query Text.Split on empty separator returns a list of single-char

@@ -10,17 +10,17 @@ use super::common::{expect_int, expect_list, expect_text, one, two, three, type_
 
 pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
     vec![
-        ("Binary.Length", one("binary"), binary_length),
-        ("Binary.ApproximateLength", one("binary"), binary_length),
-        ("Binary.From", one("value"), binary_from),
-        ("Binary.FromList", one("list"), binary_from_list),
+        ("Binary.Length", one("binary"), length),
+        ("Binary.ApproximateLength", one("binary"), length),
+        ("Binary.From", one("value"), from),
+        ("Binary.FromList", one("list"), from_list),
         (
             "Binary.FromText",
             vec![
                 Param { name: "text".into(),     optional: false, type_annotation: None },
                 Param { name: "encoding".into(), optional: true,  type_annotation: None },
             ],
-            binary_from_text,
+            from_text,
         ),
         (
             "Binary.ToText",
@@ -28,9 +28,9 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "binary".into(),   optional: false, type_annotation: None },
                 Param { name: "encoding".into(), optional: true,  type_annotation: None },
             ],
-            binary_to_text,
+            to_text,
         ),
-        ("Binary.ToList", one("binary"), binary_to_list),
+        ("Binary.ToList", one("binary"), to_list),
         (
             "Binary.Range",
             vec![
@@ -38,18 +38,18 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "offset".into(), optional: false, type_annotation: None },
                 Param { name: "count".into(),  optional: true,  type_annotation: None },
             ],
-            binary_range,
+            range,
         ),
-        ("Binary.Combine", one("binaries"), binary_combine),
-        ("Binary.Buffer", one("binary"), binary_buffer),
-        ("Binary.Split", two("binary", "pageSize"), binary_split),
-        ("Binary.InferContentType", one("binary"), binary_infer_content_type),
+        ("Binary.Combine", one("binaries"), combine),
+        ("Binary.Buffer", one("binary"), buffer),
+        ("Binary.Split", two("binary", "pageSize"), split),
+        ("Binary.InferContentType", one("binary"), infer_content_type),
         // --- Slice #173: compression + view stubs ---
-        ("Binary.Compress", two("binary", "compressionType"), binary_compress),
-        ("Binary.Decompress", two("binary", "compressionType"), binary_decompress),
-        ("Binary.View", two("binary", "handlers"), binary_view),
-        ("Binary.ViewError", one("record"), binary_view_passthrough),
-        ("Binary.ViewFunction", one("function"), binary_view_passthrough),
+        ("Binary.Compress", two("binary", "compressionType"), compress),
+        ("Binary.Decompress", two("binary", "compressionType"), decompress),
+        ("Binary.View", two("binary", "handlers"), view),
+        ("Binary.ViewError", one("record"), view_passthrough),
+        ("Binary.ViewFunction", one("function"), view_passthrough),
     ]
 }
 
@@ -60,12 +60,12 @@ fn expect_binary(v: &Value) -> Result<&[u8], MError> {
     }
 }
 
-fn binary_length(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn length(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let b = expect_binary(&args[0])?;
     Ok(Value::Number(b.len() as f64))
 }
 
-fn binary_from(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn from(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     match &args[0] {
         Value::Binary(b) => Ok(Value::Binary(b.clone())),
         Value::Text(s) => Ok(Value::Binary(s.as_bytes().to_vec())),
@@ -74,7 +74,7 @@ fn binary_from(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     }
 }
 
-fn binary_from_list(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn from_list(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let xs = expect_list(&args[0])?;
     let mut bytes: Vec<u8> = Vec::with_capacity(xs.len());
     for v in xs {
@@ -118,7 +118,7 @@ fn parse_encoding(v: Option<&Value>, ctx: &str) -> Result<Encoding, MError> {
     }
 }
 
-fn binary_from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     let enc = parse_encoding(args.get(1), "Binary.FromText")?;
     Ok(Value::Binary(match enc {
@@ -127,7 +127,7 @@ fn binary_from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError>
     }))
 }
 
-fn binary_to_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn to_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let bytes = expect_binary(&args[0])?;
     let enc = parse_encoding(args.get(1), "Binary.ToText")?;
     Ok(Value::Text(match enc {
@@ -136,12 +136,12 @@ fn binary_to_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     }))
 }
 
-fn binary_to_list(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn to_list(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let bytes = expect_binary(&args[0])?;
     Ok(Value::List(bytes.iter().map(|b| Value::Number(*b as f64)).collect()))
 }
 
-fn binary_range(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn range(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let bytes = expect_binary(&args[0])?;
     let offset = expect_int(&args[1], "Binary.Range: offset")?;
     if offset < 0 {
@@ -161,7 +161,7 @@ fn binary_range(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(Value::Binary(bytes[offset..offset + count].to_vec()))
 }
 
-fn binary_combine(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn combine(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let xs = expect_list(&args[0])?;
     let mut out: Vec<u8> = Vec::new();
     for v in xs {
@@ -173,12 +173,12 @@ fn binary_combine(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(Value::Binary(out))
 }
 
-fn binary_buffer(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn buffer(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let _ = expect_binary(&args[0])?;
     Ok(args[0].clone())
 }
 
-fn binary_split(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn split(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let bytes = expect_binary(&args[0])?;
     let page_size = expect_int(&args[1], "Binary.Split: pageSize")?;
     if page_size <= 0 {
@@ -192,7 +192,7 @@ fn binary_split(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(Value::List(out))
 }
 
-fn binary_infer_content_type(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn infer_content_type(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     // v1: no sniffing — return null. (PQ uses this for HTTP content-types.)
     let _ = expect_binary(&args[0])?;
     Ok(Value::Null)
@@ -309,7 +309,7 @@ fn parse_compression(v: &Value, ctx: &str) -> Result<Compression, MError> {
     }
 }
 
-fn binary_compress(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn compress(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     use std::io::Write;
     let bytes = expect_binary(&args[0])?;
     let kind = parse_compression(&args[1], "Binary.Compress")?;
@@ -340,7 +340,7 @@ fn binary_compress(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> 
     Ok(Value::Binary(out))
 }
 
-fn binary_decompress(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn decompress(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     use std::io::Read;
     let bytes = expect_binary(&args[0])?;
     let kind = parse_compression(&args[1], "Binary.Decompress")?;
@@ -370,13 +370,13 @@ fn binary_decompress(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError
     Ok(Value::Binary(out))
 }
 
-fn binary_view(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn view(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     // v1: View is a folding hook — pass binary through unchanged.
     let _ = expect_binary(&args[0])?;
     Ok(args[0].clone())
 }
 
-fn binary_view_passthrough(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn view_passthrough(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(args[0].clone())
 }
 

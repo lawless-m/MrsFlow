@@ -24,13 +24,13 @@ use super::common::{
 
 pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
     vec![
-        ("Logical.ToText", one("logical"), logical_to_text),
-        ("Logical.From", one("value"), logical_from),
-        ("Logical.FromText", one("text"), logical_from_text),
+        ("Logical.ToText", one("logical"), to_text),
+        ("Logical.From", one("value"), from),
+        ("Logical.FromText", one("text"), from_text),
     ]
 }
 
-fn logical_to_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn to_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     match &args[0] {
         Value::Null => Ok(Value::Null),
         Value::Logical(b) => Ok(Value::Text(if *b { "true".into() } else { "false".into() })),
@@ -39,19 +39,19 @@ fn logical_to_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> 
 }
 
 
-fn logical_from(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+fn from(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let v = &args[0];
     match v {
         Value::Null => Ok(Value::Null),
         Value::Logical(b) => Ok(Value::Logical(*b)),
         Value::Number(n) => Ok(Value::Logical(*n != 0.0)),
-        Value::Text(_) => logical_from_text(args, host),
+        Value::Text(_) => from_text(args, host),
         other => Err(type_mismatch("text/number/logical/null", other)),
     }
 }
 
 
-fn logical_from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     match text.to_ascii_lowercase().as_str() {
         "true" => Ok(Value::Logical(true)),

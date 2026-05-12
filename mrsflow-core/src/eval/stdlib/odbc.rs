@@ -24,11 +24,11 @@ use super::common::{
 
 pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
     vec![
-        ("Odbc.Query", two("connection", "sql"), odbc_query),
+        ("Odbc.Query", two("connection", "sql"), query),
     ]
 }
 
-fn odbc_query(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+fn query(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let conn = expect_text(&args[0])?;
     let sql = expect_text(&args[1])?;
     host.odbc_query(conn, sql, None)

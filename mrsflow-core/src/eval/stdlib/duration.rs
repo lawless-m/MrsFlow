@@ -32,31 +32,31 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "minutes".into(), optional: false, type_annotation: None },
                 Param { name: "seconds".into(), optional: false, type_annotation: None },
             ],
-            duration_constructor,
+            constructor,
         ),
-        ("Duration.Days", one("duration"), duration_days),
-        ("Duration.Hours", one("duration"), duration_hours),
-        ("Duration.Minutes", one("duration"), duration_minutes),
-        ("Duration.Seconds", one("duration"), duration_seconds),
-        ("Duration.TotalDays", one("duration"), duration_total_days),
-        ("Duration.TotalHours", one("duration"), duration_total_hours),
-        ("Duration.TotalMinutes", one("duration"), duration_total_minutes),
-        ("Duration.TotalSeconds", one("duration"), duration_total_seconds),
-        ("Duration.From", one("value"), duration_from),
-        ("Duration.FromText", one("text"), duration_from_text),
-        ("Duration.ToRecord", one("duration"), duration_to_record),
+        ("Duration.Days", one("duration"), days),
+        ("Duration.Hours", one("duration"), hours),
+        ("Duration.Minutes", one("duration"), minutes),
+        ("Duration.Seconds", one("duration"), seconds),
+        ("Duration.TotalDays", one("duration"), total_days),
+        ("Duration.TotalHours", one("duration"), total_hours),
+        ("Duration.TotalMinutes", one("duration"), total_minutes),
+        ("Duration.TotalSeconds", one("duration"), total_seconds),
+        ("Duration.From", one("value"), from),
+        ("Duration.FromText", one("text"), from_text),
+        ("Duration.ToRecord", one("duration"), to_record),
         (
             "Duration.ToText",
             vec![
                 Param { name: "duration".into(), optional: false, type_annotation: None },
                 Param { name: "format".into(),   optional: true,  type_annotation: None },
             ],
-            duration_to_text,
+            to_text,
         ),
     ]
 }
 
-fn duration_constructor(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn constructor(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let d = expect_int(&args[0], "#duration: days")?;
     let h = expect_int(&args[1], "#duration: hours")?;
     let mn = expect_int(&args[2], "#duration: minutes")?;
@@ -82,14 +82,14 @@ fn extract_duration(v: &Value, ctx: &str) -> Result<chrono::Duration, MError> {
 }
 
 
-fn duration_days(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn days(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     if matches!(args[0], Value::Null) { return Ok(Value::Null); }
     let d = extract_duration(&args[0], "Duration.Days")?;
     Ok(Value::Number(d.num_days() as f64))
 }
 
 
-fn duration_hours(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn hours(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     if matches!(args[0], Value::Null) { return Ok(Value::Null); }
     let d = extract_duration(&args[0], "Duration.Hours")?;
     let total_secs = d.num_seconds();
@@ -100,7 +100,7 @@ fn duration_hours(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn duration_minutes(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn minutes(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     if matches!(args[0], Value::Null) { return Ok(Value::Null); }
     let d = extract_duration(&args[0], "Duration.Minutes")?;
     let total_secs = d.num_seconds();
@@ -111,7 +111,7 @@ fn duration_minutes(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError>
 }
 
 
-fn duration_seconds(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn seconds(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     if matches!(args[0], Value::Null) { return Ok(Value::Null); }
     let d = extract_duration(&args[0], "Duration.Seconds")?;
     let total_secs = d.num_seconds();
@@ -122,35 +122,35 @@ fn duration_seconds(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError>
 }
 
 
-fn duration_total_days(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn total_days(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     if matches!(args[0], Value::Null) { return Ok(Value::Null); }
     let d = extract_duration(&args[0], "Duration.TotalDays")?;
     Ok(Value::Number(d.num_seconds() as f64 / 86400.0))
 }
 
 
-fn duration_total_hours(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn total_hours(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     if matches!(args[0], Value::Null) { return Ok(Value::Null); }
     let d = extract_duration(&args[0], "Duration.TotalHours")?;
     Ok(Value::Number(d.num_seconds() as f64 / 3600.0))
 }
 
 
-fn duration_total_minutes(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn total_minutes(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     if matches!(args[0], Value::Null) { return Ok(Value::Null); }
     let d = extract_duration(&args[0], "Duration.TotalMinutes")?;
     Ok(Value::Number(d.num_seconds() as f64 / 60.0))
 }
 
 
-fn duration_total_seconds(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn total_seconds(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     if matches!(args[0], Value::Null) { return Ok(Value::Null); }
     let d = extract_duration(&args[0], "Duration.TotalSeconds")?;
     Ok(Value::Number(d.num_seconds() as f64))
 }
 
 
-fn duration_from(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+fn from(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     match &args[0] {
         Value::Null => Ok(Value::Null),
         Value::Duration(d) => Ok(Value::Duration(*d)),
@@ -158,14 +158,14 @@ fn duration_from(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
             // PQ treats Number as number of days.
             Ok(Value::Duration(chrono::Duration::seconds((n * 86400.0) as i64)))
         }
-        Value::Text(_) => duration_from_text(args, host),
+        Value::Text(_) => from_text(args, host),
         other => Err(type_mismatch("text/number/duration/null", other)),
     }
 }
 
 /// Parse PQ duration text: "[d.]hh:mm:ss[.fff]" or just "hh:mm:ss".
 
-fn duration_from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?.trim();
     let (negative, body) = if let Some(rest) = text.strip_prefix('-') {
         (true, rest)
@@ -209,7 +209,7 @@ fn duration_from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MErro
 }
 
 
-fn duration_to_record(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn to_record(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     if matches!(args[0], Value::Null) { return Ok(Value::Null); }
     let d = extract_duration(&args[0], "Duration.ToRecord")?;
     let total_secs = d.num_seconds();
@@ -231,7 +231,7 @@ fn duration_to_record(args: &[Value], _host: &dyn IoHost) -> Result<Value, MErro
 }
 
 
-fn duration_to_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn to_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     if matches!(args[0], Value::Null) { return Ok(Value::Null); }
     let d = extract_duration(&args[0], "Duration.ToText")?;
     if !matches!(args.get(1), Some(Value::Null) | None) {

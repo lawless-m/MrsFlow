@@ -24,17 +24,17 @@ use super::common::{
 
 pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
     vec![
-        ("Time.Hour", one("time"), time_hour),
-        ("Time.Minute", one("time"), time_minute),
-        ("Time.Second", one("time"), time_second),
-        ("Time.From", one("value"), time_from),
+        ("Time.Hour", one("time"), hour),
+        ("Time.Minute", one("time"), minute),
+        ("Time.Second", one("time"), second),
+        ("Time.From", one("value"), from),
         (
             "Time.FromText",
             vec![
                 Param { name: "text".into(),    optional: false, type_annotation: None },
                 Param { name: "culture".into(), optional: true,  type_annotation: None },
             ],
-            time_from_text,
+            from_text,
         ),
         (
             "Time.ToText",
@@ -43,11 +43,11 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "format".into(), optional: true,  type_annotation: None },
                 Param { name: "culture".into(), optional: true,  type_annotation: None },
             ],
-            time_to_text,
+            to_text,
         ),
-        ("Time.ToRecord", one("time"), time_to_record),
-        ("Time.StartOfHour", one("time"), time_start_of_hour),
-        ("Time.EndOfHour", one("time"), time_end_of_hour),
+        ("Time.ToRecord", one("time"), to_record),
+        ("Time.StartOfHour", one("time"), start_of_hour),
+        ("Time.EndOfHour", one("time"), end_of_hour),
     ]
 }
 
@@ -63,39 +63,39 @@ fn extract_time(v: &Value, ctx: &str) -> Result<chrono::NaiveTime, MError> {
 }
 
 
-fn time_hour(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn hour(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     use chrono::Timelike;
     if matches!(args[0], Value::Null) { return Ok(Value::Null); }
     Ok(Value::Number(extract_time(&args[0], "Time.Hour")?.hour() as f64))
 }
 
 
-fn time_minute(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn minute(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     use chrono::Timelike;
     if matches!(args[0], Value::Null) { return Ok(Value::Null); }
     Ok(Value::Number(extract_time(&args[0], "Time.Minute")?.minute() as f64))
 }
 
 
-fn time_second(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn second(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     use chrono::Timelike;
     if matches!(args[0], Value::Null) { return Ok(Value::Null); }
     Ok(Value::Number(extract_time(&args[0], "Time.Second")?.second() as f64))
 }
 
 
-fn time_from(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+fn from(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     match &args[0] {
         Value::Null => Ok(Value::Null),
         Value::Time(t) => Ok(Value::Time(*t)),
         Value::Datetime(dt) => Ok(Value::Time(dt.time())),
-        Value::Text(_) => time_from_text(args, host),
+        Value::Text(_) => from_text(args, host),
         other => Err(type_mismatch("text/time/datetime/null", other)),
     }
 }
 
 
-fn time_from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     for fmt in &["%H:%M:%S%.f", "%H:%M:%S", "%H:%M"] {
         if let Ok(t) = chrono::NaiveTime::parse_from_str(text, fmt) {
@@ -106,7 +106,7 @@ fn time_from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn time_to_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn to_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     if matches!(args[0], Value::Null) { return Ok(Value::Null); }
     let t = extract_time(&args[0], "Time.ToText")?;
     if !matches!(args.get(1), Some(Value::Null) | None) {
@@ -116,7 +116,7 @@ fn time_to_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn time_to_record(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn to_record(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     use chrono::Timelike;
     if matches!(args[0], Value::Null) { return Ok(Value::Null); }
     let t = extract_time(&args[0], "Time.ToRecord")?;
@@ -131,7 +131,7 @@ fn time_to_record(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn time_start_of_hour(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn start_of_hour(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     use chrono::Timelike;
     match &args[0] {
         Value::Null => Ok(Value::Null),
@@ -147,7 +147,7 @@ fn time_start_of_hour(args: &[Value], _host: &dyn IoHost) -> Result<Value, MErro
 }
 
 
-fn time_end_of_hour(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn end_of_hour(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     use chrono::Timelike;
     match &args[0] {
         Value::Null => Ok(Value::Null),

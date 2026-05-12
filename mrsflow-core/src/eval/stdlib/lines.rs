@@ -19,7 +19,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "text".into(),       optional: false, type_annotation: None },
                 Param { name: "quoteStyle".into(), optional: true,  type_annotation: None },
             ],
-            lines_from_text,
+            from_text,
         ),
         (
             "Lines.ToText",
@@ -27,7 +27,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "lines".into(),         optional: false, type_annotation: None },
                 Param { name: "lineSeparator".into(), optional: true,  type_annotation: None },
             ],
-            lines_to_text,
+            to_text,
         ),
         (
             "Lines.FromBinary",
@@ -37,7 +37,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "includeLineSeparators".into(), optional: true,  type_annotation: None },
                 Param { name: "encoding".into(),              optional: true,  type_annotation: None },
             ],
-            lines_from_binary,
+            from_binary,
         ),
         (
             "Lines.ToBinary",
@@ -47,17 +47,17 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "lineTerminator".into(), optional: true,  type_annotation: None },
                 Param { name: "encoding".into(),       optional: true,  type_annotation: None },
             ],
-            lines_to_binary,
+            to_binary,
         ),
     ]
 }
 
-fn lines_from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     Ok(Value::List(split_lines(text, false)))
 }
 
-fn lines_to_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn to_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let lines = expect_text_list(&args[0], "Lines.ToText")?;
     let sep = match args.get(1) {
         Some(Value::Text(s)) => s.clone(),
@@ -67,7 +67,7 @@ fn lines_to_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(Value::Text(lines.join(&sep)))
 }
 
-fn lines_from_binary(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn from_binary(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let bytes = match &args[0] {
         Value::Binary(b) => b,
         other => return Err(type_mismatch("binary", other)),
@@ -78,7 +78,7 @@ fn lines_from_binary(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError
     Ok(Value::List(split_lines(text, include_seps)))
 }
 
-fn lines_to_binary(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn to_binary(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let lines = expect_text_list(&args[0], "Lines.ToBinary")?;
     let sep = match args.get(1) {
         Some(Value::Text(s)) => s.clone(),

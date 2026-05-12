@@ -23,12 +23,12 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "delimiter".into(), optional: false, type_annotation: None },
                 Param { name: "quoteStyle".into(), optional: true, type_annotation: None },
             ],
-            combiner_combine_text_by_delimiter,
+            combine_text_by_delimiter,
         ),
         (
             "Combiner.CombineTextByEachDelimiter",
             one("delimiters"),
-            combiner_combine_text_by_each_delimiter,
+            combine_text_by_each_delimiter,
         ),
         (
             "Combiner.CombineTextByLengths",
@@ -36,7 +36,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "lengths".into(), optional: false, type_annotation: None },
                 Param { name: "template".into(), optional: true, type_annotation: None },
             ],
-            combiner_combine_text_by_lengths,
+            combine_text_by_lengths,
         ),
         (
             "Combiner.CombineTextByPositions",
@@ -44,7 +44,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "positions".into(), optional: false, type_annotation: None },
                 Param { name: "template".into(), optional: true, type_annotation: None },
             ],
-            combiner_combine_text_by_positions,
+            combine_text_by_positions,
         ),
         (
             "Combiner.CombineTextByRanges",
@@ -52,7 +52,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "ranges".into(), optional: false, type_annotation: None },
                 Param { name: "template".into(), optional: true, type_annotation: None },
             ],
-            combiner_combine_text_by_ranges,
+            combine_text_by_ranges,
         ),
     ]
 }
@@ -100,7 +100,7 @@ fn make_combiner(captures: Vec<(String, Value)>, impl_fn: BuiltinFn) -> Value {
 
 // --- Factories ---
 
-fn combiner_combine_text_by_delimiter(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn combine_text_by_delimiter(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     if !matches!(&args[0], Value::Text(_)) {
         return Err(type_mismatch("text", &args[0]));
     }
@@ -115,7 +115,7 @@ fn combiner_combine_text_by_delimiter(args: &[Value], _host: &dyn IoHost) -> Res
     ))
 }
 
-fn combiner_combine_text_by_each_delimiter(
+fn combine_text_by_each_delimiter(
     args: &[Value],
     _host: &dyn IoHost,
 ) -> Result<Value, MError> {
@@ -126,7 +126,7 @@ fn combiner_combine_text_by_each_delimiter(
     ))
 }
 
-fn combiner_combine_text_by_lengths(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn combine_text_by_lengths(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let xs = expect_list(&args[0])?;
     for v in xs {
         let _ = expect_int(v, "Combiner.CombineTextByLengths")?;
@@ -142,7 +142,7 @@ fn combiner_combine_text_by_lengths(args: &[Value], _host: &dyn IoHost) -> Resul
     ))
 }
 
-fn combiner_combine_text_by_positions(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn combine_text_by_positions(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let xs = expect_list(&args[0])?;
     for v in xs {
         let _ = expect_int(v, "Combiner.CombineTextByPositions")?;
@@ -158,7 +158,7 @@ fn combiner_combine_text_by_positions(args: &[Value], _host: &dyn IoHost) -> Res
     ))
 }
 
-fn combiner_combine_text_by_ranges(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn combine_text_by_ranges(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let xs = expect_list(&args[0])?;
     for r in xs {
         let pair = match r {

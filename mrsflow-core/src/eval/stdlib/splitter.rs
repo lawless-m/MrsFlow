@@ -19,14 +19,14 @@ use super::common::{
 
 pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
     vec![
-        ("Splitter.SplitByNothing", vec![], splitter_split_by_nothing),
+        ("Splitter.SplitByNothing", vec![], split_by_nothing),
         (
             "Splitter.SplitTextByDelimiter",
             vec![
                 Param { name: "delimiter".into(), optional: false, type_annotation: None },
                 Param { name: "quoteStyle".into(), optional: true, type_annotation: None },
             ],
-            splitter_split_text_by_delimiter,
+            split_text_by_delimiter,
         ),
         (
             "Splitter.SplitTextByAnyDelimiter",
@@ -34,7 +34,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "delimiters".into(), optional: false, type_annotation: None },
                 Param { name: "quoteStyle".into(), optional: true, type_annotation: None },
             ],
-            splitter_split_text_by_any_delimiter,
+            split_text_by_any_delimiter,
         ),
         (
             "Splitter.SplitTextByEachDelimiter",
@@ -43,7 +43,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "quoteStyle".into(), optional: true, type_annotation: None },
                 Param { name: "startAtEnd".into(), optional: true, type_annotation: None },
             ],
-            splitter_split_text_by_each_delimiter,
+            split_text_by_each_delimiter,
         ),
         (
             "Splitter.SplitTextByLengths",
@@ -51,7 +51,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "lengths".into(), optional: false, type_annotation: None },
                 Param { name: "startAtEnd".into(), optional: true, type_annotation: None },
             ],
-            splitter_split_text_by_lengths,
+            split_text_by_lengths,
         ),
         (
             "Splitter.SplitTextByPositions",
@@ -59,7 +59,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "positions".into(), optional: false, type_annotation: None },
                 Param { name: "startAtEnd".into(), optional: true, type_annotation: None },
             ],
-            splitter_split_text_by_positions,
+            split_text_by_positions,
         ),
         (
             "Splitter.SplitTextByRanges",
@@ -67,17 +67,17 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "ranges".into(), optional: false, type_annotation: None },
                 Param { name: "startAtEnd".into(), optional: true, type_annotation: None },
             ],
-            splitter_split_text_by_ranges,
+            split_text_by_ranges,
         ),
         (
             "Splitter.SplitTextByCharacterTransition",
             two("before", "after"),
-            splitter_split_text_by_character_transition,
+            split_text_by_character_transition,
         ),
         (
             "Splitter.SplitTextByRepeatedLengths",
             one("length"),
-            splitter_split_text_by_repeated_lengths,
+            split_text_by_repeated_lengths,
         ),
         (
             "Splitter.SplitTextByWhitespace",
@@ -86,7 +86,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 optional: true,
                 type_annotation: None,
             }],
-            splitter_split_text_by_whitespace,
+            split_text_by_whitespace,
         ),
     ]
 }
@@ -136,11 +136,11 @@ fn make_splitter(captures: Vec<(String, Value)>, impl_fn: BuiltinFn) -> Value {
 
 // --- Factories ---
 
-fn splitter_split_by_nothing(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn split_by_nothing(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(make_splitter(vec![], split_by_nothing_impl))
 }
 
-fn splitter_split_text_by_delimiter(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn split_text_by_delimiter(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     if !matches!(&args[0], Value::Text(_)) {
         return Err(type_mismatch("text", &args[0]));
     }
@@ -155,7 +155,7 @@ fn splitter_split_text_by_delimiter(args: &[Value], _host: &dyn IoHost) -> Resul
     ))
 }
 
-fn splitter_split_text_by_any_delimiter(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn split_text_by_any_delimiter(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     // Validate at factory time so the error surfaces immediately.
     let _ = expect_text_list(&args[0], "Splitter.SplitTextByAnyDelimiter")?;
     if !matches!(args.get(1), Some(Value::Null) | None) {
@@ -169,7 +169,7 @@ fn splitter_split_text_by_any_delimiter(args: &[Value], _host: &dyn IoHost) -> R
     ))
 }
 
-fn splitter_split_text_by_each_delimiter(
+fn split_text_by_each_delimiter(
     args: &[Value],
     _host: &dyn IoHost,
 ) -> Result<Value, MError> {
@@ -190,7 +190,7 @@ fn splitter_split_text_by_each_delimiter(
     ))
 }
 
-fn splitter_split_text_by_lengths(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn split_text_by_lengths(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let xs = expect_list(&args[0])?;
     for v in xs {
         let _ = expect_int(v, "Splitter.SplitTextByLengths")?;
@@ -206,7 +206,7 @@ fn splitter_split_text_by_lengths(args: &[Value], _host: &dyn IoHost) -> Result<
     ))
 }
 
-fn splitter_split_text_by_positions(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn split_text_by_positions(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let xs = expect_list(&args[0])?;
     for v in xs {
         let _ = expect_int(v, "Splitter.SplitTextByPositions")?;
@@ -222,7 +222,7 @@ fn splitter_split_text_by_positions(args: &[Value], _host: &dyn IoHost) -> Resul
     ))
 }
 
-fn splitter_split_text_by_ranges(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn split_text_by_ranges(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let xs = expect_list(&args[0])?;
     for r in xs {
         let pair = match r {
@@ -249,7 +249,7 @@ fn splitter_split_text_by_ranges(args: &[Value], _host: &dyn IoHost) -> Result<V
     ))
 }
 
-fn splitter_split_text_by_character_transition(
+fn split_text_by_character_transition(
     args: &[Value],
     _host: &dyn IoHost,
 ) -> Result<Value, MError> {
@@ -264,7 +264,7 @@ fn splitter_split_text_by_character_transition(
     ))
 }
 
-fn splitter_split_text_by_repeated_lengths(
+fn split_text_by_repeated_lengths(
     args: &[Value],
     _host: &dyn IoHost,
 ) -> Result<Value, MError> {
@@ -275,7 +275,7 @@ fn splitter_split_text_by_repeated_lengths(
     ))
 }
 
-fn splitter_split_text_by_whitespace(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn split_text_by_whitespace(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     if !matches!(args.get(0), Some(Value::Null) | None) {
         return Err(MError::NotImplemented(
             "Splitter.SplitTextByWhitespace: quoteStyle not yet supported",

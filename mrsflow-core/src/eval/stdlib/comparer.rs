@@ -16,15 +16,15 @@ use super::common::{
 
 pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
     vec![
-        ("Comparer.Ordinal", vec![], comparer_ordinal),
-        ("Comparer.OrdinalIgnoreCase", vec![], comparer_ordinal_ignore_case),
+        ("Comparer.Ordinal", vec![], ordinal),
+        ("Comparer.OrdinalIgnoreCase", vec![], ordinal_ignore_case),
         (
             "Comparer.FromCulture",
             vec![
                 Param { name: "culture".into(),    optional: false, type_annotation: None },
                 Param { name: "ignoreCase".into(), optional: true,  type_annotation: None },
             ],
-            comparer_from_culture,
+            from_culture,
         ),
         (
             "Comparer.Equals",
@@ -33,22 +33,22 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "x".into(),        optional: false, type_annotation: None },
                 Param { name: "y".into(),        optional: false, type_annotation: None },
             ],
-            comparer_equals,
+            equals,
         ),
     ]
 }
 
 // --- Factories ---
 
-fn comparer_ordinal(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn ordinal(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(make_comparer(ordinal_impl))
 }
 
-fn comparer_ordinal_ignore_case(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn ordinal_ignore_case(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(make_comparer(ordinal_ignore_case_impl))
 }
 
-fn comparer_from_culture(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn from_culture(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     // Culture arg is accepted (must be text) but ignored in v1.
     if !matches!(&args[0], Value::Text(_) | Value::Null) {
         return Err(type_mismatch("text (culture name)", &args[0]));
@@ -122,7 +122,7 @@ fn sign(o: std::cmp::Ordering) -> i32 {
 
 // --- Helper: Comparer.Equals(comparer, x, y) ---
 
-fn comparer_equals(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+fn equals(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let cmp = expect_function(&args[0])?;
     let result = invoke_callback_with_host(cmp, vec![args[1].clone(), args[2].clone()], host)?;
     match result {

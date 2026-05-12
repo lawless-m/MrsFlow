@@ -24,21 +24,21 @@ use super::common::{
 
 pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
     vec![
-        ("DateTimeZone.FixedLocalNow", vec![], dtz_local_now),
-        ("DateTimeZone.FixedUtcNow", vec![], dtz_utc_now),
-        ("DateTimeZone.LocalNow", vec![], dtz_local_now),
-        ("DateTimeZone.UtcNow", vec![], dtz_utc_now),
-        ("DateTimeZone.From", one("value"), dtz_from),
+        ("DateTimeZone.FixedLocalNow", vec![], local_now),
+        ("DateTimeZone.FixedUtcNow", vec![], utc_now),
+        ("DateTimeZone.LocalNow", vec![], local_now),
+        ("DateTimeZone.UtcNow", vec![], utc_now),
+        ("DateTimeZone.From", one("value"), from),
         (
             "DateTimeZone.FromText",
             vec![
                 Param { name: "text".into(),    optional: false, type_annotation: None },
                 Param { name: "culture".into(), optional: true,  type_annotation: None },
             ],
-            dtz_from_text,
+            from_text,
         ),
-        ("DateTimeZone.FromFileTime", one("fileTime"), dtz_from_file_time),
-        ("DateTimeZone.RemoveZone", one("dtz"), dtz_remove_zone),
+        ("DateTimeZone.FromFileTime", one("fileTime"), from_file_time),
+        ("DateTimeZone.RemoveZone", one("dtz"), remove_zone),
         (
             "DateTimeZone.SwitchZone",
             vec![
@@ -46,11 +46,11 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "hours".into(),   optional: false, type_annotation: None },
                 Param { name: "minutes".into(), optional: true,  type_annotation: None },
             ],
-            dtz_switch_zone,
+            switch_zone,
         ),
-        ("DateTimeZone.ToLocal", one("dtz"), dtz_to_local),
-        ("DateTimeZone.ToUtc", one("dtz"), dtz_to_utc),
-        ("DateTimeZone.ToRecord", one("dtz"), dtz_to_record),
+        ("DateTimeZone.ToLocal", one("dtz"), to_local),
+        ("DateTimeZone.ToUtc", one("dtz"), to_utc),
+        ("DateTimeZone.ToRecord", one("dtz"), to_record),
         (
             "DateTimeZone.ToText",
             vec![
@@ -58,26 +58,26 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "format".into(),  optional: true,  type_annotation: None },
                 Param { name: "culture".into(), optional: true,  type_annotation: None },
             ],
-            dtz_to_text,
+            to_text,
         ),
-        ("DateTimeZone.ZoneHours", one("dtz"), dtz_zone_hours),
-        ("DateTimeZone.ZoneMinutes", one("dtz"), dtz_zone_minutes),
+        ("DateTimeZone.ZoneHours", one("dtz"), zone_hours),
+        ("DateTimeZone.ZoneMinutes", one("dtz"), zone_minutes),
     ]
 }
 
-fn dtz_local_now(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn local_now(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(Value::Datetimezone(chrono::Local::now().fixed_offset()))
 }
 
 
-fn dtz_utc_now(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn utc_now(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(Value::Datetimezone(
         chrono::Utc::now().with_timezone(&chrono::FixedOffset::east_opt(0).unwrap())
     ))
 }
 
 
-fn dtz_from(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+fn from(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     match &args[0] {
         Value::Null => Ok(Value::Null),
         Value::Datetimezone(dt) => Ok(Value::Datetimezone(*dt)),
@@ -95,13 +95,13 @@ fn dtz_from(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
                 .ok_or_else(|| MError::Other("DateTimeZone.From: ambiguous/invalid local time".into()))?;
             Ok(Value::Datetimezone(dt))
         }
-        Value::Text(_) => dtz_from_text(args, host),
+        Value::Text(_) => from_text(args, host),
         other => Err(type_mismatch("text/date/datetime/datetimezone/null", other)),
     }
 }
 
 
-fn dtz_from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     // Try a few common formats with timezone info.
     if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(text) {
@@ -120,7 +120,7 @@ fn dtz_from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn dtz_from_file_time(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn from_file_time(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let ticks = match &args[0] {
         Value::Number(n) => *n,
         Value::Null => return Ok(Value::Null),
@@ -133,7 +133,7 @@ fn dtz_from_file_time(args: &[Value], _host: &dyn IoHost) -> Result<Value, MErro
 }
 
 
-fn dtz_remove_zone(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn remove_zone(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     match &args[0] {
         Value::Null => Ok(Value::Null),
         Value::Datetimezone(dt) => Ok(Value::Datetime(dt.naive_local())),
@@ -142,7 +142,7 @@ fn dtz_remove_zone(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> 
 }
 
 
-fn dtz_switch_zone(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn switch_zone(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let dt = match &args[0] {
         Value::Null => return Ok(Value::Null),
         Value::Datetimezone(dt) => *dt,
@@ -167,7 +167,7 @@ fn dtz_switch_zone(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> 
 }
 
 
-fn dtz_to_local(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn to_local(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     match &args[0] {
         Value::Null => Ok(Value::Null),
         Value::Datetimezone(dt) => {
@@ -179,7 +179,7 @@ fn dtz_to_local(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn dtz_to_utc(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn to_utc(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     match &args[0] {
         Value::Null => Ok(Value::Null),
         Value::Datetimezone(dt) => Ok(Value::Datetimezone(
@@ -190,7 +190,7 @@ fn dtz_to_utc(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn dtz_to_record(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn to_record(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     use chrono::{Datelike, Timelike};
     let dt = match &args[0] {
         Value::Null => return Ok(Value::Null),
@@ -216,7 +216,7 @@ fn dtz_to_record(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn dtz_to_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn to_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let dt = match &args[0] {
         Value::Null => return Ok(Value::Null),
         Value::Datetimezone(dt) => *dt,
@@ -229,7 +229,7 @@ fn dtz_to_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn dtz_zone_hours(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn zone_hours(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     match &args[0] {
         Value::Null => Ok(Value::Null),
         Value::Datetimezone(dt) => Ok(Value::Number((dt.offset().local_minus_utc() / 3600) as f64)),
@@ -238,7 +238,7 @@ fn dtz_zone_hours(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn dtz_zone_minutes(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn zone_minutes(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     match &args[0] {
         Value::Null => Ok(Value::Null),
         Value::Datetimezone(dt) => {

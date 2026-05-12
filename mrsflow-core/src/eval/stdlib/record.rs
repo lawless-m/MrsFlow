@@ -24,11 +24,11 @@ use super::common::{
 
 pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
     vec![
-        ("Record.Field", two("record", "field"), record_field),
-        ("Record.FieldNames", one("record"), record_field_names),
-        ("Record.FieldValues", one("record"), record_field_values),
-        ("Record.HasFields", two("record", "fields"), record_has_fields),
-        ("Record.Combine", one("records"), record_combine),
+        ("Record.Field", two("record", "field"), field),
+        ("Record.FieldNames", one("record"), field_names),
+        ("Record.FieldValues", one("record"), field_values),
+        ("Record.HasFields", two("record", "fields"), has_fields),
+        ("Record.Combine", one("records"), combine),
         (
             "Record.FieldOrDefault",
             vec![
@@ -36,7 +36,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "field".into(),        optional: false, type_annotation: None },
                 Param { name: "defaultValue".into(), optional: true,  type_annotation: None },
             ],
-            record_field_or_default,
+            field_or_default,
         ),
         (
             "Record.RemoveFields",
@@ -45,7 +45,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "fields".into(),       optional: false, type_annotation: None },
                 Param { name: "missingField".into(), optional: true,  type_annotation: None },
             ],
-            record_remove_fields,
+            remove_fields,
         ),
         (
             "Record.AddField",
@@ -55,11 +55,11 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "value".into(),     optional: false, type_annotation: None },
                 Param { name: "delayed".into(),   optional: true,  type_annotation: None },
             ],
-            record_add_field,
+            add_field,
         ),
-        ("Record.FieldCount", one("record"), record_field_count),
-        ("Record.FromList", two("values", "fields"), record_from_list),
-        ("Record.FromTable", one("table"), record_from_table),
+        ("Record.FieldCount", one("record"), field_count),
+        ("Record.FromList", two("values", "fields"), from_list),
+        ("Record.FromTable", one("table"), from_table),
         (
             "Record.RenameFields",
             vec![
@@ -67,7 +67,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "renames".into(),      optional: false, type_annotation: None },
                 Param { name: "missingField".into(), optional: true,  type_annotation: None },
             ],
-            record_rename_fields,
+            rename_fields,
         ),
         (
             "Record.ReorderFields",
@@ -76,7 +76,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "fieldOrder".into(),   optional: false, type_annotation: None },
                 Param { name: "missingField".into(), optional: true,  type_annotation: None },
             ],
-            record_reorder_fields,
+            reorder_fields,
         ),
         (
             "Record.SelectFields",
@@ -85,10 +85,10 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "fields".into(),       optional: false, type_annotation: None },
                 Param { name: "missingField".into(), optional: true,  type_annotation: None },
             ],
-            record_select_fields,
+            select_fields,
         ),
-        ("Record.ToList", one("record"), record_to_list),
-        ("Record.ToTable", one("record"), record_to_table),
+        ("Record.ToList", one("record"), to_list),
+        ("Record.ToTable", one("record"), to_table),
         (
             "Record.TransformFields",
             vec![
@@ -96,12 +96,12 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "transformOperations".into(), optional: false, type_annotation: None },
                 Param { name: "missingField".into(),        optional: true,  type_annotation: None },
             ],
-            record_transform_fields,
+            transform_fields,
         ),
     ]
 }
 
-fn record_field(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn field(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let record = match &args[0] {
         Value::Record(r) => r,
         other => return Err(type_mismatch("record", other)),
@@ -116,7 +116,7 @@ fn record_field(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn record_field_names(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn field_names(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let record = match &args[0] {
         Value::Record(r) => r,
         other => return Err(type_mismatch("record", other)),
@@ -130,7 +130,7 @@ fn record_field_names(args: &[Value], _host: &dyn IoHost) -> Result<Value, MErro
 }
 
 
-fn record_field_values(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+fn field_values(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let record = match &args[0] {
         Value::Record(r) => r,
         other => return Err(type_mismatch("record", other)),
@@ -144,7 +144,7 @@ fn record_field_values(args: &[Value], host: &dyn IoHost) -> Result<Value, MErro
 }
 
 
-fn record_has_fields(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn has_fields(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let record = match &args[0] {
         Value::Record(r) => r,
         other => return Err(type_mismatch("record", other)),
@@ -167,7 +167,7 @@ fn record_has_fields(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError
 }
 
 
-fn record_combine(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+fn combine(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let records = expect_list(&args[0])?;
     let mut fields: Vec<(String, Value)> = Vec::new();
     for rv in records {
@@ -191,7 +191,7 @@ fn record_combine(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn record_field_or_default(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+fn field_or_default(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let record = match &args[0] {
         Value::Record(r) => r,
         other => return Err(type_mismatch("record", other)),
@@ -205,7 +205,7 @@ fn record_field_or_default(args: &[Value], host: &dyn IoHost) -> Result<Value, M
 }
 
 
-fn record_remove_fields(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn remove_fields(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let record = match &args[0] {
         Value::Record(r) => r,
         other => return Err(type_mismatch("record", other)),
@@ -247,7 +247,7 @@ fn record_remove_fields(args: &[Value], _host: &dyn IoHost) -> Result<Value, MEr
     }))
 }
 
-fn record_add_field(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn add_field(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let record = match &args[0] {
         Value::Record(r) => r,
         other => return Err(type_mismatch("record", other)),
@@ -269,7 +269,7 @@ fn record_add_field(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError>
 }
 
 
-fn record_field_count(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn field_count(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let record = match &args[0] {
         Value::Record(r) => r,
         other => return Err(type_mismatch("record", other)),
@@ -278,7 +278,7 @@ fn record_field_count(args: &[Value], _host: &dyn IoHost) -> Result<Value, MErro
 }
 
 
-fn record_from_list(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn from_list(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let values = expect_list(&args[0])?;
     let names = expect_text_list(&args[1], "Record.FromList")?;
     if values.len() != names.len() {
@@ -299,7 +299,7 @@ fn record_from_list(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError>
 }
 
 
-fn record_from_table(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+fn from_table(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let names = table.column_names();
     let name_idx = names.iter().position(|n| n == "Name").ok_or_else(|| {
@@ -328,7 +328,7 @@ fn record_from_table(args: &[Value], host: &dyn IoHost) -> Result<Value, MError>
 }
 
 
-fn record_rename_fields(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn rename_fields(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let record = match &args[0] {
         Value::Record(r) => r,
         other => return Err(type_mismatch("record", other)),
@@ -381,7 +381,7 @@ fn parse_rename_pair(v: &Value) -> Result<(String, String), MError> {
 }
 
 
-fn record_reorder_fields(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn reorder_fields(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let record = match &args[0] {
         Value::Record(r) => r,
         other => return Err(type_mismatch("record", other)),
@@ -423,7 +423,7 @@ fn record_reorder_fields(args: &[Value], _host: &dyn IoHost) -> Result<Value, ME
 }
 
 
-fn record_select_fields(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn select_fields(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let record = match &args[0] {
         Value::Record(r) => r,
         other => return Err(type_mismatch("record", other)),
@@ -456,7 +456,7 @@ fn record_select_fields(args: &[Value], _host: &dyn IoHost) -> Result<Value, MEr
 }
 
 
-fn record_to_list(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+fn to_list(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let record = match &args[0] {
         Value::Record(r) => r,
         other => return Err(type_mismatch("record", other)),
@@ -474,7 +474,7 @@ fn record_to_list(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn record_to_table(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+fn to_table(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let record = match &args[0] {
         Value::Record(r) => r,
         other => return Err(type_mismatch("record", other)),
@@ -491,7 +491,7 @@ fn record_to_table(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn record_transform_fields(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+fn transform_fields(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let record = match &args[0] {
         Value::Record(r) => r,
         other => return Err(type_mismatch("record", other)),

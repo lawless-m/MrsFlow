@@ -11,10 +11,10 @@ use super::super::value::{BuiltinFn, MError, Record, Value};
 use super::common::{expect_text, three, type_mismatch};
 
 pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
-    vec![("Error.Record", three("reason", "message", "detail"), error_record)]
+    vec![("Error.Record", three("reason", "message", "detail"), record)]
 }
 
-fn error_record(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn record(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let reason = expect_text(&args[0])?.to_string();
     let message = expect_text(&args[1])?.to_string();
     Ok(Value::Record(Record {

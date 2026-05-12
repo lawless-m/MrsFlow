@@ -13,50 +13,50 @@ use super::common::{expect_function, expect_list, expect_text, one, two, three, 
 
 pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
     vec![
-        ("Type.Is", two("value", "type"), type_is),
-        ("Type.IsNullable", one("type"), type_is_nullable),
-        ("Type.NonNullable", one("type"), type_non_nullable),
-        ("Type.OpenRecord", one("type"), type_open_record),
-        ("Type.ClosedRecord", one("type"), type_closed_record),
-        ("Type.IsOpenRecord", one("type"), type_is_open_record),
-        ("Type.RecordFields", one("type"), type_record_fields),
-        ("Type.ListItem", one("type"), type_list_item),
-        ("Type.TableColumn", two("type", "columnName"), type_table_column),
-        ("Type.TableKeys", one("type"), type_table_keys),
+        ("Type.Is", two("value", "type"), is),
+        ("Type.IsNullable", one("type"), is_nullable),
+        ("Type.NonNullable", one("type"), non_nullable),
+        ("Type.OpenRecord", one("type"), open_record),
+        ("Type.ClosedRecord", one("type"), closed_record),
+        ("Type.IsOpenRecord", one("type"), is_open_record),
+        ("Type.RecordFields", one("type"), record_fields),
+        ("Type.ListItem", one("type"), list_item),
+        ("Type.TableColumn", two("type", "columnName"), table_column),
+        ("Type.TableKeys", one("type"), table_keys),
         (
             "Type.AddTableKey",
             three("type", "columns", "isPrimary"),
-            type_identity_passthrough,
+            identity_passthrough,
         ),
         (
             "Type.ReplaceTableKeys",
             two("type", "keys"),
-            type_identity_passthrough,
+            identity_passthrough,
         ),
-        ("Type.TableRow", one("type"), type_table_row),
-        ("Type.TableSchema", one("type"), type_table_schema),
-        ("Type.FunctionParameters", one("type"), type_function_parameters),
+        ("Type.TableRow", one("type"), table_row),
+        ("Type.TableSchema", one("type"), table_schema),
+        ("Type.FunctionParameters", one("type"), function_parameters),
         (
             "Type.FunctionRequiredParameters",
             one("type"),
-            type_function_required_parameters,
+            function_required_parameters,
         ),
-        ("Type.FunctionReturn", one("type"), type_function_return),
+        ("Type.FunctionReturn", one("type"), function_return),
         (
             "Type.ForFunction",
             two("signature", "requiredParameters"),
-            type_for_function,
+            for_function,
         ),
-        ("Type.ForRecord", two("fields", "open"), type_for_record),
-        ("Type.Facets", one("type"), type_facets),
-        ("Type.ReplaceFacets", two("type", "facets"), type_identity_passthrough),
-        ("Type.TablePartitionKey", one("type"), type_table_partition_key),
+        ("Type.ForRecord", two("fields", "open"), for_record),
+        ("Type.Facets", one("type"), facets),
+        ("Type.ReplaceFacets", two("type", "facets"), identity_passthrough),
+        ("Type.TablePartitionKey", one("type"), table_partition_key),
         (
             "Type.ReplaceTablePartitionKey",
             two("type", "key"),
-            type_identity_passthrough,
+            identity_passthrough,
         ),
-        ("Type.Union", one("types"), type_union),
+        ("Type.Union", one("types"), union_),
     ]
 }
 
@@ -67,17 +67,17 @@ fn expect_type(v: &Value) -> Result<&TypeRep, MError> {
     }
 }
 
-fn type_is(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn is(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let t = expect_type(&args[1])?;
     Ok(Value::Logical(super::super::type_conforms(&args[0], t)))
 }
 
-fn type_is_nullable(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn is_nullable(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let t = expect_type(&args[0])?;
     Ok(Value::Logical(matches!(t, TypeRep::Nullable(_))))
 }
 
-fn type_non_nullable(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn non_nullable(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let t = expect_type(&args[0])?;
     let stripped = match t {
         TypeRep::Nullable(inner) => (**inner).clone(),
@@ -86,7 +86,7 @@ fn type_non_nullable(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError
     Ok(Value::Type(stripped))
 }
 
-fn type_open_record(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn open_record(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     match expect_type(&args[0])? {
         TypeRep::RecordOf { fields, .. } => Ok(Value::Type(TypeRep::RecordOf {
             fields: fields.clone(),
@@ -99,7 +99,7 @@ fn type_open_record(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError>
     }
 }
 
-fn type_closed_record(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn closed_record(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     match expect_type(&args[0])? {
         TypeRep::RecordOf { fields, .. } => Ok(Value::Type(TypeRep::RecordOf {
             fields: fields.clone(),
@@ -112,14 +112,14 @@ fn type_closed_record(args: &[Value], _host: &dyn IoHost) -> Result<Value, MErro
     }
 }
 
-fn type_is_open_record(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn is_open_record(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     match expect_type(&args[0])? {
         TypeRep::RecordOf { open, .. } => Ok(Value::Logical(*open)),
         _ => Ok(Value::Logical(false)),
     }
 }
 
-fn type_record_fields(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn record_fields(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     match expect_type(&args[0])? {
         TypeRep::RecordOf { fields, .. } => {
             let out_fields: Vec<(String, Value)> = fields
@@ -147,7 +147,7 @@ fn type_record_fields(args: &[Value], _host: &dyn IoHost) -> Result<Value, MErro
     }
 }
 
-fn type_list_item(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn list_item(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     match expect_type(&args[0])? {
         TypeRep::ListOf(item) => Ok(Value::Type((**item).clone())),
         other => Err(MError::Other(format!(
@@ -157,7 +157,7 @@ fn type_list_item(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     }
 }
 
-fn type_table_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn table_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let t = expect_type(&args[0])?;
     let name = expect_text(&args[1])?;
     match t {
@@ -173,12 +173,12 @@ fn type_table_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError
     }
 }
 
-fn type_table_keys(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn table_keys(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let _ = expect_type(&args[0])?;
     Ok(Value::List(Vec::new()))
 }
 
-fn type_table_row(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn table_row(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     match expect_type(&args[0])? {
         TypeRep::TableOf { columns } => {
             let fields = columns
@@ -194,7 +194,7 @@ fn type_table_row(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     }
 }
 
-fn type_table_schema(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn table_schema(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     match expect_type(&args[0])? {
         TypeRep::TableOf { columns } => {
             let names = vec!["Name".to_string(), "Type".to_string()];
@@ -211,7 +211,7 @@ fn type_table_schema(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError
     }
 }
 
-fn type_function_parameters(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn function_parameters(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     match expect_type(&args[0])? {
         TypeRep::FunctionOf { params, .. } => {
             // Power Query convention: anonymous param positions named Parameter1, ...
@@ -232,7 +232,7 @@ fn type_function_parameters(args: &[Value], _host: &dyn IoHost) -> Result<Value,
     }
 }
 
-fn type_function_required_parameters(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn function_required_parameters(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     match expect_type(&args[0])? {
         TypeRep::FunctionOf { params, .. } => {
             let n = params.iter().filter(|(_, opt)| !*opt).count();
@@ -245,7 +245,7 @@ fn type_function_required_parameters(args: &[Value], _host: &dyn IoHost) -> Resu
     }
 }
 
-fn type_function_return(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn function_return(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     match expect_type(&args[0])? {
         TypeRep::FunctionOf { return_type, .. } => Ok(Value::Type((**return_type).clone())),
         other => Err(MError::Other(format!(
@@ -255,7 +255,7 @@ fn type_function_return(args: &[Value], _host: &dyn IoHost) -> Result<Value, MEr
     }
 }
 
-fn type_for_function(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn for_function(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     // signature: a record with fields ReturnType (type) and Parameters (record).
     let sig = match &args[0] {
         Value::Record(r) => r,
@@ -307,7 +307,7 @@ fn type_for_function(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError
     }))
 }
 
-fn type_for_record(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn for_record(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let rec = match &args[0] {
         Value::Record(r) => r,
         other => return Err(type_mismatch("record (fields spec)", other)),
@@ -345,7 +345,7 @@ fn type_for_record(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> 
     Ok(Value::Type(TypeRep::RecordOf { fields, open }))
 }
 
-fn type_facets(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn facets(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let _ = expect_type(&args[0])?;
     Ok(Value::Record(Record {
         fields: Vec::new(),
@@ -353,17 +353,17 @@ fn type_facets(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     }))
 }
 
-fn type_table_partition_key(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn table_partition_key(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let _ = expect_type(&args[0])?;
     Ok(Value::List(Vec::new()))
 }
 
-fn type_identity_passthrough(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn identity_passthrough(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let _ = expect_type(&args[0])?;
     Ok(args[0].clone())
 }
 
-fn type_union(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn union_(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let xs = expect_list(&args[0])?;
     let mut iter = xs.iter();
     let mut common: TypeRep = match iter.next() {

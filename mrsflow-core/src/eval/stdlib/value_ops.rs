@@ -17,23 +17,23 @@ use super::common::{
 pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
     vec![
         // --- Slice #170: type / inspect ---
-        ("Value.As", two("value", "type"), value_as),
-        ("Value.Is", two("value", "type"), value_is),
-        ("Value.Type", one("value"), value_type),
-        ("Value.ReplaceType", two("value", "type"), value_replace_type),
+        ("Value.As", two("value", "type"), as_),
+        ("Value.Is", two("value", "type"), is),
+        ("Value.Type", one("value"), type_),
+        ("Value.ReplaceType", two("value", "type"), replace_type),
         (
             "Value.FromText",
             vec![
                 Param { name: "text".into(),    optional: false, type_annotation: None },
                 Param { name: "culture".into(), optional: true,  type_annotation: None },
             ],
-            value_from_text,
+            from_text,
         ),
-        ("Value.Expression", one("value"), value_expression),
-        ("Value.Lineage", one("value"), value_lineage),
-        ("Value.Traits", one("value"), value_traits),
-        ("Value.VersionIdentity", one("value"), value_version_identity),
-        ("Value.Versions", one("value"), value_versions),
+        ("Value.Expression", one("value"), expression),
+        ("Value.Lineage", one("value"), lineage),
+        ("Value.Traits", one("value"), traits),
+        ("Value.VersionIdentity", one("value"), version_identity),
+        ("Value.Versions", one("value"), versions),
         (
             "Value.NativeQuery",
             vec![
@@ -42,24 +42,24 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "parameters".into(), optional: true,  type_annotation: None },
                 Param { name: "options".into(),    optional: true,  type_annotation: None },
             ],
-            value_native_query,
+            native_query,
         ),
-        ("Value.Optimize", one("value"), value_passthrough),
+        ("Value.Optimize", one("value"), passthrough),
         (
             "Value.Firewall",
             vec![
                 Param { name: "value".into(),       optional: false, type_annotation: None },
                 Param { name: "trustLevel".into(),  optional: true,  type_annotation: None },
             ],
-            value_firewall,
+            firewall,
         ),
-        ("Value.Alternates", one("value"), value_alternates),
-        ("Value.ViewError", one("value"), value_passthrough),
-        ("Value.ViewFunction", one("value"), value_passthrough),
+        ("Value.Alternates", one("value"), alternates),
+        ("Value.ViewError", one("value"), passthrough),
+        ("Value.ViewFunction", one("value"), passthrough),
         // --- Slice #171: metadata ---
-        ("Value.Metadata", one("value"), value_metadata),
-        ("Value.ReplaceMetadata", two("value", "metadata"), value_replace_metadata),
-        ("Value.RemoveMetadata", one("value"), value_remove_metadata),
+        ("Value.Metadata", one("value"), metadata),
+        ("Value.ReplaceMetadata", two("value", "metadata"), replace_metadata),
+        ("Value.RemoveMetadata", one("value"), remove_metadata),
         // --- Slice #169: arithmetic + equality ---
         (
             "Value.Add",
@@ -68,7 +68,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "y".into(),         optional: false, type_annotation: None },
                 Param { name: "precision".into(), optional: true,  type_annotation: None },
             ],
-            value_add,
+            add,
         ),
         (
             "Value.Subtract",
@@ -77,7 +77,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "y".into(),         optional: false, type_annotation: None },
                 Param { name: "precision".into(), optional: true,  type_annotation: None },
             ],
-            value_subtract,
+            subtract,
         ),
         (
             "Value.Multiply",
@@ -86,7 +86,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "y".into(),         optional: false, type_annotation: None },
                 Param { name: "precision".into(), optional: true,  type_annotation: None },
             ],
-            value_multiply,
+            multiply,
         ),
         (
             "Value.Divide",
@@ -95,7 +95,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "y".into(),         optional: false, type_annotation: None },
                 Param { name: "precision".into(), optional: true,  type_annotation: None },
             ],
-            value_divide,
+            divide,
         ),
         (
             "Value.Equals",
@@ -104,7 +104,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "y".into(),                optional: false, type_annotation: None },
                 Param { name: "equationCriteria".into(), optional: true,  type_annotation: None },
             ],
-            value_equals,
+            equals,
         ),
         (
             "Value.Compare",
@@ -113,7 +113,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "y".into(),        optional: false, type_annotation: None },
                 Param { name: "comparer".into(), optional: true,  type_annotation: None },
             ],
-            value_compare,
+            compare,
         ),
         (
             "Value.NullableEquals",
@@ -122,7 +122,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "y".into(),        optional: false, type_annotation: None },
                 Param { name: "comparer".into(), optional: true,  type_annotation: None },
             ],
-            value_nullable_equals,
+            nullable_equals,
         ),
     ]
 }
@@ -136,7 +136,7 @@ fn expect_typerep(v: &Value) -> Result<&TypeRep, MError> {
     }
 }
 
-fn value_as(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn as_(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let t = expect_typerep(&args[1])?;
     if super::super::type_conforms(&args[0], t) {
         Ok(args[0].clone())
@@ -148,12 +148,12 @@ fn value_as(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     }
 }
 
-fn value_is(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn is(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let t = expect_typerep(&args[1])?;
     Ok(Value::Logical(super::super::type_conforms(&args[0], t)))
 }
 
-fn value_type(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn type_(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(Value::Type(typerep_of(&args[0])))
 }
 
@@ -179,13 +179,13 @@ fn typerep_of(v: &Value) -> TypeRep {
     }
 }
 
-fn value_replace_type(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn replace_type(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     // v1: we don't track ascribed type metadata — return value unchanged.
     let _ = expect_typerep(&args[1])?;
     Ok(args[0].clone())
 }
 
-fn value_from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let s = expect_text(&args[0])?.trim();
     if !matches!(args.get(1), Some(Value::Null) | None) {
         return Err(MError::NotImplemented(
@@ -214,58 +214,58 @@ fn value_from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> 
     )))
 }
 
-fn value_expression(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn expression(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Err(MError::NotImplemented(
         "Value.Expression: source expression introspection requires cloud-PQ infra",
     ))
 }
 
-fn value_lineage(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn lineage(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     // v1: no fold lineage tracking.
     Ok(Value::List(Vec::new()))
 }
 
-fn value_traits(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn traits(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(Value::Record(Record {
         fields: Vec::new(),
         env: EnvNode::empty(),
     }))
 }
 
-fn value_version_identity(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn version_identity(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Err(MError::NotImplemented(
         "Value.VersionIdentity: requires versioning machinery not built in v1",
     ))
 }
 
-fn value_versions(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn versions(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Err(MError::NotImplemented(
         "Value.Versions: requires versioning machinery not built in v1",
     ))
 }
 
-fn value_native_query(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn native_query(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Err(MError::NotImplemented(
         "Value.NativeQuery: query folding not available without a fold-aware data source",
     ))
 }
 
-fn value_passthrough(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn passthrough(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(args[0].clone())
 }
 
-fn value_firewall(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn firewall(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     // v1: no privacy levels — values pass through unchanged.
     Ok(args[0].clone())
 }
 
-fn value_alternates(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn alternates(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(Value::List(vec![args[0].clone()]))
 }
 
 // --- Slice #171: metadata ---
 
-fn value_metadata(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn metadata(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     match &args[0] {
         Value::WithMetadata { meta, .. } => Ok(Value::Record(meta.clone())),
         _ => Ok(Value::Record(Record {
@@ -275,7 +275,7 @@ fn value_metadata(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     }
 }
 
-fn value_replace_metadata(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn replace_metadata(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let meta = match &args[1] {
         Value::Record(r) => r.clone(),
         Value::WithMetadata { inner, .. } => match inner.as_ref() {
@@ -294,7 +294,7 @@ fn value_replace_metadata(args: &[Value], _host: &dyn IoHost) -> Result<Value, M
     })
 }
 
-fn value_remove_metadata(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn remove_metadata(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(match &args[0] {
         Value::WithMetadata { inner, .. } => (**inner).clone(),
         v => v.clone(),
@@ -303,7 +303,7 @@ fn value_remove_metadata(args: &[Value], _host: &dyn IoHost) -> Result<Value, ME
 
 // --- Slice #169 impls ---
 
-fn value_add(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn add(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     match (&args[0], &args[1]) {
         (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a + b)),
         (Value::Text(a), Value::Text(b)) => Ok(Value::Text(format!("{}{}", a, b))),
@@ -343,7 +343,7 @@ fn value_add(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     }
 }
 
-fn value_subtract(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn subtract(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     match (&args[0], &args[1]) {
         (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a - b)),
         (Value::Date(a), Value::Date(b)) => {
@@ -372,7 +372,7 @@ fn value_subtract(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     }
 }
 
-fn value_multiply(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn multiply(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     match (&args[0], &args[1]) {
         (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a * b)),
         (a, b) => Err(MError::Other(format!(
@@ -383,7 +383,7 @@ fn value_multiply(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     }
 }
 
-fn value_divide(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn divide(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     match (&args[0], &args[1]) {
         (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a / b)),
         (a, b) => Err(MError::Other(format!(
@@ -452,7 +452,7 @@ pub(super) fn values_equal_deep(a: &Value, b: &Value) -> Result<bool, MError> {
     }
 }
 
-fn value_equals(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn equals(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     if !matches!(args.get(2), Some(Value::Null) | None) {
         return Err(MError::NotImplemented(
             "Value.Equals: equationCriteria not yet supported",
@@ -461,7 +461,7 @@ fn value_equals(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(Value::Logical(values_equal_deep(&args[0], &args[1])?))
 }
 
-fn value_compare(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+fn compare(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     if let Some(Value::Function(c)) = args.get(2) {
         // User-supplied comparer takes precedence.
         let result = invoke_callback_with_host(c, vec![args[0].clone(), args[1].clone()], host)?;
@@ -508,7 +508,7 @@ fn compare_values(a: &Value, b: &Value) -> Result<i32, MError> {
     })
 }
 
-fn value_nullable_equals(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+fn nullable_equals(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     if let Some(Value::Function(c)) = args.get(2) {
         let result = invoke_callback_with_host(c, vec![args[0].clone(), args[1].clone()], host)?;
         match result {

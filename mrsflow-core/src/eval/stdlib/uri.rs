@@ -15,16 +15,16 @@ use super::common::{expect_text, one, two, type_mismatch};
 
 pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
     vec![
-        ("Uri.EscapeDataString", one("text"), uri_escape_data_string),
-        ("Uri.Combine", two("baseUri", "relativeUri"), uri_combine),
-        ("Uri.BuildQueryString", one("record"), uri_build_query_string),
-        ("Uri.Parts", one("uri"), uri_parts),
+        ("Uri.EscapeDataString", one("text"), escape_data_string),
+        ("Uri.Combine", two("baseUri", "relativeUri"), combine),
+        ("Uri.BuildQueryString", one("record"), build_query_string),
+        ("Uri.Parts", one("uri"), parts),
     ]
 }
 
 // --- EscapeDataString ---
 
-fn uri_escape_data_string(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn escape_data_string(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let s = expect_text(&args[0])?;
     Ok(Value::Text(percent_encode(s)))
 }
@@ -81,13 +81,13 @@ fn hex(b: u8) -> Option<u8> {
 
 // --- Combine ---
 
-fn uri_combine(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn combine(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let base = expect_text(&args[0])?;
     let rel = expect_text(&args[1])?;
-    Ok(Value::Text(combine(base, rel)))
+    Ok(Value::Text(combine_str(base, rel)))
 }
 
-fn combine(base: &str, rel: &str) -> String {
+fn combine_str(base: &str, rel: &str) -> String {
     // Absolute URI → return as-is.
     if has_scheme(rel) {
         return rel.to_string();
@@ -133,7 +133,7 @@ fn scheme_authority_end(s: &str) -> Option<usize> {
 
 // --- BuildQueryString ---
 
-fn uri_build_query_string(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn build_query_string(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let record = match &args[0] {
         Value::Record(r) => r,
         other => return Err(type_mismatch("record", other)),
@@ -169,7 +169,7 @@ fn value_to_query_text(v: &Value) -> Result<String, MError> {
 
 // --- Parts ---
 
-fn uri_parts(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn parts(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let s = expect_text(&args[0])?;
     let (scheme, rest) = match s.find("://") {
         Some(idx) => (s[..idx].to_string(), &s[idx + 3..]),

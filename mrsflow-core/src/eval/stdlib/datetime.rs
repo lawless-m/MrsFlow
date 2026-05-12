@@ -34,18 +34,18 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "minute".into(), optional: false, type_annotation: None },
                 Param { name: "second".into(), optional: false, type_annotation: None },
             ],
-            datetime_constructor,
+            constructor,
         ),
-        ("DateTime.Date", one("datetime"), datetime_date),
-        ("DateTime.Time", one("datetime"), datetime_time),
-        ("DateTime.From", one("value"), datetime_from),
+        ("DateTime.Date", one("datetime"), date),
+        ("DateTime.Time", one("datetime"), time),
+        ("DateTime.From", one("value"), from),
         (
             "DateTime.FromText",
             vec![
                 Param { name: "text".into(),    optional: false, type_annotation: None },
                 Param { name: "culture".into(), optional: true,  type_annotation: None },
             ],
-            datetime_from_text,
+            from_text,
         ),
         (
             "DateTime.ToText",
@@ -54,9 +54,9 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "format".into(),   optional: true,  type_annotation: None },
                 Param { name: "culture".into(),  optional: true,  type_annotation: None },
             ],
-            datetime_to_text,
+            to_text,
         ),
-        ("DateTime.ToRecord", one("datetime"), datetime_to_record),
+        ("DateTime.ToRecord", one("datetime"), to_record),
         (
             "DateTime.AddZone",
             vec![
@@ -64,30 +64,30 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
                 Param { name: "hours".into(),    optional: false, type_annotation: None },
                 Param { name: "minutes".into(),  optional: true,  type_annotation: None },
             ],
-            datetime_add_zone,
+            add_zone,
         ),
-        ("DateTime.FromFileTime", one("fileTime"), datetime_from_file_time),
-        ("DateTime.LocalNow", vec![], datetime_local_now),
-        ("DateTime.FixedLocalNow", vec![], datetime_local_now),
-        ("DateTime.IsInCurrentHour", one("datetime"), datetime_is_in_current_hour),
-        ("DateTime.IsInCurrentMinute", one("datetime"), datetime_is_in_current_minute),
-        ("DateTime.IsInCurrentSecond", one("datetime"), datetime_is_in_current_second),
-        ("DateTime.IsInNextHour", one("datetime"), datetime_is_in_next_hour),
-        ("DateTime.IsInNextMinute", one("datetime"), datetime_is_in_next_minute),
-        ("DateTime.IsInNextSecond", one("datetime"), datetime_is_in_next_second),
-        ("DateTime.IsInPreviousHour", one("datetime"), datetime_is_in_previous_hour),
-        ("DateTime.IsInPreviousMinute", one("datetime"), datetime_is_in_previous_minute),
-        ("DateTime.IsInPreviousSecond", one("datetime"), datetime_is_in_previous_second),
-        ("DateTime.IsInNextNHours", two("datetime", "n"), datetime_is_in_next_n_hours),
-        ("DateTime.IsInNextNMinutes", two("datetime", "n"), datetime_is_in_next_n_minutes),
-        ("DateTime.IsInNextNSeconds", two("datetime", "n"), datetime_is_in_next_n_seconds),
-        ("DateTime.IsInPreviousNHours", two("datetime", "n"), datetime_is_in_previous_n_hours),
-        ("DateTime.IsInPreviousNMinutes", two("datetime", "n"), datetime_is_in_previous_n_minutes),
-        ("DateTime.IsInPreviousNSeconds", two("datetime", "n"), datetime_is_in_previous_n_seconds),
+        ("DateTime.FromFileTime", one("fileTime"), from_file_time),
+        ("DateTime.LocalNow", vec![], local_now),
+        ("DateTime.FixedLocalNow", vec![], local_now),
+        ("DateTime.IsInCurrentHour", one("datetime"), is_in_current_hour),
+        ("DateTime.IsInCurrentMinute", one("datetime"), is_in_current_minute),
+        ("DateTime.IsInCurrentSecond", one("datetime"), is_in_current_second),
+        ("DateTime.IsInNextHour", one("datetime"), is_in_next_hour),
+        ("DateTime.IsInNextMinute", one("datetime"), is_in_next_minute),
+        ("DateTime.IsInNextSecond", one("datetime"), is_in_next_second),
+        ("DateTime.IsInPreviousHour", one("datetime"), is_in_previous_hour),
+        ("DateTime.IsInPreviousMinute", one("datetime"), is_in_previous_minute),
+        ("DateTime.IsInPreviousSecond", one("datetime"), is_in_previous_second),
+        ("DateTime.IsInNextNHours", two("datetime", "n"), is_in_next_n_hours),
+        ("DateTime.IsInNextNMinutes", two("datetime", "n"), is_in_next_n_minutes),
+        ("DateTime.IsInNextNSeconds", two("datetime", "n"), is_in_next_n_seconds),
+        ("DateTime.IsInPreviousNHours", two("datetime", "n"), is_in_previous_n_hours),
+        ("DateTime.IsInPreviousNMinutes", two("datetime", "n"), is_in_previous_n_minutes),
+        ("DateTime.IsInPreviousNSeconds", two("datetime", "n"), is_in_previous_n_seconds),
     ]
 }
 
-fn datetime_constructor(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn constructor(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let y = expect_int(&args[0], "#datetime: year")?;
     let mo = expect_int(&args[1], "#datetime: month")?;
     let d = expect_int(&args[2], "#datetime: day")?;
@@ -102,7 +102,7 @@ fn datetime_constructor(args: &[Value], _host: &dyn IoHost) -> Result<Value, MEr
 }
 
 
-fn datetime_date(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn date(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     match &args[0] {
         Value::Null => Ok(Value::Null),
         Value::Datetime(dt) => Ok(Value::Date(dt.date())),
@@ -111,7 +111,7 @@ fn datetime_date(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn datetime_time(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn time(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     match &args[0] {
         Value::Null => Ok(Value::Null),
         Value::Datetime(dt) => Ok(Value::Time(dt.time())),
@@ -120,14 +120,14 @@ fn datetime_time(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn datetime_from(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+fn from(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     match &args[0] {
         Value::Null => Ok(Value::Null),
         Value::Datetime(dt) => Ok(Value::Datetime(*dt)),
         Value::Date(d) => Ok(Value::Datetime(
             d.and_time(chrono::NaiveTime::from_hms_opt(0, 0, 0).unwrap())
         )),
-        Value::Text(_) => datetime_from_text(args, host),
+        Value::Text(_) => from_text(args, host),
         Value::Number(n) => {
             // PQ treats Number as OLE Automation date (days since 1899-12-30).
             let base = chrono::NaiveDate::from_ymd_opt(1899, 12, 30).unwrap()
@@ -140,7 +140,7 @@ fn datetime_from(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn datetime_from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     for fmt in &[
         "%Y-%m-%dT%H:%M:%S%.f",
@@ -168,7 +168,7 @@ fn datetime_from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MErro
 }
 
 
-fn datetime_to_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn to_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     if matches!(args[0], Value::Null) { return Ok(Value::Null); }
     let dt = match &args[0] {
         Value::Datetime(dt) => *dt,
@@ -181,7 +181,7 @@ fn datetime_to_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError>
 }
 
 
-fn datetime_to_record(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn to_record(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     use chrono::{Datelike, Timelike};
     if matches!(args[0], Value::Null) { return Ok(Value::Null); }
     let dt = match &args[0] {
@@ -202,14 +202,14 @@ fn datetime_to_record(args: &[Value], _host: &dyn IoHost) -> Result<Value, MErro
 }
 
 
-fn datetime_add_zone(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn add_zone(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Err(MError::NotImplemented(
         "DateTime.AddZone: produces a Datetimezone; pending Datetimezone Value variant",
     ))
 }
 
 
-fn datetime_from_file_time(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn from_file_time(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let ticks = match &args[0] {
         Value::Number(n) => *n,
         Value::Null => return Ok(Value::Null),
@@ -223,7 +223,7 @@ fn datetime_from_file_time(args: &[Value], _host: &dyn IoHost) -> Result<Value, 
 }
 
 
-fn datetime_local_now(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn local_now(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(Value::Datetime(chrono::Local::now().naive_local()))
 }
 
@@ -261,19 +261,19 @@ fn start_of_unit(dt: chrono::NaiveDateTime, unit_secs: i64) -> chrono::NaiveDate
 // ----- IsInCurrent* (single-unit) -----
 
 
-fn datetime_is_in_current_hour(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn is_in_current_hour(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let dt = match extract_naive_datetime(&args[0], "DateTime.IsInCurrentHour")? { Some(d) => d, None => return Ok(Value::Null) };
     let s = start_of_unit(now_naive(), 3600);
     Ok(Value::Logical(dt_in_range(dt, s, s + chrono::Duration::hours(1))))
 }
 
-fn datetime_is_in_current_minute(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn is_in_current_minute(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let dt = match extract_naive_datetime(&args[0], "DateTime.IsInCurrentMinute")? { Some(d) => d, None => return Ok(Value::Null) };
     let s = start_of_unit(now_naive(), 60);
     Ok(Value::Logical(dt_in_range(dt, s, s + chrono::Duration::minutes(1))))
 }
 
-fn datetime_is_in_current_second(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn is_in_current_second(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let dt = match extract_naive_datetime(&args[0], "DateTime.IsInCurrentSecond")? { Some(d) => d, None => return Ok(Value::Null) };
     let s = start_of_unit(now_naive(), 1);
     Ok(Value::Logical(dt_in_range(dt, s, s + chrono::Duration::seconds(1))))
@@ -282,19 +282,19 @@ fn datetime_is_in_current_second(args: &[Value], _host: &dyn IoHost) -> Result<V
 // ----- IsInNext* -----
 
 
-fn datetime_is_in_next_hour(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn is_in_next_hour(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let dt = match extract_naive_datetime(&args[0], "DateTime.IsInNextHour")? { Some(d) => d, None => return Ok(Value::Null) };
     let s = start_of_unit(now_naive(), 3600) + chrono::Duration::hours(1);
     Ok(Value::Logical(dt_in_range(dt, s, s + chrono::Duration::hours(1))))
 }
 
-fn datetime_is_in_next_minute(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn is_in_next_minute(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let dt = match extract_naive_datetime(&args[0], "DateTime.IsInNextMinute")? { Some(d) => d, None => return Ok(Value::Null) };
     let s = start_of_unit(now_naive(), 60) + chrono::Duration::minutes(1);
     Ok(Value::Logical(dt_in_range(dt, s, s + chrono::Duration::minutes(1))))
 }
 
-fn datetime_is_in_next_second(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn is_in_next_second(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let dt = match extract_naive_datetime(&args[0], "DateTime.IsInNextSecond")? { Some(d) => d, None => return Ok(Value::Null) };
     let s = start_of_unit(now_naive(), 1) + chrono::Duration::seconds(1);
     Ok(Value::Logical(dt_in_range(dt, s, s + chrono::Duration::seconds(1))))
@@ -303,19 +303,19 @@ fn datetime_is_in_next_second(args: &[Value], _host: &dyn IoHost) -> Result<Valu
 // ----- IsInPrevious* -----
 
 
-fn datetime_is_in_previous_hour(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn is_in_previous_hour(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let dt = match extract_naive_datetime(&args[0], "DateTime.IsInPreviousHour")? { Some(d) => d, None => return Ok(Value::Null) };
     let s = start_of_unit(now_naive(), 3600) - chrono::Duration::hours(1);
     Ok(Value::Logical(dt_in_range(dt, s, s + chrono::Duration::hours(1))))
 }
 
-fn datetime_is_in_previous_minute(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn is_in_previous_minute(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let dt = match extract_naive_datetime(&args[0], "DateTime.IsInPreviousMinute")? { Some(d) => d, None => return Ok(Value::Null) };
     let s = start_of_unit(now_naive(), 60) - chrono::Duration::minutes(1);
     Ok(Value::Logical(dt_in_range(dt, s, s + chrono::Duration::minutes(1))))
 }
 
-fn datetime_is_in_previous_second(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn is_in_previous_second(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let dt = match extract_naive_datetime(&args[0], "DateTime.IsInPreviousSecond")? { Some(d) => d, None => return Ok(Value::Null) };
     let s = start_of_unit(now_naive(), 1) - chrono::Duration::seconds(1);
     Ok(Value::Logical(dt_in_range(dt, s, s + chrono::Duration::seconds(1))))
@@ -324,42 +324,42 @@ fn datetime_is_in_previous_second(args: &[Value], _host: &dyn IoHost) -> Result<
 // ----- IsInNextN* / IsInPreviousN* -----
 
 
-fn datetime_is_in_next_n_hours(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn is_in_next_n_hours(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let dt = match extract_naive_datetime(&args[0], "DateTime.IsInNextNHours")? { Some(d) => d, None => return Ok(Value::Null) };
     let n = int_n_arg(&args[1], "DateTime.IsInNextNHours")?;
     let s = start_of_unit(now_naive(), 3600) + chrono::Duration::hours(1);
     Ok(Value::Logical(dt_in_range(dt, s, s + chrono::Duration::hours(n))))
 }
 
-fn datetime_is_in_next_n_minutes(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn is_in_next_n_minutes(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let dt = match extract_naive_datetime(&args[0], "DateTime.IsInNextNMinutes")? { Some(d) => d, None => return Ok(Value::Null) };
     let n = int_n_arg(&args[1], "DateTime.IsInNextNMinutes")?;
     let s = start_of_unit(now_naive(), 60) + chrono::Duration::minutes(1);
     Ok(Value::Logical(dt_in_range(dt, s, s + chrono::Duration::minutes(n))))
 }
 
-fn datetime_is_in_next_n_seconds(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn is_in_next_n_seconds(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let dt = match extract_naive_datetime(&args[0], "DateTime.IsInNextNSeconds")? { Some(d) => d, None => return Ok(Value::Null) };
     let n = int_n_arg(&args[1], "DateTime.IsInNextNSeconds")?;
     let s = start_of_unit(now_naive(), 1) + chrono::Duration::seconds(1);
     Ok(Value::Logical(dt_in_range(dt, s, s + chrono::Duration::seconds(n))))
 }
 
-fn datetime_is_in_previous_n_hours(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn is_in_previous_n_hours(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let dt = match extract_naive_datetime(&args[0], "DateTime.IsInPreviousNHours")? { Some(d) => d, None => return Ok(Value::Null) };
     let n = int_n_arg(&args[1], "DateTime.IsInPreviousNHours")?;
     let e = start_of_unit(now_naive(), 3600);
     Ok(Value::Logical(dt_in_range(dt, e - chrono::Duration::hours(n), e)))
 }
 
-fn datetime_is_in_previous_n_minutes(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn is_in_previous_n_minutes(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let dt = match extract_naive_datetime(&args[0], "DateTime.IsInPreviousNMinutes")? { Some(d) => d, None => return Ok(Value::Null) };
     let n = int_n_arg(&args[1], "DateTime.IsInPreviousNMinutes")?;
     let e = start_of_unit(now_naive(), 60);
     Ok(Value::Logical(dt_in_range(dt, e - chrono::Duration::minutes(n), e)))
 }
 
-fn datetime_is_in_previous_n_seconds(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn is_in_previous_n_seconds(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let dt = match extract_naive_datetime(&args[0], "DateTime.IsInPreviousNSeconds")? { Some(d) => d, None => return Ok(Value::Null) };
     let n = int_n_arg(&args[1], "DateTime.IsInPreviousNSeconds")?;
     let e = start_of_unit(now_naive(), 1);

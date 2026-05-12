@@ -15,16 +15,16 @@ use super::common::{expect_text, type_mismatch, values_equal_primitive};
 
 pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
     vec![
-        ("Replacer.ReplaceText", vec![], replacer_replace_text),
-        ("Replacer.ReplaceValue", vec![], replacer_replace_value),
+        ("Replacer.ReplaceText", vec![], replace_text),
+        ("Replacer.ReplaceValue", vec![], replace_value),
     ]
 }
 
-fn replacer_replace_text(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn replace_text(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(make_replacer(replace_text_impl))
 }
 
-fn replacer_replace_value(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn replace_value(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(make_replacer(replace_value_impl))
 }
 

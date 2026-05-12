@@ -13,20 +13,20 @@ use super::common::{expect_text, one, type_mismatch};
 
 pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
     vec![
-        ("Expression.Constant", one("value"), expression_constant),
-        ("Expression.Identifier", one("name"), expression_identifier),
+        ("Expression.Constant", one("value"), constant),
+        ("Expression.Identifier", one("name"), identifier),
         (
             "Expression.Evaluate",
             vec![
                 Param { name: "document".into(),    optional: false, type_annotation: None },
                 Param { name: "environment".into(), optional: true,  type_annotation: None },
             ],
-            expression_evaluate,
+            evaluate,
         ),
     ]
 }
 
-fn expression_constant(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn constant(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(Value::Text(render_constant(&args[0])))
 }
 
@@ -104,7 +104,7 @@ fn render_constant(v: &Value) -> String {
     }
 }
 
-fn expression_identifier(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn identifier(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let name = expect_text(&args[0])?;
     Ok(Value::Text(quote_identifier(name)))
 }
@@ -129,7 +129,7 @@ fn is_valid_m_identifier(s: &str) -> bool {
     chars.all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.')
 }
 
-fn expression_evaluate(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+fn evaluate(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let document = expect_text(&args[0])?;
     let tokens = tokenize(document)
         .map_err(|e| MError::Other(format!("Expression.Evaluate: lex error: {:?}", e)))?;
