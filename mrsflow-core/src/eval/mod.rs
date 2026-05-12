@@ -944,11 +944,31 @@ fn compare(
             let ord = l.cmp(r);
             ord == expected || (allow_equal && ord == std::cmp::Ordering::Equal)
         }
-        // For slice 1, cross-type and other-type comparisons error. Spec
-        // covers more cases; they land with later slices as needed.
+        (Value::Date(l), Value::Date(r)) => {
+            let ord = l.cmp(r);
+            ord == expected || (allow_equal && ord == std::cmp::Ordering::Equal)
+        }
+        (Value::Datetime(l), Value::Datetime(r)) => {
+            let ord = l.cmp(r);
+            ord == expected || (allow_equal && ord == std::cmp::Ordering::Equal)
+        }
+        (Value::Datetimezone(l), Value::Datetimezone(r)) => {
+            let ord = l.cmp(r);
+            ord == expected || (allow_equal && ord == std::cmp::Ordering::Equal)
+        }
+        (Value::Time(l), Value::Time(r)) => {
+            let ord = l.cmp(r);
+            ord == expected || (allow_equal && ord == std::cmp::Ordering::Equal)
+        }
+        (Value::Duration(l), Value::Duration(r)) => {
+            let ord = l.cmp(r);
+            ord == expected || (allow_equal && ord == std::cmp::Ordering::Equal)
+        }
+        // Cross-type and other-type comparisons error. Spec covers more
+        // coercions (nullable etc.); they land with later slices as needed.
         _ => {
             return Err(MError::TypeMismatch {
-                expected: "two numbers or two texts",
+                expected: "two numbers, texts, or temporal values of the same kind",
                 found: type_name(&lv),
             });
         }
