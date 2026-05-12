@@ -2940,6 +2940,34 @@ mod tests {
     }
 
     #[test]
+    fn list_sort_numbers() {
+        match eval_str("List.Sort({3, 1, 4, 1, 5, 9, 2, 6})").unwrap() {
+            Value::List(xs) => {
+                let nums: Vec<f64> = xs.iter().map(|v| match v {
+                    Value::Number(n) => *n,
+                    _ => panic!(),
+                }).collect();
+                assert_eq!(nums, vec![1.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 9.0]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn list_sort_text() {
+        match eval_str("List.Sort({\"banana\", \"apple\", \"cherry\"})").unwrap() {
+            Value::List(xs) => {
+                let texts: Vec<&str> = xs.iter().map(|v| match v {
+                    Value::Text(s) => s.as_str(),
+                    _ => panic!(),
+                }).collect();
+                assert_eq!(texts, vec!["apple", "banana", "cherry"]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn list_last_n_default() {
         match eval_str("List.LastN({10, 20, 30, 40})").unwrap() {
             Value::List(xs) => {

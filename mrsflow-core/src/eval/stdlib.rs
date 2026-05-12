@@ -254,6 +254,14 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ("List.Skip", two("list", "countOrCondition"), list_skip),
         ("List.Distinct", one("list"), list_distinct),
         (
+            "List.Sort",
+            vec![
+                Param { name: "list".into(),               optional: false, type_annotation: None },
+                Param { name: "comparisonCriteria".into(), optional: true,  type_annotation: None },
+            ],
+            list_sort,
+        ),
+        (
             "List.RemoveMatchingItems",
             two("list", "items"),
             list_remove_matching_items,
@@ -955,6 +963,44 @@ fn list_last(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     } else {
         Ok(args.get(1).cloned().unwrap_or(Value::Null))
     }
+}
+
+fn list_sort(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let list = expect_list(&args[0])?;
+    if !matches!(args.get(1), Some(Value::Null) | None) {
+        return Err(MError::NotImplemented(
+            "List.Sort: comparisonCriteria not yet supported",
+        ));
+    }
+    enum Kind { Empty, Num, Text }
+    let mut kind = Kind::Empty;
+    for v in list {
+        let k = match v {
+            Value::Number(_) => Kind::Num,
+            Value::Text(_) => Kind::Text,
+            other => return Err(type_mismatch("number or text (in list)", other)),
+        };
+        match (&kind, &k) {
+            (Kind::Empty, _) => kind = k,
+            (Kind::Num, Kind::Num) | (Kind::Text, Kind::Text) => {}
+            _ => return Err(MError::Other(
+                "List.Sort: mixed-type lists not supported (numbers and text together)".into(),
+            )),
+        }
+    }
+    let mut out: Vec<Value> = list.clone();
+    match kind {
+        Kind::Empty => {}
+        Kind::Num => out.sort_by(|a, b| {
+            let (Value::Number(x), Value::Number(y)) = (a, b) else { unreachable!() };
+            x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Equal)
+        }),
+        Kind::Text => out.sort_by(|a, b| {
+            let (Value::Text(x), Value::Text(y)) = (a, b) else { unreachable!() };
+            x.cmp(y)
+        }),
+    }
+    Ok(Value::List(out))
 }
 
 fn list_reverse(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
