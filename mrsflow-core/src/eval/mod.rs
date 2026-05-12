@@ -2940,6 +2940,22 @@ mod tests {
     }
 
     #[test]
+    fn number_to_text_whole() {
+        match eval_str("Number.ToText(2)").unwrap() {
+            Value::Text(s) => assert_eq!(s, "2"),
+            other => panic!("expected text, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn number_to_text_decimal() {
+        match eval_str("Number.ToText(3.14)").unwrap() {
+            Value::Text(s) => assert_eq!(s, "3.14"),
+            other => panic!("expected text, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn list_sort_numbers() {
         match eval_str("List.Sort({3, 1, 4, 1, 5, 9, 2, 6})").unwrap() {
             Value::List(xs) => {

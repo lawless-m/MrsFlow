@@ -146,6 +146,15 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
             number_round,
         ),
         ("Number.Abs", one("number"), number_abs),
+        (
+            "Number.ToText",
+            vec![
+                Param { name: "number".into(),  optional: false, type_annotation: None },
+                Param { name: "format".into(),  optional: true,  type_annotation: None },
+                Param { name: "culture".into(), optional: true,  type_annotation: None },
+            ],
+            number_to_text,
+        ),
         ("Number.Sign", one("number"), number_sign),
         ("Number.Power", two("base", "exponent"), number_power),
         ("Number.Sqrt", one("number"), number_sqrt),
@@ -494,6 +503,27 @@ fn number_from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError>
             .map(Value::Number)
             .map_err(|_| MError::Other(format!("Number.FromText: cannot parse {:?}", s))),
         other => Err(type_mismatch("text", other)),
+    }
+}
+
+fn number_to_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    match &args[0] {
+        Value::Null => Ok(Value::Null),
+        Value::Number(n) => {
+            if !matches!(args.get(1), Some(Value::Null) | None) {
+                return Err(MError::NotImplemented(
+                    "Number.ToText: format string not yet supported",
+                ));
+            }
+            // PQ prints whole-number floats without a trailing ".0".
+            let s = if n.is_finite() && n.fract() == 0.0 && n.abs() < 1e16 {
+                format!("{}", *n as i64)
+            } else {
+                n.to_string()
+            };
+            Ok(Value::Text(s))
+        }
+        other => Err(type_mismatch("number", other)),
     }
 }
 
