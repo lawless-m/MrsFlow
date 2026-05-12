@@ -333,6 +333,10 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
             ],
             list_generate,
         ),
+        ("List.Dates", three("start", "count", "step"), list_dates),
+        ("List.DateTimes", three("start", "count", "step"), list_datetimes),
+        ("List.DateTimeZones", three("start", "count", "step"), list_datetimezones),
+        ("List.Durations", three("start", "count", "step"), list_durations),
     ]
 }
 
@@ -1168,6 +1172,98 @@ fn list_intersect(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             if !found { continue 'outer; }
         }
         out.push(v.clone());
+    }
+    Ok(Value::List(out))
+}
+
+fn list_dates(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let start = match &args[0] {
+        Value::Date(d) => *d,
+        other => return Err(type_mismatch("date (start)", other)),
+    };
+    let count = match &args[1] {
+        Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
+        other => return Err(type_mismatch("non-negative integer (count)", other)),
+    };
+    let step = match &args[2] {
+        Value::Duration(d) => *d,
+        other => return Err(type_mismatch("duration (step)", other)),
+    };
+    let mut out = Vec::with_capacity(count);
+    let mut cur = start;
+    for _ in 0..count {
+        out.push(Value::Date(cur));
+        cur = cur.checked_add_signed(step)
+            .ok_or_else(|| MError::Other("List.Dates: result out of range".into()))?;
+    }
+    Ok(Value::List(out))
+}
+
+fn list_datetimes(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let start = match &args[0] {
+        Value::Datetime(dt) => *dt,
+        other => return Err(type_mismatch("datetime (start)", other)),
+    };
+    let count = match &args[1] {
+        Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
+        other => return Err(type_mismatch("non-negative integer (count)", other)),
+    };
+    let step = match &args[2] {
+        Value::Duration(d) => *d,
+        other => return Err(type_mismatch("duration (step)", other)),
+    };
+    let mut out = Vec::with_capacity(count);
+    let mut cur = start;
+    for _ in 0..count {
+        out.push(Value::Datetime(cur));
+        cur = cur.checked_add_signed(step)
+            .ok_or_else(|| MError::Other("List.DateTimes: result out of range".into()))?;
+    }
+    Ok(Value::List(out))
+}
+
+fn list_datetimezones(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let start = match &args[0] {
+        Value::Datetimezone(dt) => *dt,
+        other => return Err(type_mismatch("datetimezone (start)", other)),
+    };
+    let count = match &args[1] {
+        Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
+        other => return Err(type_mismatch("non-negative integer (count)", other)),
+    };
+    let step = match &args[2] {
+        Value::Duration(d) => *d,
+        other => return Err(type_mismatch("duration (step)", other)),
+    };
+    let mut out = Vec::with_capacity(count);
+    let mut cur = start;
+    for _ in 0..count {
+        out.push(Value::Datetimezone(cur));
+        cur = cur.checked_add_signed(step)
+            .ok_or_else(|| MError::Other("List.DateTimeZones: result out of range".into()))?;
+    }
+    Ok(Value::List(out))
+}
+
+fn list_durations(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let start = match &args[0] {
+        Value::Duration(d) => *d,
+        other => return Err(type_mismatch("duration (start)", other)),
+    };
+    let count = match &args[1] {
+        Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
+        other => return Err(type_mismatch("non-negative integer (count)", other)),
+    };
+    let step = match &args[2] {
+        Value::Duration(d) => *d,
+        other => return Err(type_mismatch("duration (step)", other)),
+    };
+    let mut out = Vec::with_capacity(count);
+    let mut cur = start;
+    for _ in 0..count {
+        out.push(Value::Duration(cur));
+        cur = cur.checked_add(&step)
+            .ok_or_else(|| MError::Other("List.Durations: result out of range".into()))?;
     }
     Ok(Value::List(out))
 }

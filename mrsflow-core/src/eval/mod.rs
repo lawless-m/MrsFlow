@@ -3928,6 +3928,57 @@ mod tests {
     }
 
     #[test]
+    fn list_dates_basic() {
+        let src = r#"
+            List.Dates(#date(2024, 1, 1), 3, #duration(1, 0, 0, 0))
+        "#;
+        match eval_str(src).unwrap() {
+            Value::List(xs) => {
+                let dates: Vec<String> = xs.iter().map(|v| match v {
+                    Value::Date(d) => d.to_string(),
+                    _ => panic!(),
+                }).collect();
+                assert_eq!(dates, vec!["2024-01-01", "2024-01-02", "2024-01-03"]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn list_datetimes_hourly() {
+        let src = r#"
+            List.DateTimes(#datetime(2024, 1, 1, 0, 0, 0), 3, #duration(0, 1, 0, 0))
+        "#;
+        match eval_str(src).unwrap() {
+            Value::List(xs) => {
+                assert_eq!(xs.len(), 3);
+                match &xs[2] {
+                    Value::Datetime(dt) => assert_eq!(dt.to_string(), "2024-01-01 02:00:00"),
+                    _ => panic!("expected datetime"),
+                }
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn list_durations_basic() {
+        let src = r#"
+            List.Durations(#duration(0, 0, 0, 0), 3, #duration(0, 0, 5, 0))
+        "#;
+        match eval_str(src).unwrap() {
+            Value::List(xs) => {
+                assert_eq!(xs.len(), 3);
+                match &xs[2] {
+                    Value::Duration(d) => assert_eq!(d.num_minutes(), 10),
+                    _ => panic!("expected duration"),
+                }
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn list_transform_many_flatten() {
         // For each x in {1,2,3}, expand to {x, x*10} then pair with x.
         let src = r#"
