@@ -5488,6 +5488,32 @@ mod tests {
     }
 
     #[test]
+    fn function_invoke_passes_args() {
+        let src = r#"Function.Invoke((x, y) => x + y, {3, 4})"#;
+        assert_eq!(eval_number(src), 7.0);
+    }
+
+    #[test]
+    fn function_invoke_after_runs_immediately() {
+        // Delay is ignored — function fires now and returns its value.
+        let src = r#"Function.InvokeAfter(() => 42, #duration(0, 0, 1, 0))"#;
+        assert_eq!(eval_number(src), 42.0);
+    }
+
+    #[test]
+    fn function_is_data_source_false() {
+        let src = r#"Function.IsDataSource((x) => x)"#;
+        assert_eq!(eval_bool(src), false);
+    }
+
+    #[test]
+    fn function_scalar_vector_returns_vector() {
+        // ScalarVector returns the runtime (vector) impl. Invoke the result.
+        let src = r#"Function.Invoke(Function.ScalarVector(() => 1, () => 2), {})"#;
+        assert_eq!(eval_number(src), 2.0);
+    }
+
+    #[test]
     fn binary_compress_decompress_gzip_round_trip() {
         // GZip round-trip should restore the original bytes.
         let src = r#"

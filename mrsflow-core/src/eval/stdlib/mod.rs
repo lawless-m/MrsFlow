@@ -37,6 +37,7 @@ mod lines;
 mod type_ops;
 mod value_ops;
 mod binary;
+mod function_ops;
 
 // External callers of the old `stdlib::*` API expect these names at this path.
 // `table_to_rows` is only reached from #[cfg(test)] code in eval::mod, hence
@@ -171,6 +172,7 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         type_ops::bindings(),
         value_ops::bindings(),
         binary::bindings(),
+        function_ops::bindings(),
     ] {
         all.extend(slice);
     }
