@@ -1586,7 +1586,9 @@ fn type_rep_to_datatype(t: &super::super::value::TypeRep) -> Result<(DataType, b
         }
         TypeRep::Any | TypeRep::AnyNonNull | TypeRep::List | TypeRep::Record
         | TypeRep::Table | TypeRep::Function | TypeRep::Type | TypeRep::Binary
-        | TypeRep::Time | TypeRep::Datetimezone => {
+        | TypeRep::Time | TypeRep::Datetimezone
+        | TypeRep::ListOf(_) | TypeRep::RecordOf { .. } | TypeRep::TableOf { .. }
+        | TypeRep::FunctionOf { .. } => {
             Err(MError::Other(format!(
                 "Table.TransformColumnTypes: type {:?} is not a castable primitive",
                 t
@@ -4315,6 +4317,10 @@ fn type_matches(t: &super::super::value::TypeRep, v: &Value) -> bool {
         (Function, Value::Function(_)) => true,
         (Nullable(_), Value::Null) => true,
         (Nullable(inner), _) => type_matches(inner, v),
+        (ListOf(_), Value::List(_)) => true,
+        (RecordOf { .. }, Value::Record(_)) => true,
+        (TableOf { .. }, Value::Table(_)) => true,
+        (FunctionOf { .. }, Value::Function(_)) => true,
         _ => false,
     }
 }

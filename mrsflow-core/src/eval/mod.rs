@@ -525,12 +525,55 @@ fn evaluate_as_type(expr: &Expr) -> Result<TypeRep, MError> {
             let t = evaluate_as_type(inner)?;
             Ok(TypeRep::Nullable(Box::new(t)))
         }
-        Expr::ListType(_)
-        | Expr::RecordType { .. }
-        | Expr::TableType(_)
-        | Expr::FunctionType { .. } => Err(MError::NotImplemented(
-            "compound type expressions deferred until corpus drives them",
-        )),
+        Expr::ListType(item) => {
+            let t = evaluate_as_type(item)?;
+            Ok(TypeRep::ListOf(Box::new(t)))
+        }
+        Expr::RecordType { fields, is_open } => {
+            let mut out: Vec<(String, TypeRep, bool)> = Vec::with_capacity(fields.len());
+            for f in fields {
+                let t = match &f.type_annotation {
+                    Some(ann) => evaluate_as_type(ann)?,
+                    None => TypeRep::Any,
+                };
+                out.push((f.name.clone(), t, f.optional));
+            }
+            Ok(TypeRep::RecordOf { fields: out, open: *is_open })
+        }
+        Expr::TableType(row) => {
+            // Per spec the row-type is a record-type; extract its fields.
+            match row.as_ref() {
+                Expr::RecordType { fields, .. } => {
+                    let mut cols: Vec<(String, TypeRep)> = Vec::with_capacity(fields.len());
+                    for f in fields {
+                        let t = match &f.type_annotation {
+                            Some(ann) => evaluate_as_type(ann)?,
+                            None => TypeRep::Any,
+                        };
+                        cols.push((f.name.clone(), t));
+                    }
+                    Ok(TypeRep::TableOf { columns: cols })
+                }
+                _ => Err(MError::Other(
+                    "table type expects a record-type as its row spec".into(),
+                )),
+            }
+        }
+        Expr::FunctionType { params, return_type } => {
+            let mut ps: Vec<(TypeRep, bool)> = Vec::with_capacity(params.len());
+            for p in params {
+                let t = match &p.type_annotation {
+                    Some(ann) => evaluate_as_type(ann)?,
+                    None => TypeRep::Any,
+                };
+                ps.push((t, p.optional));
+            }
+            let r = evaluate_as_type(return_type)?;
+            Ok(TypeRep::FunctionOf {
+                params: ps,
+                return_type: Box::new(r),
+            })
+        }
         _ => Err(MError::Other(
             "expression is not a type expression".into(),
         )),
@@ -559,6 +602,56 @@ fn type_conforms(v: &Value, t: &TypeRep) -> bool {
         TypeRep::Function => matches!(v, Value::Function(_)),
         TypeRep::Type => matches!(v, Value::Type(_)),
         TypeRep::Nullable(inner) => matches!(v, Value::Null) || type_conforms(v, inner),
+        TypeRep::ListOf(item) => match v {
+            Value::List(xs) => xs.iter().all(|x| type_conforms(x, item)),
+            _ => false,
+        },
+        TypeRep::RecordOf { fields, open } => match v {
+            Value::Record(r) => {
+                // Every required field must be present and type-conform.
+                // Field values may be thunks (record literals are lazy) —
+                // force before the conformance check.
+                for (name, t, optional) in fields {
+                    match r.fields.iter().find(|(n, _)| n == name) {
+                        Some((_, fv)) => {
+                            let forced = force(fv.clone(), &mut |e, env| {
+                                evaluate(e, env, &NoIoHost)
+                            });
+                            let fv_forced = match forced {
+                                Ok(v) => v,
+                                Err(_) => return false,
+                            };
+                            if !type_conforms(&fv_forced, t) {
+                                return false;
+                            }
+                        }
+                        None if *optional => continue,
+                        None => return false,
+                    }
+                }
+                if !*open {
+                    // Closed type: reject extra fields.
+                    for (n, _) in &r.fields {
+                        if !fields.iter().any(|(fn_, _, _)| fn_ == n) {
+                            return false;
+                        }
+                    }
+                }
+                true
+            }
+            _ => false,
+        },
+        TypeRep::TableOf { columns } => match v {
+            Value::Table(t) => {
+                let have = t.column_names();
+                columns.iter().all(|(n, _)| have.iter().any(|h| h == n))
+            }
+            _ => false,
+        },
+        TypeRep::FunctionOf { params, .. } => match v {
+            Value::Function(c) => c.params.len() == params.len(),
+            _ => false,
+        },
     }
 }
 
@@ -583,6 +676,37 @@ fn type_rep_name(t: &TypeRep) -> String {
         TypeRep::Function => "function".into(),
         TypeRep::Type => "type".into(),
         TypeRep::Nullable(inner) => format!("nullable {}", type_rep_name(inner)),
+        TypeRep::ListOf(item) => format!("{{{}}}", type_rep_name(item)),
+        TypeRep::RecordOf { fields, open } => {
+            let mut parts: Vec<String> = fields
+                .iter()
+                .map(|(n, t, opt)| {
+                    let pfx = if *opt { "optional " } else { "" };
+                    format!("{}{} = {}", pfx, n, type_rep_name(t))
+                })
+                .collect();
+            if *open {
+                parts.push("...".into());
+            }
+            format!("[{}]", parts.join(", "))
+        }
+        TypeRep::TableOf { columns } => {
+            let parts: Vec<String> = columns
+                .iter()
+                .map(|(n, t)| format!("{} = {}", n, type_rep_name(t)))
+                .collect();
+            format!("table [{}]", parts.join(", "))
+        }
+        TypeRep::FunctionOf { params, return_type } => {
+            let ps: Vec<String> = params
+                .iter()
+                .map(|(t, opt)| {
+                    let pfx = if *opt { "optional " } else { "" };
+                    format!("{}{}", pfx, type_rep_name(t))
+                })
+                .collect();
+            format!("function ({}) as {}", ps.join(", "), type_rep_name(return_type))
+        }
     }
 }
 
@@ -1139,22 +1263,20 @@ mod tests {
     }
 
     #[test]
-    fn deferred_form_returns_not_implemented() {
-        // `meta` and compound type expressions remain deferred after eval-5.
-        // Build the AST directly: ListType only appears inside `type {T}`
-        // contexts, and we route it to evaluate_as_type which currently
-        // returns NotImplemented for compound type expressions.
+    fn compound_type_expr_builds_listof_typerep() {
+        // `type {number}` now yields a Type value wrapping ListOf(Number)
+        // (slice #167 added structural variants — was NotImplemented before).
         use crate::parser::Expr;
-        // `type {number}` constructs a list-type — which evaluate_as_type
-        // bounces with NotImplemented (compound types deferred).
         let ast = Expr::Unary(
             UnaryOp::Type,
             Box::new(Expr::ListType(Box::new(Expr::Identifier("number".into())))),
         );
         let env = EnvNode::empty();
-        match evaluate(&ast, &env, &NoIoHost) {
-            Err(MError::NotImplemented(_)) => {}
-            other => panic!("expected NotImplemented, got {:?}", other),
+        match evaluate(&ast, &env, &NoIoHost).unwrap() {
+            Value::Type(TypeRep::ListOf(inner)) => {
+                assert_eq!(*inner, TypeRep::Number);
+            }
+            other => panic!("expected ListOf(Number), got {:?}", other),
         }
     }
 
@@ -5339,6 +5461,47 @@ mod tests {
             }
             other => panic!("expected table, got {:?}", other),
         }
+    }
+
+    #[test]
+    fn type_list_of_number_conforms_to_list_only() {
+        // {number} accepts a list of numbers but rejects a list with text.
+        assert_eq!(eval_bool("{1, 2, 3} is {number}"), true);
+        assert_eq!(eval_bool(r#"{1, "x"} is {number}"#), false);
+        assert_eq!(eval_bool("42 is {number}"), false);
+    }
+
+    #[test]
+    fn type_record_of_a_number_conformance() {
+        // Closed record-type: extra fields make it fail.
+        assert_eq!(eval_bool("[a = 1] is [a = number]"), true);
+        assert_eq!(eval_bool(r#"[a = 1, b = "x"] is [a = number]"#), false);
+        assert_eq!(eval_bool("[a = 1] is [a = text]"), false);
+    }
+
+    #[test]
+    fn type_extended_repr_equality() {
+        // TypeRep equality: same shape compares equal, different shape doesn't.
+        use crate::eval::value::TypeRep;
+        let a = TypeRep::ListOf(Box::new(TypeRep::Number));
+        let b = TypeRep::ListOf(Box::new(TypeRep::Number));
+        let c = TypeRep::ListOf(Box::new(TypeRep::Text));
+        assert_eq!(a, b);
+        assert_ne!(a, c);
+        let r1 = TypeRep::RecordOf {
+            fields: vec![("a".into(), TypeRep::Number, false)],
+            open: false,
+        };
+        let r2 = TypeRep::RecordOf {
+            fields: vec![("a".into(), TypeRep::Number, false)],
+            open: false,
+        };
+        let r3 = TypeRep::RecordOf {
+            fields: vec![("a".into(), TypeRep::Number, false)],
+            open: true,
+        };
+        assert_eq!(r1, r2);
+        assert_ne!(r1, r3);
     }
 
     #[test]

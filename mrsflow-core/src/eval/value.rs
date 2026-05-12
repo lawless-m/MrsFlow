@@ -86,9 +86,9 @@ pub struct Record {
 }
 
 /// Type-values produced by `type X`. Primitive types + the `nullable T`
-/// wrapper land in this slice. Compound types (list-of-T, record-with-fields,
-/// table-of-record, function-type) are deferred per design doc §07 until
-/// the user's corpus shows them being used in `as`/`is`.
+/// wrapper land here, along with the four structural variants:
+/// `type {T}` → ListOf, `type [a = T]` → RecordOf, `type table [...]` →
+/// TableOf, `type function (...) as T` → FunctionOf.
 #[derive(Debug, Clone, PartialEq)]
 pub enum TypeRep {
     Any,
@@ -109,6 +109,22 @@ pub enum TypeRep {
     Function,
     Type,
     Nullable(Box<TypeRep>),
+    /// `type {T}` — list of T.
+    ListOf(Box<TypeRep>),
+    /// `type [a = T, b = optional T, …]` (closed) or with `…` trailing (open).
+    RecordOf {
+        fields: Vec<(String, TypeRep, bool /* optional */)>,
+        open: bool,
+    },
+    /// `type table [a = T, b = T]` — table whose row-record matches.
+    TableOf {
+        columns: Vec<(String, TypeRep)>,
+    },
+    /// `type function (n as T, optional t as U) as R` — function type.
+    FunctionOf {
+        params: Vec<(TypeRep, bool /* optional */)>,
+        return_type: Box<TypeRep>,
+    },
 }
 
 /// State of a lazy thunk: pending evaluation (with the captured expression

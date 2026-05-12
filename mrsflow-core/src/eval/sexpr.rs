@@ -162,6 +162,63 @@ fn write_type(out: &mut String, t: &TypeRep) {
             write_type(out, inner);
             out.push(')');
         }
+        TypeRep::ListOf(item) => {
+            out.push_str("(list-of ");
+            write_type(out, item);
+            out.push(')');
+        }
+        TypeRep::RecordOf { fields, open } => {
+            out.push_str("(record-of (");
+            for (i, (name, t, opt)) in fields.iter().enumerate() {
+                if i > 0 {
+                    out.push(' ');
+                }
+                out.push('(');
+                out.push('"');
+                out.push_str(name);
+                out.push('"');
+                out.push(' ');
+                out.push_str(if *opt { "opt" } else { "req" });
+                out.push(' ');
+                write_type(out, t);
+                out.push(')');
+            }
+            out.push_str(") ");
+            out.push_str(if *open { "open" } else { "closed" });
+            out.push(')');
+        }
+        TypeRep::TableOf { columns } => {
+            out.push_str("(table-of (");
+            for (i, (name, t)) in columns.iter().enumerate() {
+                if i > 0 {
+                    out.push(' ');
+                }
+                out.push('(');
+                out.push('"');
+                out.push_str(name);
+                out.push('"');
+                out.push(' ');
+                write_type(out, t);
+                out.push(')');
+            }
+            out.push_str("))");
+        }
+        TypeRep::FunctionOf { params, return_type } => {
+            out.push_str("(function-of (");
+            for (i, (t, opt)) in params.iter().enumerate() {
+                if i > 0 {
+                    out.push(' ');
+                }
+                out.push('(');
+                out.push_str(if *opt { "opt" } else { "req" });
+                out.push(' ');
+                write_type(out, t);
+                out.push(')');
+            }
+            out.push_str(") ");
+            write_type(out, return_type);
+            out.push(')');
+        }
     }
 }
 
