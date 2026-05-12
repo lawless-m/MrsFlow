@@ -2940,6 +2940,51 @@ mod tests {
     }
 
     #[test]
+    fn record_combine_basic() {
+        // Later fields override earlier ones; first-seen order preserved.
+        let src = r#"Record.Combine({[a = 1, b = 2], [b = 99, c = 3]})"#;
+        match eval_str(src).unwrap() {
+            Value::Record(r) => {
+                let names: Vec<&str> = r.fields.iter().map(|(n, _)| n.as_str()).collect();
+                assert_eq!(names, vec!["a", "b", "c"]);
+                let b = r.fields.iter().find(|(n, _)| n == "b").unwrap();
+                assert!(matches!(b.1, Value::Number(n) if n == 99.0));
+            }
+            other => panic!("expected record, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn record_field_or_default_present_and_missing() {
+        match eval_str(r#"Record.FieldOrDefault([a = 1], "a")"#).unwrap() {
+            Value::Number(n) => assert_eq!(n, 1.0),
+            other => panic!("expected number, got {:?}", other),
+        }
+        // Missing field with explicit default.
+        match eval_str(r#"Record.FieldOrDefault([a = 1], "missing", 42)"#).unwrap() {
+            Value::Number(n) => assert_eq!(n, 42.0),
+            other => panic!("expected number, got {:?}", other),
+        }
+        // Missing field with no default → null.
+        match eval_str(r#"Record.FieldOrDefault([a = 1], "missing")"#).unwrap() {
+            Value::Null => {}
+            other => panic!("expected null, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn record_remove_fields_drops_named() {
+        let src = r#"Record.RemoveFields([a = 1, b = 2, c = 3], {"a", "c"})"#;
+        match eval_str(src).unwrap() {
+            Value::Record(r) => {
+                let names: Vec<&str> = r.fields.iter().map(|(n, _)| n.as_str()).collect();
+                assert_eq!(names, vec!["b"]);
+            }
+            other => panic!("expected record, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn number_to_text_whole() {
         match eval_str("Number.ToText(2)").unwrap() {
             Value::Text(s) => assert_eq!(s, "2"),
