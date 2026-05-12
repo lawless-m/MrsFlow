@@ -184,6 +184,16 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ("Text.EndsWith", two("text", "suffix"), text_ends_with),
         ("Text.StartsWith", two("text", "prefix"), text_starts_with),
         ("Text.TrimEnd", one("text"), text_trim_end),
+        (
+            "Text.TrimStart",
+            vec![
+                Param { name: "text".into(), optional: false, type_annotation: None },
+                Param { name: "trim".into(), optional: true,  type_annotation: None },
+            ],
+            text_trim_start,
+        ),
+        ("Text.Reverse", one("text"), text_reverse),
+        ("Text.Proper", one("text"), text_proper),
         ("Text.Start", two("text", "count"), text_start),
         (
             "Text.Middle",
@@ -789,6 +799,51 @@ fn text_starts_with(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError>
 fn text_trim_end(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     Ok(Value::Text(text.trim_end().to_string()))
+}
+
+fn text_trim_start(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let text = expect_text(&args[0])?;
+    match args.get(1) {
+        Some(Value::Null) | None => Ok(Value::Text(text.trim_start().to_string())),
+        Some(Value::Text(t)) => {
+            let chars: Vec<char> = t.chars().collect();
+            Ok(Value::Text(text.trim_start_matches(|c| chars.contains(&c)).to_string()))
+        }
+        Some(Value::List(xs)) => {
+            let mut chars: Vec<char> = Vec::new();
+            for v in xs {
+                match v {
+                    Value::Text(s) => chars.extend(s.chars()),
+                    other => return Err(type_mismatch("text (in trim list)", other)),
+                }
+            }
+            Ok(Value::Text(text.trim_start_matches(|c| chars.contains(&c)).to_string()))
+        }
+        Some(other) => Err(type_mismatch("text or list of text", other)),
+    }
+}
+
+fn text_reverse(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let text = expect_text(&args[0])?;
+    Ok(Value::Text(text.chars().rev().collect()))
+}
+
+fn text_proper(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let text = expect_text(&args[0])?;
+    let mut out = String::with_capacity(text.len());
+    let mut start_of_word = true;
+    for c in text.chars() {
+        if c.is_whitespace() {
+            out.push(c);
+            start_of_word = true;
+        } else if start_of_word {
+            out.extend(c.to_uppercase());
+            start_of_word = false;
+        } else {
+            out.extend(c.to_lowercase());
+        }
+    }
+    Ok(Value::Text(out))
 }
 
 fn text_combine(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {

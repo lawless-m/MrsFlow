@@ -2940,6 +2940,34 @@ mod tests {
     }
 
     #[test]
+    fn text_trim_start_default_and_chars() {
+        match eval_str(r#"Text.TrimStart("   hello")"#).unwrap() {
+            Value::Text(s) => assert_eq!(s, "hello"),
+            other => panic!("expected text, got {:?}", other),
+        }
+        match eval_str(r#"Text.TrimStart("xxxabc", "x")"#).unwrap() {
+            Value::Text(s) => assert_eq!(s, "abc"),
+            other => panic!("expected text, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn text_reverse_basic() {
+        match eval_str(r#"Text.Reverse("abc")"#).unwrap() {
+            Value::Text(s) => assert_eq!(s, "cba"),
+            other => panic!("expected text, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn text_proper_capitalises_each_word() {
+        match eval_str(r#"Text.Proper("hello WORLD from RUST")"#).unwrap() {
+            Value::Text(s) => assert_eq!(s, "Hello World From Rust"),
+            other => panic!("expected text, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn logical_to_text_basic() {
         assert!(matches!(eval_str("Logical.ToText(true)").unwrap(), Value::Text(s) if s == "true"));
         assert!(matches!(eval_str("Logical.ToText(false)").unwrap(), Value::Text(s) if s == "false"));
