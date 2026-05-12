@@ -2940,6 +2940,39 @@ mod tests {
     }
 
     #[test]
+    fn number_exp_zero() {
+        match eval_str("Number.Exp(0)").unwrap() {
+            Value::Number(n) => assert_eq!(n, 1.0),
+            other => panic!("expected number, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn number_ln_e() {
+        let src = format!("Number.Ln({})", std::f64::consts::E);
+        match eval_str(&src).unwrap() {
+            Value::Number(n) => assert!((n - 1.0).abs() < 1e-12),
+            other => panic!("expected number, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn number_factorial_five() {
+        match eval_str("Number.Factorial(5)").unwrap() {
+            Value::Number(n) => assert_eq!(n, 120.0),
+            other => panic!("expected number, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn number_combinations_5_2() {
+        match eval_str("Number.Combinations(5, 2)").unwrap() {
+            Value::Number(n) => assert_eq!(n, 10.0),
+            other => panic!("expected number, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn number_sin_zero() {
         match eval_str("Number.Sin(0)").unwrap() {
             Value::Number(n) => assert_eq!(n, 0.0),

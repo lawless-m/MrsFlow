@@ -199,6 +199,20 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ("Number.Sinh", one("number"), number_sinh),
         ("Number.Tan", one("number"), number_tan),
         ("Number.Tanh", one("number"), number_tanh),
+        ("Number.Exp", one("number"), number_exp),
+        ("Number.Ln", one("number"), number_ln),
+        (
+            "Number.Log",
+            vec![
+                Param { name: "number".into(), optional: false, type_annotation: None },
+                Param { name: "base".into(),   optional: true,  type_annotation: None },
+            ],
+            number_log,
+        ),
+        ("Number.Log10", one("number"), number_log10),
+        ("Number.Factorial", one("number"), number_factorial),
+        ("Number.Combinations", two("setSize", "combinationSize"), number_combinations),
+        ("Number.Permutations", two("setSize", "combinationSize"), number_permutations),
         ("Byte.From", one("value"), number_from),
         ("Currency.From", one("value"), number_from),
         ("Decimal.From", one("value"), number_from),
@@ -846,6 +860,84 @@ fn number_is_even(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         }
         other => Err(type_mismatch("number", other)),
     }
+}
+
+fn number_exp(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> { unary_f64(args, f64::exp) }
+fn number_ln(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> { unary_f64(args, f64::ln) }
+fn number_log10(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> { unary_f64(args, f64::log10) }
+
+fn number_log(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let n = match &args[0] {
+        Value::Null => return Ok(Value::Null),
+        Value::Number(n) => *n,
+        other => return Err(type_mismatch("number", other)),
+    };
+    let base = match args.get(1) {
+        Some(Value::Number(b)) => *b,
+        Some(Value::Null) | None => std::f64::consts::E,
+        Some(other) => return Err(type_mismatch("number (base)", other)),
+    };
+    Ok(Value::Number(n.log(base)))
+}
+
+fn factorial_f64(n: f64) -> Result<f64, MError> {
+    if !n.is_finite() || n < 0.0 || n.fract() != 0.0 {
+        return Err(MError::Other(format!(
+            "Number.Factorial: argument must be a non-negative integer (got {})", n
+        )));
+    }
+    let n = n as u64;
+    if n > 170 {
+        return Err(MError::Other("Number.Factorial: overflow (n > 170)".into()));
+    }
+    let mut acc = 1f64;
+    for i in 2..=n {
+        acc *= i as f64;
+    }
+    Ok(acc)
+}
+
+fn number_factorial(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let n = match &args[0] {
+        Value::Null => return Ok(Value::Null),
+        Value::Number(n) => *n,
+        other => return Err(type_mismatch("number", other)),
+    };
+    Ok(Value::Number(factorial_f64(n)?))
+}
+
+fn number_combinations(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let n = match &args[0] {
+        Value::Number(n) => *n,
+        other => return Err(type_mismatch("number", other)),
+    };
+    let k = match &args[1] {
+        Value::Number(n) => *n,
+        other => return Err(type_mismatch("number", other)),
+    };
+    if k > n {
+        return Err(MError::Other(
+            "Number.Combinations: combinationSize must not exceed setSize".into(),
+        ));
+    }
+    Ok(Value::Number(factorial_f64(n)? / (factorial_f64(k)? * factorial_f64(n - k)?)))
+}
+
+fn number_permutations(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let n = match &args[0] {
+        Value::Number(n) => *n,
+        other => return Err(type_mismatch("number", other)),
+    };
+    let k = match &args[1] {
+        Value::Number(n) => *n,
+        other => return Err(type_mismatch("number", other)),
+    };
+    if k > n {
+        return Err(MError::Other(
+            "Number.Permutations: combinationSize must not exceed setSize".into(),
+        ));
+    }
+    Ok(Value::Number(factorial_f64(n)? / factorial_f64(n - k)?))
 }
 
 fn unary_f64(args: &[Value], f: fn(f64) -> f64) -> Result<Value, MError> {
