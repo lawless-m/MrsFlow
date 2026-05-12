@@ -157,6 +157,38 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ("Number.IsEven", one("number"), number_is_even),
         ("Number.Random", vec![], number_random),
         ("Number.RandomBetween", two("bottom", "top"), number_random_between),
+        (
+            "Number.RoundUp",
+            vec![
+                Param { name: "number".into(), optional: false, type_annotation: None },
+                Param { name: "digits".into(), optional: true,  type_annotation: None },
+            ],
+            number_round_up,
+        ),
+        (
+            "Number.RoundDown",
+            vec![
+                Param { name: "number".into(), optional: false, type_annotation: None },
+                Param { name: "digits".into(), optional: true,  type_annotation: None },
+            ],
+            number_round_down,
+        ),
+        (
+            "Number.RoundTowardZero",
+            vec![
+                Param { name: "number".into(), optional: false, type_annotation: None },
+                Param { name: "digits".into(), optional: true,  type_annotation: None },
+            ],
+            number_round_toward_zero,
+        ),
+        (
+            "Number.RoundAwayFromZero",
+            vec![
+                Param { name: "number".into(), optional: false, type_annotation: None },
+                Param { name: "digits".into(), optional: true,  type_annotation: None },
+            ],
+            number_round_away_from_zero,
+        ),
         ("Byte.From", one("value"), number_from),
         ("Currency.From", one("value"), number_from),
         ("Decimal.From", one("value"), number_from),
@@ -804,6 +836,42 @@ fn number_is_even(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         }
         other => Err(type_mismatch("number", other)),
     }
+}
+
+fn apply_round_mode(args: &[Value], ctx: &str, mode: fn(f64) -> f64) -> Result<Value, MError> {
+    let n = match &args[0] {
+        Value::Number(n) => *n,
+        Value::Null => return Ok(Value::Null),
+        other => return Err(type_mismatch("number", other)),
+    };
+    let digits = match args.get(1) {
+        Some(Value::Number(d)) if d.fract() == 0.0 => *d as i32,
+        Some(Value::Null) | None => 0,
+        Some(other) => {
+            let _ = ctx;
+            return Err(type_mismatch("integer (digits)", other));
+        }
+    };
+    let scale = 10f64.powi(digits);
+    Ok(Value::Number(mode(n * scale) / scale))
+}
+
+fn number_round_up(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    apply_round_mode(args, "Number.RoundUp", f64::ceil)
+}
+
+fn number_round_down(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    apply_round_mode(args, "Number.RoundDown", f64::floor)
+}
+
+fn number_round_toward_zero(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    apply_round_mode(args, "Number.RoundTowardZero", f64::trunc)
+}
+
+fn number_round_away_from_zero(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    apply_round_mode(args, "Number.RoundAwayFromZero", |x| {
+        if x >= 0.0 { (x + 0.5).floor() } else { (x - 0.5).ceil() }
+    })
 }
 
 fn number_random(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {

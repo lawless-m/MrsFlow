@@ -2940,6 +2940,42 @@ mod tests {
     }
 
     #[test]
+    fn number_round_up_basic() {
+        match eval_str("Number.RoundUp(3.1)").unwrap() {
+            Value::Number(n) => assert_eq!(n, 4.0),
+            other => panic!("expected number, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn number_round_down_basic() {
+        match eval_str("Number.RoundDown(3.9)").unwrap() {
+            Value::Number(n) => assert_eq!(n, 3.0),
+            other => panic!("expected number, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn number_round_toward_zero_basic() {
+        match eval_str("Number.RoundTowardZero(-3.7)").unwrap() {
+            Value::Number(n) => assert_eq!(n, -3.0),
+            other => panic!("expected number, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn number_round_away_from_zero_basic() {
+        match eval_str("Number.RoundAwayFromZero(2.5)").unwrap() {
+            Value::Number(n) => assert_eq!(n, 3.0),
+            other => panic!("expected number, got {:?}", other),
+        }
+        match eval_str("Number.RoundAwayFromZero(-2.5)").unwrap() {
+            Value::Number(n) => assert_eq!(n, -3.0),
+            other => panic!("expected number, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn number_mod_negative_dividend() {
         // Floor mod: -7 mod 3 = 2 (since -7 = -3*3 + 2)
         match eval_str("Number.Mod(-7, 3)").unwrap() {
