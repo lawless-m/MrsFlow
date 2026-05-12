@@ -430,13 +430,18 @@ fn odbc_query_impl(connection_string: &str, sql: &str) -> Result<Value, IoError>
         std::panic::set_hook(original_hook);
         match attempt {
             Ok(result) => return result,
-            Err(_panic) => {
+            Err(panic_payload) => {
                 if let Ok(mut set) = columnar_blocklist().lock() {
                     set.insert(connection_string.to_string());
                 }
+                let panic_msg = panic_payload
+                    .downcast_ref::<&'static str>()
+                    .map(|s| s.to_string())
+                    .or_else(|| panic_payload.downcast_ref::<String>().cloned())
+                    .unwrap_or_else(|| "<non-string panic payload>".to_string());
                 eprintln!(
                     "Odbc.Query: columnar fetch panicked for `{connection_string}`; \
-                     falling back to row-at-a-time (driver indicator quirk)"
+                     falling back to row-at-a-time. panic: {panic_msg}"
                 );
             }
         }
@@ -447,8 +452,9 @@ fn odbc_query_impl(connection_string: &str, sql: &str) -> Result<Value, IoError>
 
 #[cfg(feature = "odbc")]
 fn odbc_query_columnar(connection_string: &str, sql: &str) -> Result<Value, IoError> {
-    use arrow::array::{Float64Array, StringArray};
-    use arrow::datatypes::{DataType, Schema};
+    use arrow::array::{Date32Array, Float64Array, StringArray, TimestampMicrosecondArray};
+    use arrow::datatypes::{DataType, Schema, TimeUnit};
+    use chrono::NaiveDate;
     use odbc_api::{
         buffers::ColumnarAnyBuffer,
         ConnectionOptions, Cursor,
@@ -474,8 +480,11 @@ fn odbc_query_columnar(connection_string: &str, sql: &str) -> Result<Value, IoEr
         .bind_buffer(buffer)
         .map_err(|e| IoError::Other(format!("Odbc.Query bind: {}", e)))?;
 
-    let mut accumulated_columns: Vec<Vec<Option<f64>>> = vec![Vec::new(); n_cols];
-    let mut accumulated_strings: Vec<Vec<Option<String>>> = vec![Vec::new(); n_cols];
+    let epoch = NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
+    let mut acc_f64: Vec<Vec<Option<f64>>> = vec![Vec::new(); n_cols];
+    let mut acc_str: Vec<Vec<Option<String>>> = vec![Vec::new(); n_cols];
+    let mut acc_date: Vec<Vec<Option<i32>>> = vec![Vec::new(); n_cols];
+    let mut acc_ts: Vec<Vec<Option<i64>>> = vec![Vec::new(); n_cols];
 
     while let Some(batch) = row_set_cursor
         .fetch()
@@ -490,9 +499,8 @@ fn odbc_query_columnar(connection_string: &str, sql: &str) -> Result<Value, IoEr
                         .as_nullable_slice::<f64>()
                         .expect("F64 buffer");
                     for opt in view {
-                        accumulated_columns[col_idx].push(opt.copied());
+                        acc_f64[col_idx].push(opt.copied());
                     }
-                    let _ = n_rows;
                 }
                 DataType::Utf8 => {
                     let view = batch
@@ -502,11 +510,53 @@ fn odbc_query_columnar(connection_string: &str, sql: &str) -> Result<Value, IoEr
                     for row in 0..n_rows {
                         let s = view
                             .get(row)
-                            .map(|b| String::from_utf8_lossy(b).into_owned());
-                        accumulated_strings[col_idx].push(s);
+                            .map(|b| String::from_utf8_lossy(b).trim_end().to_string());
+                        acc_str[col_idx].push(s);
                     }
                 }
-                _ => unreachable!("schema only contains Float64/Utf8 in this slice"),
+                DataType::Date32 => {
+                    let view = batch
+                        .column(col_idx)
+                        .as_nullable_slice::<odbc_api::sys::Date>()
+                        .expect("Date buffer");
+                    for opt in view {
+                        let cell = opt.and_then(|d| {
+                            NaiveDate::from_ymd_opt(
+                                d.year as i32,
+                                d.month as u32,
+                                d.day as u32,
+                            )
+                            .map(|nd| (nd - epoch).num_days() as i32)
+                        });
+                        acc_date[col_idx].push(cell);
+                    }
+                }
+                DataType::Timestamp(TimeUnit::Microsecond, _) => {
+                    let view = batch
+                        .column(col_idx)
+                        .as_nullable_slice::<odbc_api::sys::Timestamp>()
+                        .expect("Timestamp buffer");
+                    for opt in view {
+                        let cell = opt.and_then(|t| {
+                            let date = NaiveDate::from_ymd_opt(
+                                t.year as i32,
+                                t.month as u32,
+                                t.day as u32,
+                            )?;
+                            // fraction is in nanoseconds (per ODBC spec).
+                            let nanos = t.fraction;
+                            let dt = date.and_hms_nano_opt(
+                                t.hour as u32,
+                                t.minute as u32,
+                                t.second as u32,
+                                nanos,
+                            )?;
+                            Some(dt.and_utc().timestamp_micros())
+                        });
+                        acc_ts[col_idx].push(cell);
+                    }
+                }
+                _ => unreachable!("describe_columns only emits Float64/Utf8/Date32/Timestamp(us)"),
             }
         }
     }
@@ -514,14 +564,22 @@ fn odbc_query_columnar(connection_string: &str, sql: &str) -> Result<Value, IoEr
     let columns: Vec<arrow::array::ArrayRef> = fields
         .iter()
         .enumerate()
-        .map(|(i, f)| match f.data_type() {
-            DataType::Float64 => std::sync::Arc::new(Float64Array::from(std::mem::take(
-                &mut accumulated_columns[i],
-            ))) as arrow::array::ArrayRef,
-            DataType::Utf8 => std::sync::Arc::new(StringArray::from(std::mem::take(
-                &mut accumulated_strings[i],
-            ))) as arrow::array::ArrayRef,
-            _ => unreachable!(),
+        .map(|(i, f)| -> arrow::array::ArrayRef {
+            match f.data_type() {
+                DataType::Float64 => std::sync::Arc::new(Float64Array::from(std::mem::take(
+                    &mut acc_f64[i],
+                ))),
+                DataType::Utf8 => std::sync::Arc::new(StringArray::from(std::mem::take(
+                    &mut acc_str[i],
+                ))),
+                DataType::Date32 => std::sync::Arc::new(Date32Array::from(std::mem::take(
+                    &mut acc_date[i],
+                ))),
+                DataType::Timestamp(TimeUnit::Microsecond, _) => std::sync::Arc::new(
+                    TimestampMicrosecondArray::from(std::mem::take(&mut acc_ts[i])),
+                ),
+                _ => unreachable!(),
+            }
         })
         .collect();
 
@@ -691,15 +749,15 @@ fn describe_columns<C: odbc_api::Cursor + odbc_api::ResultSetMetadata>(
                 let max = length.map(|n| n.get()).unwrap_or(255);
                 (DataType::Utf8, BufferDesc::Text { max_str_len: max })
             }
-            // Temporal types: present the column as a real Arrow Date32 /
-            // Timestamp so M's date arithmetic (e.g. `[d] > #date(...)`)
-            // works without a separate TransformColumnTypes step — that's
-            // how Power Query treats ODBC date columns by default.
-            // We still buffer as text on the wire because DBISAM panics
-            // on typed binding; the row-path parses the text into the
-            // typed Arrow array client-side.
+            // Temporal types: bind natively (SQL_C_TYPE_DATE/TIMESTAMP).
+            // DBISAM silently returns null for date columns when bound as
+            // text, so going through native struct buffers is required.
+            // The columnar path decodes the resulting odbc_api::sys::Date /
+            // Timestamp into Arrow Date32 / Timestamp(us). Time stays as
+            // text since we don't have a typed Arrow Time array in this
+            // pipeline.
             odbc_api::DataType::Date => {
-                (DataType::Date32, BufferDesc::Text { max_str_len: 32 })
+                (DataType::Date32, BufferDesc::Date { nullable: true })
             }
             odbc_api::DataType::Time { .. } => {
                 (DataType::Utf8, BufferDesc::Text { max_str_len: 32 })
@@ -707,7 +765,7 @@ fn describe_columns<C: odbc_api::Cursor + odbc_api::ResultSetMetadata>(
             odbc_api::DataType::Timestamp { .. } => {
                 (
                     DataType::Timestamp(arrow::datatypes::TimeUnit::Microsecond, None),
-                    BufferDesc::Text { max_str_len: 32 },
+                    BufferDesc::Timestamp { nullable: true },
                 )
             }
             other => {

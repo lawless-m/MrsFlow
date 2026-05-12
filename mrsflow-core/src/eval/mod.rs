@@ -934,6 +934,12 @@ fn compare(
     expected: std::cmp::Ordering,
     allow_equal: bool,
 ) -> Result<Value, MError> {
+    // Null propagates through ordered comparisons: `null < x`, `x > null`,
+    // and `null = null` are all `null`, not errors. Table.SelectRows treats
+    // the resulting null as "exclude this row".
+    if matches!(lv, Value::Null) || matches!(rv, Value::Null) {
+        return Ok(Value::Null);
+    }
     let result = match (&lv, &rv) {
         (Value::Number(l), Value::Number(r)) => match l.partial_cmp(r) {
             Some(ord) => ord == expected || (allow_equal && ord == std::cmp::Ordering::Equal),

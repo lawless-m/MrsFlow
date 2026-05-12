@@ -1066,6 +1066,10 @@ fn select_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
         match result {
             Value::Logical(true) => keep.push(row as u32),
             Value::Logical(false) => {}
+            // Null predicate → row excluded (matches PQ 3-valued logic:
+            // when any operand in the predicate is null, comparison
+            // returns null, which Table.SelectRows treats as "not kept").
+            Value::Null => {}
             other => {
                 return Err(MError::TypeMismatch {
                     expected: "logical (from row predicate)",

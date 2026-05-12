@@ -13,3 +13,9 @@ repository = "https://github.com/lawless-m/MrsFlow"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
+
+# Local fork of odbc-api with one patched function: Indicator::from_isize
+# no longer panics on unrecognised negative SQLLEN values, which DBISAM
+# returns. See vendor/odbc-api/src/buffers/indicator.rs.
+[patch.crates-io]
+odbc-api = { path = "vendor/odbc-api" }
