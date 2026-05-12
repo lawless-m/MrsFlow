@@ -135,6 +135,9 @@ pub fn write_value(out: &mut String, v: &Value) {
             out.push(')');
         }
         Value::Thunk(_) => out.push_str("(thunk ...)"),
+        // Metadata is invisible to the canonical s-expression — render the
+        // inner value so the Prolog companion (no metadata) stays in sync.
+        Value::WithMetadata { inner, .. } => write_value(out, inner),
     }
 }
 

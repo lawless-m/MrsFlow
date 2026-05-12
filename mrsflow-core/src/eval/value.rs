@@ -39,6 +39,14 @@ pub enum Value {
     Table(Table),
     Function(Closure),
     Type(TypeRep),
+    /// `value meta record` attaches a metadata record. Per the spec
+    /// metadata is preserved through field/item access but not through
+    /// arithmetic. Most operations should strip-and-rewrap or strip-only,
+    /// using `Value::strip_metadata` to peek at the inner value.
+    WithMetadata {
+        inner: Box<Value>,
+        meta: Record,
+    },
     /// Lazy thunk — forced on first access, memoised thereafter. Central to
     /// M's laziness (per design doc §07 §1).
     Thunk(Rc<RefCell<ThunkState>>),

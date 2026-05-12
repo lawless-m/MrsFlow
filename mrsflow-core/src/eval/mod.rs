@@ -832,9 +832,23 @@ fn apply_binary(op: BinaryOp, lv: Value, rv: Value) -> Result<Value, MError> {
         BinaryOp::As | BinaryOp::Is => unreachable!(
             "as/is intercepted in evaluate (RHS is in type context)"
         ),
-        BinaryOp::Meta => Err(MError::NotImplemented(
-            "meta operator deferred to a later eval slice",
-        )),
+        BinaryOp::Meta => {
+            let meta = match strip_metadata_owned(rv) {
+                Value::Record(r) => r,
+                other => {
+                    return Err(MError::TypeMismatch {
+                        expected: "record (meta RHS)",
+                        found: type_name(&other),
+                    });
+                }
+            };
+            // Replace any existing metadata.
+            let inner = strip_metadata_owned(lv);
+            Ok(Value::WithMetadata {
+                inner: Box::new(inner),
+                meta,
+            })
+        }
     }
 }
 
@@ -919,6 +933,16 @@ pub(crate) fn type_name(v: &Value) -> &'static str {
         Value::Function(_) => "function",
         Value::Type(_) => "type",
         Value::Thunk(_) => "thunk",
+        Value::WithMetadata { inner, .. } => type_name(inner),
+    }
+}
+
+/// Strip a `WithMetadata` wrapper by-value. The borrowed counterpart isn't
+/// needed yet — adding it on demand.
+pub(crate) fn strip_metadata_owned(v: Value) -> Value {
+    match v {
+        Value::WithMetadata { inner, .. } => strip_metadata_owned(*inner),
+        _ => v,
     }
 }
 
@@ -5460,6 +5484,56 @@ mod tests {
                 assert_eq!(t.num_rows(), 1); // only "banana" contains "an"
             }
             other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn value_metadata_default_is_empty_record() {
+        let src = r#"Value.Metadata(42)"#;
+        match eval_str(src).unwrap() {
+            Value::Record(r) => assert!(r.fields.is_empty()),
+            other => panic!("expected record, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn value_replace_metadata_sets_meta() {
+        let src = r#"Value.Metadata(Value.ReplaceMetadata(42, [k = 1]))"#;
+        match eval_str(src).unwrap() {
+            Value::Record(r) => {
+                assert_eq!(r.fields.len(), 1);
+                assert_eq!(r.fields[0].0, "k");
+            }
+            other => panic!("expected record, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn value_remove_metadata_strips_wrapper() {
+        let src = r#"
+            let
+                v = Value.ReplaceMetadata(42, [k = 1]),
+                bare = Value.RemoveMetadata(v),
+                back = Value.Metadata(bare)
+            in back
+        "#;
+        match eval_str(src).unwrap() {
+            Value::Record(r) => assert!(r.fields.is_empty()),
+            other => panic!("expected record, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn value_meta_operator_attaches_metadata() {
+        // The `meta` operator should produce a WithMetadata value whose
+        // Value.Metadata returns the supplied record.
+        let src = r#"Value.Metadata(42 meta [k = 1])"#;
+        match eval_str(src).unwrap() {
+            Value::Record(r) => {
+                assert_eq!(r.fields.len(), 1);
+                assert_eq!(r.fields[0].0, "k");
+            }
+            other => panic!("expected record, got {:?}", other),
         }
     }
 

@@ -56,6 +56,10 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ("Value.Alternates", one("value"), value_alternates),
         ("Value.ViewError", one("value"), value_passthrough),
         ("Value.ViewFunction", one("value"), value_passthrough),
+        // --- Slice #171: metadata ---
+        ("Value.Metadata", one("value"), value_metadata),
+        ("Value.ReplaceMetadata", two("value", "metadata"), value_replace_metadata),
+        ("Value.RemoveMetadata", one("value"), value_remove_metadata),
         // --- Slice #169: arithmetic + equality ---
         (
             "Value.Add",
@@ -171,6 +175,7 @@ fn typerep_of(v: &Value) -> TypeRep {
         Value::Function(_) => TypeRep::Function,
         Value::Type(_) => TypeRep::Type,
         Value::Thunk(_) => TypeRep::Any,
+        Value::WithMetadata { inner, .. } => typerep_of(inner),
     }
 }
 
@@ -256,6 +261,44 @@ fn value_firewall(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 
 fn value_alternates(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(Value::List(vec![args[0].clone()]))
+}
+
+// --- Slice #171: metadata ---
+
+fn value_metadata(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    match &args[0] {
+        Value::WithMetadata { meta, .. } => Ok(Value::Record(meta.clone())),
+        _ => Ok(Value::Record(Record {
+            fields: Vec::new(),
+            env: EnvNode::empty(),
+        })),
+    }
+}
+
+fn value_replace_metadata(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let meta = match &args[1] {
+        Value::Record(r) => r.clone(),
+        Value::WithMetadata { inner, .. } => match inner.as_ref() {
+            Value::Record(r) => r.clone(),
+            other => return Err(type_mismatch("record (metadata)", other)),
+        },
+        other => return Err(type_mismatch("record (metadata)", other)),
+    };
+    let inner = match &args[0] {
+        Value::WithMetadata { inner, .. } => (**inner).clone(),
+        v => v.clone(),
+    };
+    Ok(Value::WithMetadata {
+        inner: Box::new(inner),
+        meta,
+    })
+}
+
+fn value_remove_metadata(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    Ok(match &args[0] {
+        Value::WithMetadata { inner, .. } => (**inner).clone(),
+        v => v.clone(),
+    })
 }
 
 // --- Slice #169 impls ---

@@ -3895,6 +3895,7 @@ fn typename_of(v: &Value) -> &'static str {
         Value::Function(_) => "Function.Type",
         Value::Type(_) => "Type.Type",
         Value::Thunk(_) => "Any.Type",
+        Value::WithMetadata { inner, .. } => typename_of(inner),
     }
 }
 
