@@ -259,6 +259,24 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ),
         ("Table.Keys", one("table"), table_keys),
         ("Table.ColumnsOfType", two("table", "listOfTypes"), table_columns_of_type),
+        // --- Slice #159: sort/fill/reverse ---
+        ("Table.Sort", two("table", "comparisonCriteria"), table_sort),
+        ("Table.FillUp", two("table", "columns"), table_fill_up),
+        ("Table.FillDown", two("table", "columns"), table_fill_down),
+        ("Table.ReverseRows", one("table"), table_reverse_rows),
+        ("Table.SplitAt", two("table", "index"), table_split_at),
+        (
+            "Table.AlternateRows",
+            vec![
+                Param { name: "table".into(),  optional: false, type_annotation: None },
+                Param { name: "offset".into(), optional: false, type_annotation: None },
+                Param { name: "skip".into(),   optional: false, type_annotation: None },
+                Param { name: "take".into(),   optional: false, type_annotation: None },
+            ],
+            table_alternate_rows,
+        ),
+        ("Table.Repeat", two("table", "count"), table_repeat),
+        ("Table.SingleRow", one("table"), table_single_row),
     ]
 }
 
@@ -2436,6 +2454,228 @@ fn table_columns_of_type(args: &[Value], _host: &dyn IoHost) -> Result<Value, ME
         }
     }
     Ok(Value::List(out))
+}
+
+// --- Slice #159: sort / fill / reverse ---
+
+/// Total-order comparison for primitive cells used by Table.Sort. Null is
+/// less than non-null. Mixed primitive types compare by type-tag ordering so
+/// the sort remains total. NaN sorts last.
+fn compare_cells(a: &Value, b: &Value) -> std::cmp::Ordering {
+    use std::cmp::Ordering::*;
+    fn tag(v: &Value) -> u8 {
+        match v {
+            Value::Null => 0,
+            Value::Logical(_) => 1,
+            Value::Number(_) => 2,
+            Value::Text(_) => 3,
+            Value::Date(_) => 4,
+            Value::Datetime(_) => 5,
+            Value::Datetimezone(_) => 6,
+            Value::Time(_) => 7,
+            Value::Duration(_) => 8,
+            _ => 9,
+        }
+    }
+    match (a, b) {
+        (Value::Null, Value::Null) => Equal,
+        (Value::Number(x), Value::Number(y)) => x.partial_cmp(y).unwrap_or(Greater),
+        (Value::Text(x), Value::Text(y)) => x.cmp(y),
+        (Value::Logical(x), Value::Logical(y)) => x.cmp(y),
+        (Value::Date(x), Value::Date(y)) => x.cmp(y),
+        (Value::Datetime(x), Value::Datetime(y)) => x.cmp(y),
+        (Value::Datetimezone(x), Value::Datetimezone(y)) => x.cmp(y),
+        (Value::Time(x), Value::Time(y)) => x.cmp(y),
+        (Value::Duration(x), Value::Duration(y)) => x.cmp(y),
+        _ => tag(a).cmp(&tag(b)),
+    }
+}
+
+fn table_sort(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let names = table.column_names();
+    // Parse criteria into a list of (column_index, descending) tuples.
+    let mut keys: Vec<(usize, bool)> = Vec::new();
+    let pairs: Vec<&Value> = match &args[1] {
+        Value::Text(_) => vec![&args[1]],
+        Value::List(xs) => xs.iter().collect(),
+        other => return Err(type_mismatch("text or list (sort criteria)", other)),
+    };
+    for p in pairs {
+        let (col_name, desc) = match p {
+            Value::Text(s) => (s.clone(), false),
+            Value::List(inner) => {
+                if inner.len() != 2 {
+                    return Err(MError::Other(format!(
+                        "Table.Sort: criterion pair must have 2 elements, got {}",
+                        inner.len()
+                    )));
+                }
+                let n = match &inner[0] {
+                    Value::Text(s) => s.clone(),
+                    other => return Err(type_mismatch("text (column name)", other)),
+                };
+                let d = match &inner[1] {
+                    Value::Number(n) => *n != 0.0,
+                    other => return Err(type_mismatch("number (Order.*)", other)),
+                };
+                (n, d)
+            }
+            other => return Err(type_mismatch("text or pair (sort criterion)", other)),
+        };
+        let idx = names
+            .iter()
+            .position(|n| n == &col_name)
+            .ok_or_else(|| MError::Other(format!("Table.Sort: column not found: {}", col_name)))?;
+        keys.push((idx, desc));
+    }
+    let (_, mut rows) = table_to_rows(table)?;
+    rows.sort_by(|a, b| {
+        for &(col, desc) in &keys {
+            let ord = compare_cells(&a[col], &b[col]);
+            if ord != std::cmp::Ordering::Equal {
+                return if desc { ord.reverse() } else { ord };
+            }
+        }
+        std::cmp::Ordering::Equal
+    });
+    Ok(Value::Table(values_to_table(&names, &rows)?))
+}
+
+/// Helper: parse the `columns` arg of Table.FillUp / FillDown into a Vec of
+/// column indices. Accepts a single text or a list of texts.
+fn parse_fill_columns(arg: &Value, names: &[String], ctx: &str) -> Result<Vec<usize>, MError> {
+    let cols: Vec<String> = match arg {
+        Value::Text(s) => vec![s.clone()],
+        Value::List(_) => expect_text_list(arg, ctx)?,
+        other => return Err(type_mismatch("text or list of text", other)),
+    };
+    let mut out = Vec::with_capacity(cols.len());
+    for n in &cols {
+        let idx = names
+            .iter()
+            .position(|h| h == n)
+            .ok_or_else(|| MError::Other(format!("{}: column not found: {}", ctx, n)))?;
+        out.push(idx);
+    }
+    Ok(out)
+}
+
+fn table_fill_down(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let (names, mut rows) = table_to_rows(table)?;
+    let cols = parse_fill_columns(&args[1], &names, "Table.FillDown")?;
+    for &col in &cols {
+        let mut last: Option<Value> = None;
+        for row in rows.iter_mut() {
+            if matches!(row[col], Value::Null) {
+                if let Some(v) = &last {
+                    row[col] = v.clone();
+                }
+            } else {
+                last = Some(row[col].clone());
+            }
+        }
+    }
+    Ok(Value::Table(values_to_table(&names, &rows)?))
+}
+
+fn table_fill_up(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let (names, mut rows) = table_to_rows(table)?;
+    let cols = parse_fill_columns(&args[1], &names, "Table.FillUp")?;
+    for &col in &cols {
+        let mut last: Option<Value> = None;
+        for row in rows.iter_mut().rev() {
+            if matches!(row[col], Value::Null) {
+                if let Some(v) = &last {
+                    row[col] = v.clone();
+                }
+            } else {
+                last = Some(row[col].clone());
+            }
+        }
+    }
+    Ok(Value::Table(values_to_table(&names, &rows)?))
+}
+
+fn table_reverse_rows(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let (names, mut rows) = table_to_rows(table)?;
+    rows.reverse();
+    Ok(Value::Table(values_to_table(&names, &rows)?))
+}
+
+fn table_split_at(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let index = expect_int(&args[1], "Table.SplitAt: index")?;
+    if index < 0 {
+        return Err(MError::Other("Table.SplitAt: index must be non-negative".into()));
+    }
+    let split = (index as usize).min(table.num_rows());
+    let (names, rows) = table_to_rows(table)?;
+    let (head, tail) = rows.split_at(split);
+    let head_tbl = values_to_table(&names, head)?;
+    let tail_tbl = values_to_table(&names, tail)?;
+    Ok(Value::List(vec![
+        Value::Table(head_tbl),
+        Value::Table(tail_tbl),
+    ]))
+}
+
+fn table_alternate_rows(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let offset = expect_int(&args[1], "Table.AlternateRows: offset")?;
+    let skip = expect_int(&args[2], "Table.AlternateRows: skip")?;
+    let take = expect_int(&args[3], "Table.AlternateRows: take")?;
+    if offset < 0 || skip < 0 || take < 0 {
+        return Err(MError::Other(
+            "Table.AlternateRows: offset/skip/take must be non-negative".into(),
+        ));
+    }
+    let offset = offset as usize;
+    let skip = skip as usize;
+    let take = take as usize;
+    let (names, rows) = table_to_rows(table)?;
+    // After the initial offset, alternate `skip` rows dropped + `take` rows kept.
+    let mut kept: Vec<Vec<Value>> = Vec::new();
+    let mut i = offset;
+    while i < rows.len() {
+        i += skip;
+        let end = (i + take).min(rows.len());
+        while i < end {
+            kept.push(rows[i].clone());
+            i += 1;
+        }
+    }
+    Ok(Value::Table(values_to_table(&names, &kept)?))
+}
+
+fn table_repeat(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let count = expect_int(&args[1], "Table.Repeat: count")?;
+    if count < 0 {
+        return Err(MError::Other("Table.Repeat: count must be non-negative".into()));
+    }
+    let (names, rows) = table_to_rows(table)?;
+    let mut out: Vec<Vec<Value>> = Vec::with_capacity(rows.len() * count as usize);
+    for _ in 0..count {
+        for r in &rows {
+            out.push(r.clone());
+        }
+    }
+    Ok(Value::Table(values_to_table(&names, &out)?))
+}
+
+fn table_single_row(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    if table.num_rows() != 1 {
+        return Err(MError::Other(format!(
+            "Table.SingleRow: expected exactly 1 row, got {}",
+            table.num_rows()
+        )));
+    }
+    row_to_record(table, 0)
 }
 
 fn type_matches(t: &super::super::value::TypeRep, v: &Value) -> bool {

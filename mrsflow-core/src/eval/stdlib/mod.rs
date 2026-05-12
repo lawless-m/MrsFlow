@@ -101,6 +101,14 @@ pub fn root_env() -> Env {
         env = env.extend(name.to_string(), Value::Number(n));
     }
 
+    // Order.* constants — Table.Sort's per-column order argument.
+    for (name, n) in [
+        ("Order.Ascending",  0.0),
+        ("Order.Descending", 1.0),
+    ] {
+        env = env.extend(name.to_string(), Value::Number(n));
+    }
+
     // Day.* constants — Date.DayOfWeek's firstDayOfWeek argument.
     for (name, n) in [
         ("Day.Sunday",    0.0),

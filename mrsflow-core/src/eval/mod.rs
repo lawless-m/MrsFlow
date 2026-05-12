@@ -5342,6 +5342,100 @@ mod tests {
     }
 
     #[test]
+    fn table_sort_by_single_column_ascending() {
+        let src = r#"
+            let
+                t = #table({"n"}, {{3}, {1}, {2}}),
+                s = Table.Sort(t, "n")
+            in Table.Column(s, "n")
+        "#;
+        match eval_str(src).unwrap() {
+            Value::List(xs) => {
+                let nums: Vec<f64> = xs.iter().map(|v| match v {
+                    Value::Number(n) => *n,
+                    _ => panic!("expected number"),
+                }).collect();
+                assert_eq!(nums, vec![1.0, 2.0, 3.0]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_fill_down_propagates_last_non_null() {
+        let src = r#"
+            let
+                t = #table({"k"}, {{"a"}, {null}, {null}, {"b"}, {null}}),
+                f = Table.FillDown(t, "k")
+            in Table.Column(f, "k")
+        "#;
+        match eval_str(src).unwrap() {
+            Value::List(xs) => {
+                let texts: Vec<&str> = xs.iter().map(|v| match v {
+                    Value::Text(s) => s.as_str(),
+                    _ => panic!("expected text, got {:?}", v),
+                }).collect();
+                assert_eq!(texts, vec!["a", "a", "a", "b", "b"]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_reverse_rows_basic() {
+        let src = r#"
+            let
+                t = #table({"n"}, {{1}, {2}, {3}}),
+                r = Table.ReverseRows(t)
+            in Table.Column(r, "n")
+        "#;
+        match eval_str(src).unwrap() {
+            Value::List(xs) => {
+                let nums: Vec<f64> = xs.iter().map(|v| match v {
+                    Value::Number(n) => *n,
+                    _ => panic!(),
+                }).collect();
+                assert_eq!(nums, vec![3.0, 2.0, 1.0]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_split_at_returns_two_tables() {
+        let src = r#"
+            let
+                t = #table({"n"}, {{1}, {2}, {3}, {4}, {5}}),
+                pair = Table.SplitAt(t, 2)
+            in
+                {Table.RowCount(pair{0}), Table.RowCount(pair{1})}
+        "#;
+        match eval_str(src).unwrap() {
+            Value::List(xs) => {
+                assert!(matches!(xs[0], Value::Number(n) if n == 2.0));
+                assert!(matches!(xs[1], Value::Number(n) if n == 3.0));
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_single_row_returns_record() {
+        let src = r#"Table.SingleRow(#table({"x"}, {{42}}))"#;
+        match eval_str(src).unwrap() {
+            Value::Record(r) => {
+                assert_eq!(r.fields.len(), 1);
+                assert_eq!(r.fields[0].0, "x");
+                assert!(matches!(r.fields[0].1, Value::Number(n) if n == 42.0));
+            }
+            other => panic!("expected record, got {:?}", other),
+        }
+        // Two-row table errors.
+        let src = r#"Table.SingleRow(#table({"x"}, {{1}, {2}}))"#;
+        assert!(eval_str(src).is_err());
+    }
+
+    #[test]
     fn table_columns_of_type_picks_matching_columns() {
         let src = r#"
             let
