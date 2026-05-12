@@ -161,6 +161,104 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ),
         ("Table.TransformRows", two("table", "transform"), table_transform_rows),
         ("Table.InsertRows", three("table", "offset", "rows"), table_insert_rows),
+        // --- Accessors + predicates batch (slice #158) ---
+        (
+            "Table.First",
+            vec![
+                Param { name: "table".into(),   optional: false, type_annotation: None },
+                Param { name: "default".into(), optional: true,  type_annotation: None },
+            ],
+            table_first,
+        ),
+        (
+            "Table.Last",
+            vec![
+                Param { name: "table".into(),   optional: false, type_annotation: None },
+                Param { name: "default".into(), optional: true,  type_annotation: None },
+            ],
+            table_last,
+        ),
+        (
+            "Table.FirstValue",
+            vec![
+                Param { name: "table".into(),   optional: false, type_annotation: None },
+                Param { name: "default".into(), optional: true,  type_annotation: None },
+            ],
+            table_first_value,
+        ),
+        ("Table.RowCount", one("table"), table_row_count),
+        ("Table.ColumnCount", one("table"), table_column_count),
+        ("Table.ApproximateRowCount", one("table"), table_row_count),
+        (
+            "Table.Range",
+            vec![
+                Param { name: "table".into(),  optional: false, type_annotation: None },
+                Param { name: "offset".into(), optional: false, type_annotation: None },
+                Param { name: "count".into(),  optional: true,  type_annotation: None },
+            ],
+            table_range,
+        ),
+        (
+            "Table.Contains",
+            vec![
+                Param { name: "table".into(),            optional: false, type_annotation: None },
+                Param { name: "row".into(),              optional: false, type_annotation: None },
+                Param { name: "equationCriteria".into(), optional: true,  type_annotation: None },
+            ],
+            table_contains,
+        ),
+        (
+            "Table.ContainsAll",
+            vec![
+                Param { name: "table".into(),            optional: false, type_annotation: None },
+                Param { name: "rows".into(),             optional: false, type_annotation: None },
+                Param { name: "equationCriteria".into(), optional: true,  type_annotation: None },
+            ],
+            table_contains_all,
+        ),
+        (
+            "Table.ContainsAny",
+            vec![
+                Param { name: "table".into(),            optional: false, type_annotation: None },
+                Param { name: "rows".into(),             optional: false, type_annotation: None },
+                Param { name: "equationCriteria".into(), optional: true,  type_annotation: None },
+            ],
+            table_contains_any,
+        ),
+        (
+            "Table.IsDistinct",
+            vec![
+                Param { name: "table".into(),              optional: false, type_annotation: None },
+                Param { name: "comparisonCriteria".into(), optional: true,  type_annotation: None },
+            ],
+            table_is_distinct,
+        ),
+        ("Table.HasColumns", two("table", "columns"), table_has_columns),
+        ("Table.MatchesAllRows", two("table", "condition"), table_matches_all_rows),
+        ("Table.MatchesAnyRows", two("table", "condition"), table_matches_any_rows),
+        ("Table.FindText", two("table", "text"), table_find_text),
+        (
+            "Table.PositionOf",
+            vec![
+                Param { name: "table".into(),            optional: false, type_annotation: None },
+                Param { name: "row".into(),              optional: false, type_annotation: None },
+                Param { name: "occurrence".into(),       optional: true,  type_annotation: None },
+                Param { name: "equationCriteria".into(), optional: true,  type_annotation: None },
+            ],
+            table_position_of,
+        ),
+        (
+            "Table.PositionOfAny",
+            vec![
+                Param { name: "table".into(),            optional: false, type_annotation: None },
+                Param { name: "rows".into(),             optional: false, type_annotation: None },
+                Param { name: "occurrence".into(),       optional: true,  type_annotation: None },
+                Param { name: "equationCriteria".into(), optional: true,  type_annotation: None },
+            ],
+            table_position_of_any,
+        ),
+        ("Table.Keys", one("table"), table_keys),
+        ("Table.ColumnsOfType", two("table", "listOfTypes"), table_columns_of_type),
     ]
 }
 
@@ -2018,5 +2116,351 @@ fn table_insert_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError>
     }
 
     Ok(Value::Table(values_to_table(&names, &rows)?))
+}
+
+// --- Slice #158: accessors + predicates batch ---
+
+fn table_first(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    if table.num_rows() == 0 {
+        return Ok(args.get(1).cloned().unwrap_or(Value::Null));
+    }
+    row_to_record(table, 0)
+}
+
+fn table_last(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let n = table.num_rows();
+    if n == 0 {
+        return Ok(args.get(1).cloned().unwrap_or(Value::Null));
+    }
+    row_to_record(table, n - 1)
+}
+
+fn table_first_value(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    if table.num_rows() == 0 || table.num_columns() == 0 {
+        return Ok(args.get(1).cloned().unwrap_or(Value::Null));
+    }
+    cell_to_value(table, 0, 0)
+}
+
+fn table_row_count(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    Ok(Value::Number(table.num_rows() as f64))
+}
+
+fn table_column_count(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    Ok(Value::Number(table.num_columns() as f64))
+}
+
+fn table_range(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let offset = expect_int(&args[1], "Table.Range: offset")?;
+    if offset < 0 {
+        return Err(MError::Other("Table.Range: offset must be non-negative".into()));
+    }
+    let offset = offset as usize;
+    let (names, rows) = table_to_rows(table)?;
+    let count = match args.get(2) {
+        Some(Value::Null) | None => rows.len().saturating_sub(offset),
+        Some(v) => {
+            let n = expect_int(v, "Table.Range: count")?;
+            if n < 0 {
+                return Err(MError::Other("Table.Range: count must be non-negative".into()));
+            }
+            n as usize
+        }
+    };
+    let kept: Vec<Vec<Value>> = rows.into_iter().skip(offset).take(count).collect();
+    Ok(Value::Table(values_to_table(&names, &kept)?))
+}
+
+/// Check whether all fields of `needle` (a record) match the corresponding
+/// cells of some row in `table`. Used by Contains/PositionOf. Field values
+/// from record literals are thunks, so force before primitive equality.
+fn row_matches_record(table: &Table, row: usize, needle: &Record) -> Result<bool, MError> {
+    for (name, expected) in &needle.fields {
+        let col = match table.column_names().iter().position(|n| n == name) {
+            Some(idx) => idx,
+            None => return Ok(false),
+        };
+        let cell = cell_to_value(table, col, row)?;
+        let expected = super::super::force(expected.clone(), &mut |e, env| {
+            super::super::evaluate(e, env, &super::super::NoIoHost)
+        })?;
+        if !values_equal_primitive(&cell, &expected)? {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
+fn table_contains(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let needle = match &args[1] {
+        Value::Record(r) => r,
+        other => return Err(type_mismatch("record", other)),
+    };
+    if !matches!(args.get(2), Some(Value::Null) | None) {
+        return Err(MError::NotImplemented(
+            "Table.Contains: equationCriteria not yet supported",
+        ));
+    }
+    for row in 0..table.num_rows() {
+        if row_matches_record(table, row, needle)? {
+            return Ok(Value::Logical(true));
+        }
+    }
+    Ok(Value::Logical(false))
+}
+
+fn table_contains_all(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let needles = expect_list(&args[1])?;
+    if !matches!(args.get(2), Some(Value::Null) | None) {
+        return Err(MError::NotImplemented(
+            "Table.ContainsAll: equationCriteria not yet supported",
+        ));
+    }
+    for n in needles {
+        let needle = match n {
+            Value::Record(r) => r,
+            other => return Err(type_mismatch("record (in list)", other)),
+        };
+        let mut found = false;
+        for row in 0..table.num_rows() {
+            if row_matches_record(table, row, needle)? {
+                found = true;
+                break;
+            }
+        }
+        if !found {
+            return Ok(Value::Logical(false));
+        }
+    }
+    Ok(Value::Logical(true))
+}
+
+fn table_contains_any(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let needles = expect_list(&args[1])?;
+    if !matches!(args.get(2), Some(Value::Null) | None) {
+        return Err(MError::NotImplemented(
+            "Table.ContainsAny: equationCriteria not yet supported",
+        ));
+    }
+    for n in needles {
+        let needle = match n {
+            Value::Record(r) => r,
+            other => return Err(type_mismatch("record (in list)", other)),
+        };
+        for row in 0..table.num_rows() {
+            if row_matches_record(table, row, needle)? {
+                return Ok(Value::Logical(true));
+            }
+        }
+    }
+    Ok(Value::Logical(false))
+}
+
+fn table_is_distinct(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    if !matches!(args.get(1), Some(Value::Null) | None) {
+        return Err(MError::NotImplemented(
+            "Table.IsDistinct: comparisonCriteria not yet supported",
+        ));
+    }
+    let (_, rows) = table_to_rows(table)?;
+    for i in 0..rows.len() {
+        for j in (i + 1)..rows.len() {
+            let mut all_eq = true;
+            for (a, b) in rows[i].iter().zip(rows[j].iter()) {
+                if !values_equal_primitive(a, b)? {
+                    all_eq = false;
+                    break;
+                }
+            }
+            if all_eq {
+                return Ok(Value::Logical(false));
+            }
+        }
+    }
+    Ok(Value::Logical(true))
+}
+
+fn table_has_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let names = match &args[1] {
+        Value::Text(s) => vec![s.clone()],
+        Value::List(_) => expect_text_list(&args[1], "Table.HasColumns")?,
+        other => return Err(type_mismatch("text or list of text", other)),
+    };
+    let have = table.column_names();
+    let all_present = names.iter().all(|n| have.iter().any(|h| h == n));
+    Ok(Value::Logical(all_present))
+}
+
+fn table_matches_all_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let cond = expect_function(&args[1])?;
+    for row in 0..table.num_rows() {
+        let rec = row_to_record(table, row)?;
+        let result = invoke_callback_with_host(cond, vec![rec], host)?;
+        match result {
+            Value::Logical(true) => continue,
+            Value::Logical(false) => return Ok(Value::Logical(false)),
+            other => return Err(type_mismatch("logical (predicate result)", &other)),
+        }
+    }
+    Ok(Value::Logical(true))
+}
+
+fn table_matches_any_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let cond = expect_function(&args[1])?;
+    for row in 0..table.num_rows() {
+        let rec = row_to_record(table, row)?;
+        let result = invoke_callback_with_host(cond, vec![rec], host)?;
+        match result {
+            Value::Logical(true) => return Ok(Value::Logical(true)),
+            Value::Logical(false) => continue,
+            other => return Err(type_mismatch("logical (predicate result)", &other)),
+        }
+    }
+    Ok(Value::Logical(false))
+}
+
+fn table_find_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let needle = expect_text(&args[1])?;
+    let (names, rows) = table_to_rows(table)?;
+    let kept: Vec<Vec<Value>> = rows
+        .into_iter()
+        .filter(|row| {
+            row.iter().any(|cell| match cell {
+                Value::Text(s) => s.contains(needle),
+                _ => false,
+            })
+        })
+        .collect();
+    Ok(Value::Table(values_to_table(&names, &kept)?))
+}
+
+fn table_position_of(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let needle = match &args[1] {
+        Value::Record(r) => r,
+        other => return Err(type_mismatch("record", other)),
+    };
+    if !matches!(args.get(2), Some(Value::Null) | None) {
+        return Err(MError::NotImplemented(
+            "Table.PositionOf: occurrence not yet supported",
+        ));
+    }
+    if !matches!(args.get(3), Some(Value::Null) | None) {
+        return Err(MError::NotImplemented(
+            "Table.PositionOf: equationCriteria not yet supported",
+        ));
+    }
+    for row in 0..table.num_rows() {
+        if row_matches_record(table, row, needle)? {
+            return Ok(Value::Number(row as f64));
+        }
+    }
+    Ok(Value::Number(-1.0))
+}
+
+fn table_position_of_any(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let needles_v = expect_list(&args[1])?;
+    if !matches!(args.get(2), Some(Value::Null) | None) {
+        return Err(MError::NotImplemented(
+            "Table.PositionOfAny: occurrence not yet supported",
+        ));
+    }
+    if !matches!(args.get(3), Some(Value::Null) | None) {
+        return Err(MError::NotImplemented(
+            "Table.PositionOfAny: equationCriteria not yet supported",
+        ));
+    }
+    for row in 0..table.num_rows() {
+        for n in needles_v {
+            let needle = match n {
+                Value::Record(r) => r,
+                other => return Err(type_mismatch("record (in list)", other)),
+            };
+            if row_matches_record(table, row, needle)? {
+                return Ok(Value::Number(row as f64));
+            }
+        }
+    }
+    Ok(Value::Number(-1.0))
+}
+
+fn table_keys(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    // v1: we don't track key metadata — return an empty list.
+    let _ = expect_table(&args[0])?;
+    Ok(Value::List(Vec::new()))
+}
+
+fn table_columns_of_type(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let type_list = expect_list(&args[1])?;
+    let mut targets: Vec<super::super::value::TypeRep> = Vec::with_capacity(type_list.len());
+    for v in type_list {
+        match v {
+            Value::Type(t) => targets.push(t.clone()),
+            other => return Err(type_mismatch("type (in list)", other)),
+        }
+    }
+    let names = table.column_names();
+    let mut out: Vec<Value> = Vec::new();
+    'col: for (col_idx, name) in names.iter().enumerate() {
+        // Inspect each cell's value and check it matches any target type.
+        // Empty columns (all null) — skip; we can't infer a type.
+        let mut saw_non_null = false;
+        for row in 0..table.num_rows() {
+            let cell = cell_to_value(table, col_idx, row)?;
+            if matches!(cell, Value::Null) {
+                continue;
+            }
+            saw_non_null = true;
+            if !targets.iter().any(|t| type_matches(t, &cell)) {
+                continue 'col;
+            }
+        }
+        if saw_non_null {
+            out.push(Value::Text(name.clone()));
+        }
+    }
+    Ok(Value::List(out))
+}
+
+fn type_matches(t: &super::super::value::TypeRep, v: &Value) -> bool {
+    use super::super::value::TypeRep::*;
+    match (t, v) {
+        (Any, _) => true,
+        (AnyNonNull, Value::Null) => false,
+        (AnyNonNull, _) => true,
+        (Null, Value::Null) => true,
+        (Logical, Value::Logical(_)) => true,
+        (Number, Value::Number(_)) => true,
+        (Text, Value::Text(_)) => true,
+        (Date, Value::Date(_)) => true,
+        (Datetime, Value::Datetime(_)) => true,
+        (Datetimezone, Value::Datetimezone(_)) => true,
+        (Time, Value::Time(_)) => true,
+        (Duration, Value::Duration(_)) => true,
+        (Binary, Value::Binary(_)) => true,
+        (List, Value::List(_)) => true,
+        (Record, Value::Record(_)) => true,
+        (Table, Value::Table(_)) => true,
+        (Function, Value::Function(_)) => true,
+        (Nullable(_), Value::Null) => true,
+        (Nullable(inner), _) => type_matches(inner, v),
+        _ => false,
+    }
 }
 

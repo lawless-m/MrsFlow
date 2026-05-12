@@ -5266,6 +5266,104 @@ mod tests {
     }
 
     #[test]
+    fn table_first_returns_first_row_record() {
+        let src = r#"
+            let
+                t = #table({"a", "b"}, {{1, 2}, {3, 4}})
+            in Table.First(t)
+        "#;
+        match eval_str(src).unwrap() {
+            Value::Record(r) => {
+                assert_eq!(r.fields.len(), 2);
+                assert_eq!(r.fields[0].0, "a");
+                assert!(matches!(r.fields[0].1, Value::Number(n) if n == 1.0));
+                assert_eq!(r.fields[1].0, "b");
+                assert!(matches!(r.fields[1].1, Value::Number(n) if n == 2.0));
+            }
+            other => panic!("expected record, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_row_count_basic() {
+        let src = r#"Table.RowCount(#table({"a"}, {{1}, {2}, {3}}))"#;
+        assert_eq!(eval_number(src), 3.0);
+    }
+
+    #[test]
+    fn table_contains_record_match() {
+        let src = r#"
+            let
+                t = #table({"a", "b"}, {{1, "x"}, {2, "y"}, {3, "z"}})
+            in
+                {Table.Contains(t, [a = 2, b = "y"]),
+                 Table.Contains(t, [a = 99, b = "x"])}
+        "#;
+        match eval_str(src).unwrap() {
+            Value::List(xs) => {
+                assert!(matches!(xs[0], Value::Logical(true)));
+                assert!(matches!(xs[1], Value::Logical(false)));
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_has_columns_basic() {
+        let src = r#"
+            let
+                t = #table({"a", "b", "c"}, {})
+            in
+                {Table.HasColumns(t, {"a", "b"}),
+                 Table.HasColumns(t, {"a", "missing"})}
+        "#;
+        match eval_str(src).unwrap() {
+            Value::List(xs) => {
+                assert!(matches!(xs[0], Value::Logical(true)));
+                assert!(matches!(xs[1], Value::Logical(false)));
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_find_text_filters_by_substring() {
+        let src = r#"
+            let
+                t = #table({"name"}, {{"apple"}, {"banana"}, {"avocado"}})
+            in Table.FindText(t, "an")
+        "#;
+        match eval_str(src).unwrap() {
+            Value::Table(t) => {
+                assert_eq!(t.num_rows(), 1); // only "banana" contains "an"
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_columns_of_type_picks_matching_columns() {
+        let src = r#"
+            let
+                t = #table({"n", "s"}, {{1, "x"}, {2, "y"}})
+            in Table.ColumnsOfType(t, {type number})
+        "#;
+        match eval_str(src).unwrap() {
+            Value::List(xs) => {
+                let names: Vec<&str> = xs
+                    .iter()
+                    .map(|v| match v {
+                        Value::Text(s) => s.as_str(),
+                        _ => panic!("expected text"),
+                    })
+                    .collect();
+                assert_eq!(names, vec!["n"]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn lines_from_text_mixed_endings() {
         // Mix of \r\n, \n, and lone \r should all split.
         let src = r#"Lines.FromText("a#(cr,lf)b#(lf)c#(cr)d")"#;
