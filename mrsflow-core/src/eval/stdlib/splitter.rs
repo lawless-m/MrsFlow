@@ -1,0 +1,515 @@
+//! `Splitter.*` factory stdlib bindings.
+//!
+//! Each factory returns a `Value::Function` closure that, when applied to a
+//! text, produces the split. The closure is M-bodied — its body is a
+//! synthetic AST node that invokes an internal impl builtin with the user's
+//! text plus the factory's captured parameters (closed-over via the
+//! closure's environment).
+
+#![allow(unused_imports)]
+
+use crate::parser::{Expr, Param};
+
+use super::super::env::{EnvNode, EnvOps};
+use super::super::iohost::IoHost;
+use super::super::value::{BuiltinFn, Closure, FnBody, MError, Value};
+use super::common::{
+    expect_int, expect_list, expect_text, expect_text_list, one, two, type_mismatch,
+};
+
+pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
+    vec![
+        ("Splitter.SplitByNothing", vec![], splitter_split_by_nothing),
+        (
+            "Splitter.SplitTextByDelimiter",
+            vec![
+                Param { name: "delimiter".into(), optional: false, type_annotation: None },
+                Param { name: "quoteStyle".into(), optional: true, type_annotation: None },
+            ],
+            splitter_split_text_by_delimiter,
+        ),
+        (
+            "Splitter.SplitTextByAnyDelimiter",
+            vec![
+                Param { name: "delimiters".into(), optional: false, type_annotation: None },
+                Param { name: "quoteStyle".into(), optional: true, type_annotation: None },
+            ],
+            splitter_split_text_by_any_delimiter,
+        ),
+        (
+            "Splitter.SplitTextByEachDelimiter",
+            vec![
+                Param { name: "delimiters".into(), optional: false, type_annotation: None },
+                Param { name: "quoteStyle".into(), optional: true, type_annotation: None },
+                Param { name: "startAtEnd".into(), optional: true, type_annotation: None },
+            ],
+            splitter_split_text_by_each_delimiter,
+        ),
+        (
+            "Splitter.SplitTextByLengths",
+            vec![
+                Param { name: "lengths".into(), optional: false, type_annotation: None },
+                Param { name: "startAtEnd".into(), optional: true, type_annotation: None },
+            ],
+            splitter_split_text_by_lengths,
+        ),
+        (
+            "Splitter.SplitTextByPositions",
+            vec![
+                Param { name: "positions".into(), optional: false, type_annotation: None },
+                Param { name: "startAtEnd".into(), optional: true, type_annotation: None },
+            ],
+            splitter_split_text_by_positions,
+        ),
+        (
+            "Splitter.SplitTextByRanges",
+            vec![
+                Param { name: "ranges".into(), optional: false, type_annotation: None },
+                Param { name: "startAtEnd".into(), optional: true, type_annotation: None },
+            ],
+            splitter_split_text_by_ranges,
+        ),
+        (
+            "Splitter.SplitTextByCharacterTransition",
+            two("before", "after"),
+            splitter_split_text_by_character_transition,
+        ),
+        (
+            "Splitter.SplitTextByRepeatedLengths",
+            one("length"),
+            splitter_split_text_by_repeated_lengths,
+        ),
+        (
+            "Splitter.SplitTextByWhitespace",
+            vec![Param {
+                name: "quoteStyle".into(),
+                optional: true,
+                type_annotation: None,
+            }],
+            splitter_split_text_by_whitespace,
+        ),
+    ]
+}
+
+/// Build the synthetic M-bodied closure that the user later applies to a
+/// text. `captures` are bound by name in the closure's env; the body invokes
+/// `impl_fn` with `text` followed by each capture value in declaration order.
+fn make_splitter(captures: Vec<(String, Value)>, impl_fn: BuiltinFn) -> Value {
+    let mut env = EnvNode::empty();
+    let mut impl_params: Vec<Param> = vec![Param {
+        name: "text".into(),
+        optional: false,
+        type_annotation: None,
+    }];
+    let mut call_args: Vec<Expr> = vec![Expr::Identifier("text".into())];
+    for (k, v) in &captures {
+        env = env.extend(k.clone(), v.clone());
+        impl_params.push(Param {
+            name: k.clone(),
+            optional: false,
+            type_annotation: None,
+        });
+        call_args.push(Expr::Identifier(k.clone()));
+    }
+    // Inner impl closure — synthetic name avoids collision with user idents.
+    let impl_name = "__splitter_impl__".to_string();
+    let impl_closure = Value::Function(Closure {
+        params: impl_params,
+        body: FnBody::Builtin(impl_fn),
+        env: EnvNode::empty(),
+    });
+    env = env.extend(impl_name.clone(), impl_closure);
+    let body = Expr::Invoke {
+        target: Box::new(Expr::Identifier(impl_name)),
+        args: call_args,
+    };
+    Value::Function(Closure {
+        params: vec![Param {
+            name: "text".into(),
+            optional: false,
+            type_annotation: None,
+        }],
+        body: FnBody::M(Box::new(body)),
+        env,
+    })
+}
+
+// --- Factories ---
+
+fn splitter_split_by_nothing(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    Ok(make_splitter(vec![], split_by_nothing_impl))
+}
+
+fn splitter_split_text_by_delimiter(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    if !matches!(&args[0], Value::Text(_)) {
+        return Err(type_mismatch("text", &args[0]));
+    }
+    if !matches!(args.get(1), Some(Value::Null) | None) {
+        return Err(MError::NotImplemented(
+            "Splitter.SplitTextByDelimiter: quoteStyle not yet supported",
+        ));
+    }
+    Ok(make_splitter(
+        vec![("__delim".into(), args[0].clone())],
+        split_text_by_delimiter_impl,
+    ))
+}
+
+fn splitter_split_text_by_any_delimiter(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    // Validate at factory time so the error surfaces immediately.
+    let _ = expect_text_list(&args[0], "Splitter.SplitTextByAnyDelimiter")?;
+    if !matches!(args.get(1), Some(Value::Null) | None) {
+        return Err(MError::NotImplemented(
+            "Splitter.SplitTextByAnyDelimiter: quoteStyle not yet supported",
+        ));
+    }
+    Ok(make_splitter(
+        vec![("__delims".into(), args[0].clone())],
+        split_text_by_any_delimiter_impl,
+    ))
+}
+
+fn splitter_split_text_by_each_delimiter(
+    args: &[Value],
+    _host: &dyn IoHost,
+) -> Result<Value, MError> {
+    let _ = expect_text_list(&args[0], "Splitter.SplitTextByEachDelimiter")?;
+    if !matches!(args.get(1), Some(Value::Null) | None) {
+        return Err(MError::NotImplemented(
+            "Splitter.SplitTextByEachDelimiter: quoteStyle not yet supported",
+        ));
+    }
+    if matches!(args.get(2), Some(Value::Logical(true))) {
+        return Err(MError::NotImplemented(
+            "Splitter.SplitTextByEachDelimiter: startAtEnd=true not yet supported",
+        ));
+    }
+    Ok(make_splitter(
+        vec![("__delims".into(), args[0].clone())],
+        split_text_by_each_delimiter_impl,
+    ))
+}
+
+fn splitter_split_text_by_lengths(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let xs = expect_list(&args[0])?;
+    for v in xs {
+        let _ = expect_int(v, "Splitter.SplitTextByLengths")?;
+    }
+    if matches!(args.get(1), Some(Value::Logical(true))) {
+        return Err(MError::NotImplemented(
+            "Splitter.SplitTextByLengths: startAtEnd=true not yet supported",
+        ));
+    }
+    Ok(make_splitter(
+        vec![("__lengths".into(), args[0].clone())],
+        split_text_by_lengths_impl,
+    ))
+}
+
+fn splitter_split_text_by_positions(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let xs = expect_list(&args[0])?;
+    for v in xs {
+        let _ = expect_int(v, "Splitter.SplitTextByPositions")?;
+    }
+    if matches!(args.get(1), Some(Value::Logical(true))) {
+        return Err(MError::NotImplemented(
+            "Splitter.SplitTextByPositions: startAtEnd=true not yet supported",
+        ));
+    }
+    Ok(make_splitter(
+        vec![("__positions".into(), args[0].clone())],
+        split_text_by_positions_impl,
+    ))
+}
+
+fn splitter_split_text_by_ranges(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let xs = expect_list(&args[0])?;
+    for r in xs {
+        let pair = match r {
+            Value::List(p) => p,
+            other => return Err(type_mismatch("list (range pair)", other)),
+        };
+        if pair.len() != 2 {
+            return Err(MError::Other(format!(
+                "Splitter.SplitTextByRanges: range must have 2 elements, got {}",
+                pair.len()
+            )));
+        }
+        let _ = expect_int(&pair[0], "Splitter.SplitTextByRanges (offset)")?;
+        let _ = expect_int(&pair[1], "Splitter.SplitTextByRanges (count)")?;
+    }
+    if matches!(args.get(1), Some(Value::Logical(true))) {
+        return Err(MError::NotImplemented(
+            "Splitter.SplitTextByRanges: startAtEnd=true not yet supported",
+        ));
+    }
+    Ok(make_splitter(
+        vec![("__ranges".into(), args[0].clone())],
+        split_text_by_ranges_impl,
+    ))
+}
+
+fn splitter_split_text_by_character_transition(
+    args: &[Value],
+    _host: &dyn IoHost,
+) -> Result<Value, MError> {
+    let _ = expect_text_list(&args[0], "Splitter.SplitTextByCharacterTransition (before)")?;
+    let _ = expect_text_list(&args[1], "Splitter.SplitTextByCharacterTransition (after)")?;
+    Ok(make_splitter(
+        vec![
+            ("__before".into(), args[0].clone()),
+            ("__after".into(), args[1].clone()),
+        ],
+        split_text_by_character_transition_impl,
+    ))
+}
+
+fn splitter_split_text_by_repeated_lengths(
+    args: &[Value],
+    _host: &dyn IoHost,
+) -> Result<Value, MError> {
+    let _ = expect_int(&args[0], "Splitter.SplitTextByRepeatedLengths")?;
+    Ok(make_splitter(
+        vec![("__length".into(), args[0].clone())],
+        split_text_by_repeated_lengths_impl,
+    ))
+}
+
+fn splitter_split_text_by_whitespace(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    if !matches!(args.get(0), Some(Value::Null) | None) {
+        return Err(MError::NotImplemented(
+            "Splitter.SplitTextByWhitespace: quoteStyle not yet supported",
+        ));
+    }
+    Ok(make_splitter(vec![], split_text_by_whitespace_impl))
+}
+
+// --- Inner impls ---
+// Each receives [text, ...captured] and returns Value::List.
+
+fn split_by_nothing_impl(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let text = expect_text(&args[0])?;
+    Ok(Value::List(vec![Value::Text(text.to_string())]))
+}
+
+fn split_text_by_delimiter_impl(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let text = expect_text(&args[0])?;
+    let delim = expect_text(&args[1])?;
+    let parts: Vec<Value> = if delim.is_empty() {
+        // Empty delimiter is degenerate — return the whole text as one part.
+        vec![Value::Text(text.to_string())]
+    } else {
+        text.split(delim).map(|s| Value::Text(s.to_string())).collect()
+    };
+    Ok(Value::List(parts))
+}
+
+fn split_text_by_any_delimiter_impl(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let text = expect_text(&args[0])?;
+    let delims = expect_text_list(&args[1], "Splitter.SplitTextByAnyDelimiter")?;
+    if delims.is_empty() {
+        return Ok(Value::List(vec![Value::Text(text.to_string())]));
+    }
+    // Sweep the text, cutting at the first matching delimiter at each position.
+    let mut parts: Vec<String> = Vec::new();
+    let mut buf = String::new();
+    let mut i = 0;
+    let bytes = text.as_bytes();
+    while i < bytes.len() {
+        let mut matched: Option<usize> = None;
+        for d in &delims {
+            if !d.is_empty() && text[i..].starts_with(d.as_str()) {
+                matched = Some(d.len());
+                break;
+            }
+        }
+        match matched {
+            Some(skip) => {
+                parts.push(std::mem::take(&mut buf));
+                i += skip;
+            }
+            None => {
+                // Advance one char (handle UTF-8 boundary).
+                let c = text[i..].chars().next().unwrap();
+                buf.push(c);
+                i += c.len_utf8();
+            }
+        }
+    }
+    parts.push(buf);
+    Ok(Value::List(parts.into_iter().map(Value::Text).collect()))
+}
+
+fn split_text_by_each_delimiter_impl(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let text = expect_text(&args[0])?;
+    let delims = expect_text_list(&args[1], "Splitter.SplitTextByEachDelimiter")?;
+    let mut rest = text.to_string();
+    let mut parts: Vec<String> = Vec::new();
+    for d in &delims {
+        if let Some(pos) = rest.find(d.as_str()) {
+            parts.push(rest[..pos].to_string());
+            rest = rest[pos + d.len()..].to_string();
+        } else {
+            return Err(MError::Other(format!(
+                "Splitter.SplitTextByEachDelimiter: delimiter not found: {:?}",
+                d
+            )));
+        }
+    }
+    parts.push(rest);
+    Ok(Value::List(parts.into_iter().map(Value::Text).collect()))
+}
+
+fn split_text_by_lengths_impl(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let text = expect_text(&args[0])?;
+    let lengths_v = expect_list(&args[1])?;
+    let mut lengths: Vec<usize> = Vec::with_capacity(lengths_v.len());
+    for v in lengths_v {
+        let n = expect_int(v, "Splitter.SplitTextByLengths")?;
+        if n < 0 {
+            return Err(MError::Other(
+                "Splitter.SplitTextByLengths: length must be non-negative".into(),
+            ));
+        }
+        lengths.push(n as usize);
+    }
+    let chars: Vec<char> = text.chars().collect();
+    let mut parts: Vec<Value> = Vec::with_capacity(lengths.len());
+    let mut idx = 0usize;
+    for n in lengths {
+        if idx + n > chars.len() {
+            return Err(MError::Other(format!(
+                "Splitter.SplitTextByLengths: text too short for length sequence (need {}, have {} remaining)",
+                n,
+                chars.len() - idx
+            )));
+        }
+        let chunk: String = chars[idx..idx + n].iter().collect();
+        parts.push(Value::Text(chunk));
+        idx += n;
+    }
+    Ok(Value::List(parts))
+}
+
+fn split_text_by_positions_impl(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let text = expect_text(&args[0])?;
+    let positions_v = expect_list(&args[1])?;
+    let mut positions: Vec<usize> = Vec::with_capacity(positions_v.len());
+    for v in positions_v {
+        let n = expect_int(v, "Splitter.SplitTextByPositions")?;
+        if n < 0 {
+            return Err(MError::Other(
+                "Splitter.SplitTextByPositions: position must be non-negative".into(),
+            ));
+        }
+        positions.push(n as usize);
+    }
+    let chars: Vec<char> = text.chars().collect();
+    let mut parts: Vec<Value> = Vec::with_capacity(positions.len());
+    for i in 0..positions.len() {
+        let start = positions[i];
+        let end = positions.get(i + 1).copied().unwrap_or(chars.len());
+        if start > chars.len() || end > chars.len() || start > end {
+            return Err(MError::Other(format!(
+                "Splitter.SplitTextByPositions: position {} out of range (text length {})",
+                start,
+                chars.len()
+            )));
+        }
+        let chunk: String = chars[start..end].iter().collect();
+        parts.push(Value::Text(chunk));
+    }
+    Ok(Value::List(parts))
+}
+
+fn split_text_by_ranges_impl(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let text = expect_text(&args[0])?;
+    let ranges_v = expect_list(&args[1])?;
+    let chars: Vec<char> = text.chars().collect();
+    let mut parts: Vec<Value> = Vec::with_capacity(ranges_v.len());
+    for r in ranges_v {
+        let pair = match r {
+            Value::List(p) => p,
+            other => return Err(type_mismatch("list (range pair)", other)),
+        };
+        let offset = expect_int(&pair[0], "Splitter.SplitTextByRanges (offset)")?;
+        let count = expect_int(&pair[1], "Splitter.SplitTextByRanges (count)")?;
+        if offset < 0 || count < 0 {
+            return Err(MError::Other(
+                "Splitter.SplitTextByRanges: offset/count must be non-negative".into(),
+            ));
+        }
+        let start = offset as usize;
+        let end = start + count as usize;
+        if end > chars.len() {
+            return Err(MError::Other(format!(
+                "Splitter.SplitTextByRanges: range {}..{} out of bounds (length {})",
+                start,
+                end,
+                chars.len()
+            )));
+        }
+        let chunk: String = chars[start..end].iter().collect();
+        parts.push(Value::Text(chunk));
+    }
+    Ok(Value::List(parts))
+}
+
+fn split_text_by_character_transition_impl(
+    args: &[Value],
+    _host: &dyn IoHost,
+) -> Result<Value, MError> {
+    let text = expect_text(&args[0])?;
+    let before = expect_text_list(&args[1], "Splitter.SplitTextByCharacterTransition (before)")?;
+    let after = expect_text_list(&args[2], "Splitter.SplitTextByCharacterTransition (after)")?;
+    // `before` and `after` are lists of single-character texts. A transition
+    // is a position where the previous char is in `before` and the next is
+    // in `after`. Split immediately before the `after` char.
+    let chars: Vec<char> = text.chars().collect();
+    let in_set = |s: &[String], ch: char| -> bool {
+        s.iter().any(|t| t.chars().next() == Some(ch) && t.chars().count() == 1)
+    };
+    let mut parts: Vec<String> = Vec::new();
+    let mut buf = String::new();
+    for i in 0..chars.len() {
+        if i > 0 && in_set(&before, chars[i - 1]) && in_set(&after, chars[i]) {
+            parts.push(std::mem::take(&mut buf));
+        }
+        buf.push(chars[i]);
+    }
+    parts.push(buf);
+    Ok(Value::List(parts.into_iter().map(Value::Text).collect()))
+}
+
+fn split_text_by_repeated_lengths_impl(
+    args: &[Value],
+    _host: &dyn IoHost,
+) -> Result<Value, MError> {
+    let text = expect_text(&args[0])?;
+    let n = expect_int(&args[1], "Splitter.SplitTextByRepeatedLengths")?;
+    if n <= 0 {
+        return Err(MError::Other(
+            "Splitter.SplitTextByRepeatedLengths: length must be positive".into(),
+        ));
+    }
+    let len = n as usize;
+    let chars: Vec<char> = text.chars().collect();
+    let mut parts: Vec<Value> = Vec::new();
+    let mut i = 0usize;
+    while i < chars.len() {
+        let end = std::cmp::min(i + len, chars.len());
+        let chunk: String = chars[i..end].iter().collect();
+        parts.push(Value::Text(chunk));
+        i = end;
+    }
+    Ok(Value::List(parts))
+}
+
+fn split_text_by_whitespace_impl(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let text = expect_text(&args[0])?;
+    let parts: Vec<Value> = text
+        .split_whitespace()
+        .map(|s| Value::Text(s.to_string()))
+        .collect();
+    Ok(Value::List(parts))
+}

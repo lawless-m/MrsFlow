@@ -5110,6 +5110,80 @@ mod tests {
     }
 
     #[test]
+    fn splitter_split_by_nothing_returns_single() {
+        let src = r#"Splitter.SplitByNothing()("hello, world")"#;
+        match eval_str(src).unwrap() {
+            Value::List(xs) => {
+                let parts: Vec<&str> = xs
+                    .iter()
+                    .map(|v| match v {
+                        Value::Text(s) => s.as_str(),
+                        _ => panic!("expected text"),
+                    })
+                    .collect();
+                assert_eq!(parts, vec!["hello, world"]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn splitter_split_text_by_delimiter_basic() {
+        let src = r#"Splitter.SplitTextByDelimiter(",")("a,b,c")"#;
+        match eval_str(src).unwrap() {
+            Value::List(xs) => {
+                let parts: Vec<&str> = xs
+                    .iter()
+                    .map(|v| match v {
+                        Value::Text(s) => s.as_str(),
+                        _ => panic!("expected text"),
+                    })
+                    .collect();
+                assert_eq!(parts, vec!["a", "b", "c"]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn splitter_split_text_by_any_delimiter_basic() {
+        // Split on either "," or ";" — any-delimiter behaviour.
+        let src = r#"Splitter.SplitTextByAnyDelimiter({",", ";"})("a,b;c,d")"#;
+        match eval_str(src).unwrap() {
+            Value::List(xs) => {
+                let parts: Vec<&str> = xs
+                    .iter()
+                    .map(|v| match v {
+                        Value::Text(s) => s.as_str(),
+                        _ => panic!("expected text"),
+                    })
+                    .collect();
+                assert_eq!(parts, vec!["a", "b", "c", "d"]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn splitter_split_text_by_lengths_basic() {
+        // Split "abcdefg" into chunks of 2, 3, 2.
+        let src = r#"Splitter.SplitTextByLengths({2, 3, 2})("abcdefg")"#;
+        match eval_str(src).unwrap() {
+            Value::List(xs) => {
+                let parts: Vec<&str> = xs
+                    .iter()
+                    .map(|v| match v {
+                        Value::Text(s) => s.as_str(),
+                        _ => panic!("expected text"),
+                    })
+                    .collect();
+                assert_eq!(parts, vec!["ab", "cde", "fg"]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn extend_lazy_supports_mutual_recursion() {
         // Thunks for `a` and `b` share the same env, so when `a`'s thunk is
         // forced and looks up `b`, it resolves to `b`'s thunk in the same

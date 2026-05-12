@@ -28,6 +28,7 @@ mod datetimezone;
 mod duration;
 mod parquet;
 mod odbc;
+mod splitter;
 
 // External callers of the old `stdlib::*` API expect these names at this path.
 // `table_to_rows` is only reached from #[cfg(test)] code in eval::mod, hence
@@ -127,6 +128,7 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         duration::bindings(),
         parquet::bindings(),
         odbc::bindings(),
+        splitter::bindings(),
     ] {
         all.extend(slice);
     }
