@@ -107,6 +107,17 @@ pub fn root_env() -> Env {
         env = env.extend(name.to_string(), Value::Number(n));
     }
 
+    // ExtraValues.* constants — Table.FromList extraValues arg. Per M spec:
+    // List = 0 (excess goes into the last column as a list), Ignore = 1
+    // (excess is dropped), Error = 2 (excess raises an error).
+    for (name, n) in [
+        ("ExtraValues.List",   0.0),
+        ("ExtraValues.Ignore", 1.0),
+        ("ExtraValues.Error",  2.0),
+    ] {
+        env = env.extend(name.to_string(), Value::Number(n));
+    }
+
     // BinaryEncoding.* constants — Binary.FromText/ToText encoding arg.
     for (name, n) in [
         ("BinaryEncoding.Base64", 0.0),

@@ -288,8 +288,10 @@ fn split_text_by_whitespace(args: &[Value], _host: &dyn IoHost) -> Result<Value,
 // Each receives [text, ...captured] and returns Value::List.
 
 fn split_by_nothing_impl(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    let text = expect_text(&args[0])?;
-    Ok(Value::List(vec![Value::Text(text.to_string())]))
+    // Identity-wrap: returns a singleton list containing the input unchanged.
+    // Unlike the other Splitter.* functions, this one accepts any value type
+    // (it's how Table.FromList puts a list of arbitrary values into a table).
+    Ok(Value::List(vec![args[0].clone()]))
 }
 
 fn split_text_by_delimiter_impl(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {

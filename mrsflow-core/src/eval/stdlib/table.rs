@@ -3731,11 +3731,19 @@ fn from_list(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
             "Table.FromList: default argument not yet supported",
         ));
     }
-    if !matches!(args.get(4), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented(
-            "Table.FromList: extraValues argument not yet supported",
-        ));
-    }
+    // ExtraValues controls what to do when a row has more cells than `names`.
+    // List = 0, Ignore = 1, Error = 2 (per `ExtraValues.*` in the root env).
+    // Default per M spec is List; missing/null also maps to List for now.
+    let extra_values: u8 = match args.get(4) {
+        Some(Value::Null) | None => 0,
+        Some(Value::Number(n)) if *n == 0.0 || *n == 1.0 || *n == 2.0 => *n as u8,
+        Some(other) => {
+            return Err(MError::Other(format!(
+                "Table.FromList: extraValues must be ExtraValues.List/Ignore/Error, got {}",
+                super::super::type_name(other),
+            )));
+        }
+    };
     let mut rows: Vec<Vec<Value>> = Vec::with_capacity(items.len());
     for item in items {
         let row: Vec<Value> = match splitter {
@@ -3748,12 +3756,32 @@ fn from_list(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
                 }
             }
         };
-        // Pad or truncate row to names.len().
+        // Pad short rows; treat overflow per extraValues.
         let mut row = row;
         while row.len() < names.len() {
             row.push(Value::Null);
         }
-        row.truncate(names.len());
+        if row.len() > names.len() {
+            match extra_values {
+                2 => {
+                    return Err(MError::Other(format!(
+                        "Table.FromList: row has {} values but {} columns (ExtraValues.Error)",
+                        row.len(),
+                        names.len(),
+                    )));
+                }
+                1 => {
+                    row.truncate(names.len());
+                }
+                _ => {
+                    // ExtraValues.List: collapse the excess into the last column
+                    // as a list. Spec is "the remaining values become a single
+                    // list value in the last column".
+                    let tail = row.split_off(names.len() - 1);
+                    row.push(Value::List(tail));
+                }
+            }
+        }
         rows.push(row);
     }
     Ok(Value::Table(values_to_table(&names, &rows)?))
