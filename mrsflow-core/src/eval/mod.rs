@@ -1044,11 +1044,19 @@ where
         _ => return Ok(value),
     };
 
-    // Fast path: already forced.
+    // Fast path: already forced. Also catch the in-progress sentinel —
+    // re-entering force on a thunk that's currently evaluating means a
+    // cycle (e.g. `[X = X]` accessed via `[X = X][X]`).
     {
         let borrowed = thunk_state.borrow();
-        if let ThunkState::Forced(v) = &*borrowed {
-            return Ok(v.clone());
+        match &*borrowed {
+            ThunkState::Forced(v) => return Ok(v.clone()),
+            ThunkState::Forcing => {
+                return Err(MError::Other(
+                    "cyclic reference: thunk forced while already evaluating".into(),
+                ));
+            }
+            _ => {}
         }
     }
 
@@ -1063,7 +1071,16 @@ where
         }
     };
     if let Some(f) = native {
-        let result = f()?;
+        *thunk_state.borrow_mut() = ThunkState::Forcing;
+        let result = match f() {
+            Ok(v) => v,
+            Err(e) => {
+                // Restore something sane so a retry doesn't see Forcing.
+                // We don't have the original closure any more, but a
+                // re-force would just re-error; leave Forcing in place.
+                return Err(e);
+            }
+        };
         let result = force(result, evaluator)?;
         *thunk_state.borrow_mut() = ThunkState::Forced(result.clone());
         return Ok(result);
@@ -1074,7 +1091,7 @@ where
         let borrowed = thunk_state.borrow();
         match &*borrowed {
             ThunkState::Pending { expr, env } => (expr.clone(), env.clone()),
-            ThunkState::Native(_) | ThunkState::Forced(_) => {
+            ThunkState::Native(_) | ThunkState::Forced(_) | ThunkState::Forcing => {
                 unreachable!("just handled above")
             }
         }
@@ -1083,6 +1100,9 @@ where
         MError::Other("thunk's environment was dropped before forcing".into())
     })?;
 
+    // Mark in-progress so a re-entrant force on this same thunk raises
+    // a cycle error instead of recursing into Pending → expr → … → here.
+    *thunk_state.borrow_mut() = ThunkState::Forcing;
     let result = evaluator(&expr, &env)?;
     let result = force(result, evaluator)?; // chained thunks
 

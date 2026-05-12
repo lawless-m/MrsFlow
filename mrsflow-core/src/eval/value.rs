@@ -153,6 +153,12 @@ pub enum TypeRep {
 pub enum ThunkState {
     Pending { expr: Expr, env: Weak<EnvNode> },
     Native(NativeThunkFn),
+    /// Cycle sentinel: this thunk's evaluation is in progress on the
+    /// stack. Re-entering force on the same thunk while it's `Forcing`
+    /// means the expression depends on itself — raise an error instead
+    /// of recursing forever. Restored to `Forced(value)` when the
+    /// outer force completes.
+    Forcing,
     Forced(Value),
 }
 
@@ -171,6 +177,7 @@ impl fmt::Debug for ThunkState {
                 .field("env", env)
                 .finish(),
             ThunkState::Native(_) => f.write_str("Native(<fn>)"),
+            ThunkState::Forcing => f.write_str("Forcing"),
             ThunkState::Forced(v) => f.debug_tuple("Forced").field(v).finish(),
         }
     }
