@@ -251,12 +251,24 @@ impl IoHost for CliIoHost {
         odbc_query_impl(connection_string, sql)
     }
 
+    #[cfg(not(feature = "odbc"))]
     fn odbc_data_source(
         &self,
         _connection_string: &str,
         _options: Option<&Value>,
     ) -> Result<Value, IoError> {
-        Err(IoError::NotSupported)
+        Err(IoError::Other(
+            "Odbc.DataSource: built without ODBC support — recompile mrsflow-cli with --features odbc".into(),
+        ))
+    }
+
+    #[cfg(feature = "odbc")]
+    fn odbc_data_source(
+        &self,
+        connection_string: &str,
+        _options: Option<&Value>,
+    ) -> Result<Value, IoError> {
+        odbc_data_source_impl(connection_string)
     }
 
     fn file_read(&self, path: &str) -> Result<Vec<u8>, IoError> {
@@ -374,8 +386,8 @@ fn odbc_query_impl(connection_string: &str, sql: &str) -> Result<Value, IoError>
     use arrow::array::{Float64Array, StringArray};
     use arrow::datatypes::{DataType, Field, Schema};
     use odbc_api::{
-        buffers::{BufferDesc, ColumnarAnyBuffer},
-        ConnectionOptions, Cursor, Environment,
+        buffers::BufferDesc,
+        ConnectionOptions, Cursor, Environment, ResultSetMetadata,
     };
 
     // Lazy-init env: an Environment is the entry point for all ODBC ops.
@@ -393,7 +405,7 @@ fn odbc_query_impl(connection_string: &str, sql: &str) -> Result<Value, IoError>
         .map_err(|e| IoError::Other(format!("Odbc.Query connect: {}", e)))?;
 
     let cursor = conn
-        .execute(sql, ())
+        .execute(sql, (), None)
         .map_err(|e| IoError::Other(format!("Odbc.Query execute: {}", e)))?;
 
     let Some(mut cursor) = cursor else {
@@ -402,12 +414,11 @@ fn odbc_query_impl(connection_string: &str, sql: &str) -> Result<Value, IoError>
         let schema = std::sync::Arc::new(Schema::empty());
         let options =
             arrow::record_batch::RecordBatchOptions::new().with_row_count(Some(0));
-        return Ok(Value::Table(Table {
-            batch: arrow::record_batch::RecordBatch::try_new_with_options(
-                schema, vec![], &options,
-            )
-            .map_err(|e| IoError::Other(format!("Odbc.Query empty: {}", e)))?,
-        }));
+        let batch = arrow::record_batch::RecordBatch::try_new_with_options(
+            schema, vec![], &options,
+        )
+        .map_err(|e| IoError::Other(format!("Odbc.Query empty: {}", e)))?;
+        return Ok(Value::Table(Table::from_arrow(batch)));
     };
 
     // Build the Arrow schema from the cursor's column descriptions. SQL
@@ -417,11 +428,12 @@ fn odbc_query_impl(connection_string: &str, sql: &str) -> Result<Value, IoError>
         .map_err(|e| IoError::Other(format!("Odbc.Query cols: {}", e)))?;
     let mut fields: Vec<Field> = Vec::with_capacity(n_cols as usize);
     let mut buf_descs: Vec<BufferDesc> = Vec::with_capacity(n_cols as usize);
+    let mut desc = odbc_api::ColumnDescription::default();
     for col_idx in 1..=n_cols {
-        let desc = cursor
-            .describe_col(col_idx as u16)
+        cursor
+            .describe_col(col_idx as u16, &mut desc)
             .map_err(|e| IoError::Other(format!("Odbc.Query describe col {}: {}", col_idx, e)))?;
-        let name = String::from_utf16_lossy(&desc.name);
+        let name = desc.name_to_string().unwrap_or_else(|_| format!("col{col_idx}"));
         let (arrow_dtype, buf_desc) = match desc.data_type {
             odbc_api::DataType::Integer | odbc_api::DataType::SmallInt
             | odbc_api::DataType::TinyInt | odbc_api::DataType::BigInt
@@ -449,50 +461,51 @@ fn odbc_query_impl(connection_string: &str, sql: &str) -> Result<Value, IoError>
         buf_descs.push(buf_desc);
     }
 
-    // Fetch rows in batches. odbc-api requires a row-set buffer sized at
-    // construction; pick 1024 as a reasonable default.
-    const BATCH_SIZE: usize = 1024;
-    let buffer = ColumnarAnyBuffer::from_descs(BATCH_SIZE, buf_descs);
-    let mut row_set_cursor = cursor
-        .bind_buffer(buffer)
-        .map_err(|e| IoError::Other(format!("Odbc.Query bind: {}", e)))?;
+    // `buf_descs` was used by the abandoned columnar-fetch path. Drop it
+    // explicitly so clippy doesn't grumble.
+    let _ = buf_descs;
 
+    // Row-at-a-time fetch via `row.get_text` / `row.get_data`. The
+    // columnar `bind_buffer` path panics on DBISAM (negative SQLLEN
+    // indicator from the driver, odbc-api 13 rejects it). Going one row
+    // at a time bypasses that path entirely. Numeric columns come back
+    // as text and we parse to f64 here.
     let mut accumulated_columns: Vec<Vec<Option<f64>>> = vec![Vec::new(); n_cols as usize];
     let mut accumulated_strings: Vec<Vec<Option<String>>> = vec![Vec::new(); n_cols as usize];
 
-    while let Some(batch) = row_set_cursor
-        .fetch()
+    let mut buf = Vec::<u8>::new();
+    while let Some(mut row) = cursor
+        .next_row()
         .map_err(|e| IoError::Other(format!("Odbc.Query fetch: {}", e)))?
     {
-        let n_rows = batch.num_rows();
         for col_idx in 0..n_cols as usize {
+            buf.clear();
+            let has_data = row
+                .get_text((col_idx + 1) as u16, &mut buf)
+                .map_err(|e| {
+                    IoError::Other(format!(
+                        "Odbc.Query read col {}: {}",
+                        col_idx + 1,
+                        e
+                    ))
+                })?;
             match fields[col_idx].data_type() {
                 DataType::Float64 => {
-                    let view = batch
-                        .column(col_idx)
-                        .as_nullable_slice::<f64>()
-                        .expect("F64 buffer");
-                    let (values, indicators) = view;
-                    for row in 0..n_rows {
-                        let v = if indicators[row] < 0 {
-                            None
-                        } else {
-                            Some(values[row])
-                        };
-                        accumulated_columns[col_idx].push(v);
-                    }
+                    let cell = if !has_data {
+                        None
+                    } else {
+                        let text = String::from_utf8_lossy(&buf);
+                        text.trim().parse::<f64>().ok()
+                    };
+                    accumulated_columns[col_idx].push(cell);
                 }
                 DataType::Utf8 => {
-                    let view = batch
-                        .column(col_idx)
-                        .as_text_view()
-                        .expect("Text buffer");
-                    for row in 0..n_rows {
-                        let s = view
-                            .get(row)
-                            .map(|b| String::from_utf8_lossy(b).into_owned());
-                        accumulated_strings[col_idx].push(s);
-                    }
+                    let cell = if !has_data {
+                        None
+                    } else {
+                        Some(String::from_utf8_lossy(&buf).into_owned())
+                    };
+                    accumulated_strings[col_idx].push(cell);
                 }
                 _ => unreachable!("schema only contains Float64/Utf8 in this slice"),
             }
@@ -517,5 +530,146 @@ fn odbc_query_impl(connection_string: &str, sql: &str) -> Result<Value, IoError>
     let schema = std::sync::Arc::new(Schema::new(fields));
     let batch = arrow::record_batch::RecordBatch::try_new(schema, columns)
         .map_err(|e| IoError::Other(format!("Odbc.Query batch: {}", e)))?;
-    Ok(Value::Table(Table { batch }))
+    Ok(Value::Table(Table::from_arrow(batch)))
+}
+
+// --- ODBC navigation table (Odbc.DataSource, feature-gated) ---
+//
+// Builds the two-level navigation table Power Query's "Get Data from ODBC"
+// generates: top level rows are catalogs/databases; each catalog's `[Data]`
+// resolves on demand to a sub-table of tables; each table's `[Data]`
+// resolves on demand to the actual SELECT * result. The catalog/table
+// metadata is fetched eagerly via SQLTables (cheap); only the row data is
+// lazy (the costly part).
+
+#[cfg(feature = "odbc")]
+fn odbc_data_source_impl(connection_string: &str) -> Result<Value, IoError> {
+    use std::cell::RefCell;
+    use std::collections::BTreeMap;
+    use std::rc::Rc;
+    use std::sync::OnceLock;
+
+    use mrsflow_core::eval::{MError, ThunkState};
+    use odbc_api::{ConnectionOptions, Cursor, Environment, ResultSetMetadata};
+
+    static ENV: OnceLock<Environment> = OnceLock::new();
+    let env = ENV.get_or_init(|| {
+        Environment::new().expect("ODBC environment allocation failed — check libodbc install")
+    });
+
+    let conn = env
+        .connect_with_connection_string(connection_string, ConnectionOptions::default())
+        .map_err(|e| IoError::Other(format!("Odbc.DataSource connect: {}", e)))?;
+
+    // SQLTables with empty filters returns all tables across all catalogs.
+    // Column order: TABLE_CAT, TABLE_SCHEM, TABLE_NAME, TABLE_TYPE, REMARKS.
+    let mut tables_cursor = conn
+        .tables("", "", "", "")
+        .map_err(|e| IoError::Other(format!("Odbc.DataSource tables: {}", e)))?;
+
+    let n_cols = tables_cursor
+        .num_result_cols()
+        .map_err(|e| IoError::Other(format!("Odbc.DataSource n_cols: {}", e)))?;
+    if n_cols < 4 {
+        return Err(IoError::Other(format!(
+            "Odbc.DataSource: SQLTables returned only {n_cols} columns, expected >= 4"
+        )));
+    }
+
+    let mut by_catalog: BTreeMap<String, Vec<(String, String)>> = BTreeMap::new();
+    let mut buf = Vec::<u8>::new();
+    while let Some(mut row) = tables_cursor
+        .next_row()
+        .map_err(|e| IoError::Other(format!("Odbc.DataSource fetch: {}", e)))?
+    {
+        let mut read = |col: u16| -> Result<String, IoError> {
+            buf.clear();
+            row.get_text(col, &mut buf)
+                .map_err(|e| IoError::Other(format!("Odbc.DataSource col {col}: {e}")))?;
+            Ok(String::from_utf8_lossy(&buf).into_owned())
+        };
+        let catalog = read(1)?;
+        let _schema = read(2)?;
+        let table_name = read(3)?;
+        let table_type = read(4)?;
+        // Skip system catalogs / internal driver bookkeeping.
+        if table_name.is_empty() {
+            continue;
+        }
+        by_catalog
+            .entry(catalog)
+            .or_default()
+            .push((table_name, table_type));
+    }
+
+    // Drop the cursor + connection now so the lazy thunks open fresh
+    // connections when they fire (the cached `Environment` is per-process).
+    drop(tables_cursor);
+    drop(conn);
+
+    let cols = vec!["Name".to_string(), "Data".to_string(), "Kind".to_string()];
+    let mut rows: Vec<Vec<Value>> = Vec::with_capacity(by_catalog.len());
+    for (catalog, tables) in by_catalog {
+        let conn_string = connection_string.to_string();
+        let catalog_for_thunk = catalog.clone();
+        let tables_for_thunk = tables.clone();
+        let inner: Rc<dyn Fn() -> Result<Value, MError>> = Rc::new(move || {
+            Ok(build_table_nav(
+                &conn_string,
+                &catalog_for_thunk,
+                &tables_for_thunk,
+            ))
+        });
+        let data = Value::Thunk(Rc::new(RefCell::new(ThunkState::Native(inner))));
+        rows.push(vec![
+            Value::Text(catalog),
+            data,
+            Value::Text("Database".to_string()),
+        ]);
+    }
+    Ok(Value::Table(Table::from_rows(cols, rows)))
+}
+
+#[cfg(feature = "odbc")]
+fn build_table_nav(connection: &str, catalog: &str, tables: &[(String, String)]) -> Value {
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    use mrsflow_core::eval::{MError, ThunkState};
+
+    let cols = vec!["Name".to_string(), "Data".to_string(), "Kind".to_string()];
+    let mut rows: Vec<Vec<Value>> = Vec::with_capacity(tables.len());
+    for (name, table_type) in tables {
+        let conn_string = connection.to_string();
+        let catalog_name = catalog.to_string();
+        let table_name = name.clone();
+        let _ = &catalog_name; // captured for future multi-catalog support
+        let fetcher: Rc<dyn Fn() -> Result<Value, MError>> = Rc::new(move || {
+            // Bare table name; DBISAM (the corpus driver) rejects
+            // "catalog"."table" qualification, and the connection string
+            // already pins the database for single-catalog DSNs. For
+            // multi-catalog drivers (MSSQL, etc.) we'd need to issue `USE`
+            // or append `DATABASE=<catalog>` to the connection string;
+            // expand here when the corpus hits that case.
+            let sql = format!("SELECT * FROM \"{}\"", table_name);
+            odbc_query_impl(&conn_string, &sql)
+                .map_err(|e| MError::Other(format!("Odbc.DataSource fetch: {e:?}")))
+        });
+        let data = Value::Thunk(Rc::new(RefCell::new(ThunkState::Native(fetcher))));
+        // PQ uses title-case Kind values: "Table", "View", etc.
+        let kind = match table_type.as_str() {
+            "TABLE" => "Table",
+            "VIEW" => "View",
+            "SYSTEM TABLE" => "SystemTable",
+            "ALIAS" => "Alias",
+            "SYNONYM" => "Synonym",
+            other => other,
+        };
+        rows.push(vec![
+            Value::Text(name.clone()),
+            data,
+            Value::Text(kind.to_string()),
+        ]);
+    }
+    Value::Table(Table::from_rows(cols, rows))
 }

@@ -8,6 +8,7 @@
 //! disruptively as later slices land.
 
 use std::cell::RefCell;
+use std::fmt;
 use std::rc::{Rc, Weak};
 
 use crate::parser::{Expr, Param};
@@ -144,10 +145,35 @@ pub enum TypeRep {
 /// stays alive while the let-body is being evaluated (the body holds an Rc),
 /// and any forced values that escape (e.g. closures) hold their own Rcs to
 /// keep their captured envs alive.
-#[derive(Debug, Clone)]
+///
+/// `Native` variant — for host-driven deferred work where there's no Expr
+/// to evaluate (e.g. Odbc.DataSource navigation tables, where the `Data`
+/// cell only fires its SELECT when forced). The closure runs once;
+/// memoisation happens via the surrounding RefCell flipping to `Forced`.
 pub enum ThunkState {
     Pending { expr: Expr, env: Weak<EnvNode> },
+    Native(NativeThunkFn),
     Forced(Value),
+}
+
+/// A no-argument callback returning a forced Value. `Rc<dyn Fn>` (not
+/// `FnOnce`) so the type-id is uniform; in practice each closure runs at
+/// most once because the surrounding `RefCell<ThunkState>` flips to
+/// `Forced` after the first invocation.
+pub type NativeThunkFn = Rc<dyn Fn() -> Result<Value, MError>>;
+
+impl fmt::Debug for ThunkState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ThunkState::Pending { expr, env } => f
+                .debug_struct("Pending")
+                .field("expr", expr)
+                .field("env", env)
+                .finish(),
+            ThunkState::Native(_) => f.write_str("Native(<fn>)"),
+            ThunkState::Forced(v) => f.debug_tuple("Forced").field(v).finish(),
+        }
+    }
 }
 
 /// Table representation. Two backings: Arrow `RecordBatch` (typed, uniform

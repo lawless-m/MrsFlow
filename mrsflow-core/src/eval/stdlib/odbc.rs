@@ -25,6 +25,14 @@ use super::common::{
 pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
     vec![
         ("Odbc.Query", two("connection", "sql"), query),
+        (
+            "Odbc.DataSource",
+            vec![
+                Param { name: "connection".into(), optional: false, type_annotation: None },
+                Param { name: "options".into(),    optional: true,  type_annotation: None },
+            ],
+            data_source,
+        ),
     ]
 }
 
@@ -33,4 +41,11 @@ fn query(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let sql = expect_text(&args[1])?;
     host.odbc_query(conn, sql, None)
         .map_err(|e| MError::Other(format!("Odbc.Query: {e:?}")))
+}
+
+fn data_source(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+    let conn = expect_text(&args[0])?;
+    let opts = args.get(1);
+    host.odbc_data_source(conn, opts)
+        .map_err(|e| MError::Other(format!("Odbc.DataSource: {e:?}")))
 }

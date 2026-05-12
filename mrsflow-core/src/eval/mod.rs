@@ -367,27 +367,70 @@ pub fn evaluate(ast: &Expr, env: &Env, host: &dyn IoHost) -> Result<Value, MErro
                         force(items[idx].clone(), &mut |e, env| evaluate(e, env, host))
                     }
                 }
-                Value::Table(t) => {
-                    let i = expect_number(&idx_v)?;
-                    if i.fract() != 0.0 || i < 0.0 {
-                        return Err(MError::Other(format!(
-                            "table row index must be non-negative integer, got {i}"
-                        )));
-                    }
-                    let idx = i as usize;
-                    let n_rows = t.num_rows();
-                    if idx >= n_rows {
-                        if *optional {
-                            Ok(Value::Null)
-                        } else {
-                            Err(MError::Other(format!(
-                                "table row index out of bounds: {idx} (rows {n_rows})"
-                            )))
+                Value::Table(t) => match &idx_v {
+                    Value::Record(predicate) => {
+                        // PQ: `table{[col1 = v1, col2 = v2]}` returns the
+                        // single row whose listed fields equal those values.
+                        // Zero or >1 matches is an error unless `?` is used,
+                        // in which case zero matches returns null.
+                        let cols = t.column_names();
+                        let n_rows = t.num_rows();
+                        let mut matches: Vec<usize> = Vec::new();
+                        for r in 0..n_rows {
+                            let mut ok = true;
+                            for (key, want) in &predicate.fields {
+                                let Some(col_idx) = cols.iter().position(|c| c == key) else {
+                                    ok = false;
+                                    break;
+                                };
+                                let cell = stdlib::cell_to_value(&t, col_idx, r)?;
+                                let cell = force(cell, &mut |e, env| evaluate(e, env, host))?;
+                                let want = force(want.clone(), &mut |e, env| evaluate(e, env, host))?;
+                                if !values_equal(&cell, &want) {
+                                    ok = false;
+                                    break;
+                                }
+                            }
+                            if ok {
+                                matches.push(r);
+                                if matches.len() > 1 {
+                                    break;
+                                }
+                            }
                         }
-                    } else {
-                        stdlib::row_to_record(&t, idx)
+                        match matches.len() {
+                            1 => stdlib::row_to_record(&t, matches[0]),
+                            0 if *optional => Ok(Value::Null),
+                            0 => Err(MError::Other(
+                                "table{predicate}: no row matched".into(),
+                            )),
+                            _ => Err(MError::Other(
+                                "table{predicate}: more than one row matched".into(),
+                            )),
+                        }
                     }
-                }
+                    _ => {
+                        let i = expect_number(&idx_v)?;
+                        if i.fract() != 0.0 || i < 0.0 {
+                            return Err(MError::Other(format!(
+                                "table row index must be non-negative integer, got {i}"
+                            )));
+                        }
+                        let idx = i as usize;
+                        let n_rows = t.num_rows();
+                        if idx >= n_rows {
+                            if *optional {
+                                Ok(Value::Null)
+                            } else {
+                                Err(MError::Other(format!(
+                                    "table row index out of bounds: {idx} (rows {n_rows})"
+                                )))
+                            }
+                        } else {
+                            stdlib::row_to_record(&t, idx)
+                        }
+                    }
+                },
                 Value::Record(_) => Err(MError::NotImplemented(
                     "record item access deferred to a later slice",
                 )),
@@ -983,12 +1026,31 @@ where
         }
     }
 
+    // Native — host-supplied callback (e.g. Odbc.DataSource's lazy table
+    // fetch). Pull the Rc out first so we drop the borrow before invoking
+    // the callback; otherwise a re-entrant force could double-borrow.
+    let native = {
+        let borrowed = thunk_state.borrow();
+        match &*borrowed {
+            ThunkState::Native(f) => Some(Rc::clone(f)),
+            _ => None,
+        }
+    };
+    if let Some(f) = native {
+        let result = f()?;
+        let result = force(result, evaluator)?;
+        *thunk_state.borrow_mut() = ThunkState::Forced(result.clone());
+        return Ok(result);
+    }
+
     // Pending — extract the captured expr/env and evaluate.
     let (expr, env_weak) = {
         let borrowed = thunk_state.borrow();
         match &*borrowed {
             ThunkState::Pending { expr, env } => (expr.clone(), env.clone()),
-            ThunkState::Forced(_) => unreachable!("just checked above"),
+            ThunkState::Native(_) | ThunkState::Forced(_) => {
+                unreachable!("just handled above")
+            }
         }
     };
     let env = env_weak.upgrade().ok_or_else(|| {
