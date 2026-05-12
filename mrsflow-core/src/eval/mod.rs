@@ -3304,6 +3304,58 @@ mod tests {
     }
 
     #[test]
+    fn date_start_of_month_basic() {
+        match eval_str("Date.StartOfMonth(#date(2024, 6, 15))").unwrap() {
+            Value::Date(d) => {
+                assert_eq!(d, chrono::NaiveDate::from_ymd_opt(2024, 6, 1).unwrap());
+            }
+            other => panic!("expected date, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn date_end_of_month_basic() {
+        match eval_str("Date.EndOfMonth(#date(2024, 2, 15))").unwrap() {
+            Value::Date(d) => {
+                // 2024 is leap → Feb has 29 days
+                assert_eq!(d, chrono::NaiveDate::from_ymd_opt(2024, 2, 29).unwrap());
+            }
+            other => panic!("expected date, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn date_start_of_quarter_basic() {
+        match eval_str("Date.StartOfQuarter(#date(2024, 5, 15))").unwrap() {
+            Value::Date(d) => {
+                assert_eq!(d, chrono::NaiveDate::from_ymd_opt(2024, 4, 1).unwrap());
+            }
+            other => panic!("expected date, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn date_start_of_year_basic() {
+        match eval_str("Date.StartOfYear(#date(2024, 6, 15))").unwrap() {
+            Value::Date(d) => {
+                assert_eq!(d, chrono::NaiveDate::from_ymd_opt(2024, 1, 1).unwrap());
+            }
+            other => panic!("expected date, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn date_start_of_week_default_sunday() {
+        // 2024-01-10 is Wednesday. Sunday-start → 2024-01-07.
+        match eval_str("Date.StartOfWeek(#date(2024, 1, 10))").unwrap() {
+            Value::Date(d) => {
+                assert_eq!(d, chrono::NaiveDate::from_ymd_opt(2024, 1, 7).unwrap());
+            }
+            other => panic!("expected date, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn date_day_of_week_default_sunday() {
         // 2024-01-07 is a Sunday. Sunday=0 with default firstDayOfWeek.
         match eval_str("Date.DayOfWeek(#date(2024, 1, 7))").unwrap() {

@@ -741,6 +741,30 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ),
         ("Date.IsLeapYear", one("date"), date_is_leap_year),
         ("Date.ToRecord", one("date"), date_to_record),
+        ("Date.StartOfDay", one("date"), date_start_of_day),
+        ("Date.EndOfDay", one("date"), date_end_of_day),
+        (
+            "Date.StartOfWeek",
+            vec![
+                Param { name: "date".into(),           optional: false, type_annotation: None },
+                Param { name: "firstDayOfWeek".into(), optional: true,  type_annotation: None },
+            ],
+            date_start_of_week,
+        ),
+        (
+            "Date.EndOfWeek",
+            vec![
+                Param { name: "date".into(),           optional: false, type_annotation: None },
+                Param { name: "firstDayOfWeek".into(), optional: true,  type_annotation: None },
+            ],
+            date_end_of_week,
+        ),
+        ("Date.StartOfMonth", one("date"), date_start_of_month),
+        ("Date.EndOfMonth", one("date"), date_end_of_month),
+        ("Date.StartOfQuarter", one("date"), date_start_of_quarter),
+        ("Date.EndOfQuarter", one("date"), date_end_of_quarter),
+        ("Date.StartOfYear", one("date"), date_start_of_year),
+        ("Date.EndOfYear", one("date"), date_end_of_year),
         ("Date.From", one("value"), date_from),
         ("Date.Year", one("date"), date_year),
         ("Date.Month", one("date"), date_month),
@@ -4681,6 +4705,126 @@ fn date_is_leap_year(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError
     let y = d.year();
     let leap = (y % 4 == 0 && y % 100 != 0) || (y % 400 == 0);
     Ok(Value::Logical(leap))
+}
+
+/// Apply a date-shape function while preserving Date vs Datetime kind.
+/// For Datetime, `start` controls whether the returned time is 00:00:00
+/// (start of day) or 23:59:59.999999 (end of day).
+fn shape_date(v: &Value, ctx: &str, start: bool, f: impl Fn(chrono::NaiveDate) -> chrono::NaiveDate) -> Result<Value, MError> {
+    match v {
+        Value::Null => Ok(Value::Null),
+        Value::Date(d) => Ok(Value::Date(f(*d))),
+        Value::Datetime(dt) => {
+            let new_date = f(dt.date());
+            let time = if start {
+                chrono::NaiveTime::from_hms_opt(0, 0, 0).unwrap()
+            } else {
+                chrono::NaiveTime::from_hms_nano_opt(23, 59, 59, 999_999_999).unwrap()
+            };
+            Ok(Value::Datetime(new_date.and_time(time)))
+        }
+        other => Err(MError::Other(format!(
+            "{}: argument must be a date or datetime (got {})",
+            ctx, super::type_name(other)
+        ))),
+    }
+}
+
+fn date_start_of_day(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    shape_date(&args[0], "Date.StartOfDay", true, |d| d)
+}
+
+fn date_end_of_day(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    shape_date(&args[0], "Date.EndOfDay", false, |d| d)
+}
+
+fn date_start_of_month(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    use chrono::Datelike;
+    shape_date(&args[0], "Date.StartOfMonth", true, |d| {
+        chrono::NaiveDate::from_ymd_opt(d.year(), d.month(), 1).unwrap()
+    })
+}
+
+fn date_end_of_month(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    use chrono::Datelike;
+    shape_date(&args[0], "Date.EndOfMonth", false, |d| {
+        let (y, m) = (d.year(), d.month());
+        let first_next = if m == 12 {
+            chrono::NaiveDate::from_ymd_opt(y + 1, 1, 1).unwrap()
+        } else {
+            chrono::NaiveDate::from_ymd_opt(y, m + 1, 1).unwrap()
+        };
+        first_next.pred_opt().unwrap()
+    })
+}
+
+fn date_start_of_quarter(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    use chrono::Datelike;
+    shape_date(&args[0], "Date.StartOfQuarter", true, |d| {
+        let q_start_month = ((d.month() - 1) / 3) * 3 + 1;
+        chrono::NaiveDate::from_ymd_opt(d.year(), q_start_month, 1).unwrap()
+    })
+}
+
+fn date_end_of_quarter(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    use chrono::Datelike;
+    shape_date(&args[0], "Date.EndOfQuarter", false, |d| {
+        let q_end_month = ((d.month() - 1) / 3) * 3 + 3;
+        let first_next = if q_end_month == 12 {
+            chrono::NaiveDate::from_ymd_opt(d.year() + 1, 1, 1).unwrap()
+        } else {
+            chrono::NaiveDate::from_ymd_opt(d.year(), q_end_month + 1, 1).unwrap()
+        };
+        first_next.pred_opt().unwrap()
+    })
+}
+
+fn date_start_of_year(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    use chrono::Datelike;
+    shape_date(&args[0], "Date.StartOfYear", true, |d| {
+        chrono::NaiveDate::from_ymd_opt(d.year(), 1, 1).unwrap()
+    })
+}
+
+fn date_end_of_year(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    use chrono::Datelike;
+    shape_date(&args[0], "Date.EndOfYear", false, |d| {
+        chrono::NaiveDate::from_ymd_opt(d.year(), 12, 31).unwrap()
+    })
+}
+
+fn first_day_of_week_arg(arg: Option<&Value>, ctx: &str) -> Result<u32, MError> {
+    match arg {
+        Some(Value::Number(n)) if n.fract() == 0.0 && *n >= 0.0 && *n <= 6.0 => Ok(*n as u32),
+        Some(Value::Null) | None => Ok(0), // default Sunday
+        Some(other) => Err(MError::Other(format!(
+            "{}: firstDayOfWeek must be 0..6 (got {})", ctx, super::type_name(other)
+        ))),
+    }
+}
+
+fn date_start_of_week(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    use chrono::Datelike;
+    let first = first_day_of_week_arg(args.get(1), "Date.StartOfWeek")?;
+    shape_date(&args[0], "Date.StartOfWeek", true, |d| {
+        // Days since `first` to step back.
+        let from_monday = d.weekday().num_days_from_monday();
+        let dow_sunday_first = (from_monday + 1) % 7;
+        let back = (dow_sunday_first + 7 - first) % 7;
+        d - chrono::Duration::days(back as i64)
+    })
+}
+
+fn date_end_of_week(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    use chrono::Datelike;
+    let first = first_day_of_week_arg(args.get(1), "Date.EndOfWeek")?;
+    shape_date(&args[0], "Date.EndOfWeek", false, |d| {
+        let from_monday = d.weekday().num_days_from_monday();
+        let dow_sunday_first = (from_monday + 1) % 7;
+        let back = (dow_sunday_first + 7 - first) % 7;
+        let start = d - chrono::Duration::days(back as i64);
+        start + chrono::Duration::days(6)
+    })
 }
 
 fn date_to_record(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
