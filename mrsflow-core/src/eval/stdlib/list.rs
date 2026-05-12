@@ -219,6 +219,31 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ("List.Alternate", four_with_opts("list", "count", "repeatInterval", "offset"), list_alternate),
         ("List.Split", two("list", "pageSize"), list_split),
         ("List.Buffer", one("list"), list_buffer),
+        (
+            "List.Difference",
+            vec![
+                Param { name: "list1".into(),            optional: false, type_annotation: None },
+                Param { name: "list2".into(),            optional: false, type_annotation: None },
+                Param { name: "equationCriteria".into(), optional: true,  type_annotation: None },
+            ],
+            list_difference,
+        ),
+        (
+            "List.Intersect",
+            vec![
+                Param { name: "lists".into(),            optional: false, type_annotation: None },
+                Param { name: "equationCriteria".into(), optional: true,  type_annotation: None },
+            ],
+            list_intersect,
+        ),
+        (
+            "List.Union",
+            vec![
+                Param { name: "lists".into(),            optional: false, type_annotation: None },
+                Param { name: "equationCriteria".into(), optional: true,  type_annotation: None },
+            ],
+            list_union,
+        ),
     ]
 }
 
@@ -1003,5 +1028,76 @@ fn list_split(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 fn list_buffer(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     Ok(Value::List(list.clone()))
+}
+
+fn list_difference(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let list1 = expect_list(&args[0])?;
+    let list2 = expect_list(&args[1])?;
+    if !matches!(args.get(2), Some(Value::Null) | None) {
+        return Err(MError::NotImplemented("List.Difference: equationCriteria not yet supported"));
+    }
+    // PQ semantics: multiplicities are subtracted (each list2 occurrence removes
+    // one matching list1 occurrence, in order).
+    let mut remaining: Vec<bool> = vec![true; list1.len()];
+    for v in list2 {
+        for (i, x) in list1.iter().enumerate() {
+            if remaining[i] && values_equal_primitive(x, v)? {
+                remaining[i] = false;
+                break;
+            }
+        }
+    }
+    let out: Vec<Value> = list1.iter().enumerate()
+        .filter(|(i, _)| remaining[*i])
+        .map(|(_, v)| v.clone())
+        .collect();
+    Ok(Value::List(out))
+}
+
+fn list_intersect(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let lists = expect_list(&args[0])?;
+    if !matches!(args.get(1), Some(Value::Null) | None) {
+        return Err(MError::NotImplemented("List.Intersect: equationCriteria not yet supported"));
+    }
+    if lists.is_empty() {
+        return Ok(Value::List(Vec::new()));
+    }
+    let sublists: Vec<&Vec<Value>> = lists.iter().map(|v| expect_list(v)).collect::<Result<_, _>>()?;
+    let first = sublists[0];
+    let mut out: Vec<Value> = Vec::new();
+    'outer: for v in first {
+        // Skip if already added (dedupe in result).
+        for existing in &out {
+            if values_equal_primitive(existing, v)? { continue 'outer; }
+        }
+        // Must appear in every other sublist.
+        for other in &sublists[1..] {
+            let mut found = false;
+            for x in *other {
+                if values_equal_primitive(v, x)? { found = true; break; }
+            }
+            if !found { continue 'outer; }
+        }
+        out.push(v.clone());
+    }
+    Ok(Value::List(out))
+}
+
+fn list_union(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let lists = expect_list(&args[0])?;
+    if !matches!(args.get(1), Some(Value::Null) | None) {
+        return Err(MError::NotImplemented("List.Union: equationCriteria not yet supported"));
+    }
+    let mut out: Vec<Value> = Vec::new();
+    for v in lists {
+        let sub = expect_list(v)?;
+        'inner: for x in sub {
+            for existing in &out {
+                if values_equal_primitive(existing, x)? { continue 'inner; }
+            }
+            out.push(x.clone());
+        }
+    }
+    Ok(Value::List(out))
 }
 

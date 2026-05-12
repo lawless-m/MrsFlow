@@ -3928,6 +3928,45 @@ mod tests {
     }
 
     #[test]
+    fn list_difference_basic() {
+        match eval_str("List.Difference({1, 2, 3, 4, 5}, {2, 4})").unwrap() {
+            Value::List(xs) => {
+                let nums: Vec<f64> = xs.iter().map(|v| match v {
+                    Value::Number(n) => *n, _ => panic!(),
+                }).collect();
+                assert_eq!(nums, vec![1.0, 3.0, 5.0]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn list_intersect_basic() {
+        match eval_str("List.Intersect({{1, 2, 3, 4}, {2, 3, 5}, {3, 2, 7}})").unwrap() {
+            Value::List(xs) => {
+                let nums: Vec<f64> = xs.iter().map(|v| match v {
+                    Value::Number(n) => *n, _ => panic!(),
+                }).collect();
+                assert_eq!(nums, vec![2.0, 3.0]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn list_union_dedupes() {
+        match eval_str("List.Union({{1, 2}, {2, 3}, {3, 4}})").unwrap() {
+            Value::List(xs) => {
+                let nums: Vec<f64> = xs.iter().map(|v| match v {
+                    Value::Number(n) => *n, _ => panic!(),
+                }).collect();
+                assert_eq!(nums, vec![1.0, 2.0, 3.0, 4.0]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn list_range_basic() {
         match eval_str("List.Range({10, 20, 30, 40, 50}, 1, 3)").unwrap() {
             Value::List(xs) => {
