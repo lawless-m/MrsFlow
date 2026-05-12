@@ -5488,6 +5488,44 @@ mod tests {
     }
 
     #[test]
+    fn error_record_has_three_fields() {
+        let src = r#"Error.Record("Expression.Error", "boom", null)"#;
+        match eval_str(src).unwrap() {
+            Value::Record(r) => {
+                let names: Vec<&str> = r.fields.iter().map(|(n, _)| n.as_str()).collect();
+                assert_eq!(names, vec!["Reason", "Message", "Detail"]);
+                assert!(matches!(&r.fields[0].1, Value::Text(s) if s == "Expression.Error"));
+                assert!(matches!(&r.fields[1].1, Value::Text(s) if s == "boom"));
+                assert!(matches!(r.fields[2].1, Value::Null));
+            }
+            other => panic!("expected record, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn error_record_with_error_keyword_raises() {
+        // `error Error.Record(...)` should raise; catch via `try`.
+        let src = r#"
+            try error Error.Record("MyReason", "MyMessage", null)
+        "#;
+        match eval_str(src).unwrap() {
+            Value::Record(r) => {
+                let has_error = r.fields.iter().find(|(n, _)| n == "HasError").unwrap();
+                assert!(matches!(has_error.1, Value::Logical(true)));
+                let err_field = r.fields.iter().find(|(n, _)| n == "Error").unwrap();
+                match &err_field.1 {
+                    Value::Record(er) => {
+                        let names: Vec<&str> = er.fields.iter().map(|(n, _)| n.as_str()).collect();
+                        assert_eq!(names, vec!["Reason", "Message", "Detail"]);
+                    }
+                    other => panic!("expected error record, got {:?}", other),
+                }
+            }
+            other => panic!("expected try record, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn expression_constant_number_text_list() {
         assert_eq!(eval_text(r#"Expression.Constant(42)"#), "42");
         assert_eq!(eval_text(r#"Expression.Constant("hi")"#), r#""hi""#);
