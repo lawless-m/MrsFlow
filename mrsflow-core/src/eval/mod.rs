@@ -5342,6 +5342,83 @@ mod tests {
     }
 
     #[test]
+    fn table_partition_splits_by_hash() {
+        // Use a hash that returns the column value itself; verify partitioning
+        // by mod 2 puts the right rows in each bucket.
+        let src = r#"
+            let
+                t = #table({"n"}, {{0}, {1}, {2}, {3}}),
+                parts = Table.Partition(t, "n", 2, (x) => x)
+            in
+                {Table.Column(parts{0}, "n"),
+                 Table.Column(parts{1}, "n")}
+        "#;
+        match eval_str(src).unwrap() {
+            Value::List(xs) => {
+                let nums = |v: &Value| -> Vec<f64> {
+                    match v {
+                        Value::List(xs) => xs.iter().map(|v| match v {
+                            Value::Number(n) => *n,
+                            _ => panic!(),
+                        }).collect(),
+                        _ => panic!(),
+                    }
+                };
+                assert_eq!(nums(&xs[0]), vec![0.0, 2.0]); // hash mod 2 = 0
+                assert_eq!(nums(&xs[1]), vec![1.0, 3.0]); // hash mod 2 = 1
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_from_partitions_concatenates() {
+        let src = r#"
+            let
+                p1 = #table({"n"}, {{1}, {2}}),
+                p2 = #table({"n"}, {{3}, {4}, {5}}),
+                t = Table.FromPartitions({p1, p2})
+            in Table.Column(t, "n")
+        "#;
+        match eval_str(src).unwrap() {
+            Value::List(xs) => {
+                let nums: Vec<f64> = xs.iter().map(|v| match v {
+                    Value::Number(n) => *n,
+                    _ => panic!(),
+                }).collect();
+                assert_eq!(nums, vec![1.0, 2.0, 3.0, 4.0, 5.0]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_add_key_is_identity() {
+        // AddKey is a no-op in v1 — the resulting table is the same shape.
+        let src = r#"
+            let
+                t = #table({"id"}, {{1}, {2}}),
+                k = Table.AddKey(t, {"id"}, true)
+            in
+                {Table.ColumnNames(k), Table.RowCount(k)}
+        "#;
+        match eval_str(src).unwrap() {
+            Value::List(xs) => {
+                let names = match &xs[0] {
+                    Value::List(ns) => ns.iter().map(|v| match v {
+                        Value::Text(s) => s.clone(),
+                        _ => panic!(),
+                    }).collect::<Vec<_>>(),
+                    _ => panic!(),
+                };
+                assert_eq!(names, vec!["id"]);
+                assert!(matches!(xs[1], Value::Number(n) if n == 2.0));
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn table_group_sums_by_key() {
         // Group {a,b,a,b,a} by k, sum the v column.
         let src = r#"

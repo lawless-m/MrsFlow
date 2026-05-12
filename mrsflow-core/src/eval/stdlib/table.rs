@@ -516,6 +516,50 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ),
         ("Table.Split", two("table", "pageSize"), table_split),
         ("Table.Buffer", one("table"), table_buffer),
+        // --- Slice #165: partitioning + miscellaneous tail ---
+        (
+            "Table.Partition",
+            vec![
+                Param { name: "table".into(),  optional: false, type_annotation: None },
+                Param { name: "column".into(), optional: false, type_annotation: None },
+                Param { name: "groups".into(), optional: false, type_annotation: None },
+                Param { name: "hash".into(),   optional: false, type_annotation: None },
+            ],
+            table_partition,
+        ),
+        ("Table.PartitionKey", one("table"), table_partition_key),
+        ("Table.PartitionValues", one("table"), table_partition_values),
+        ("Table.ReplacePartitionKey", two("table", "key"), table_identity_passthrough),
+        (
+            "Table.FilterWithDataTable",
+            vec![
+                Param { name: "table".into(),     optional: false, type_annotation: None },
+                Param { name: "dataTable".into(), optional: false, type_annotation: None },
+            ],
+            table_filter_with_data_table,
+        ),
+        (
+            "Table.FromPartitions",
+            vec![
+                Param { name: "partitions".into(), optional: false, type_annotation: None },
+                Param { name: "columnInfo".into(), optional: true,  type_annotation: None },
+            ],
+            table_from_partitions,
+        ),
+        ("Table.AddKey", three("table", "columns", "isPrimary"), table_identity_passthrough),
+        ("Table.ReplaceKeys", two("table", "keys"), table_identity_passthrough),
+        ("Table.ConformToPageReader", one("table"), table_identity_passthrough_one),
+        ("Table.StopFolding", one("table"), table_identity_passthrough_one),
+        ("Table.ReplaceRelationshipIdentity", two("table", "identity"), table_identity_passthrough),
+        (
+            "Table.SelectRowsWithErrors",
+            vec![
+                Param { name: "table".into(),   optional: false, type_annotation: None },
+                Param { name: "columns".into(), optional: true,  type_annotation: None },
+            ],
+            table_select_rows_with_errors,
+        ),
+        ("Table.WithErrorContext", two("table", "errorContext"), table_identity_passthrough),
     ]
 }
 
@@ -4069,6 +4113,111 @@ fn table_split(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 fn table_buffer(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let _ = expect_table(&args[0])?;
     Ok(args[0].clone())
+}
+
+// --- Slice #165: partitioning + miscellaneous tail ---
+
+fn table_partition(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let col_name = expect_text(&args[1])?.to_string();
+    let groups = expect_int(&args[2], "Table.Partition: groups")?;
+    if groups <= 0 {
+        return Err(MError::Other("Table.Partition: groups must be positive".into()));
+    }
+    let groups = groups as usize;
+    let hash_fn = expect_function(&args[3])?;
+    let (names, rows) = table_to_rows(table)?;
+    let col_idx = names
+        .iter()
+        .position(|n| n == &col_name)
+        .ok_or_else(|| MError::Other(format!("Table.Partition: column not found: {}", col_name)))?;
+    let mut buckets: Vec<Vec<Vec<Value>>> = (0..groups).map(|_| Vec::new()).collect();
+    for row in rows {
+        let key = row[col_idx].clone();
+        let h = invoke_callback_with_host(hash_fn, vec![key], host)?;
+        let n = match h {
+            Value::Number(n) if n.is_finite() => n as i64,
+            other => return Err(type_mismatch("number (hash result)", &other)),
+        };
+        let bucket_idx = (n.rem_euclid(groups as i64)) as usize;
+        buckets[bucket_idx].push(row);
+    }
+    let out: Vec<Value> = buckets
+        .into_iter()
+        .map(|b| values_to_table(&names, &b).map(Value::Table))
+        .collect::<Result<_, _>>()?;
+    Ok(Value::List(out))
+}
+
+fn table_partition_key(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    // v1: no partition key tracking.
+    let _ = expect_table(&args[0])?;
+    Ok(Value::List(Vec::new()))
+}
+
+fn table_partition_values(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    // v1: no partition key tracking.
+    let _ = expect_table(&args[0])?;
+    Ok(Value::List(Vec::new()))
+}
+
+fn table_identity_passthrough(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let _ = expect_table(&args[0])?;
+    Ok(args[0].clone())
+}
+
+fn table_identity_passthrough_one(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let _ = expect_table(&args[0])?;
+    Ok(args[0].clone())
+}
+
+fn table_filter_with_data_table(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    // v1: this is a query-folding hint with no semantic effect off-cloud.
+    let _ = expect_table(&args[0])?;
+    let _ = expect_table(&args[1])?;
+    Ok(args[0].clone())
+}
+
+fn table_from_partitions(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let parts = expect_list(&args[0])?;
+    if !matches!(args.get(1), Some(Value::Null) | None) {
+        return Err(MError::NotImplemented(
+            "Table.FromPartitions: columnInfo not yet supported",
+        ));
+    }
+    if parts.is_empty() {
+        // No partitions → no rows, but we need column names. Return an
+        // empty schemaless table; matching values_to_table's zero-cols path.
+        return Ok(Value::Table(values_to_table(&[], &[])?));
+    }
+    let mut names: Option<Vec<String>> = None;
+    let mut rows: Vec<Vec<Value>> = Vec::new();
+    for (i, p) in parts.iter().enumerate() {
+        let t = match p {
+            Value::Table(t) => t,
+            other => return Err(type_mismatch("table (partition)", other)),
+        };
+        let (n, r) = table_to_rows(t)?;
+        match &names {
+            None => names = Some(n),
+            Some(existing) if *existing == n => {}
+            Some(_) => {
+                return Err(MError::Other(format!(
+                    "Table.FromPartitions: partition {} has different column set",
+                    i
+                )));
+            }
+        }
+        rows.extend(r);
+    }
+    Ok(Value::Table(values_to_table(&names.unwrap(), &rows)?))
+}
+
+fn table_select_rows_with_errors(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    // v1: cells don't carry per-cell error state — no rows are "errored".
+    let table = expect_table(&args[0])?;
+    let (names, _rows) = table_to_rows(table)?;
+    Ok(Value::Table(values_to_table(&names, &[])?))
 }
 
 fn type_matches(t: &super::super::value::TypeRep, v: &Value) -> bool {
