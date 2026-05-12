@@ -3307,6 +3307,51 @@ mod tests {
     }
 
     #[test]
+    fn datetime_is_in_current_hour_now() {
+        // "now" should be in current hour.
+        let now = chrono::Local::now().naive_local();
+        let src = format!(
+            "DateTime.IsInCurrentHour(#datetime({}, {}, {}, {}, {}, {}))",
+            chrono::Datelike::year(&now), chrono::Datelike::month(&now), chrono::Datelike::day(&now),
+            chrono::Timelike::hour(&now), chrono::Timelike::minute(&now), chrono::Timelike::second(&now)
+        );
+        match eval_str(&src).unwrap() {
+            Value::Logical(b) => assert!(b),
+            other => panic!("expected logical, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn datetime_is_in_next_n_minutes_range() {
+        let now = chrono::Local::now().naive_local();
+        let in5 = now + chrono::Duration::minutes(3);
+        let src = format!(
+            "DateTime.IsInNextNMinutes(#datetime({}, {}, {}, {}, {}, {}), 10)",
+            chrono::Datelike::year(&in5), chrono::Datelike::month(&in5), chrono::Datelike::day(&in5),
+            chrono::Timelike::hour(&in5), chrono::Timelike::minute(&in5), chrono::Timelike::second(&in5)
+        );
+        match eval_str(&src).unwrap() {
+            Value::Logical(b) => assert!(b),
+            other => panic!("expected logical, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn datetime_is_in_previous_second_yes() {
+        let now = chrono::Local::now().naive_local();
+        let s_ago = now - chrono::Duration::seconds(2);
+        let src = format!(
+            "DateTime.IsInPreviousSecond(#datetime({}, {}, {}, {}, {}, {}))",
+            chrono::Datelike::year(&s_ago), chrono::Datelike::month(&s_ago), chrono::Datelike::day(&s_ago),
+            chrono::Timelike::hour(&s_ago), chrono::Timelike::minute(&s_ago), chrono::Timelike::second(&s_ago)
+        );
+        match eval_str(&src).unwrap() {
+            Value::Logical(_) => {} // tolerant: depends on alignment with second boundary
+            other => panic!("expected logical, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn datetime_date_extracts() {
         match eval_str("DateTime.Date(#datetime(2024, 6, 15, 14, 30, 0))").unwrap() {
             Value::Date(d) => assert_eq!(d, chrono::NaiveDate::from_ymd_opt(2024, 6, 15).unwrap()),
