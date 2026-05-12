@@ -5342,6 +5342,110 @@ mod tests {
     }
 
     #[test]
+    fn table_group_sums_by_key() {
+        // Group {a,b,a,b,a} by k, sum the v column.
+        let src = r#"
+            let
+                t = #table({"k", "v"}, {{"a", 1}, {"b", 2}, {"a", 3}, {"b", 4}, {"a", 5}}),
+                g = Table.Group(t, "k", {{"sumV", each List.Sum(Table.Column(_, "v"))}})
+            in
+                {Table.Column(g, "k"), Table.Column(g, "sumV")}
+        "#;
+        match eval_str(src).unwrap() {
+            Value::List(xs) => {
+                let keys = match &xs[0] {
+                    Value::List(ks) => ks.iter().map(|v| match v {
+                        Value::Text(s) => s.clone(),
+                        _ => panic!(),
+                    }).collect::<Vec<_>>(),
+                    _ => panic!(),
+                };
+                let sums = match &xs[1] {
+                    Value::List(ns) => ns.iter().map(|v| match v {
+                        Value::Number(n) => *n,
+                        _ => panic!(),
+                    }).collect::<Vec<_>>(),
+                    _ => panic!(),
+                };
+                assert_eq!(keys, vec!["a", "b"]);
+                assert_eq!(sums, vec![9.0, 6.0]); // a=1+3+5, b=2+4
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_add_rank_column_basic() {
+        // Rank by "n" ascending: 1→1, 2→2, 3→3.
+        let src = r#"
+            let
+                t = #table({"n"}, {{3}, {1}, {2}}),
+                r = Table.AddRankColumn(t, "rank", "n")
+            in Table.Column(r, "rank")
+        "#;
+        match eval_str(src).unwrap() {
+            Value::List(xs) => {
+                let nums: Vec<f64> = xs.iter().map(|v| match v {
+                    Value::Number(n) => *n,
+                    _ => panic!(),
+                }).collect();
+                // Row 0 has n=3 → rank 3; row 1 has n=1 → rank 1; row 2 has n=2 → rank 2.
+                assert_eq!(nums, vec![3.0, 1.0, 2.0]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_split_chunks_rows() {
+        let src = r#"
+            let
+                t = #table({"n"}, {{1}, {2}, {3}, {4}, {5}}),
+                pages = Table.Split(t, 2)
+            in
+                {List.Count(pages),
+                 Table.RowCount(pages{0}),
+                 Table.RowCount(pages{1}),
+                 Table.RowCount(pages{2})}
+        "#;
+        match eval_str(src).unwrap() {
+            Value::List(xs) => {
+                let nums: Vec<f64> = xs.iter().map(|v| match v {
+                    Value::Number(n) => *n,
+                    _ => panic!(),
+                }).collect();
+                assert_eq!(nums, vec![3.0, 2.0, 2.0, 1.0]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_buffer_is_identity() {
+        let src = r#"
+            let
+                t = #table({"n"}, {{1}, {2}, {3}}),
+                b = Table.Buffer(t)
+            in
+                {Table.ColumnNames(b), Table.RowCount(b)}
+        "#;
+        match eval_str(src).unwrap() {
+            Value::List(xs) => {
+                let names = match &xs[0] {
+                    Value::List(ns) => ns.iter().map(|v| match v {
+                        Value::Text(s) => s.clone(),
+                        _ => panic!(),
+                    }).collect::<Vec<_>>(),
+                    _ => panic!(),
+                };
+                assert_eq!(names, vec!["n"]);
+                assert!(matches!(xs[1], Value::Number(n) if n == 3.0));
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn table_from_columns_default_names() {
         let src = r#"
             let

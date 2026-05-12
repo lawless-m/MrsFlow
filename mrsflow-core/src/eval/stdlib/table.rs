@@ -492,6 +492,30 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
             ],
             table_profile,
         ),
+        // --- Slice #164: Group + AddRankColumn + Split + Buffer ---
+        (
+            "Table.Group",
+            vec![
+                Param { name: "table".into(),              optional: false, type_annotation: None },
+                Param { name: "key".into(),                optional: false, type_annotation: None },
+                Param { name: "aggregatedColumns".into(),  optional: false, type_annotation: None },
+                Param { name: "groupKind".into(),          optional: true,  type_annotation: None },
+                Param { name: "comparisonCriteria".into(), optional: true,  type_annotation: None },
+            ],
+            table_group,
+        ),
+        (
+            "Table.AddRankColumn",
+            vec![
+                Param { name: "table".into(),              optional: false, type_annotation: None },
+                Param { name: "newColumnName".into(),      optional: false, type_annotation: None },
+                Param { name: "comparisonCriteria".into(), optional: false, type_annotation: None },
+                Param { name: "options".into(),            optional: true,  type_annotation: None },
+            ],
+            table_add_rank_column,
+        ),
+        ("Table.Split", two("table", "pageSize"), table_split),
+        ("Table.Buffer", one("table"), table_buffer),
     ]
 }
 
@@ -3862,6 +3886,189 @@ fn table_profile(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         ],
         &rows,
     )?))
+}
+
+// --- Slice #164: Group + AddRankColumn + Split + Buffer ---
+
+fn table_group(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let keys: Vec<String> = match &args[1] {
+        Value::Text(s) => vec![s.clone()],
+        Value::List(_) => expect_text_list(&args[1], "Table.Group: key")?,
+        other => return Err(type_mismatch("text or list of text", other)),
+    };
+    let agg_list = expect_list(&args[2])?;
+    if !matches!(args.get(3), Some(Value::Null) | None) {
+        return Err(MError::NotImplemented(
+            "Table.Group: groupKind not yet supported",
+        ));
+    }
+    if !matches!(args.get(4), Some(Value::Null) | None) {
+        return Err(MError::NotImplemented(
+            "Table.Group: comparisonCriteria not yet supported",
+        ));
+    }
+
+    // Parse aggregations into (newColName, agg_fn).
+    struct AggSpec {
+        new_col: String,
+        agg: Closure,
+    }
+    let mut specs: Vec<AggSpec> = Vec::with_capacity(agg_list.len());
+    for entry in agg_list {
+        let xs = match entry {
+            Value::List(xs) => xs,
+            other => return Err(type_mismatch("list (aggregation tuple)", other)),
+        };
+        if xs.len() < 2 {
+            return Err(MError::Other(format!(
+                "Table.Group: aggregation must have ≥2 elements, got {}",
+                xs.len()
+            )));
+        }
+        let new_col = expect_text(&xs[0])?.to_string();
+        let agg = expect_function(&xs[1])?.clone();
+        // xs.get(2) is optional column type — ignored in v1.
+        specs.push(AggSpec { new_col, agg });
+    }
+
+    let (names, rows) = table_to_rows(table)?;
+    let key_indices: Vec<usize> = keys
+        .iter()
+        .map(|k| {
+            names.iter().position(|n| n == k).ok_or_else(|| {
+                MError::Other(format!("Table.Group: key column not found: {}", k))
+            })
+        })
+        .collect::<Result<_, _>>()?;
+
+    // Group rows by key tuple, preserving first-seen order.
+    let mut groups: Vec<(Vec<Value>, Vec<Vec<Value>>)> = Vec::new();
+    for row in rows {
+        let key_tuple: Vec<Value> = key_indices.iter().map(|&i| row[i].clone()).collect();
+        let mut placed = false;
+        for (existing_key, group_rows) in groups.iter_mut() {
+            let mut all_eq = true;
+            for (a, b) in existing_key.iter().zip(key_tuple.iter()) {
+                if !values_equal_primitive(a, b)? {
+                    all_eq = false;
+                    break;
+                }
+            }
+            if all_eq {
+                group_rows.push(row.clone());
+                placed = true;
+                break;
+            }
+        }
+        if !placed {
+            groups.push((key_tuple, vec![row]));
+        }
+    }
+
+    // Output: key columns followed by aggregate columns.
+    let mut out_names: Vec<String> = keys.clone();
+    for s in &specs {
+        out_names.push(s.new_col.clone());
+    }
+    let mut out_rows: Vec<Vec<Value>> = Vec::with_capacity(groups.len());
+    for (key_tuple, group_rows) in groups {
+        let mut new_row: Vec<Value> = key_tuple;
+        let group_tbl = Value::Table(values_to_table(&names, &group_rows)?);
+        for s in &specs {
+            let agg_result = invoke_callback_with_host(&s.agg, vec![group_tbl.clone()], host)?;
+            new_row.push(agg_result);
+        }
+        out_rows.push(new_row);
+    }
+    Ok(Value::Table(values_to_table(&out_names, &out_rows)?))
+}
+
+fn table_add_rank_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let new_col = expect_text(&args[1])?.to_string();
+    let crit = &args[2];
+    if !matches!(args.get(3), Some(Value::Null) | None) {
+        return Err(MError::NotImplemented(
+            "Table.AddRankColumn: options not yet supported",
+        ));
+    }
+    let names = table.column_names();
+    // v1: criterion is a column-name text → ascending; pair of {col, order} → descending toggle.
+    let (col_name, desc): (String, bool) = match crit {
+        Value::Text(s) => (s.clone(), false),
+        Value::List(xs) if xs.len() == 2 => {
+            let name = expect_text(&xs[0])?.to_string();
+            let d = match &xs[1] {
+                Value::Number(n) => *n != 0.0,
+                other => return Err(type_mismatch("number (Order.*)", other)),
+            };
+            (name, d)
+        }
+        _ => {
+            return Err(MError::NotImplemented(
+                "Table.AddRankColumn: criterion must be text or {column, order}",
+            ));
+        }
+    };
+    let col_idx = names
+        .iter()
+        .position(|n| n == &col_name)
+        .ok_or_else(|| MError::Other(format!("Table.AddRankColumn: column not found: {}", col_name)))?;
+
+    let (names_owned, rows) = table_to_rows(table)?;
+    // Sort row indices by the criterion column, preserving original index for tie order.
+    let mut idx_with_val: Vec<(usize, Value)> = rows
+        .iter()
+        .enumerate()
+        .map(|(i, r)| (i, r[col_idx].clone()))
+        .collect();
+    idx_with_val.sort_by(|a, b| {
+        let o = compare_cells(&a.1, &b.1);
+        if desc { o.reverse() } else { o }
+    });
+    // Build rank-by-original-index using dense rank (equal values get equal rank).
+    let mut rank_per_row: Vec<usize> = vec![0; rows.len()];
+    let mut current_rank = 0usize;
+    let mut prev: Option<&Value> = None;
+    for (i, (orig_idx, val)) in idx_with_val.iter().enumerate() {
+        match prev {
+            Some(p) if compare_cells(p, val) == std::cmp::Ordering::Equal => {}
+            _ => current_rank = i + 1,
+        }
+        rank_per_row[*orig_idx] = current_rank;
+        prev = Some(val);
+    }
+
+    let mut out_names = names_owned.clone();
+    out_names.push(new_col);
+    let mut out_rows: Vec<Vec<Value>> = Vec::with_capacity(rows.len());
+    for (i, row) in rows.into_iter().enumerate() {
+        let mut new_row = row;
+        new_row.push(Value::Number(rank_per_row[i] as f64));
+        out_rows.push(new_row);
+    }
+    Ok(Value::Table(values_to_table(&out_names, &out_rows)?))
+}
+
+fn table_split(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let page_size = expect_int(&args[1], "Table.Split: pageSize")?;
+    if page_size <= 0 {
+        return Err(MError::Other("Table.Split: pageSize must be positive".into()));
+    }
+    let page_size = page_size as usize;
+    let (names, rows) = table_to_rows(table)?;
+    let mut out: Vec<Value> = Vec::new();
+    for chunk in rows.chunks(page_size) {
+        out.push(Value::Table(values_to_table(&names, chunk)?));
+    }
+    Ok(Value::List(out))
+}
+
+fn table_buffer(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let _ = expect_table(&args[0])?;
+    Ok(args[0].clone())
 }
 
 fn type_matches(t: &super::super::value::TypeRep, v: &Value) -> bool {
