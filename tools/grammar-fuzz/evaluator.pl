@@ -333,12 +333,28 @@ eval(try(Body, some(Fallback)), Env, Value) :-
 % --- force/2: thunk → forced value ---
 %
 % Slice-1 recomputes; memoisation TBD when a real workload shows it matters.
+% Cycle detection: force/3 carries a Visited list of thunks currently
+% being evaluated. Re-entering force on a thunk already in Visited means
+% the expression depends on itself (e.g. `[X = X][X]`) — throw rather
+% than recurse forever. Only catches direct force→force cycles; cycles
+% that route through eval intermediaries aren't tracked yet.
 
-force(thunk(Expr, Env), Value) :-
+force(V, Value) :- force(V, [], Value).
+
+force(thunk(Expr, Env), Visited, _) :-
+    member(thunk(Expr, Env), Visited),
+    !,
+    string_codes("cyclic reference", MsgCs),
+    throw(mrsflow_error(record([
+        pair("Reason",  text("Expression.Error")),
+        pair("Message", text(MsgCs)),
+        pair("Detail",  null)
+    ]))).
+force(thunk(Expr, Env), Visited, Value) :-
     !,
     eval(Expr, Env, V0),
-    force(V0, Value).
-force(V, V).
+    force(V0, [thunk(Expr, Env) | Visited], Value).
+force(V, _, V).
 
 % --- env operations ---
 
