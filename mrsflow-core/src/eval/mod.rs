@@ -5184,6 +5184,35 @@ mod tests {
     }
 
     #[test]
+    fn combiner_combine_text_by_delimiter_basic() {
+        let src = r#"Combiner.CombineTextByDelimiter(", ")({"a", "b", "c"})"#;
+        match eval_str(src).unwrap() {
+            Value::Text(s) => assert_eq!(s, "a, b, c"),
+            other => panic!("expected text, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn combiner_combine_text_by_each_delimiter_cycles() {
+        // 4 items, 2 delimiters → cycle: a-b/c-d (use "-" then "/")
+        let src = r#"Combiner.CombineTextByEachDelimiter({"-", "/"})({"a", "b", "c", "d"})"#;
+        match eval_str(src).unwrap() {
+            Value::Text(s) => assert_eq!(s, "a-b/c-d"),
+            other => panic!("expected text, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn combiner_combine_text_by_lengths_pads_and_truncates() {
+        // "ab" pad to 4 → "ab  ", "longer" truncate to 3 → "lon"  → "ab  lon"
+        let src = r#"Combiner.CombineTextByLengths({4, 3})({"ab", "longer"})"#;
+        match eval_str(src).unwrap() {
+            Value::Text(s) => assert_eq!(s, "ab  lon"),
+            other => panic!("expected text, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn extend_lazy_supports_mutual_recursion() {
         // Thunks for `a` and `b` share the same env, so when `a`'s thunk is
         // forced and looks up `b`, it resolves to `b`'s thunk in the same
