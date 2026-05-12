@@ -5213,6 +5213,29 @@ mod tests {
     }
 
     #[test]
+    fn replacer_replace_text_substring() {
+        // Replacer.ReplaceText returns a 3-arg fn; apply it to substitute "o" → "0".
+        let src = r#"Replacer.ReplaceText()("foo bar", "o", "0")"#;
+        match eval_str(src).unwrap() {
+            Value::Text(s) => assert_eq!(s, "f00 bar"),
+            other => panic!("expected text, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn replacer_replace_value_equality() {
+        // Equal → replaced; not equal → unchanged.
+        match eval_str(r#"Replacer.ReplaceValue()(5, 5, 99)"#).unwrap() {
+            Value::Number(n) => assert_eq!(n, 99.0),
+            other => panic!("expected number, got {:?}", other),
+        }
+        match eval_str(r#"Replacer.ReplaceValue()(5, 3, 99)"#).unwrap() {
+            Value::Number(n) => assert_eq!(n, 5.0),
+            other => panic!("expected number, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn extend_lazy_supports_mutual_recursion() {
         // Thunks for `a` and `b` share the same env, so when `a`'s thunk is
         // forced and looks up `b`, it resolves to `b`'s thunk in the same
