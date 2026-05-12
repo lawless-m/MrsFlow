@@ -318,6 +318,21 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
             ],
             list_random,
         ),
+        (
+            "List.TransformMany",
+            three("list", "collectionTransform", "resultTransform"),
+            list_transform_many,
+        ),
+        (
+            "List.Generate",
+            vec![
+                Param { name: "initial".into(),   optional: false, type_annotation: None },
+                Param { name: "condition".into(), optional: false, type_annotation: None },
+                Param { name: "next".into(),      optional: false, type_annotation: None },
+                Param { name: "selector".into(),  optional: true,  type_annotation: None },
+            ],
+            list_generate,
+        ),
     ]
 }
 
@@ -1153,6 +1168,65 @@ fn list_intersect(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             if !found { continue 'outer; }
         }
         out.push(v.clone());
+    }
+    Ok(Value::List(out))
+}
+
+fn list_transform_many(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+    let list = expect_list(&args[0])?;
+    let collection_fn = expect_function(&args[1])?;
+    let result_fn = expect_function(&args[2])?;
+    let mut out: Vec<Value> = Vec::new();
+    for item in list {
+        let inner = invoke_callback_with_host(collection_fn, vec![item.clone()], host)?;
+        let inner_list = match &inner {
+            Value::List(xs) => xs.clone(),
+            other => return Err(MError::Other(format!(
+                "List.TransformMany: collectionTransform must return a list (got {})",
+                super::super::type_name(other)
+            ))),
+        };
+        for inner_item in inner_list {
+            let mapped = invoke_callback_with_host(
+                result_fn,
+                vec![item.clone(), inner_item],
+                host,
+            )?;
+            out.push(mapped);
+        }
+    }
+    Ok(Value::List(out))
+}
+
+fn list_generate(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+    let initial_fn = expect_function(&args[0])?;
+    let condition_fn = expect_function(&args[1])?;
+    let next_fn = expect_function(&args[2])?;
+    let selector_fn: Option<&Closure> = match args.get(3) {
+        Some(Value::Function(c)) => Some(c),
+        Some(Value::Null) | None => None,
+        Some(other) => return Err(type_mismatch("function (selector)", other)),
+    };
+    let mut state = invoke_callback_with_host(initial_fn, vec![], host)?;
+    let mut out: Vec<Value> = Vec::new();
+    let mut iters = 0;
+    while iters < 100_000 {
+        let cond = invoke_callback_with_host(condition_fn, vec![state.clone()], host)?;
+        match cond {
+            Value::Logical(false) => break,
+            Value::Logical(true) => {}
+            other => return Err(type_mismatch("logical", &other)),
+        }
+        let item = match selector_fn {
+            Some(s) => invoke_callback_with_host(s, vec![state.clone()], host)?,
+            None => state.clone(),
+        };
+        out.push(item);
+        state = invoke_callback_with_host(next_fn, vec![state], host)?;
+        iters += 1;
+    }
+    if iters >= 100_000 {
+        return Err(MError::Other("List.Generate: exceeded 100000 iteration cap".into()));
     }
     Ok(Value::List(out))
 }

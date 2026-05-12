@@ -3928,6 +3928,68 @@ mod tests {
     }
 
     #[test]
+    fn list_transform_many_flatten() {
+        // For each x in {1,2,3}, expand to {x, x*10} then pair with x.
+        let src = r#"
+            List.TransformMany(
+                {1, 2, 3},
+                (x) => {x, x * 10},
+                (x, y) => y
+            )
+        "#;
+        match eval_str(src).unwrap() {
+            Value::List(xs) => {
+                let nums: Vec<f64> = xs.iter().map(|v| match v {
+                    Value::Number(n) => *n, _ => panic!(),
+                }).collect();
+                assert_eq!(nums, vec![1.0, 10.0, 2.0, 20.0, 3.0, 30.0]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn list_generate_count_to_five() {
+        let src = r#"
+            List.Generate(
+                () => 1,
+                (s) => s <= 5,
+                (s) => s + 1
+            )
+        "#;
+        match eval_str(src).unwrap() {
+            Value::List(xs) => {
+                let nums: Vec<f64> = xs.iter().map(|v| match v {
+                    Value::Number(n) => *n, _ => panic!(),
+                }).collect();
+                assert_eq!(nums, vec![1.0, 2.0, 3.0, 4.0, 5.0]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn list_generate_with_selector() {
+        let src = r#"
+            List.Generate(
+                () => 1,
+                (s) => s <= 3,
+                (s) => s + 1,
+                (s) => s * 10
+            )
+        "#;
+        match eval_str(src).unwrap() {
+            Value::List(xs) => {
+                let nums: Vec<f64> = xs.iter().map(|v| match v {
+                    Value::Number(n) => *n, _ => panic!(),
+                }).collect();
+                assert_eq!(nums, vec![10.0, 20.0, 30.0]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn list_single_one_elem() {
         match eval_str("List.Single({42})").unwrap() {
             Value::Number(n) => assert_eq!(n, 42.0),
