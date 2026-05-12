@@ -97,5 +97,6 @@ fn kind(v: &Value) -> &'static str {
         Value::Function(_) => "function",
         Value::Type(_) => "type",
         Value::Thunk(_) => "thunk",
+        Value::WithMetadata { inner, .. } => kind(inner),
     }
 }
