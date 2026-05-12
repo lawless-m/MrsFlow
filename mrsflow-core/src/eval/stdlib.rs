@@ -687,6 +687,9 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ("Date.FromText", one("text"), date_from_text),
         ("Date.AddDays", two("date", "numberOfDays"), date_add_days),
         ("Date.AddMonths", two("date", "numberOfMonths"), date_add_months),
+        ("Date.AddYears", two("date", "numberOfYears"), date_add_years),
+        ("Date.AddQuarters", two("date", "numberOfQuarters"), date_add_quarters),
+        ("Date.AddWeeks", two("date", "numberOfWeeks"), date_add_weeks),
         ("Date.From", one("value"), date_from),
         ("Date.Year", one("date"), date_year),
         ("Date.Month", one("date"), date_month),
@@ -4505,6 +4508,77 @@ fn date_add_days(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             .checked_add_signed(delta)
             .map(Value::Datetime)
             .ok_or_else(|| MError::Other("Date.AddDays: result out of range".into())),
+        other => Err(type_mismatch("date or datetime", other)),
+    }
+}
+
+fn shift_months_signed(d: chrono::NaiveDate, n: i64) -> Option<chrono::NaiveDate> {
+    if n >= 0 {
+        d.checked_add_months(chrono::Months::new(n as u32))
+    } else {
+        d.checked_sub_months(chrono::Months::new((-n) as u32))
+    }
+}
+
+fn date_add_years(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let n = match &args[1] {
+        Value::Number(n) if n.fract() == 0.0 => *n as i64,
+        Value::Null => return Ok(Value::Null),
+        other => return Err(type_mismatch("integer (numberOfYears)", other)),
+    };
+    let months = n * 12;
+    match &args[0] {
+        Value::Null => Ok(Value::Null),
+        Value::Date(d) => shift_months_signed(*d, months)
+            .map(Value::Date)
+            .ok_or_else(|| MError::Other("Date.AddYears: result out of range".into())),
+        Value::Datetime(dt) => {
+            let nd = shift_months_signed(dt.date(), months)
+                .ok_or_else(|| MError::Other("Date.AddYears: result out of range".into()))?;
+            Ok(Value::Datetime(nd.and_time(dt.time())))
+        }
+        other => Err(type_mismatch("date or datetime", other)),
+    }
+}
+
+fn date_add_quarters(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let n = match &args[1] {
+        Value::Number(n) if n.fract() == 0.0 => *n as i64,
+        Value::Null => return Ok(Value::Null),
+        other => return Err(type_mismatch("integer (numberOfQuarters)", other)),
+    };
+    let months = n * 3;
+    match &args[0] {
+        Value::Null => Ok(Value::Null),
+        Value::Date(d) => shift_months_signed(*d, months)
+            .map(Value::Date)
+            .ok_or_else(|| MError::Other("Date.AddQuarters: result out of range".into())),
+        Value::Datetime(dt) => {
+            let nd = shift_months_signed(dt.date(), months)
+                .ok_or_else(|| MError::Other("Date.AddQuarters: result out of range".into()))?;
+            Ok(Value::Datetime(nd.and_time(dt.time())))
+        }
+        other => Err(type_mismatch("date or datetime", other)),
+    }
+}
+
+fn date_add_weeks(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let n = match &args[1] {
+        Value::Number(n) if n.fract() == 0.0 => *n as i64,
+        Value::Null => return Ok(Value::Null),
+        other => return Err(type_mismatch("integer (numberOfWeeks)", other)),
+    };
+    let delta = chrono::Duration::weeks(n);
+    match &args[0] {
+        Value::Null => Ok(Value::Null),
+        Value::Date(d) => d
+            .checked_add_signed(delta)
+            .map(Value::Date)
+            .ok_or_else(|| MError::Other("Date.AddWeeks: result out of range".into())),
+        Value::Datetime(dt) => dt
+            .checked_add_signed(delta)
+            .map(Value::Datetime)
+            .ok_or_else(|| MError::Other("Date.AddWeeks: result out of range".into())),
         other => Err(type_mismatch("date or datetime", other)),
     }
 }

@@ -3304,6 +3304,37 @@ mod tests {
     }
 
     #[test]
+    fn date_add_years_positive() {
+        match eval_str("Date.AddYears(#date(2020, 6, 15), 5)").unwrap() {
+            Value::Date(d) => {
+                assert_eq!(d, chrono::NaiveDate::from_ymd_opt(2025, 6, 15).unwrap());
+            }
+            other => panic!("expected date, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn date_add_quarters_crosses_year() {
+        // 2024-11-15 + 2 quarters = 2025-05-15
+        match eval_str("Date.AddQuarters(#date(2024, 11, 15), 2)").unwrap() {
+            Value::Date(d) => {
+                assert_eq!(d, chrono::NaiveDate::from_ymd_opt(2025, 5, 15).unwrap());
+            }
+            other => panic!("expected date, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn date_add_weeks_negative() {
+        match eval_str("Date.AddWeeks(#date(2024, 1, 15), -2)").unwrap() {
+            Value::Date(d) => {
+                assert_eq!(d, chrono::NaiveDate::from_ymd_opt(2024, 1, 1).unwrap());
+            }
+            other => panic!("expected date, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn date_add_days_positive() {
         match eval_str("Date.AddDays(#date(2024, 1, 30), 5)").unwrap() {
             Value::Date(d) => {
