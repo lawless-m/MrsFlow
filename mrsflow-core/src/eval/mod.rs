@@ -5342,6 +5342,104 @@ mod tests {
     }
 
     #[test]
+    fn table_from_columns_default_names() {
+        let src = r#"
+            let
+                t = Table.FromColumns({{1, 2, 3}, {"a", "b", "c"}})
+            in
+                {Table.ColumnNames(t), Table.RowCount(t)}
+        "#;
+        match eval_str(src).unwrap() {
+            Value::List(xs) => {
+                let names = match &xs[0] {
+                    Value::List(ns) => ns.iter().map(|v| match v {
+                        Value::Text(s) => s.clone(),
+                        _ => panic!(),
+                    }).collect::<Vec<_>>(),
+                    _ => panic!(),
+                };
+                assert_eq!(names, vec!["Column1", "Column2"]);
+                assert!(matches!(xs[1], Value::Number(n) if n == 3.0));
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_to_columns_round_trip() {
+        let src = r#"
+            let
+                t = #table({"a", "b"}, {{1, 10}, {2, 20}, {3, 30}}),
+                cols = Table.ToColumns(t)
+            in cols
+        "#;
+        match eval_str(src).unwrap() {
+            Value::List(cols) => {
+                assert_eq!(cols.len(), 2);
+                let nums = |c: &Value| -> Vec<f64> {
+                    match c {
+                        Value::List(xs) => xs.iter().map(|v| match v {
+                            Value::Number(n) => *n,
+                            _ => panic!(),
+                        }).collect(),
+                        _ => panic!(),
+                    }
+                };
+                assert_eq!(nums(&cols[0]), vec![1.0, 2.0, 3.0]);
+                assert_eq!(nums(&cols[1]), vec![10.0, 20.0, 30.0]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_from_value_wraps_single() {
+        let src = r#"Table.FromValue(42)"#;
+        match eval_str(src).unwrap() {
+            Value::Table(t) => {
+                assert_eq!(t.column_names(), vec!["Value"]);
+                assert_eq!(t.num_rows(), 1);
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_schema_returns_name_typename() {
+        let src = r#"
+            let
+                t = #table({"n", "s"}, {{1, "x"}, {2, "y"}}),
+                s = Table.Schema(t)
+            in s
+        "#;
+        match eval_str(src).unwrap() {
+            Value::Table(t) => {
+                assert_eq!(t.column_names(), vec!["Name", "TypeName"]);
+                assert_eq!(t.num_rows(), 2);
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_profile_counts_nulls_and_distinct() {
+        let src = r#"
+            let
+                t = #table({"v"}, {{1}, {1}, {2}, {null}}),
+                p = Table.Profile(t)
+            in p
+        "#;
+        match eval_str(src).unwrap() {
+            Value::Table(tbl) => {
+                // Profile should have one row per column with the four counts.
+                assert_eq!(tbl.column_names(), vec!["Column", "Count", "NullCount", "DistinctCount"]);
+                assert_eq!(tbl.num_rows(), 1);
+            }
+            other => panic!("expected table, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn table_demote_headers_inverse_of_promote() {
         // The original column names appear as the first data row; new
         // headers are Column1, Column2, ...

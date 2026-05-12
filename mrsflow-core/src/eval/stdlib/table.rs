@@ -445,6 +445,53 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
             ],
             table_add_join_column,
         ),
+        // --- Slice #163: format converters ---
+        (
+            "Table.FromColumns",
+            vec![
+                Param { name: "lists".into(),       optional: false, type_annotation: None },
+                Param { name: "columnNames".into(), optional: true,  type_annotation: None },
+            ],
+            table_from_columns,
+        ),
+        (
+            "Table.FromList",
+            vec![
+                Param { name: "list".into(),        optional: false, type_annotation: None },
+                Param { name: "splitter".into(),    optional: true,  type_annotation: None },
+                Param { name: "columns".into(),     optional: true,  type_annotation: None },
+                Param { name: "default".into(),     optional: true,  type_annotation: None },
+                Param { name: "extraValues".into(), optional: true,  type_annotation: None },
+            ],
+            table_from_list,
+        ),
+        (
+            "Table.FromValue",
+            vec![
+                Param { name: "value".into(),   optional: false, type_annotation: None },
+                Param { name: "options".into(), optional: true,  type_annotation: None },
+            ],
+            table_from_value,
+        ),
+        ("Table.ToColumns", one("table"), table_to_columns),
+        (
+            "Table.ToList",
+            vec![
+                Param { name: "table".into(),    optional: false, type_annotation: None },
+                Param { name: "combiner".into(), optional: true,  type_annotation: None },
+            ],
+            table_to_list,
+        ),
+        ("Table.ToRows", one("table"), table_to_rows_value),
+        ("Table.Schema", one("table"), table_schema),
+        (
+            "Table.Profile",
+            vec![
+                Param { name: "table".into(),                optional: false, type_annotation: None },
+                Param { name: "additionalAggregates".into(), optional: true,  type_annotation: None },
+            ],
+            table_profile,
+        ),
     ]
 }
 
@@ -3550,6 +3597,271 @@ fn table_add_join_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, ME
         out_rows.push(new_row);
     }
     Ok(Value::Table(values_to_table(&out_names, &out_rows)?))
+}
+
+// --- Slice #163: format converters ---
+
+fn table_from_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let cols = expect_list(&args[0])?;
+    // Each column is a list. Their lengths must match.
+    let col_lists: Vec<&Vec<Value>> = cols
+        .iter()
+        .map(|v| match v {
+            Value::List(xs) => Ok(xs),
+            other => Err(type_mismatch("list (column)", other)),
+        })
+        .collect::<Result<_, _>>()?;
+    let n_rows = col_lists.first().map(|c| c.len()).unwrap_or(0);
+    for (i, col) in col_lists.iter().enumerate() {
+        if col.len() != n_rows {
+            return Err(MError::Other(format!(
+                "Table.FromColumns: column {} length {} doesn't match column 0 length {}",
+                i, col.len(), n_rows
+            )));
+        }
+    }
+    let names: Vec<String> = match args.get(1) {
+        Some(Value::Null) | None => (1..=col_lists.len()).map(|i| format!("Column{}", i)).collect(),
+        Some(v) => expect_text_list(v, "Table.FromColumns: columnNames")?,
+    };
+    if names.len() != col_lists.len() {
+        return Err(MError::Other(format!(
+            "Table.FromColumns: names ({}) and columns ({}) must have same count",
+            names.len(),
+            col_lists.len()
+        )));
+    }
+    let mut rows: Vec<Vec<Value>> = Vec::with_capacity(n_rows);
+    for r in 0..n_rows {
+        let row: Vec<Value> = col_lists.iter().map(|c| c[r].clone()).collect();
+        rows.push(row);
+    }
+    Ok(Value::Table(values_to_table(&names, &rows)?))
+}
+
+fn table_from_list(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+    let items = expect_list(&args[0])?;
+    let splitter = match args.get(1) {
+        Some(Value::Function(c)) => Some(c),
+        Some(Value::Null) | None => None,
+        Some(other) => return Err(type_mismatch("function (splitter)", other)),
+    };
+    let names: Vec<String> = match args.get(2) {
+        Some(Value::Null) | None => vec!["Column1".to_string()],
+        Some(v) => expect_text_list(v, "Table.FromList: columns")?,
+    };
+    if !matches!(args.get(3), Some(Value::Null) | None) {
+        return Err(MError::NotImplemented(
+            "Table.FromList: default argument not yet supported",
+        ));
+    }
+    if !matches!(args.get(4), Some(Value::Null) | None) {
+        return Err(MError::NotImplemented(
+            "Table.FromList: extraValues argument not yet supported",
+        ));
+    }
+    let mut rows: Vec<Vec<Value>> = Vec::with_capacity(items.len());
+    for item in items {
+        let row: Vec<Value> = match splitter {
+            None => vec![item.clone()],
+            Some(s) => {
+                let result = invoke_callback_with_host(s, vec![item.clone()], host)?;
+                match result {
+                    Value::List(xs) => xs,
+                    other => return Err(type_mismatch("list (splitter result)", &other)),
+                }
+            }
+        };
+        // Pad or truncate row to names.len().
+        let mut row = row;
+        while row.len() < names.len() {
+            row.push(Value::Null);
+        }
+        row.truncate(names.len());
+        rows.push(row);
+    }
+    Ok(Value::Table(values_to_table(&names, &rows)?))
+}
+
+fn table_from_value(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    if !matches!(args.get(1), Some(Value::Null) | None) {
+        return Err(MError::NotImplemented(
+            "Table.FromValue: options not yet supported",
+        ));
+    }
+    let names = vec!["Value".to_string()];
+    let rows = vec![vec![args[0].clone()]];
+    Ok(Value::Table(values_to_table(&names, &rows)?))
+}
+
+fn table_to_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let n_cols = table.num_columns();
+    let n_rows = table.num_rows();
+    let mut out: Vec<Value> = Vec::with_capacity(n_cols);
+    for c in 0..n_cols {
+        let mut col: Vec<Value> = Vec::with_capacity(n_rows);
+        for r in 0..n_rows {
+            col.push(cell_to_value(table, c, r)?);
+        }
+        out.push(Value::List(col));
+    }
+    Ok(Value::List(out))
+}
+
+fn table_to_list(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let combiner = match args.get(1) {
+        Some(Value::Function(c)) => Some(c),
+        Some(Value::Null) | None => None,
+        Some(other) => return Err(type_mismatch("function (combiner)", other)),
+    };
+    let n_rows = table.num_rows();
+    let n_cols = table.num_columns();
+    let mut out: Vec<Value> = Vec::with_capacity(n_rows);
+    for r in 0..n_rows {
+        let mut cells: Vec<Value> = Vec::with_capacity(n_cols);
+        for c in 0..n_cols {
+            cells.push(cell_to_value(table, c, r)?);
+        }
+        let joined = match combiner {
+            Some(cb) => invoke_callback_with_host(cb, vec![Value::List(cells)], host)?,
+            None => {
+                // Default: comma-join text-coerced cells.
+                let strs: Vec<String> = cells
+                    .iter()
+                    .map(|v| match v {
+                        Value::Text(s) => s.clone(),
+                        Value::Number(n) => {
+                            let s = format!("{:?}", n);
+                            s.trim_end_matches(".0").to_string()
+                        }
+                        Value::Null => String::new(),
+                        Value::Logical(b) => (if *b { "true" } else { "false" }).to_string(),
+                        _ => format!("{:?}", v),
+                    })
+                    .collect();
+                Value::Text(strs.join(","))
+            }
+        };
+        out.push(joined);
+    }
+    Ok(Value::List(out))
+}
+
+fn table_to_rows_value(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let (_, rows) = table_to_rows(table)?;
+    let out: Vec<Value> = rows.into_iter().map(Value::List).collect();
+    Ok(Value::List(out))
+}
+
+/// Returns the (PowerQuery-style) type name for a cell value, e.g.
+/// `Number.Type`, `Text.Type`. Mixed/empty columns get `Any.Type`.
+fn typename_of(v: &Value) -> &'static str {
+    match v {
+        Value::Null => "Null.Type",
+        Value::Logical(_) => "Logical.Type",
+        Value::Number(_) => "Number.Type",
+        Value::Text(_) => "Text.Type",
+        Value::Date(_) => "Date.Type",
+        Value::Datetime(_) => "DateTime.Type",
+        Value::Datetimezone(_) => "DateTimeZone.Type",
+        Value::Time(_) => "Time.Type",
+        Value::Duration(_) => "Duration.Type",
+        Value::Binary(_) => "Binary.Type",
+        Value::List(_) => "List.Type",
+        Value::Record(_) => "Record.Type",
+        Value::Table(_) => "Table.Type",
+        Value::Function(_) => "Function.Type",
+        Value::Type(_) => "Type.Type",
+        Value::Thunk(_) => "Any.Type",
+    }
+}
+
+fn table_schema(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let names = table.column_names();
+    let n_rows = table.num_rows();
+    let mut rows: Vec<Vec<Value>> = Vec::with_capacity(names.len());
+    for (col_idx, name) in names.iter().enumerate() {
+        // Infer column type from non-null cells. Mixed → Any.Type.
+        let mut col_type: Option<&'static str> = None;
+        let mut mixed = false;
+        for r in 0..n_rows {
+            let cell = cell_to_value(table, col_idx, r)?;
+            if matches!(cell, Value::Null) {
+                continue;
+            }
+            let t = typename_of(&cell);
+            match col_type {
+                None => col_type = Some(t),
+                Some(existing) if existing == t => {}
+                Some(_) => {
+                    mixed = true;
+                    break;
+                }
+            }
+        }
+        let type_name = if mixed {
+            "Any.Type"
+        } else {
+            col_type.unwrap_or("Any.Type")
+        };
+        rows.push(vec![
+            Value::Text(name.clone()),
+            Value::Text(type_name.to_string()),
+        ]);
+    }
+    Ok(Value::Table(values_to_table(
+        &["Name".to_string(), "TypeName".to_string()],
+        &rows,
+    )?))
+}
+
+fn table_profile(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    if !matches!(args.get(1), Some(Value::Null) | None) {
+        return Err(MError::NotImplemented(
+            "Table.Profile: additionalAggregates not yet supported",
+        ));
+    }
+    let names = table.column_names();
+    let n_rows = table.num_rows();
+    let mut rows: Vec<Vec<Value>> = Vec::with_capacity(names.len());
+    for (col_idx, name) in names.iter().enumerate() {
+        let mut null_count = 0usize;
+        let mut seen: Vec<Value> = Vec::new();
+        for r in 0..n_rows {
+            let cell = cell_to_value(table, col_idx, r)?;
+            if matches!(cell, Value::Null) {
+                null_count += 1;
+                continue;
+            }
+            let already = seen.iter().any(|v| match values_equal_primitive(v, &cell) {
+                Ok(b) => b,
+                Err(_) => false,
+            });
+            if !already {
+                seen.push(cell);
+            }
+        }
+        rows.push(vec![
+            Value::Text(name.clone()),
+            Value::Number(n_rows as f64),
+            Value::Number(null_count as f64),
+            Value::Number(seen.len() as f64),
+        ]);
+    }
+    Ok(Value::Table(values_to_table(
+        &[
+            "Column".to_string(),
+            "Count".to_string(),
+            "NullCount".to_string(),
+            "DistinctCount".to_string(),
+        ],
+        &rows,
+    )?))
 }
 
 fn type_matches(t: &super::super::value::TypeRep, v: &Value) -> bool {
