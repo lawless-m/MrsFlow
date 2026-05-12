@@ -389,6 +389,62 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
             two("table", "errorReplacement"),
             table_replace_error_values,
         ),
+        // --- Slice #162: column mutation ---
+        (
+            "Table.CombineColumns",
+            vec![
+                Param { name: "table".into(),         optional: false, type_annotation: None },
+                Param { name: "sourceColumns".into(), optional: false, type_annotation: None },
+                Param { name: "combiner".into(),      optional: false, type_annotation: None },
+                Param { name: "newColumnName".into(), optional: false, type_annotation: None },
+            ],
+            table_combine_columns,
+        ),
+        (
+            "Table.CombineColumnsToRecord",
+            three("table", "newColumnName", "sourceColumns"),
+            table_combine_columns_to_record,
+        ),
+        ("Table.DemoteHeaders", one("table"), table_demote_headers),
+        (
+            "Table.DuplicateColumn",
+            three("table", "columnName", "newColumnName"),
+            table_duplicate_column,
+        ),
+        ("Table.PrefixColumns", two("table", "prefix"), table_prefix_columns),
+        (
+            "Table.SplitColumn",
+            vec![
+                Param { name: "table".into(),                optional: false, type_annotation: None },
+                Param { name: "sourceColumn".into(),         optional: false, type_annotation: None },
+                Param { name: "splitter".into(),             optional: false, type_annotation: None },
+                Param { name: "columnNamesOrNumber".into(),  optional: true,  type_annotation: None },
+                Param { name: "default".into(),              optional: true,  type_annotation: None },
+                Param { name: "extraValues".into(),          optional: true,  type_annotation: None },
+            ],
+            table_split_column,
+        ),
+        (
+            "Table.TransformColumnNames",
+            vec![
+                Param { name: "table".into(),         optional: false, type_annotation: None },
+                Param { name: "nameGenerator".into(), optional: false, type_annotation: None },
+                Param { name: "options".into(),       optional: true,  type_annotation: None },
+            ],
+            table_transform_column_names,
+        ),
+        ("Table.Transpose", one("table"), table_transpose),
+        (
+            "Table.AddJoinColumn",
+            vec![
+                Param { name: "table1".into(),        optional: false, type_annotation: None },
+                Param { name: "key1".into(),          optional: false, type_annotation: None },
+                Param { name: "table2".into(),        optional: false, type_annotation: None },
+                Param { name: "key2".into(),          optional: false, type_annotation: None },
+                Param { name: "newColumnName".into(), optional: false, type_annotation: None },
+            ],
+            table_add_join_column,
+        ),
     ]
 }
 
@@ -3218,6 +3274,282 @@ fn table_replace_error_values(args: &[Value], _host: &dyn IoHost) -> Result<Valu
     // v1: cells don't carry per-cell error state, so this is a no-op.
     let _ = expect_table(&args[0])?;
     Ok(args[0].clone())
+}
+
+// --- Slice #162: column mutation ---
+
+fn table_combine_columns(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let sources = expect_text_list(&args[1], "Table.CombineColumns: sourceColumns")?;
+    let combiner = expect_function(&args[2])?;
+    let new_name = expect_text(&args[3])?.to_string();
+    let (names, rows) = table_to_rows(table)?;
+    let src_indices: Vec<usize> = sources
+        .iter()
+        .map(|n| {
+            names
+                .iter()
+                .position(|h| h == n)
+                .ok_or_else(|| MError::Other(format!("Table.CombineColumns: column not found: {}", n)))
+        })
+        .collect::<Result<_, _>>()?;
+    let keep: Vec<usize> = (0..names.len()).filter(|i| !src_indices.contains(i)).collect();
+    let mut out_names: Vec<String> = keep.iter().map(|&i| names[i].clone()).collect();
+    out_names.push(new_name);
+    let mut out_rows: Vec<Vec<Value>> = Vec::with_capacity(rows.len());
+    for row in rows {
+        let mut new_row: Vec<Value> = keep.iter().map(|&i| row[i].clone()).collect();
+        let source_values: Vec<Value> = src_indices.iter().map(|&i| row[i].clone()).collect();
+        let combined = invoke_callback_with_host(combiner, vec![Value::List(source_values)], host)?;
+        new_row.push(combined);
+        out_rows.push(new_row);
+    }
+    Ok(Value::Table(values_to_table(&out_names, &out_rows)?))
+}
+
+fn table_combine_columns_to_record(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let new_name = expect_text(&args[1])?.to_string();
+    let sources = expect_text_list(&args[2], "Table.CombineColumnsToRecord: sourceColumns")?;
+    let (names, rows) = table_to_rows(table)?;
+    let src_indices: Vec<usize> = sources
+        .iter()
+        .map(|n| {
+            names.iter().position(|h| h == n).ok_or_else(|| {
+                MError::Other(format!(
+                    "Table.CombineColumnsToRecord: column not found: {}",
+                    n
+                ))
+            })
+        })
+        .collect::<Result<_, _>>()?;
+    let keep: Vec<usize> = (0..names.len()).filter(|i| !src_indices.contains(i)).collect();
+    let mut out_names: Vec<String> = keep.iter().map(|&i| names[i].clone()).collect();
+    out_names.push(new_name);
+    let mut out_rows: Vec<Vec<Value>> = Vec::with_capacity(rows.len());
+    for row in rows {
+        let mut new_row: Vec<Value> = keep.iter().map(|&i| row[i].clone()).collect();
+        let fields: Vec<(String, Value)> = src_indices
+            .iter()
+            .map(|&i| (names[i].clone(), row[i].clone()))
+            .collect();
+        new_row.push(Value::Record(Record {
+            fields,
+            env: EnvNode::empty(),
+        }));
+        out_rows.push(new_row);
+    }
+    Ok(Value::Table(values_to_table(&out_names, &out_rows)?))
+}
+
+fn table_demote_headers(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let names = table.column_names();
+    let n_cols = names.len();
+    // New headers: Column1, Column2, ...
+    let new_names: Vec<String> = (1..=n_cols).map(|i| format!("Column{}", i)).collect();
+    // First row: original header names as text cells.
+    let header_row: Vec<Value> = names.iter().cloned().map(Value::Text).collect();
+    let (_, mut rows) = table_to_rows(table)?;
+    rows.insert(0, header_row);
+    Ok(Value::Table(values_to_table(&new_names, &rows)?))
+}
+
+fn table_duplicate_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let src = expect_text(&args[1])?.to_string();
+    let new_name = expect_text(&args[2])?.to_string();
+    let (names, rows) = table_to_rows(table)?;
+    let idx = names
+        .iter()
+        .position(|n| n == &src)
+        .ok_or_else(|| MError::Other(format!("Table.DuplicateColumn: column not found: {}", src)))?;
+    if names.iter().any(|n| n == &new_name) {
+        return Err(MError::Other(format!(
+            "Table.DuplicateColumn: new column name already exists: {}",
+            new_name
+        )));
+    }
+    let mut out_names = names.clone();
+    out_names.push(new_name);
+    let mut out_rows: Vec<Vec<Value>> = Vec::with_capacity(rows.len());
+    for row in rows {
+        let mut new_row = row.clone();
+        new_row.push(row[idx].clone());
+        out_rows.push(new_row);
+    }
+    Ok(Value::Table(values_to_table(&out_names, &out_rows)?))
+}
+
+fn table_prefix_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let prefix = expect_text(&args[1])?;
+    let (names, rows) = table_to_rows(table)?;
+    let new_names: Vec<String> = names.iter().map(|n| format!("{}.{}", prefix, n)).collect();
+    Ok(Value::Table(values_to_table(&new_names, &rows)?))
+}
+
+fn table_split_column(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let source = expect_text(&args[1])?.to_string();
+    let splitter = expect_function(&args[2])?;
+    // Optional column names: list of texts, or a number specifying expected count.
+    let (out_names_opt, num_expected): (Option<Vec<String>>, Option<usize>) = match args.get(3) {
+        Some(Value::Null) | None => (None, None),
+        Some(Value::List(_)) => (
+            Some(expect_text_list(&args[3], "Table.SplitColumn: columnNamesOrNumber")?),
+            None,
+        ),
+        Some(Value::Number(n)) if n.is_finite() && *n > 0.0 && n.fract() == 0.0 => {
+            (None, Some(*n as usize))
+        }
+        Some(other) => return Err(type_mismatch("list of text or number", other)),
+    };
+    if !matches!(args.get(4), Some(Value::Null) | None) {
+        return Err(MError::NotImplemented(
+            "Table.SplitColumn: default argument not yet supported",
+        ));
+    }
+    if !matches!(args.get(5), Some(Value::Null) | None) {
+        return Err(MError::NotImplemented(
+            "Table.SplitColumn: extraValues argument not yet supported",
+        ));
+    }
+    let (names, rows) = table_to_rows(table)?;
+    let src_idx = names
+        .iter()
+        .position(|n| n == &source)
+        .ok_or_else(|| MError::Other(format!("Table.SplitColumn: column not found: {}", source)))?;
+
+    // First pass: run the splitter on each row to capture results and infer width.
+    let mut split_results: Vec<Vec<Value>> = Vec::with_capacity(rows.len());
+    let mut max_width: usize = 0;
+    for row in &rows {
+        let cell = row[src_idx].clone();
+        let result = invoke_callback_with_host(splitter, vec![cell], host)?;
+        let parts = match result {
+            Value::List(xs) => xs,
+            other => return Err(type_mismatch("list (splitter result)", &other)),
+        };
+        max_width = max_width.max(parts.len());
+        split_results.push(parts);
+    }
+    let width = num_expected
+        .or_else(|| out_names_opt.as_ref().map(|v| v.len()))
+        .unwrap_or(max_width);
+    let new_col_names: Vec<String> = match out_names_opt {
+        Some(v) => v,
+        None => (1..=width)
+            .map(|i| format!("{}.{}", source, i))
+            .collect(),
+    };
+    if new_col_names.len() != width {
+        return Err(MError::Other(format!(
+            "Table.SplitColumn: column name count ({}) doesn't match width ({})",
+            new_col_names.len(),
+            width
+        )));
+    }
+
+    // Build output: original columns up to src_idx, then split columns, then rest.
+    let mut out_names: Vec<String> = Vec::with_capacity(names.len() - 1 + width);
+    for (i, n) in names.iter().enumerate() {
+        if i == src_idx {
+            for s in &new_col_names {
+                out_names.push(s.clone());
+            }
+        } else {
+            out_names.push(n.clone());
+        }
+    }
+    let mut out_rows: Vec<Vec<Value>> = Vec::with_capacity(rows.len());
+    for (row_i, row) in rows.into_iter().enumerate() {
+        let mut new_row: Vec<Value> = Vec::with_capacity(out_names.len());
+        for (i, cell) in row.into_iter().enumerate() {
+            if i == src_idx {
+                let parts = &split_results[row_i];
+                for j in 0..width {
+                    new_row.push(parts.get(j).cloned().unwrap_or(Value::Null));
+                }
+            } else {
+                new_row.push(cell);
+            }
+        }
+        out_rows.push(new_row);
+    }
+    Ok(Value::Table(values_to_table(&out_names, &out_rows)?))
+}
+
+fn table_transform_column_names(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let gen = expect_function(&args[1])?;
+    if !matches!(args.get(2), Some(Value::Null) | None) {
+        return Err(MError::NotImplemented(
+            "Table.TransformColumnNames: options not yet supported",
+        ));
+    }
+    let (names, rows) = table_to_rows(table)?;
+    let mut new_names: Vec<String> = Vec::with_capacity(names.len());
+    for n in &names {
+        let result = invoke_callback_with_host(gen, vec![Value::Text(n.clone())], host)?;
+        match result {
+            Value::Text(s) => new_names.push(s),
+            other => return Err(type_mismatch("text (column name)", &other)),
+        }
+    }
+    Ok(Value::Table(values_to_table(&new_names, &rows)?))
+}
+
+fn table_transpose(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let n_cols = table.num_columns();
+    let n_rows = table.num_rows();
+    // Each new row corresponds to one source column; new column count = old row count.
+    let new_names: Vec<String> = (1..=n_rows).map(|i| format!("Column{}", i)).collect();
+    let mut new_rows: Vec<Vec<Value>> = Vec::with_capacity(n_cols);
+    for col in 0..n_cols {
+        let mut row: Vec<Value> = Vec::with_capacity(n_rows);
+        for r in 0..n_rows {
+            row.push(cell_to_value(table, col, r)?);
+        }
+        new_rows.push(row);
+    }
+    Ok(Value::Table(values_to_table(&new_names, &new_rows)?))
+}
+
+fn table_add_join_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table1 = expect_table(&args[0])?;
+    let key1 = expect_text(&args[1])?.to_string();
+    let table2 = expect_table(&args[2])?;
+    let key2 = expect_text(&args[3])?.to_string();
+    let new_col = expect_text(&args[4])?.to_string();
+    let (names1, rows1) = table_to_rows(table1)?;
+    let (names2, rows2) = table_to_rows(table2)?;
+    let k1_idx = names1
+        .iter()
+        .position(|n| n == &key1)
+        .ok_or_else(|| MError::Other(format!("Table.AddJoinColumn: key1 column not found: {}", key1)))?;
+    let k2_idx = names2
+        .iter()
+        .position(|n| n == &key2)
+        .ok_or_else(|| MError::Other(format!("Table.AddJoinColumn: key2 column not found: {}", key2)))?;
+    let mut out_names = names1.clone();
+    out_names.push(new_col);
+    let mut out_rows: Vec<Vec<Value>> = Vec::with_capacity(rows1.len());
+    for r1 in &rows1 {
+        let key_val = &r1[k1_idx];
+        let mut matched: Vec<Vec<Value>> = Vec::new();
+        for r2 in &rows2 {
+            if values_equal_primitive(key_val, &r2[k2_idx])? {
+                matched.push(r2.clone());
+            }
+        }
+        let nested = values_to_table(&names2, &matched)?;
+        let mut new_row = r1.clone();
+        new_row.push(Value::Table(nested));
+        out_rows.push(new_row);
+    }
+    Ok(Value::Table(values_to_table(&out_names, &out_rows)?))
 }
 
 fn type_matches(t: &super::super::value::TypeRep, v: &Value) -> bool {

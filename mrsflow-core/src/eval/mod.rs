@@ -5342,6 +5342,133 @@ mod tests {
     }
 
     #[test]
+    fn table_demote_headers_inverse_of_promote() {
+        // The original column names appear as the first data row; new
+        // headers are Column1, Column2, ...
+        let src = r#"
+            let
+                t = #table({"a", "b"}, {{1, 2}, {3, 4}}),
+                d = Table.DemoteHeaders(t)
+            in
+                {Table.ColumnNames(d), Table.RowCount(d)}
+        "#;
+        match eval_str(src).unwrap() {
+            Value::List(xs) => {
+                let names = match &xs[0] {
+                    Value::List(ns) => ns.iter().map(|v| match v {
+                        Value::Text(s) => s.clone(),
+                        _ => panic!(),
+                    }).collect::<Vec<_>>(),
+                    _ => panic!(),
+                };
+                assert_eq!(names, vec!["Column1", "Column2"]);
+                assert!(matches!(xs[1], Value::Number(n) if n == 3.0)); // header + 2 data
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_duplicate_column_copies_values() {
+        let src = r#"
+            let
+                t = #table({"n"}, {{1}, {2}, {3}}),
+                d = Table.DuplicateColumn(t, "n", "n2")
+            in
+                {Table.ColumnNames(d), Table.Column(d, "n2")}
+        "#;
+        match eval_str(src).unwrap() {
+            Value::List(xs) => {
+                let names = match &xs[0] {
+                    Value::List(ns) => ns.iter().map(|v| match v {
+                        Value::Text(s) => s.clone(),
+                        _ => panic!(),
+                    }).collect::<Vec<_>>(),
+                    _ => panic!(),
+                };
+                assert_eq!(names, vec!["n", "n2"]);
+                let nums = match &xs[1] {
+                    Value::List(ns) => ns.iter().map(|v| match v {
+                        Value::Number(n) => *n,
+                        _ => panic!(),
+                    }).collect::<Vec<_>>(),
+                    _ => panic!(),
+                };
+                assert_eq!(nums, vec![1.0, 2.0, 3.0]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_prefix_columns_renames_all() {
+        let src = r#"
+            Table.ColumnNames(Table.PrefixColumns(#table({"a", "b"}, {}), "x"))
+        "#;
+        match eval_str(src).unwrap() {
+            Value::List(ns) => {
+                let names: Vec<String> = ns.iter().map(|v| match v {
+                    Value::Text(s) => s.clone(),
+                    _ => panic!(),
+                }).collect();
+                assert_eq!(names, vec!["x.a", "x.b"]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_transpose_swaps_rows_and_columns() {
+        // 2 rows × 2 columns → 2 rows × 2 columns but transposed.
+        let src = r#"
+            let
+                t = #table({"a", "b"}, {{1, 2}, {3, 4}}),
+                tt = Table.Transpose(t)
+            in
+                {Table.ColumnNames(tt), Table.Column(tt, "Column1")}
+        "#;
+        match eval_str(src).unwrap() {
+            Value::List(xs) => {
+                let names = match &xs[0] {
+                    Value::List(ns) => ns.iter().map(|v| match v {
+                        Value::Text(s) => s.clone(),
+                        _ => panic!(),
+                    }).collect::<Vec<_>>(),
+                    _ => panic!(),
+                };
+                assert_eq!(names, vec!["Column1", "Column2"]);
+                // Column1 holds the values from the first original row: [1, 2].
+                let nums = match &xs[1] {
+                    Value::List(ns) => ns.iter().map(|v| match v {
+                        Value::Number(n) => *n,
+                        _ => panic!(),
+                    }).collect::<Vec<_>>(),
+                    _ => panic!(),
+                };
+                assert_eq!(nums, vec![1.0, 2.0]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn table_transform_column_names_uppercases() {
+        let src = r#"
+            Table.ColumnNames(Table.TransformColumnNames(#table({"abc", "def"}, {}), Text.Upper))
+        "#;
+        match eval_str(src).unwrap() {
+            Value::List(ns) => {
+                let names: Vec<String> = ns.iter().map(|v| match v {
+                    Value::Text(s) => s.clone(),
+                    _ => panic!(),
+                }).collect();
+                assert_eq!(names, vec!["ABC", "DEF"]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn table_remove_first_n_default_drops_one() {
         let src = r#"
             let
