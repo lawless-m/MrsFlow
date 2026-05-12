@@ -3928,6 +3928,65 @@ mod tests {
     }
 
     #[test]
+    fn list_single_one_elem() {
+        match eval_str("List.Single({42})").unwrap() {
+            Value::Number(n) => assert_eq!(n, 42.0),
+            other => panic!("expected number, got {:?}", other),
+        }
+        assert!(eval_str("List.Single({1, 2})").is_err());
+        assert!(eval_str("List.Single({})").is_err());
+    }
+
+    #[test]
+    fn list_single_or_default_basic() {
+        match eval_str("List.SingleOrDefault({}, 99)").unwrap() {
+            Value::Number(n) => assert_eq!(n, 99.0),
+            other => panic!("expected number, got {:?}", other),
+        }
+        match eval_str("List.SingleOrDefault({})").unwrap() {
+            Value::Null => {}
+            other => panic!("expected null, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn list_median_odd_count() {
+        match eval_str("List.Median({3, 1, 5, 2, 4})").unwrap() {
+            Value::Number(n) => assert_eq!(n, 3.0),
+            other => panic!("expected number, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn list_product_basic() {
+        match eval_str("List.Product({2, 3, 4})").unwrap() {
+            Value::Number(n) => assert_eq!(n, 24.0),
+            other => panic!("expected number, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn list_max_n_basic() {
+        match eval_str("List.MaxN({3, 1, 4, 1, 5, 9, 2, 6}, 3)").unwrap() {
+            Value::List(xs) => {
+                let nums: Vec<f64> = xs.iter().map(|v| match v {
+                    Value::Number(n) => *n, _ => panic!(),
+                }).collect();
+                assert_eq!(nums, vec![9.0, 6.0, 5.0]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn list_non_null_count_basic() {
+        match eval_str("List.NonNullCount({1, null, 2, null, 3})").unwrap() {
+            Value::Number(n) => assert_eq!(n, 3.0),
+            other => panic!("expected number, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn list_difference_basic() {
         match eval_str("List.Difference({1, 2, 3, 4, 5}, {2, 4})").unwrap() {
             Value::List(xs) => {

@@ -244,6 +244,80 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
             ],
             list_union,
         ),
+        ("List.Single", one("list"), list_single),
+        (
+            "List.SingleOrDefault",
+            vec![
+                Param { name: "list".into(),    optional: false, type_annotation: None },
+                Param { name: "default".into(), optional: true,  type_annotation: None },
+            ],
+            list_single_or_default,
+        ),
+        ("List.Median", one("list"), list_median),
+        (
+            "List.Mode",
+            vec![
+                Param { name: "list".into(),             optional: false, type_annotation: None },
+                Param { name: "equationCriteria".into(), optional: true,  type_annotation: None },
+            ],
+            list_mode,
+        ),
+        (
+            "List.Modes",
+            vec![
+                Param { name: "list".into(),             optional: false, type_annotation: None },
+                Param { name: "equationCriteria".into(), optional: true,  type_annotation: None },
+            ],
+            list_modes,
+        ),
+        (
+            "List.Product",
+            vec![
+                Param { name: "list".into(),      optional: false, type_annotation: None },
+                Param { name: "precision".into(), optional: true,  type_annotation: None },
+            ],
+            list_product,
+        ),
+        (
+            "List.MaxN",
+            vec![
+                Param { name: "list".into(),                optional: false, type_annotation: None },
+                Param { name: "count".into(),               optional: false, type_annotation: None },
+                Param { name: "comparisonCriteria".into(),  optional: true,  type_annotation: None },
+                Param { name: "includeNulls".into(),        optional: true,  type_annotation: None },
+            ],
+            list_max_n,
+        ),
+        (
+            "List.MinN",
+            vec![
+                Param { name: "list".into(),                optional: false, type_annotation: None },
+                Param { name: "count".into(),               optional: false, type_annotation: None },
+                Param { name: "comparisonCriteria".into(),  optional: true,  type_annotation: None },
+                Param { name: "includeNulls".into(),        optional: true,  type_annotation: None },
+            ],
+            list_min_n,
+        ),
+        ("List.NonNullCount", one("list"), list_non_null_count),
+        ("List.StandardDeviation", one("list"), list_standard_deviation),
+        ("List.Covariance", two("list1", "list2"), list_covariance),
+        (
+            "List.Percentile",
+            vec![
+                Param { name: "list".into(),       optional: false, type_annotation: None },
+                Param { name: "percentile".into(), optional: false, type_annotation: None },
+                Param { name: "options".into(),    optional: true,  type_annotation: None },
+            ],
+            list_percentile,
+        ),
+        (
+            "List.Random",
+            vec![
+                Param { name: "count".into(), optional: false, type_annotation: None },
+                Param { name: "seed".into(),  optional: true,  type_annotation: None },
+            ],
+            list_random,
+        ),
     ]
 }
 
@@ -1080,6 +1154,249 @@ fn list_intersect(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         }
         out.push(v.clone());
     }
+    Ok(Value::List(out))
+}
+
+fn numbers_only(list: &[Value], ctx: &str) -> Result<Vec<f64>, MError> {
+    let mut out = Vec::with_capacity(list.len());
+    for v in list {
+        match v {
+            Value::Number(n) => out.push(*n),
+            Value::Null => continue,
+            other => return Err(MError::Other(format!(
+                "{}: expected number, got {}", ctx, super::super::type_name(other)
+            ))),
+        }
+    }
+    Ok(out)
+}
+
+fn list_single(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let list = expect_list(&args[0])?;
+    match list.len() {
+        0 => Err(MError::Other("List.Single: list is empty".into())),
+        1 => Ok(list[0].clone()),
+        n => Err(MError::Other(format!("List.Single: expected exactly one element, got {}", n))),
+    }
+}
+
+fn list_single_or_default(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let list = expect_list(&args[0])?;
+    match list.len() {
+        0 => Ok(args.get(1).cloned().unwrap_or(Value::Null)),
+        1 => Ok(list[0].clone()),
+        n => Err(MError::Other(format!("List.SingleOrDefault: expected at most one element, got {}", n))),
+    }
+}
+
+fn list_median(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let list = expect_list(&args[0])?;
+    let mut nums = numbers_only(list, "List.Median")?;
+    if nums.is_empty() {
+        return Ok(Value::Null);
+    }
+    nums.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    let n = nums.len();
+    let median = if n % 2 == 1 {
+        nums[n / 2]
+    } else {
+        (nums[n / 2 - 1] + nums[n / 2]) / 2.0
+    };
+    Ok(Value::Number(median))
+}
+
+fn list_mode(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let list = expect_list(&args[0])?;
+    if !matches!(args.get(1), Some(Value::Null) | None) {
+        return Err(MError::NotImplemented("List.Mode: equationCriteria not yet supported"));
+    }
+    if list.is_empty() {
+        return Ok(Value::Null);
+    }
+    // Tally each distinct value's count, preserving first-seen order.
+    let mut tally: Vec<(Value, usize)> = Vec::new();
+    for v in list {
+        let mut matched = false;
+        for (k, c) in tally.iter_mut() {
+            if values_equal_primitive(k, v)? {
+                *c += 1;
+                matched = true;
+                break;
+            }
+        }
+        if !matched {
+            tally.push((v.clone(), 1));
+        }
+    }
+    let max = tally.iter().map(|(_, c)| *c).max().unwrap();
+    let (v, _) = tally.into_iter().find(|(_, c)| *c == max).unwrap();
+    Ok(v)
+}
+
+fn list_modes(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let list = expect_list(&args[0])?;
+    if !matches!(args.get(1), Some(Value::Null) | None) {
+        return Err(MError::NotImplemented("List.Modes: equationCriteria not yet supported"));
+    }
+    if list.is_empty() {
+        return Ok(Value::List(Vec::new()));
+    }
+    let mut tally: Vec<(Value, usize)> = Vec::new();
+    for v in list {
+        let mut matched = false;
+        for (k, c) in tally.iter_mut() {
+            if values_equal_primitive(k, v)? {
+                *c += 1;
+                matched = true;
+                break;
+            }
+        }
+        if !matched {
+            tally.push((v.clone(), 1));
+        }
+    }
+    let max = tally.iter().map(|(_, c)| *c).max().unwrap();
+    let out: Vec<Value> = tally.into_iter()
+        .filter(|(_, c)| *c == max)
+        .map(|(v, _)| v)
+        .collect();
+    Ok(Value::List(out))
+}
+
+fn list_product(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let list = expect_list(&args[0])?;
+    let nums = numbers_only(list, "List.Product")?;
+    if nums.is_empty() {
+        return Ok(Value::Null);
+    }
+    Ok(Value::Number(nums.iter().product()))
+}
+
+fn sort_numeric_or_text(list: &[Value], ctx: &str, descending: bool) -> Result<Vec<Value>, MError> {
+    enum Kind { Empty, Num, Text }
+    let mut kind = Kind::Empty;
+    for v in list {
+        let k = match v {
+            Value::Number(_) => Kind::Num,
+            Value::Text(_) => Kind::Text,
+            Value::Null => continue,
+            other => return Err(MError::Other(format!(
+                "{}: expected number or text, got {}", ctx, super::super::type_name(other)
+            ))),
+        };
+        match (&kind, &k) {
+            (Kind::Empty, _) => kind = k,
+            (Kind::Num, Kind::Num) | (Kind::Text, Kind::Text) => {}
+            _ => return Err(MError::Other(format!(
+                "{}: mixed-type list not supported", ctx
+            ))),
+        }
+    }
+    let mut out: Vec<Value> = list.iter().filter(|v| !matches!(v, Value::Null)).cloned().collect();
+    match kind {
+        Kind::Empty => {}
+        Kind::Num => out.sort_by(|a, b| {
+            let (Value::Number(x), Value::Number(y)) = (a, b) else { unreachable!() };
+            let c = x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Equal);
+            if descending { c.reverse() } else { c }
+        }),
+        Kind::Text => out.sort_by(|a, b| {
+            let (Value::Text(x), Value::Text(y)) = (a, b) else { unreachable!() };
+            let c = x.cmp(y);
+            if descending { c.reverse() } else { c }
+        }),
+    }
+    Ok(out)
+}
+
+fn list_max_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let list = expect_list(&args[0])?;
+    let n = match &args[1] {
+        Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
+        other => return Err(type_mismatch("non-negative integer", other)),
+    };
+    let sorted = sort_numeric_or_text(list, "List.MaxN", true)?;
+    Ok(Value::List(sorted.into_iter().take(n).collect()))
+}
+
+fn list_min_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let list = expect_list(&args[0])?;
+    let n = match &args[1] {
+        Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
+        other => return Err(type_mismatch("non-negative integer", other)),
+    };
+    let sorted = sort_numeric_or_text(list, "List.MinN", false)?;
+    Ok(Value::List(sorted.into_iter().take(n).collect()))
+}
+
+fn list_non_null_count(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let list = expect_list(&args[0])?;
+    let n = list.iter().filter(|v| !matches!(v, Value::Null)).count();
+    Ok(Value::Number(n as f64))
+}
+
+fn list_standard_deviation(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let list = expect_list(&args[0])?;
+    let nums = numbers_only(list, "List.StandardDeviation")?;
+    if nums.len() < 2 {
+        return Ok(Value::Null);
+    }
+    let mean: f64 = nums.iter().sum::<f64>() / nums.len() as f64;
+    let var: f64 = nums.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / (nums.len() - 1) as f64;
+    Ok(Value::Number(var.sqrt()))
+}
+
+fn list_covariance(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let xs = numbers_only(expect_list(&args[0])?, "List.Covariance: list1")?;
+    let ys = numbers_only(expect_list(&args[1])?, "List.Covariance: list2")?;
+    if xs.len() != ys.len() {
+        return Err(MError::Other("List.Covariance: lists must have equal length".into()));
+    }
+    if xs.len() < 2 {
+        return Ok(Value::Null);
+    }
+    let mx: f64 = xs.iter().sum::<f64>() / xs.len() as f64;
+    let my: f64 = ys.iter().sum::<f64>() / ys.len() as f64;
+    let cov: f64 = xs.iter().zip(ys.iter())
+        .map(|(x, y)| (x - mx) * (y - my))
+        .sum::<f64>() / (xs.len() - 1) as f64;
+    Ok(Value::Number(cov))
+}
+
+fn list_percentile(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let list = expect_list(&args[0])?;
+    let mut nums = numbers_only(list, "List.Percentile")?;
+    let p = match &args[1] {
+        Value::Number(n) if *n >= 0.0 && *n <= 1.0 => *n,
+        other => return Err(MError::Other(format!(
+            "List.Percentile: percentile must be in [0,1] (got {:?})", other
+        ))),
+    };
+    if !matches!(args.get(2), Some(Value::Null) | None) {
+        return Err(MError::NotImplemented("List.Percentile: options not yet supported"));
+    }
+    if nums.is_empty() {
+        return Ok(Value::Null);
+    }
+    nums.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    let n = nums.len();
+    // Linear interpolation between adjacent ranks.
+    let rank = p * (n - 1) as f64;
+    let lo = rank.floor() as usize;
+    let hi = rank.ceil() as usize;
+    let frac = rank - lo as f64;
+    Ok(Value::Number(nums[lo] + frac * (nums[hi] - nums[lo])))
+}
+
+fn list_random(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let count = match &args[0] {
+        Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
+        other => return Err(type_mismatch("non-negative integer", other)),
+    };
+    if !matches!(args.get(1), Some(Value::Null) | None) {
+        return Err(MError::NotImplemented("List.Random: seed not yet supported"));
+    }
+    let out: Vec<Value> = (0..count).map(|_| Value::Number(rand::random::<f64>())).collect();
     Ok(Value::List(out))
 }
 
