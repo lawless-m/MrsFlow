@@ -2940,6 +2940,36 @@ mod tests {
     }
 
     #[test]
+    fn date_add_days_positive() {
+        match eval_str("Date.AddDays(#date(2024, 1, 30), 5)").unwrap() {
+            Value::Date(d) => {
+                assert_eq!(d, chrono::NaiveDate::from_ymd_opt(2024, 2, 4).unwrap());
+            }
+            other => panic!("expected date, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn date_add_days_negative() {
+        match eval_str("Date.AddDays(#date(2024, 1, 5), -10)").unwrap() {
+            Value::Date(d) => {
+                assert_eq!(d, chrono::NaiveDate::from_ymd_opt(2023, 12, 26).unwrap());
+            }
+            other => panic!("expected date, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn date_add_months_crosses_year() {
+        match eval_str("Date.AddMonths(#date(2024, 11, 15), 3)").unwrap() {
+            Value::Date(d) => {
+                assert_eq!(d, chrono::NaiveDate::from_ymd_opt(2025, 2, 15).unwrap());
+            }
+            other => panic!("expected date, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn record_combine_basic() {
         // Later fields override earlier ones; first-seen order preserved.
         let src = r#"Record.Combine({[a = 1, b = 2], [b = 99, c = 3]})"#;

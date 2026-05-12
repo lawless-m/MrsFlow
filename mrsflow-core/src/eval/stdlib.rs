@@ -473,6 +473,8 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ("Table.TransformRows", two("table", "transform"), table_transform_rows),
         ("Table.InsertRows", three("table", "offset", "rows"), table_insert_rows),
         ("Date.FromText", one("text"), date_from_text),
+        ("Date.AddDays", two("date", "numberOfDays"), date_add_days),
+        ("Date.AddMonths", two("date", "numberOfMonths"), date_add_months),
         ("Date.From", one("value"), date_from),
         ("Date.Year", one("date"), date_year),
         ("Date.Month", one("date"), date_month),
@@ -3464,6 +3466,54 @@ fn date_day(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         Value::Null => Ok(Value::Null),
         Value::Date(d) => Ok(Value::Number(d.day() as f64)),
         other => Err(type_mismatch("date", other)),
+    }
+}
+
+fn date_add_days(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let n_days = match &args[1] {
+        Value::Number(n) if n.fract() == 0.0 => *n as i64,
+        Value::Null => return Ok(Value::Null),
+        other => return Err(type_mismatch("integer (numberOfDays)", other)),
+    };
+    let delta = chrono::Duration::days(n_days);
+    match &args[0] {
+        Value::Null => Ok(Value::Null),
+        Value::Date(d) => d
+            .checked_add_signed(delta)
+            .map(Value::Date)
+            .ok_or_else(|| MError::Other("Date.AddDays: result out of range".into())),
+        Value::Datetime(dt) => dt
+            .checked_add_signed(delta)
+            .map(Value::Datetime)
+            .ok_or_else(|| MError::Other("Date.AddDays: result out of range".into())),
+        other => Err(type_mismatch("date or datetime", other)),
+    }
+}
+
+fn date_add_months(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let n = match &args[1] {
+        Value::Number(n) if n.fract() == 0.0 => *n as i64,
+        Value::Null => return Ok(Value::Null),
+        other => return Err(type_mismatch("integer (numberOfMonths)", other)),
+    };
+    fn shift_date(d: chrono::NaiveDate, n: i64) -> Option<chrono::NaiveDate> {
+        if n >= 0 {
+            d.checked_add_months(chrono::Months::new(n as u32))
+        } else {
+            d.checked_sub_months(chrono::Months::new((-n) as u32))
+        }
+    }
+    match &args[0] {
+        Value::Null => Ok(Value::Null),
+        Value::Date(d) => shift_date(*d, n)
+            .map(Value::Date)
+            .ok_or_else(|| MError::Other("Date.AddMonths: result out of range".into())),
+        Value::Datetime(dt) => {
+            let new_date = shift_date(dt.date(), n)
+                .ok_or_else(|| MError::Other("Date.AddMonths: result out of range".into()))?;
+            Ok(Value::Datetime(new_date.and_time(dt.time())))
+        }
+        other => Err(type_mismatch("date or datetime", other)),
     }
 }
 
