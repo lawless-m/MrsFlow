@@ -21,9 +21,26 @@ the CLI, or the WASM build.
 
 ## Running
 
+Single expression through the lexer DCG:
+
 ```sh
 echo 'let x = 1 + 2 in x' | scryer-prolog -f --no-add-history lex_cli.pl
 ```
+
+Full differential against the Rust implementation — two routes, same result:
+
+```sh
+# Direct: spawns scryer-prolog per case
+bash tools/grammar-fuzz/diff_parser.sh
+bash tools/grammar-fuzz/diff_eval.sh
+
+# Via cargo (skips cleanly if bash or scryer-prolog isn't on PATH)
+cargo test --test differential -- --ignored
+```
+
+Both are `#[ignore]` in the cargo wiring because they take minutes — they
+sit in the regression surface to prevent the Prolog companion from rotting,
+not to gate every inner-loop edit.
 
 ## Scope
 

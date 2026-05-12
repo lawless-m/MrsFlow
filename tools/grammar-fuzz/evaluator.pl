@@ -99,6 +99,68 @@ eval(binop(sub, L, R), Env, num(V)) :-
     eval(L, Env, num(A)), eval(R, Env, num(B)),
     V is A - B.
 
+% Date / datetime / duration arithmetic.
+% Mirrors mrsflow-core/src/eval/stdlib/value_ops.rs (value_add / value_subtract).
+% Note that the operand-type check happens inside the eval(L/R) recursive
+% calls — each clause only succeeds when L and R have the expected shapes,
+% so Prolog's natural backtracking provides the type-dispatch.
+
+% date - date → duration (whole-day difference, in seconds)
+eval(binop(sub, L, R), Env, duration(F)) :-
+    eval(L, Env, date(LY, LM, LD)),
+    eval(R, Env, date(RY, RM, RD)),
+    date_to_jdn(date(LY, LM, LD), LJ),
+    date_to_jdn(date(RY, RM, RD), RJ),
+    F is float((LJ - RJ) * 86400).
+
+% datetime - datetime → duration (full second-precision difference)
+eval(binop(sub, L, R), Env, duration(F)) :-
+    eval(L, Env, datetime(LY, LMo, LD, LH, LMi, LS)),
+    eval(R, Env, datetime(RY, RMo, RD, RH, RMi, RS)),
+    datetime_to_seconds(datetime(LY, LMo, LD, LH, LMi, LS), LSec),
+    datetime_to_seconds(datetime(RY, RMo, RD, RH, RMi, RS), RSec),
+    F is float(LSec - RSec).
+
+% duration ± duration → duration
+eval(binop(add, L, R), Env, duration(F)) :-
+    eval(L, Env, duration(A)), eval(R, Env, duration(B)),
+    F is A + B.
+eval(binop(sub, L, R), Env, duration(F)) :-
+    eval(L, Env, duration(A)), eval(R, Env, duration(B)),
+    F is A - B.
+
+% date ± duration → date (whole-day) or datetime (sub-day). Symmetric add.
+eval(binop(add, L, R), Env, Result) :-
+    eval(L, Env, date(Y, M, D)), eval(R, Env, duration(S)),
+    add_seconds_to_date(date(Y, M, D), S, Result).
+eval(binop(add, L, R), Env, Result) :-
+    eval(L, Env, duration(S)), eval(R, Env, date(Y, M, D)),
+    add_seconds_to_date(date(Y, M, D), S, Result).
+eval(binop(sub, L, R), Env, Result) :-
+    eval(L, Env, date(Y, M, D)), eval(R, Env, duration(S)),
+    NegS is -S,
+    add_seconds_to_date(date(Y, M, D), NegS, Result).
+
+% datetime ± duration → datetime
+eval(binop(add, L, R), Env, datetime(Y2, Mo2, D2, H2, Mi2, S2)) :-
+    eval(L, Env, datetime(Y, Mo, D, H, Mi, S)), eval(R, Env, duration(Sec)),
+    datetime_to_seconds(datetime(Y, Mo, D, H, Mi, S), Base),
+    SecInt is truncate(Sec),
+    Total is Base + SecInt,
+    seconds_to_datetime(Total, datetime(Y2, Mo2, D2, H2, Mi2, S2)).
+eval(binop(add, L, R), Env, datetime(Y2, Mo2, D2, H2, Mi2, S2)) :-
+    eval(L, Env, duration(Sec)), eval(R, Env, datetime(Y, Mo, D, H, Mi, S)),
+    datetime_to_seconds(datetime(Y, Mo, D, H, Mi, S), Base),
+    SecInt is truncate(Sec),
+    Total is Base + SecInt,
+    seconds_to_datetime(Total, datetime(Y2, Mo2, D2, H2, Mi2, S2)).
+eval(binop(sub, L, R), Env, datetime(Y2, Mo2, D2, H2, Mi2, S2)) :-
+    eval(L, Env, datetime(Y, Mo, D, H, Mi, S)), eval(R, Env, duration(Sec)),
+    datetime_to_seconds(datetime(Y, Mo, D, H, Mi, S), Base),
+    SecInt is truncate(Sec),
+    Total is Base - SecInt,
+    seconds_to_datetime(Total, datetime(Y2, Mo2, D2, H2, Mi2, S2)).
+
 % Concat — text only for slice 1; list concat lands when eval-3 brings lists.
 eval(binop(cat, L, R), Env, text(Combined)) :-
     eval(L, Env, text(LCs)),
@@ -996,6 +1058,59 @@ collect_rows([], []).
 collect_rows([table(_, Rows) | Rest], AllRows) :-
     collect_rows(Rest, RestAll),
     append(Rows, RestAll, AllRows).
+
+% --- chrono helpers ---
+
+% Proleptic Gregorian Julian Day Number (Fliegel & Van Flandern). Operates
+% on integer components — civil days only, no leap-second math. Matches
+% chrono::NaiveDate's internal day count, which is what the Rust value
+% subtraction takes the difference of.
+date_to_jdn(date(Y, M, D), JDN) :-
+    A is (14 - M) // 12,
+    YY is Y + 4800 - A,
+    MM is M + 12 * A - 3,
+    JDN is D + (153 * MM + 2) // 5 + 365 * YY + YY // 4 - YY // 100 + YY // 400 - 32045.
+
+% Inverse of date_to_jdn — same source.
+jdn_to_date(JDN, date(Y, M, D)) :-
+    A is JDN + 32044,
+    B is (4 * A + 3) // 146097,
+    C is A - (146097 * B) // 4,
+    DD is (4 * C + 3) // 1461,
+    E is C - (1461 * DD) // 4,
+    MM is (5 * E + 2) // 153,
+    D is E - (153 * MM + 2) // 5 + 1,
+    M is MM + 3 - 12 * (MM // 10),
+    Y is 100 * B + DD - 4800 + MM // 10.
+
+datetime_to_seconds(datetime(Y, Mo, D, H, Mi, S), Sec) :-
+    date_to_jdn(date(Y, Mo, D), JDN),
+    Sec is JDN * 86400 + H * 3600 + Mi * 60 + S.
+
+seconds_to_datetime(Sec, datetime(Y, Mo, D, H, Mi, S)) :-
+    JDN is Sec // 86400,
+    SecInDay is Sec - JDN * 86400,
+    H is SecInDay // 3600,
+    Rem is SecInDay - H * 3600,
+    Mi is Rem // 60,
+    S is Rem - Mi * 60,
+    jdn_to_date(JDN, date(Y, Mo, D)).
+
+% date ± duration → date when the duration is a whole-day multiple,
+% otherwise datetime. Mirrors the chrono branch in Rust's value_add /
+% value_subtract for the (Date, Duration) operand pair.
+add_seconds_to_date(date(Y, M, D), Seconds, Result) :-
+    date_to_jdn(date(Y, M, D), JDN),
+    SecInt is truncate(Seconds),
+    Frac is Seconds - SecInt,
+    ( Frac =:= 0.0, 0 =:= SecInt mod 86400 ->
+        DayDelta is SecInt // 86400,
+        NewJDN is JDN + DayDelta,
+        jdn_to_date(NewJDN, Result)
+    ;   BaseSec is JDN * 86400,
+        Total is BaseSec + SecInt,
+        seconds_to_datetime(Total, Result)
+    ).
 
 % --- chrono constructors (eval-7b) ---
 
