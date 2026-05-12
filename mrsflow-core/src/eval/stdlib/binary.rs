@@ -44,6 +44,12 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ("Binary.Buffer", one("binary"), binary_buffer),
         ("Binary.Split", two("binary", "pageSize"), binary_split),
         ("Binary.InferContentType", one("binary"), binary_infer_content_type),
+        // --- Slice #173: compression + view stubs ---
+        ("Binary.Compress", two("binary", "compressionType"), binary_compress),
+        ("Binary.Decompress", two("binary", "compressionType"), binary_decompress),
+        ("Binary.View", two("binary", "handlers"), binary_view),
+        ("Binary.ViewError", one("record"), binary_view_passthrough),
+        ("Binary.ViewFunction", one("function"), binary_view_passthrough),
     ]
 }
 
@@ -278,6 +284,100 @@ fn hex_decode(s: &str) -> Result<Vec<u8>, MError> {
         out.push((hi << 4) | lo);
     }
     Ok(out)
+}
+
+// --- Slice #173: compression ---
+
+#[derive(Clone, Copy)]
+enum Compression {
+    None,
+    GZip,
+    Deflate,
+    Brotli,
+}
+
+fn parse_compression(v: &Value, ctx: &str) -> Result<Compression, MError> {
+    match v {
+        Value::Number(n) if *n == 0.0 => Ok(Compression::None),
+        Value::Number(n) if *n == 1.0 => Ok(Compression::GZip),
+        Value::Number(n) if *n == 2.0 => Ok(Compression::Deflate),
+        Value::Number(n) if *n == 3.0 => Ok(Compression::Brotli),
+        other => Err(MError::Other(format!(
+            "{}: expected Compression.* constant, got {:?}",
+            ctx, other
+        ))),
+    }
+}
+
+fn binary_compress(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    use std::io::Write;
+    let bytes = expect_binary(&args[0])?;
+    let kind = parse_compression(&args[1], "Binary.Compress")?;
+    let out: Vec<u8> = match kind {
+        Compression::None => bytes.to_vec(),
+        Compression::GZip => {
+            let mut enc = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+            enc.write_all(bytes)
+                .map_err(|e| MError::Other(format!("Binary.Compress: gzip failed: {}", e)))?;
+            enc.finish()
+                .map_err(|e| MError::Other(format!("Binary.Compress: gzip finish failed: {}", e)))?
+        }
+        Compression::Deflate => {
+            let mut enc =
+                flate2::write::DeflateEncoder::new(Vec::new(), flate2::Compression::default());
+            enc.write_all(bytes)
+                .map_err(|e| MError::Other(format!("Binary.Compress: deflate failed: {}", e)))?;
+            enc.finish().map_err(|e| {
+                MError::Other(format!("Binary.Compress: deflate finish failed: {}", e))
+            })?
+        }
+        Compression::Brotli => {
+            return Err(MError::NotImplemented(
+                "Binary.Compress: Brotli not supported in v1 (no brotli crate dependency)",
+            ));
+        }
+    };
+    Ok(Value::Binary(out))
+}
+
+fn binary_decompress(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    use std::io::Read;
+    let bytes = expect_binary(&args[0])?;
+    let kind = parse_compression(&args[1], "Binary.Decompress")?;
+    let out: Vec<u8> = match kind {
+        Compression::None => bytes.to_vec(),
+        Compression::GZip => {
+            let mut dec = flate2::read::GzDecoder::new(bytes);
+            let mut buf = Vec::new();
+            dec.read_to_end(&mut buf)
+                .map_err(|e| MError::Other(format!("Binary.Decompress: gzip failed: {}", e)))?;
+            buf
+        }
+        Compression::Deflate => {
+            let mut dec = flate2::read::DeflateDecoder::new(bytes);
+            let mut buf = Vec::new();
+            dec.read_to_end(&mut buf).map_err(|e| {
+                MError::Other(format!("Binary.Decompress: deflate failed: {}", e))
+            })?;
+            buf
+        }
+        Compression::Brotli => {
+            return Err(MError::NotImplemented(
+                "Binary.Decompress: Brotli not supported in v1",
+            ));
+        }
+    };
+    Ok(Value::Binary(out))
+}
+
+fn binary_view(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    // v1: View is a folding hook — pass binary through unchanged.
+    let _ = expect_binary(&args[0])?;
+    Ok(args[0].clone())
+}
+
+fn binary_view_passthrough(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    Ok(args[0].clone())
 }
 
 fn decode_hex_nibble(b: u8) -> Result<u8, MError> {

@@ -112,6 +112,16 @@ pub fn root_env() -> Env {
         env = env.extend(name.to_string(), Value::Number(n));
     }
 
+    // Compression.* constants — Binary.Compress/Decompress compressionType arg.
+    for (name, n) in [
+        ("Compression.None",    0.0),
+        ("Compression.GZip",    1.0),
+        ("Compression.Deflate", 2.0),
+        ("Compression.Brotli",  3.0),
+    ] {
+        env = env.extend(name.to_string(), Value::Number(n));
+    }
+
     // Order.* constants — Table.Sort's per-column order argument.
     for (name, n) in [
         ("Order.Ascending",  0.0),

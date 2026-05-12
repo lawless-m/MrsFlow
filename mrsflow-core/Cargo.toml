@@ -14,6 +14,7 @@ unicode-general-category = "1"
 arrow = { version = "53", default-features = false }
 chrono = { version = "0.4", default-features = false, features = ["alloc", "clock"] }
 rand = "0.8"
+flate2 = "1"
 
 [dev-dependencies]
 insta = "1"

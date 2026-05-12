@@ -5488,6 +5488,72 @@ mod tests {
     }
 
     #[test]
+    fn binary_compress_decompress_gzip_round_trip() {
+        // GZip round-trip should restore the original bytes.
+        let src = r#"
+            let
+                b = Binary.FromList({10, 20, 30, 40, 50, 60, 70, 80}),
+                c = Binary.Compress(b, Compression.GZip),
+                d = Binary.Decompress(c, Compression.GZip)
+            in Binary.ToList(d)
+        "#;
+        match eval_str(src).unwrap() {
+            Value::List(xs) => {
+                let nums: Vec<f64> = xs.iter().map(|v| match v {
+                    Value::Number(n) => *n,
+                    _ => panic!(),
+                }).collect();
+                assert_eq!(nums, vec![10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn binary_compress_decompress_deflate_round_trip() {
+        let src = r#"
+            let
+                b = Binary.FromList({1, 2, 3, 4, 5}),
+                c = Binary.Compress(b, Compression.Deflate),
+                d = Binary.Decompress(c, Compression.Deflate)
+            in Binary.Length(d)
+        "#;
+        assert_eq!(eval_number(src), 5.0);
+    }
+
+    #[test]
+    fn binary_compress_none_is_passthrough() {
+        // With Compression.None, Compress should be an identity.
+        let src = r#"
+            let
+                b = Binary.FromList({1, 2, 3}),
+                c = Binary.Compress(b, Compression.None)
+            in Binary.ToList(c)
+        "#;
+        match eval_str(src).unwrap() {
+            Value::List(xs) => {
+                let nums: Vec<f64> = xs.iter().map(|v| match v {
+                    Value::Number(n) => *n,
+                    _ => panic!(),
+                }).collect();
+                assert_eq!(nums, vec![1.0, 2.0, 3.0]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn binary_view_is_identity() {
+        let src = r#"
+            let
+                b = Binary.FromList({1, 2, 3, 4}),
+                v = Binary.View(b, [])
+            in Binary.Length(v)
+        "#;
+        assert_eq!(eval_number(src), 4.0);
+    }
+
+    #[test]
     fn binary_length_basic() {
         let src = r#"Binary.Length(Binary.FromList({1, 2, 3, 4, 5}))"#;
         assert_eq!(eval_number(src), 5.0);
