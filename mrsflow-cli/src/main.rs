@@ -31,15 +31,15 @@ fn main() {
     };
 
     let src = fs::read_to_string(&input).unwrap_or_else(|e| {
-        eprintln!("read {}: {}", input, e);
+        eprintln!("read {input}: {e}");
         process::exit(66);
     });
     let toks = tokenize(&src).unwrap_or_else(|e| {
-        eprintln!("LEX ERROR: {:?}", e);
+        eprintln!("LEX ERROR: {e:?}");
         process::exit(2);
     });
     let ast = parse(&toks).unwrap_or_else(|e| {
-        eprintln!("PARSE ERROR: {:?}", e);
+        eprintln!("PARSE ERROR: {e:?}");
         process::exit(3);
     });
 
@@ -48,14 +48,14 @@ fn main() {
     let value = match evaluate(&ast, &env, &host) {
         Ok(v) => v,
         Err(e) => {
-            eprintln!("EVAL ERROR: {:?}", e);
+            eprintln!("EVAL ERROR: {e:?}");
             process::exit(4);
         }
     };
     let value = match deep_force(value, &host) {
         Ok(v) => v,
         Err(e) => {
-            eprintln!("EVAL ERROR: {:?}", e);
+            eprintln!("EVAL ERROR: {e:?}");
             process::exit(4);
         }
     };
@@ -64,7 +64,7 @@ fn main() {
         Some(path) => match &value {
             Value::Table(_) => {
                 if let Err(e) = host.parquet_write(&path, &value) {
-                    eprintln!("WRITE ERROR: {:?}", e);
+                    eprintln!("WRITE ERROR: {e:?}");
                     process::exit(5);
                 }
             }

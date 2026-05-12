@@ -96,15 +96,6 @@ pub(super) fn expect_function(v: &Value) -> Result<&Closure, MError> {
     }
 }
 
-/// Call a closure from within a builtin. Builtins receive already-forced
-/// values, so we need only mirror the body-dispatch part of the evaluator's
-/// Invoke handling. For M-bodied closures we run the body in the captured
-/// env; for nested builtins we recurse directly.
-///
-/// Slice-6 stdlib needs IoHost-free recursion only — List.Transform's
-/// callback fn cannot itself perform IO since builtins don't carry a host.
-/// Pass a no-op host to be safe.
-
 pub(super) fn expect_table(v: &Value) -> Result<&Table, MError> {
     match v {
         Value::Table(t) => Ok(t),
@@ -132,7 +123,7 @@ pub(super) fn expect_text_list(v: &Value, ctx: &str) -> Result<Vec<String>, MErr
 }
 
 
-pub(super) fn expect_list_of_lists<'a>(v: &'a Value, ctx: &str) -> Result<Vec<Vec<Value>>, MError> {
+pub(super) fn expect_list_of_lists(v: &Value, ctx: &str) -> Result<Vec<Vec<Value>>, MError> {
     let xs = expect_list(v)?;
     let mut out = Vec::with_capacity(xs.len());
     for x in xs {
@@ -150,16 +141,11 @@ pub(super) fn expect_list_of_lists<'a>(v: &'a Value, ctx: &str) -> Result<Vec<Ve
     Ok(out)
 }
 
-/// Build a Table from column names + row-major cells. Picks the Arrow-backed
-/// representation when every column fits the uniform-column rule; falls back
-/// to a Rows-backed Table when any column is heterogeneous (compound values,
-/// mixed primitives, Binary).
-
 pub(super) fn expect_int(v: &Value, ctx: &str) -> Result<i64, MError> {
     match v {
         Value::Number(n) => {
             if n.fract() != 0.0 {
-                return Err(MError::Other(format!("{}: not an integer: {}", ctx, n)));
+                return Err(MError::Other(format!("{ctx}: not an integer: {n}")));
             }
             Ok(*n as i64)
         }

@@ -26,7 +26,7 @@ pub fn write_value(out: &mut String, v: &Value) {
         // {:?} formats floats with always-trailing fractional digit
         // (e.g. `42.0`, not `42`) which matches scryer's `~w` for floats.
         // Differential parity hinges on this.
-        Value::Number(n) => out.push_str(&format!("(num {:?})", n)),
+        Value::Number(n) => out.push_str(&format!("(num {n:?})")),
         Value::Text(s) => {
             out.push_str("(text ");
             write_quoted(out, s);
@@ -73,7 +73,7 @@ pub fn write_value(out: &mut String, v: &Value) {
         }
         Value::Duration(dur) => {
             let s = dur.num_seconds() as f64;
-            out.push_str(&format!("(duration {:?})", s));
+            out.push_str(&format!("(duration {s:?})"));
         }
         Value::Binary(_) => out.push_str("(binary ...)"),
         Value::List(items) => {

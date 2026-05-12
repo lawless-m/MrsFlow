@@ -32,5 +32,5 @@ fn query(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let conn = expect_text(&args[0])?;
     let sql = expect_text(&args[1])?;
     host.odbc_query(conn, sql, None)
-        .map_err(|e| MError::Other(format!("Odbc.Query: {:?}", e)))
+        .map_err(|e| MError::Other(format!("Odbc.Query: {e:?}")))
 }

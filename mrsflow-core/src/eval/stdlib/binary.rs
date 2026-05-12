@@ -81,8 +81,7 @@ fn from_list(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         let n = expect_int(v, "Binary.FromList")?;
         if !(0..=255).contains(&n) {
             return Err(MError::Other(format!(
-                "Binary.FromList: byte value out of range: {}",
-                n
+                "Binary.FromList: byte value out of range: {n}"
             )));
         }
         bytes.push(n as u8);
@@ -105,12 +104,11 @@ fn parse_encoding(v: Option<&Value>, ctx: &str) -> Result<Encoding, MError> {
         Some(Value::Text(s)) => {
             let n = s.to_ascii_lowercase();
             let n = n.trim_start_matches("binaryencoding.");
-            match n.as_ref() {
+            match n {
                 "base64" => Ok(Encoding::Base64),
                 "hex" => Ok(Encoding::Hex),
                 _ => Err(MError::Other(format!(
-                    "{}: unknown encoding: {}",
-                    ctx, s
+                    "{ctx}: unknown encoding: {s}"
                 ))),
             }
         }
@@ -204,7 +202,7 @@ const B64_ALPHABET: &[u8; 64] =
     b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 fn base64_encode(bytes: &[u8]) -> String {
-    let mut out = String::with_capacity(((bytes.len() + 2) / 3) * 4);
+    let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
     let chunks = bytes.chunks(3);
     for chunk in chunks {
         let n = chunk.len();
@@ -226,7 +224,7 @@ fn base64_encode(bytes: &[u8]) -> String {
 fn base64_decode(s: &str) -> Result<Vec<u8>, MError> {
     // Strip whitespace and the optional "=" padding.
     let s: String = s.chars().filter(|c| !c.is_whitespace()).collect();
-    if s.len() % 4 != 0 {
+    if !s.len().is_multiple_of(4) {
         return Err(MError::Other("Binary.FromText: invalid base64 length".into()));
     }
     let mut out: Vec<u8> = Vec::with_capacity(s.len() / 4 * 3);
@@ -273,7 +271,7 @@ fn hex_encode(bytes: &[u8]) -> String {
 
 fn hex_decode(s: &str) -> Result<Vec<u8>, MError> {
     let s: String = s.chars().filter(|c| !c.is_whitespace()).collect();
-    if s.len() % 2 != 0 {
+    if !s.len().is_multiple_of(2) {
         return Err(MError::Other("Binary.FromText: hex must have even length".into()));
     }
     let mut out: Vec<u8> = Vec::with_capacity(s.len() / 2);
@@ -303,8 +301,7 @@ fn parse_compression(v: &Value, ctx: &str) -> Result<Compression, MError> {
         Value::Number(n) if *n == 2.0 => Ok(Compression::Deflate),
         Value::Number(n) if *n == 3.0 => Ok(Compression::Brotli),
         other => Err(MError::Other(format!(
-            "{}: expected Compression.* constant, got {:?}",
-            ctx, other
+            "{ctx}: expected Compression.* constant, got {other:?}"
         ))),
     }
 }
@@ -318,17 +315,17 @@ fn compress(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         Compression::GZip => {
             let mut enc = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
             enc.write_all(bytes)
-                .map_err(|e| MError::Other(format!("Binary.Compress: gzip failed: {}", e)))?;
+                .map_err(|e| MError::Other(format!("Binary.Compress: gzip failed: {e}")))?;
             enc.finish()
-                .map_err(|e| MError::Other(format!("Binary.Compress: gzip finish failed: {}", e)))?
+                .map_err(|e| MError::Other(format!("Binary.Compress: gzip finish failed: {e}")))?
         }
         Compression::Deflate => {
             let mut enc =
                 flate2::write::DeflateEncoder::new(Vec::new(), flate2::Compression::default());
             enc.write_all(bytes)
-                .map_err(|e| MError::Other(format!("Binary.Compress: deflate failed: {}", e)))?;
+                .map_err(|e| MError::Other(format!("Binary.Compress: deflate failed: {e}")))?;
             enc.finish().map_err(|e| {
-                MError::Other(format!("Binary.Compress: deflate finish failed: {}", e))
+                MError::Other(format!("Binary.Compress: deflate finish failed: {e}"))
             })?
         }
         Compression::Brotli => {
@@ -350,14 +347,14 @@ fn decompress(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             let mut dec = flate2::read::GzDecoder::new(bytes);
             let mut buf = Vec::new();
             dec.read_to_end(&mut buf)
-                .map_err(|e| MError::Other(format!("Binary.Decompress: gzip failed: {}", e)))?;
+                .map_err(|e| MError::Other(format!("Binary.Decompress: gzip failed: {e}")))?;
             buf
         }
         Compression::Deflate => {
             let mut dec = flate2::read::DeflateDecoder::new(bytes);
             let mut buf = Vec::new();
             dec.read_to_end(&mut buf).map_err(|e| {
-                MError::Other(format!("Binary.Decompress: deflate failed: {}", e))
+                MError::Other(format!("Binary.Decompress: deflate failed: {e}"))
             })?;
             buf
         }

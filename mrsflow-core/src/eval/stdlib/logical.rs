@@ -57,8 +57,7 @@ fn from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         "true" => Ok(Value::Logical(true)),
         "false" => Ok(Value::Logical(false)),
         _ => Err(MError::Other(format!(
-            "Logical.FromText: not a boolean: {:?}",
-            text
+            "Logical.FromText: not a boolean: {text:?}"
         ))),
     }
 }

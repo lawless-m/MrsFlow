@@ -204,7 +204,7 @@ fn is_odd(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         Value::Number(n) => {
             if !n.is_finite() || n.fract() != 0.0 {
                 return Err(MError::Other(format!(
-                    "Number.IsOdd: argument must be an integer (got {})", n
+                    "Number.IsOdd: argument must be an integer (got {n})"
                 )));
             }
             Ok(Value::Logical((*n as i64) % 2 != 0))
@@ -220,7 +220,7 @@ fn is_even(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         Value::Number(n) => {
             if !n.is_finite() || n.fract() != 0.0 {
                 return Err(MError::Other(format!(
-                    "Number.IsEven: argument must be an integer (got {})", n
+                    "Number.IsEven: argument must be an integer (got {n})"
                 )));
             }
             Ok(Value::Logical((*n as i64) % 2 == 0))
@@ -233,7 +233,7 @@ fn is_even(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 fn int_arg(v: &Value, ctx: &str) -> Result<i64, MError> {
     match v {
         Value::Number(n) if n.is_finite() && n.fract() == 0.0 => Ok(*n as i64),
-        Value::Null => Err(MError::Other(format!("{}: null argument", ctx))),
+        Value::Null => Err(MError::Other(format!("{ctx}: null argument"))),
         other => Err(MError::Other(format!(
             "{}: argument must be an integer (got {})", ctx, super::super::type_name(other)
         ))),
@@ -298,7 +298,7 @@ fn log(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 fn factorial_f64(n: f64) -> Result<f64, MError> {
     if !n.is_finite() || n < 0.0 || n.fract() != 0.0 {
         return Err(MError::Other(format!(
-            "Number.Factorial: argument must be a non-negative integer (got {})", n
+            "Number.Factorial: argument must be a non-negative integer (got {n})"
         )));
     }
     let n = n as u64;
@@ -457,9 +457,9 @@ fn random_between(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         Value::Number(n) => *n,
         other => return Err(type_mismatch("number", other)),
     };
-    if !(bottom <= top) {
+    if bottom.is_nan() || top.is_nan() || bottom > top {
         return Err(MError::Other(format!(
-            "Number.RandomBetween: bottom ({}) must be <= top ({})", bottom, top
+            "Number.RandomBetween: bottom ({bottom}) must be <= top ({top})"
         )));
     }
     Ok(Value::Number(bottom + rand::random::<f64>() * (top - bottom)))
@@ -476,7 +476,7 @@ fn from(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             .trim()
             .parse::<f64>()
             .map(Value::Number)
-            .map_err(|_| MError::Other(format!("Number.From: cannot parse {:?}", s))),
+            .map_err(|_| MError::Other(format!("Number.From: cannot parse {s:?}"))),
         other => Err(type_mismatch("text/number/logical/null", other)),
     }
 }
@@ -489,7 +489,7 @@ fn from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             .trim()
             .parse::<f64>()
             .map(Value::Number)
-            .map_err(|_| MError::Other(format!("Number.FromText: cannot parse {:?}", s))),
+            .map_err(|_| MError::Other(format!("Number.FromText: cannot parse {s:?}"))),
         other => Err(type_mismatch("text", other)),
     }
 }

@@ -209,8 +209,7 @@ fn from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         return Ok(Value::Text(s[1..s.len() - 1].to_string()));
     }
     Err(MError::Other(format!(
-        "Value.FromText: could not parse: {}",
-        s
+        "Value.FromText: could not parse: {s}"
     )))
 }
 
@@ -306,7 +305,7 @@ fn remove_metadata(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> 
 fn add(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     match (&args[0], &args[1]) {
         (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a + b)),
-        (Value::Text(a), Value::Text(b)) => Ok(Value::Text(format!("{}{}", a, b))),
+        (Value::Text(a), Value::Text(b)) => Ok(Value::Text(format!("{a}{b}"))),
         (Value::Date(d), Value::Duration(dur)) | (Value::Duration(dur), Value::Date(d)) => {
             // Date + Duration: Power Query promotes to Datetime when the
             // duration has a non-day component.

@@ -102,7 +102,7 @@ fn from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             return Ok(Value::Time(t));
         }
     }
-    Err(MError::Other(format!("Time.FromText: cannot parse {:?}", text)))
+    Err(MError::Other(format!("Time.FromText: cannot parse {text:?}")))
 }
 
 

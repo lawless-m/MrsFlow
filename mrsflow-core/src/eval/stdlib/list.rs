@@ -681,7 +681,6 @@ fn last_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 /// Structural equality for primitive cell types only — number, text, logical,
 /// null, date, datetime, duration. Compound values (list/record/table/function/
 /// type/thunk/binary) error out; the caller wraps the error.
-
 fn any_true(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     for v in list {
@@ -883,11 +882,10 @@ fn find_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let needle = expect_text(&args[1])?;
     let mut out: Vec<Value> = Vec::new();
     for v in list {
-        if let Value::Text(s) = v {
-            if s.contains(needle) {
+        if let Value::Text(s) = v
+            && s.contains(needle) {
                 out.push(v.clone());
             }
-        }
     }
     Ok(Value::List(out))
 }
@@ -1346,7 +1344,7 @@ fn single(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     match list.len() {
         0 => Err(MError::Other("List.Single: list is empty".into())),
         1 => Ok(list[0].clone()),
-        n => Err(MError::Other(format!("List.Single: expected exactly one element, got {}", n))),
+        n => Err(MError::Other(format!("List.Single: expected exactly one element, got {n}"))),
     }
 }
 
@@ -1355,7 +1353,7 @@ fn single_or_default(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError
     match list.len() {
         0 => Ok(args.get(1).cloned().unwrap_or(Value::Null)),
         1 => Ok(list[0].clone()),
-        n => Err(MError::Other(format!("List.SingleOrDefault: expected at most one element, got {}", n))),
+        n => Err(MError::Other(format!("List.SingleOrDefault: expected at most one element, got {n}"))),
     }
 }
 
@@ -1458,7 +1456,7 @@ fn sort_numeric_or_text(list: &[Value], ctx: &str, descending: bool) -> Result<V
             (Kind::Empty, _) => kind = k,
             (Kind::Num, Kind::Num) | (Kind::Text, Kind::Text) => {}
             _ => return Err(MError::Other(format!(
-                "{}: mixed-type list not supported", ctx
+                "{ctx}: mixed-type list not supported"
             ))),
         }
     }
@@ -1539,7 +1537,7 @@ fn percentile(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let p = match &args[1] {
         Value::Number(n) if *n >= 0.0 && *n <= 1.0 => *n,
         other => return Err(MError::Other(format!(
-            "List.Percentile: percentile must be in [0,1] (got {:?})", other
+            "List.Percentile: percentile must be in [0,1] (got {other:?})"
         ))),
     };
     if !matches!(args.get(2), Some(Value::Null) | None) {

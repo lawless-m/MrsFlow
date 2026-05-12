@@ -111,7 +111,7 @@ fn field(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         Some((_, v)) => super::super::force(v.clone(), &mut |e, env| {
             super::super::evaluate(e, env, &super::super::NoIoHost)
         }),
-        None => Err(MError::Other(format!("Record.Field: field not found: {}", name))),
+        None => Err(MError::Other(format!("Record.Field: field not found: {name}"))),
     }
 }
 
@@ -230,8 +230,7 @@ fn remove_fields(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     for n in &drop_names {
         if !record.fields.iter().any(|(fname, _)| fname == n) {
             return Err(MError::Other(format!(
-                "Record.RemoveFields: field not found: {}",
-                n
+                "Record.RemoveFields: field not found: {n}"
             )));
         }
     }
@@ -255,8 +254,7 @@ fn add_field(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let name = expect_text(&args[1])?;
     if record.fields.iter().any(|(n, _)| n == name) {
         return Err(MError::Other(format!(
-            "Record.AddField: field already exists: {}",
-            name
+            "Record.AddField: field already exists: {name}"
         )));
     }
     // v1: ignore the optional `delayed` flag — we evaluate args eagerly.
@@ -342,7 +340,7 @@ fn rename_fields(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let raw = expect_list(&args[1])?;
     let pairs: Vec<(String, String)> = if raw.iter().all(|v| matches!(v, Value::List(_))) {
         raw.iter()
-            .map(|v| parse_rename_pair(v))
+            .map(parse_rename_pair)
             .collect::<Result<_, _>>()?
     } else {
         vec![parse_rename_pair(&Value::List(raw.clone()))?]
@@ -350,12 +348,11 @@ fn rename_fields(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let mut fields = record.fields.clone();
     for (old, new) in pairs {
         let pos = fields.iter().position(|(n, _)| n == &old).ok_or_else(|| {
-            MError::Other(format!("Record.RenameFields: field not found: {}", old))
+            MError::Other(format!("Record.RenameFields: field not found: {old}"))
         })?;
         if old != new && fields.iter().any(|(n, _)| n == &new) {
             return Err(MError::Other(format!(
-                "Record.RenameFields: target field already exists: {}",
-                new
+                "Record.RenameFields: target field already exists: {new}"
             )));
         }
         fields[pos].0 = new;
@@ -397,8 +394,7 @@ fn reorder_fields(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     for n in &order {
         if !record.fields.iter().any(|(fname, _)| fname == n) {
             return Err(MError::Other(format!(
-                "Record.ReorderFields: field not found: {}",
-                n
+                "Record.ReorderFields: field not found: {n}"
             )));
         }
     }
@@ -445,7 +441,7 @@ fn select_fields(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             .iter()
             .find(|(fname, _)| fname == n)
             .ok_or_else(|| {
-                MError::Other(format!("Record.SelectFields: field not found: {}", n))
+                MError::Other(format!("Record.SelectFields: field not found: {n}"))
             })?;
         fields.push((fname.clone(), fv.clone()));
     }
@@ -524,7 +520,7 @@ fn transform_fields(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> 
         let name = expect_text(&xs[0])?.to_string();
         let closure = expect_function(&xs[1])?;
         let pos = fields.iter().position(|(n, _)| n == &name).ok_or_else(|| {
-            MError::Other(format!("Record.TransformFields: field not found: {}", name))
+            MError::Other(format!("Record.TransformFields: field not found: {name}"))
         })?;
         let forced = super::super::force(fields[pos].1.clone(), &mut |e, env| {
             super::super::evaluate(e, env, host)

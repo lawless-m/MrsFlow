@@ -93,8 +93,7 @@ fn open_record(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             open: true,
         })),
         other => Err(MError::Other(format!(
-            "Type.OpenRecord: expected record-type, got {:?}",
-            other
+            "Type.OpenRecord: expected record-type, got {other:?}"
         ))),
     }
 }
@@ -106,8 +105,7 @@ fn closed_record(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             open: false,
         })),
         other => Err(MError::Other(format!(
-            "Type.ClosedRecord: expected record-type, got {:?}",
-            other
+            "Type.ClosedRecord: expected record-type, got {other:?}"
         ))),
     }
 }
@@ -141,8 +139,7 @@ fn record_fields(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             }))
         }
         other => Err(MError::Other(format!(
-            "Type.RecordFields: expected record-type, got {:?}",
-            other
+            "Type.RecordFields: expected record-type, got {other:?}"
         ))),
     }
 }
@@ -151,8 +148,7 @@ fn list_item(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     match expect_type(&args[0])? {
         TypeRep::ListOf(item) => Ok(Value::Type((**item).clone())),
         other => Err(MError::Other(format!(
-            "Type.ListItem: expected list-type, got {:?}",
-            other
+            "Type.ListItem: expected list-type, got {other:?}"
         ))),
     }
 }
@@ -165,10 +161,9 @@ fn table_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             .iter()
             .find(|(n, _)| n == name)
             .map(|(_, ty)| Value::Type(ty.clone()))
-            .ok_or_else(|| MError::Other(format!("Type.TableColumn: column not found: {}", name))),
+            .ok_or_else(|| MError::Other(format!("Type.TableColumn: column not found: {name}"))),
         other => Err(MError::Other(format!(
-            "Type.TableColumn: expected table-type, got {:?}",
-            other
+            "Type.TableColumn: expected table-type, got {other:?}"
         ))),
     }
 }
@@ -188,8 +183,7 @@ fn table_row(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             Ok(Value::Type(TypeRep::RecordOf { fields, open: false }))
         }
         other => Err(MError::Other(format!(
-            "Type.TableRow: expected table-type, got {:?}",
-            other
+            "Type.TableRow: expected table-type, got {other:?}"
         ))),
     }
 }
@@ -205,8 +199,7 @@ fn table_schema(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             Ok(Value::Table(super::table::values_to_table(&names, &rows)?))
         }
         other => Err(MError::Other(format!(
-            "Type.TableSchema: expected table-type, got {:?}",
-            other
+            "Type.TableSchema: expected table-type, got {other:?}"
         ))),
     }
 }
@@ -226,8 +219,7 @@ fn function_parameters(args: &[Value], _host: &dyn IoHost) -> Result<Value, MErr
             }))
         }
         other => Err(MError::Other(format!(
-            "Type.FunctionParameters: expected function-type, got {:?}",
-            other
+            "Type.FunctionParameters: expected function-type, got {other:?}"
         ))),
     }
 }
@@ -239,8 +231,7 @@ fn function_required_parameters(args: &[Value], _host: &dyn IoHost) -> Result<Va
             Ok(Value::Number(n as f64))
         }
         other => Err(MError::Other(format!(
-            "Type.FunctionRequiredParameters: expected function-type, got {:?}",
-            other
+            "Type.FunctionRequiredParameters: expected function-type, got {other:?}"
         ))),
     }
 }
@@ -249,8 +240,7 @@ fn function_return(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> 
     match expect_type(&args[0])? {
         TypeRep::FunctionOf { return_type, .. } => Ok(Value::Type((**return_type).clone())),
         other => Err(MError::Other(format!(
-            "Type.FunctionReturn: expected function-type, got {:?}",
-            other
+            "Type.FunctionReturn: expected function-type, got {other:?}"
         ))),
     }
 }

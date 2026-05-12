@@ -73,7 +73,7 @@ fn from_binary(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         other => return Err(type_mismatch("binary", other)),
     };
     let text = std::str::from_utf8(bytes)
-        .map_err(|e| MError::Other(format!("Lines.FromBinary: invalid UTF-8: {}", e)))?;
+        .map_err(|e| MError::Other(format!("Lines.FromBinary: invalid UTF-8: {e}")))?;
     let include_seps = matches!(args.get(2), Some(Value::Logical(true)));
     Ok(Value::List(split_lines(text, include_seps)))
 }

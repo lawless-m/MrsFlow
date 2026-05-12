@@ -26,20 +26,20 @@ impl Default for CliIoHost {
 impl IoHost for CliIoHost {
     fn parquet_read(&self, path: &str) -> Result<Value, IoError> {
         let file = File::open(path)
-            .map_err(|e| IoError::Other(format!("open {}: {}", path, e)))?;
+            .map_err(|e| IoError::Other(format!("open {path}: {e}")))?;
         let builder = ParquetRecordBatchReaderBuilder::try_new(file)
-            .map_err(|e| IoError::Other(format!("parquet read {}: {}", path, e)))?;
+            .map_err(|e| IoError::Other(format!("parquet read {path}: {e}")))?;
         let mut reader = builder
             .build()
-            .map_err(|e| IoError::Other(format!("parquet read {}: {}", path, e)))?;
+            .map_err(|e| IoError::Other(format!("parquet read {path}: {e}")))?;
         let mut batches: Vec<RecordBatch> = Vec::new();
         for batch in reader.by_ref() {
             let b =
-                batch.map_err(|e| IoError::Other(format!("parquet read {}: {}", path, e)))?;
+                batch.map_err(|e| IoError::Other(format!("parquet read {path}: {e}")))?;
             batches.push(b);
         }
         let combined = concatenate_batches(&batches)
-            .map_err(|e| IoError::Other(format!("parquet read {}: {}", path, e)))?;
+            .map_err(|e| IoError::Other(format!("parquet read {path}: {e}")))?;
         Ok(Value::Table(Table::from_arrow(combined)))
     }
 
@@ -47,7 +47,7 @@ impl IoHost for CliIoHost {
         let batch_owned = match value {
             Value::Table(t) => t
                 .try_to_arrow()
-                .map_err(|e| IoError::Other(format!("parquet_write: {:?}", e)))?,
+                .map_err(|e| IoError::Other(format!("parquet_write: {e:?}")))?,
             _ => {
                 return Err(IoError::Other(
                     "parquet_write: value must be a table".into(),
@@ -56,23 +56,22 @@ impl IoHost for CliIoHost {
         };
         let batch = &batch_owned;
         let parent = Path::new(path).parent();
-        if let Some(p) = parent {
-            if !p.as_os_str().is_empty() {
+        if let Some(p) = parent
+            && !p.as_os_str().is_empty() {
                 std::fs::create_dir_all(p).map_err(|e| {
                     IoError::Other(format!("mkdir {}: {}", p.display(), e))
                 })?;
             }
-        }
         let file = File::create(path)
-            .map_err(|e| IoError::Other(format!("create {}: {}", path, e)))?;
+            .map_err(|e| IoError::Other(format!("create {path}: {e}")))?;
         let mut writer = ArrowWriter::try_new(file, batch.schema(), None)
-            .map_err(|e| IoError::Other(format!("parquet write {}: {}", path, e)))?;
+            .map_err(|e| IoError::Other(format!("parquet write {path}: {e}")))?;
         writer
             .write(batch)
-            .map_err(|e| IoError::Other(format!("parquet write {}: {}", path, e)))?;
+            .map_err(|e| IoError::Other(format!("parquet write {path}: {e}")))?;
         writer
             .close()
-            .map_err(|e| IoError::Other(format!("parquet close {}: {}", path, e)))?;
+            .map_err(|e| IoError::Other(format!("parquet close {path}: {e}")))?;
         Ok(())
     }
 

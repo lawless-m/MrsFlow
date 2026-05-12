@@ -260,14 +260,12 @@ pub fn evaluate(ast: &Expr, env: &Env, host: &dyn IoHost) -> Result<Value, MErro
                         let e = expect_number(&ev)?;
                         if s.fract() != 0.0 || e.fract() != 0.0 {
                             return Err(MError::Other(format!(
-                                "range bounds must be integers, got {} and {}",
-                                s, e
+                                "range bounds must be integers, got {s} and {e}"
                             )));
                         }
                         if s > e {
                             return Err(MError::Other(format!(
-                                "range start must be <= end, got {}..{}",
-                                s, e
+                                "range start must be <= end, got {s}..{e}"
                             )));
                         }
                         let mut i = s as i64;
@@ -330,7 +328,7 @@ pub fn evaluate(ast: &Expr, env: &Env, host: &dyn IoHost) -> Result<Value, MErro
                     if *optional {
                         Ok(Value::Null)
                     } else {
-                        Err(MError::Other(format!("field not found: {}", field)))
+                        Err(MError::Other(format!("field not found: {field}")))
                     }
                 }
             }
@@ -351,8 +349,7 @@ pub fn evaluate(ast: &Expr, env: &Env, host: &dyn IoHost) -> Result<Value, MErro
                     let i = expect_number(&idx_v)?;
                     if i.fract() != 0.0 || i < 0.0 {
                         return Err(MError::Other(format!(
-                            "list index must be non-negative integer, got {}",
-                            i
+                            "list index must be non-negative integer, got {i}"
                         )));
                     }
                     let idx = i as usize;
@@ -374,8 +371,7 @@ pub fn evaluate(ast: &Expr, env: &Env, host: &dyn IoHost) -> Result<Value, MErro
                     let i = expect_number(&idx_v)?;
                     if i.fract() != 0.0 || i < 0.0 {
                         return Err(MError::Other(format!(
-                            "table row index must be non-negative integer, got {}",
-                            i
+                            "table row index must be non-negative integer, got {i}"
                         )));
                     }
                     let idx = i as usize;
@@ -385,8 +381,7 @@ pub fn evaluate(ast: &Expr, env: &Env, host: &dyn IoHost) -> Result<Value, MErro
                             Ok(Value::Null)
                         } else {
                             Err(MError::Other(format!(
-                                "table row index out of bounds: {} (rows {})",
-                                idx, n_rows
+                                "table row index out of bounds: {idx} (rows {n_rows})"
                             )))
                         }
                     } else {
@@ -519,7 +514,7 @@ fn evaluate_as_type(expr: &Expr) -> Result<TypeRep, MError> {
             "table" => Ok(TypeRep::Table),
             "function" => Ok(TypeRep::Function),
             "type" => Ok(TypeRep::Type),
-            other => Err(MError::Other(format!("unknown primitive type: {}", other))),
+            other => Err(MError::Other(format!("unknown primitive type: {other}"))),
         },
         Expr::Unary(UnaryOp::Nullable, inner) => {
             let t = evaluate_as_type(inner)?;
@@ -717,15 +712,15 @@ fn error_to_record(err: MError) -> Value {
         MError::Raised(v) => v,
         MError::NameNotInScope(name) => build_standard_error_record(
             "Expression.Error".to_string(),
-            format!("the name '{}' wasn't recognized", name),
+            format!("the name '{name}' wasn't recognized"),
         ),
         MError::TypeMismatch { expected, found } => build_standard_error_record(
             "Expression.Error".to_string(),
-            format!("expected {}, found {}", expected, found),
+            format!("expected {expected}, found {found}"),
         ),
         MError::NotImplemented(what) => build_standard_error_record(
             "Expression.Error".to_string(),
-            format!("not implemented: {}", what),
+            format!("not implemented: {what}"),
         ),
         MError::Other(msg) => build_standard_error_record(
             "Expression.Error".to_string(),
@@ -768,11 +763,11 @@ fn parse_number_literal(lexeme: &str) -> Result<f64, MError> {
     if let Some(hex) = lexeme.strip_prefix("0x").or_else(|| lexeme.strip_prefix("0X")) {
         u64::from_str_radix(hex, 16)
             .map(|n| n as f64)
-            .map_err(|_| MError::Other(format!("invalid hex number: {}", lexeme)))
+            .map_err(|_| MError::Other(format!("invalid hex number: {lexeme}")))
     } else {
         lexeme
             .parse::<f64>()
-            .map_err(|_| MError::Other(format!("invalid number: {}", lexeme)))
+            .map_err(|_| MError::Other(format!("invalid number: {lexeme}")))
     }
 }
 
@@ -1009,21 +1004,21 @@ mod tests {
     fn eval_number(src: &str) -> f64 {
         match eval_str(src).expect("eval") {
             Value::Number(n) => n,
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
     }
 
     fn eval_text(src: &str) -> String {
         match eval_str(src).expect("eval") {
             Value::Text(s) => s,
-            other => panic!("expected text, got {:?}", other),
+            other => panic!("expected text, got {other:?}"),
         }
     }
 
     fn eval_bool(src: &str) -> bool {
         match eval_str(src).expect("eval") {
             Value::Logical(b) => b,
-            other => panic!("expected logical, got {:?}", other),
+            other => panic!("expected logical, got {other:?}"),
         }
     }
 
@@ -1052,8 +1047,8 @@ mod tests {
 
     #[test]
     fn literal_logicals_and_null() {
-        assert_eq!(eval_bool("true"), true);
-        assert_eq!(eval_bool("false"), false);
+        assert!(eval_bool("true"));
+        assert!(!eval_bool("false"));
         assert!(matches!(eval_str("null").unwrap(), Value::Null));
     }
 
@@ -1072,8 +1067,8 @@ mod tests {
 
     #[test]
     fn unary_not() {
-        assert_eq!(eval_bool("not true"), false);
-        assert_eq!(eval_bool("not false"), true);
+        assert!(!eval_bool("not true"));
+        assert!(eval_bool("not false"));
     }
 
     #[test]
@@ -1083,7 +1078,7 @@ mod tests {
                 expected: "logical",
                 found: "number",
             }) => {}
-            other => panic!("expected TypeMismatch, got {:?}", other),
+            other => panic!("expected TypeMismatch, got {other:?}"),
         }
     }
 
@@ -1115,7 +1110,7 @@ mod tests {
     fn arithmetic_type_mismatch() {
         match eval_str(r#""hi" + 1"#) {
             Err(MError::TypeMismatch { expected: "number", .. }) => {}
-            other => panic!("expected TypeMismatch, got {:?}", other),
+            other => panic!("expected TypeMismatch, got {other:?}"),
         }
     }
 
@@ -1136,17 +1131,17 @@ mod tests {
 
     #[test]
     fn comparison_numbers() {
-        assert_eq!(eval_bool("1 < 2"), true);
-        assert_eq!(eval_bool("2 < 1"), false);
-        assert_eq!(eval_bool("1 <= 1"), true);
-        assert_eq!(eval_bool("2 > 1"), true);
-        assert_eq!(eval_bool("2 >= 2"), true);
+        assert!(eval_bool("1 < 2"));
+        assert!(!eval_bool("2 < 1"));
+        assert!(eval_bool("1 <= 1"));
+        assert!(eval_bool("2 > 1"));
+        assert!(eval_bool("2 >= 2"));
     }
 
     #[test]
     fn comparison_texts() {
-        assert_eq!(eval_bool(r#""a" < "b""#), true);
-        assert_eq!(eval_bool(r#""z" > "a""#), true);
+        assert!(eval_bool(r#""a" < "b""#));
+        assert!(eval_bool(r#""z" > "a""#));
     }
 
     #[test]
@@ -1159,27 +1154,27 @@ mod tests {
 
     #[test]
     fn equality_basic() {
-        assert_eq!(eval_bool("1 = 1"), true);
-        assert_eq!(eval_bool("1 = 2"), false);
-        assert_eq!(eval_bool("1 <> 2"), true);
-        assert_eq!(eval_bool(r#""a" = "a""#), true);
-        assert_eq!(eval_bool("true = true"), true);
-        assert_eq!(eval_bool("null = null"), true);
+        assert!(eval_bool("1 = 1"));
+        assert!(!eval_bool("1 = 2"));
+        assert!(eval_bool("1 <> 2"));
+        assert!(eval_bool(r#""a" = "a""#));
+        assert!(eval_bool("true = true"));
+        assert!(eval_bool("null = null"));
     }
 
     #[test]
     fn equality_cross_type_returns_false() {
         // Per design: mismatched-kind equality returns false (no coercion in
         // slice 1; spec has some allowed coercions for later slices).
-        assert_eq!(eval_bool(r#"1 = "1""#), false);
-        assert_eq!(eval_bool(r#"1 <> "1""#), true);
-        assert_eq!(eval_bool("null = false"), false);
+        assert!(!eval_bool(r#"1 = "1""#));
+        assert!(eval_bool(r#"1 <> "1""#));
+        assert!(!eval_bool("null = false"));
     }
 
     #[test]
     fn nan_is_not_equal_to_itself() {
         // Per IEEE 754; matches f64's PartialEq.
-        assert_eq!(eval_bool("(1 / 0 - 1 / 0) = (1 / 0 - 1 / 0)"), false);
+        assert!(!eval_bool("(1 / 0 - 1 / 0) = (1 / 0 - 1 / 0)"));
     }
 
     // --- Logical ---
@@ -1187,22 +1182,22 @@ mod tests {
     #[test]
     fn logical_and_short_circuit() {
         // If left is false, right is never evaluated — even if it would error.
-        assert_eq!(eval_bool("false and (1 / 0 > 0)"), false);
+        assert!(!eval_bool("false and (1 / 0 > 0)"));
         // The TypeMismatch on the right side does NOT fire because we short-circuit.
-        assert_eq!(eval_bool(r#"false and "not a logical""#), false);
+        assert!(!eval_bool(r#"false and "not a logical""#));
     }
 
     #[test]
     fn logical_or_short_circuit() {
-        assert_eq!(eval_bool("true or (1 / 0 > 0)"), true);
-        assert_eq!(eval_bool(r#"true or "not a logical""#), true);
+        assert!(eval_bool("true or (1 / 0 > 0)"));
+        assert!(eval_bool(r#"true or "not a logical""#));
     }
 
     #[test]
     fn logical_combined() {
-        assert_eq!(eval_bool("true and false"), false);
-        assert_eq!(eval_bool("true and true"), true);
-        assert_eq!(eval_bool("false or true"), true);
+        assert!(!eval_bool("true and false"));
+        assert!(eval_bool("true and true"));
+        assert!(eval_bool("false or true"));
     }
 
     // --- if / then / else ---
@@ -1224,7 +1219,7 @@ mod tests {
     fn if_cond_must_be_logical() {
         match eval_str("if 1 then 1 else 2") {
             Err(MError::TypeMismatch { expected: "logical", .. }) => {}
-            other => panic!("expected TypeMismatch, got {:?}", other),
+            other => panic!("expected TypeMismatch, got {other:?}"),
         }
     }
 
@@ -1282,7 +1277,7 @@ mod tests {
     fn name_not_in_scope() {
         match eval_str("missing") {
             Err(MError::NameNotInScope(n)) => assert_eq!(n, "missing"),
-            other => panic!("expected NameNotInScope, got {:?}", other),
+            other => panic!("expected NameNotInScope, got {other:?}"),
         }
     }
 
@@ -1300,7 +1295,7 @@ mod tests {
             Value::Type(TypeRep::ListOf(inner)) => {
                 assert_eq!(*inner, TypeRep::Number);
             }
-            other => panic!("expected ListOf(Number), got {:?}", other),
+            other => panic!("expected ListOf(Number), got {other:?}"),
         }
     }
 
@@ -1311,7 +1306,7 @@ mod tests {
         let env = EnvNode::empty().extend("x".into(), Value::Number(1.0));
         match env.lookup("x") {
             Some(Value::Number(n)) => assert_eq!(n, 1.0),
-            other => panic!("expected Number(1.0), got {:?}", other),
+            other => panic!("expected Number(1.0), got {other:?}"),
         }
     }
 
@@ -1337,12 +1332,12 @@ mod tests {
         // inner's x shadows outer's
         match inner.lookup("x") {
             Some(Value::Number(n)) => assert_eq!(n, 2.0),
-            other => panic!("expected Number(2.0), got {:?}", other),
+            other => panic!("expected Number(2.0), got {other:?}"),
         }
         // outer is unaffected
         match outer.lookup("x") {
             Some(Value::Number(n)) => assert_eq!(n, 1.0),
-            other => panic!("expected outer Number(1.0), got {:?}", other),
+            other => panic!("expected outer Number(1.0), got {other:?}"),
         }
     }
 
@@ -1363,7 +1358,7 @@ mod tests {
         let mut eval = counting_evaluator(&counter);
         match force(Value::Number(7.0), &mut eval) {
             Ok(Value::Number(n)) => assert_eq!(n, 7.0),
-            other => panic!("expected Number(7.0), got {:?}", other),
+            other => panic!("expected Number(7.0), got {other:?}"),
         }
         assert_eq!(counter.get(), 0, "evaluator should not have been called");
     }
@@ -1382,7 +1377,7 @@ mod tests {
         let value = env.lookup("x").expect("x bound");
         match force(value, &mut eval) {
             Ok(Value::Number(n)) => assert_eq!(n, 42.0),
-            other => panic!("expected Number(42.0), got {:?}", other),
+            other => panic!("expected Number(42.0), got {other:?}"),
         }
         assert_eq!(counter.get(), 1, "evaluator should have been called once");
     }
@@ -1440,16 +1435,16 @@ mod tests {
     #[test]
     fn invoke_arity_too_few() {
         match eval_str("((x, y) => x + y)(1)") {
-            Err(MError::Other(msg)) => assert!(msg.contains("arity"), "got: {}", msg),
-            other => panic!("expected arity error, got {:?}", other),
+            Err(MError::Other(msg)) => assert!(msg.contains("arity"), "got: {msg}"),
+            other => panic!("expected arity error, got {other:?}"),
         }
     }
 
     #[test]
     fn invoke_arity_too_many() {
         match eval_str("((x) => x)(1, 2)") {
-            Err(MError::Other(msg)) => assert!(msg.contains("arity"), "got: {}", msg),
-            other => panic!("expected arity error, got {:?}", other),
+            Err(MError::Other(msg)) => assert!(msg.contains("arity"), "got: {msg}"),
+            other => panic!("expected arity error, got {other:?}"),
         }
     }
 
@@ -1460,7 +1455,7 @@ mod tests {
                 expected: "function",
                 found: "number",
             }) => {}
-            other => panic!("expected TypeMismatch on non-function, got {:?}", other),
+            other => panic!("expected TypeMismatch on non-function, got {other:?}"),
         }
     }
 
@@ -1494,13 +1489,12 @@ mod tests {
 
     #[test]
     fn mutually_recursive_functions_via_at() {
-        assert_eq!(
+        assert!(
             eval_bool(
                 "let even = (n) => if n = 0 then true else @odd(n - 1), \
                      odd = (n) => if n = 0 then false else @even(n - 1) \
                  in even(4)"
-            ),
-            true
+            )
         );
     }
 
@@ -1509,7 +1503,7 @@ mod tests {
     fn eval_list_len(src: &str) -> usize {
         match eval_str(src).expect("eval") {
             Value::List(xs) => xs.len(),
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -1523,9 +1517,9 @@ mod tests {
         match eval_str("{42}").unwrap() {
             Value::List(xs) => match xs.as_slice() {
                 [Value::Number(n)] => assert_eq!(*n, 42.0),
-                other => panic!("unexpected items: {:?}", other),
+                other => panic!("unexpected items: {other:?}"),
             },
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -1542,12 +1536,12 @@ mod tests {
                     .iter()
                     .map(|v| match v {
                         Value::Number(n) => *n,
-                        other => panic!("expected number, got {:?}", other),
+                        other => panic!("expected number, got {other:?}"),
                     })
                     .collect();
                 assert_eq!(nums, vec![1.0, 2.0, 3.0]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -1565,7 +1559,7 @@ mod tests {
     fn empty_record() {
         match eval_str("[]").unwrap() {
             Value::Record(r) => assert!(r.fields.is_empty()),
-            other => panic!("expected record, got {:?}", other),
+            other => panic!("expected record, got {other:?}"),
         }
     }
 
@@ -1594,7 +1588,7 @@ mod tests {
     fn field_access_optional_missing_is_null() {
         match eval_str("[a = 1][missing]?").unwrap() {
             Value::Null => {}
-            other => panic!("expected null, got {:?}", other),
+            other => panic!("expected null, got {other:?}"),
         }
     }
 
@@ -1606,8 +1600,8 @@ mod tests {
     #[test]
     fn field_access_required_missing_errors() {
         match eval_str("[a = 1][missing]") {
-            Err(MError::Other(msg)) => assert!(msg.contains("field not found"), "got: {}", msg),
-            other => panic!("expected field-not-found error, got {:?}", other),
+            Err(MError::Other(msg)) => assert!(msg.contains("field not found"), "got: {msg}"),
+            other => panic!("expected field-not-found error, got {other:?}"),
         }
     }
 
@@ -1625,7 +1619,7 @@ mod tests {
     fn item_access_out_of_bounds_optional() {
         match eval_str("{10, 20}{99}?").unwrap() {
             Value::Null => {}
-            other => panic!("expected null, got {:?}", other),
+            other => panic!("expected null, got {other:?}"),
         }
     }
 
@@ -1648,7 +1642,7 @@ mod tests {
         // is the record we're accessing.
         match eval_str(r#"(each [name])([name = "ok"])"#).unwrap() {
             Value::Text(s) => assert_eq!(s, "ok"),
-            other => panic!("expected text, got {:?}", other),
+            other => panic!("expected text, got {other:?}"),
         }
     }
 
@@ -1666,8 +1660,8 @@ mod tests {
                 .iter()
                 .find(|(n, _)| n == name)
                 .map(|(_, v)| v.clone())
-                .unwrap_or_else(|| panic!("field {} not found in {:?}", name, v)),
-            other => panic!("expected record, got {:?}", other),
+                .unwrap_or_else(|| panic!("field {name} not found in {v:?}")),
+            other => panic!("expected record, got {other:?}"),
         }
     }
 
@@ -1677,11 +1671,11 @@ mod tests {
         let v = deep_force(v, &NoIoHost).unwrap();
         match &record_field(&v, "HasError") {
             Value::Logical(false) => {}
-            other => panic!("expected HasError=false, got {:?}", other),
+            other => panic!("expected HasError=false, got {other:?}"),
         }
         match &record_field(&v, "Value") {
             Value::Number(n) => assert_eq!(*n, 42.0),
-            other => panic!("expected Value=42, got {:?}", other),
+            other => panic!("expected Value=42, got {other:?}"),
         }
     }
 
@@ -1691,13 +1685,13 @@ mod tests {
         let v = deep_force(v, &NoIoHost).unwrap();
         match &record_field(&v, "HasError") {
             Value::Logical(true) => {}
-            other => panic!("expected HasError=true, got {:?}", other),
+            other => panic!("expected HasError=true, got {other:?}"),
         }
         let err = record_field(&v, "Error");
         // Error.Message should mention the missing name
         match record_field(&err, "Message") {
-            Value::Text(s) => assert!(s.contains("missing_name"), "got: {}", s),
-            other => panic!("expected text Message, got {:?}", other),
+            Value::Text(s) => assert!(s.contains("missing_name"), "got: {s}"),
+            other => panic!("expected text Message, got {other:?}"),
         }
     }
 
@@ -1715,7 +1709,7 @@ mod tests {
     fn error_text_propagates_as_raised() {
         match eval_str(r#"error "boom""#) {
             Err(MError::Raised(_)) => {}
-            other => panic!("expected MError::Raised, got {:?}", other),
+            other => panic!("expected MError::Raised, got {other:?}"),
         }
     }
 
@@ -1725,16 +1719,16 @@ mod tests {
         let v = deep_force(v, &NoIoHost).unwrap();
         match &record_field(&v, "HasError") {
             Value::Logical(true) => {}
-            other => panic!("expected HasError=true, got {:?}", other),
+            other => panic!("expected HasError=true, got {other:?}"),
         }
         let err = record_field(&v, "Error");
         match record_field(&err, "Message") {
             Value::Text(s) => assert_eq!(s, "boom"),
-            other => panic!("expected Message=boom, got {:?}", other),
+            other => panic!("expected Message=boom, got {other:?}"),
         }
         match record_field(&err, "Reason") {
             Value::Text(s) => assert_eq!(s, "Expression.Error"),
-            other => panic!("expected Reason=Expression.Error, got {:?}", other),
+            other => panic!("expected Reason=Expression.Error, got {other:?}"),
         }
     }
 
@@ -1748,11 +1742,11 @@ mod tests {
         let err = record_field(&v, "Error");
         match record_field(&err, "Reason") {
             Value::Text(s) => assert_eq!(s, "X"),
-            other => panic!("expected Reason=X, got {:?}", other),
+            other => panic!("expected Reason=X, got {other:?}"),
         }
         match record_field(&err, "Message") {
             Value::Text(s) => assert_eq!(s, "Y"),
-            other => panic!("expected Message=Y, got {:?}", other),
+            other => panic!("expected Message=Y, got {other:?}"),
         }
     }
 
@@ -1793,15 +1787,15 @@ mod tests {
                 use chrono::Datelike;
                 assert_eq!((d.year(), d.month(), d.day()), (2024, 1, 15));
             }
-            other => panic!("expected date, got {:?}", other),
+            other => panic!("expected date, got {other:?}"),
         }
     }
 
     #[test]
     fn date_invalid_errors() {
         match eval_str("#date(2024, 13, 1)") {
-            Err(MError::Other(msg)) => assert!(msg.contains("invalid date"), "got: {}", msg),
-            other => panic!("expected error, got {:?}", other),
+            Err(MError::Other(msg)) => assert!(msg.contains("invalid date"), "got: {msg}"),
+            other => panic!("expected error, got {other:?}"),
         }
     }
 
@@ -1813,7 +1807,7 @@ mod tests {
                 assert_eq!((dt.year(), dt.month(), dt.day()), (2024, 1, 15));
                 assert_eq!((dt.hour(), dt.minute(), dt.second()), (12, 30, 0));
             }
-            other => panic!("expected datetime, got {:?}", other),
+            other => panic!("expected datetime, got {other:?}"),
         }
     }
 
@@ -1821,7 +1815,7 @@ mod tests {
     fn duration_constructor_basic() {
         match eval_str("#duration(1, 0, 0, 0)").unwrap() {
             Value::Duration(d) => assert_eq!(d.num_seconds(), 86400),
-            other => panic!("expected duration, got {:?}", other),
+            other => panic!("expected duration, got {other:?}"),
         }
     }
 
@@ -1829,30 +1823,30 @@ mod tests {
     fn duration_mixed_units() {
         match eval_str("#duration(0, 1, 30, 0)").unwrap() {
             Value::Duration(d) => assert_eq!(d.num_seconds(), 3600 + 1800),
-            other => panic!("expected duration, got {:?}", other),
+            other => panic!("expected duration, got {other:?}"),
         }
     }
 
     #[test]
     fn date_is_date_type() {
-        assert_eq!(eval_bool("#date(2024, 1, 15) is date"), true);
-        assert_eq!(eval_bool("#date(2024, 1, 15) is datetime"), false);
+        assert!(eval_bool("#date(2024, 1, 15) is date"));
+        assert!(!eval_bool("#date(2024, 1, 15) is datetime"));
     }
 
     #[test]
     fn datetime_is_datetime_type() {
-        assert_eq!(eval_bool("#datetime(2024, 1, 15, 0, 0, 0) is datetime"), true);
-        assert_eq!(eval_bool("#datetime(2024, 1, 15, 0, 0, 0) is date"), false);
+        assert!(eval_bool("#datetime(2024, 1, 15, 0, 0, 0) is datetime"));
+        assert!(!eval_bool("#datetime(2024, 1, 15, 0, 0, 0) is date"));
     }
 
     #[test]
     fn duration_is_duration_type() {
-        assert_eq!(eval_bool("#duration(1, 0, 0, 0) is duration"), true);
+        assert!(eval_bool("#duration(1, 0, 0, 0) is duration"));
     }
 
     #[test]
     fn null_is_nullable_date() {
-        assert_eq!(eval_bool("null is nullable date"), true);
+        assert!(eval_bool("null is nullable date"));
     }
 
     // --- Odbc.Query plumbing via mock host (eval-8) ---
@@ -1926,7 +1920,7 @@ mod tests {
                 let names: Vec<String> = t.column_names();
                 assert_eq!(names, vec!["name".to_string(), "v".to_string()]);
             }
-            other => panic!("expected table from Odbc.Query, got {:?}", other),
+            other => panic!("expected table from Odbc.Query, got {other:?}"),
         }
     }
 
@@ -1941,10 +1935,10 @@ mod tests {
         {
             Value::Table(t) => {
                 let dtype = t.as_arrow().unwrap().schema().field(0).data_type().clone();
-                assert_eq!(format!("{:?}", dtype), "Float64");
+                assert_eq!(format!("{dtype:?}"), "Float64");
                 assert_eq!(t.num_rows(), 2);
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -1967,7 +1961,7 @@ mod tests {
                 let vals: Vec<f64> = (0..col.len()).map(|i| col.value(i)).collect();
                 assert_eq!(vals, vec![2.0, 3.0, 4.0]);
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -1992,7 +1986,7 @@ mod tests {
                 let vals: Vec<f64> = (0..col.len()).map(|i| col.value(i)).collect();
                 assert_eq!(vals, vec![11.0, 12.0]);
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -2000,11 +1994,11 @@ mod tests {
     fn text_end_basic() {
         match eval_str(r#"Text.End("abcdef", 3)"#).unwrap() {
             Value::Text(s) => assert_eq!(s, "def"),
-            other => panic!("expected text, got {:?}", other),
+            other => panic!("expected text, got {other:?}"),
         }
         match eval_str(r#"Text.End("ab", 10)"#).unwrap() {
             Value::Text(s) => assert_eq!(s, "ab"),
-            other => panic!("expected text, got {:?}", other),
+            other => panic!("expected text, got {other:?}"),
         }
     }
 
@@ -2012,12 +2006,12 @@ mod tests {
     fn text_middle_with_and_without_count() {
         match eval_str(r#"Text.Middle("abcdef", 2, 3)"#).unwrap() {
             Value::Text(s) => assert_eq!(s, "cde"),
-            other => panic!("expected text, got {:?}", other),
+            other => panic!("expected text, got {other:?}"),
         }
         // No count → rest of string.
         match eval_str(r#"Text.Middle("abcdef", 2)"#).unwrap() {
             Value::Text(s) => assert_eq!(s, "cdef"),
-            other => panic!("expected text, got {:?}", other),
+            other => panic!("expected text, got {other:?}"),
         }
     }
 
@@ -2034,7 +2028,7 @@ mod tests {
                     .collect();
                 assert_eq!(strs, vec!["a", "b", "c"]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -2042,7 +2036,7 @@ mod tests {
     fn text_lower_basic() {
         match eval_str(r#"Text.Lower("Hello WORLD")"#).unwrap() {
             Value::Text(s) => assert_eq!(s, "hello world"),
-            other => panic!("expected text, got {:?}", other),
+            other => panic!("expected text, got {other:?}"),
         }
     }
 
@@ -2050,7 +2044,7 @@ mod tests {
     fn text_upper_basic() {
         match eval_str(r#"Text.Upper("Hello world")"#).unwrap() {
             Value::Text(s) => assert_eq!(s, "HELLO WORLD"),
-            other => panic!("expected text, got {:?}", other),
+            other => panic!("expected text, got {other:?}"),
         }
     }
 
@@ -2070,7 +2064,7 @@ mod tests {
     fn number_abs_basic() {
         match eval_str("Number.Abs(-3.5)").unwrap() {
             Value::Number(n) => assert_eq!(n, 3.5),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
     }
 
@@ -2085,7 +2079,7 @@ mod tests {
     fn number_power_basic() {
         match eval_str("Number.Power(2, 10)").unwrap() {
             Value::Number(n) => assert_eq!(n, 1024.0),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
     }
 
@@ -2093,7 +2087,7 @@ mod tests {
     fn number_sqrt_basic() {
         match eval_str("Number.Sqrt(16)").unwrap() {
             Value::Number(n) => assert_eq!(n, 4.0),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
     }
 
@@ -2101,11 +2095,11 @@ mod tests {
     fn number_round_to_digits() {
         match eval_str("Number.Round(10.503, 2)").unwrap() {
             Value::Number(n) => assert!((n - 10.5).abs() < 1e-9),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
         match eval_str("Number.Round(2.7)").unwrap() {
             Value::Number(n) => assert_eq!(n, 3.0),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
     }
 
@@ -2125,7 +2119,7 @@ mod tests {
                 assert_eq!(t.num_rows(), 2);
                 assert_eq!(t.column_names(), vec!["id", "name", "Orders"]);
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -2143,7 +2137,7 @@ mod tests {
                 // Row 0 (id=1) has nested orders with 1 row.
                 let r0 = match super::stdlib::row_to_record(&t, 0).unwrap() {
                     Value::Record(r) => r,
-                    other => panic!("expected record, got {:?}", other),
+                    other => panic!("expected record, got {other:?}"),
                 };
                 let orders_cell = &r0
                     .fields
@@ -2153,10 +2147,10 @@ mod tests {
                     .1;
                 match orders_cell {
                     Value::Table(inner) => assert_eq!(inner.num_rows(), 1),
-                    other => panic!("expected table cell, got {:?}", other),
+                    other => panic!("expected table cell, got {other:?}"),
                 }
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -2175,7 +2169,7 @@ mod tests {
                 assert_eq!(t.num_rows(), 2);
                 let r0 = match super::stdlib::row_to_record(&t, 0).unwrap() {
                     Value::Record(r) => r,
-                    other => panic!("expected record, got {:?}", other),
+                    other => panic!("expected record, got {other:?}"),
                 };
                 let orders_cell = &r0
                     .fields
@@ -2185,10 +2179,10 @@ mod tests {
                     .1;
                 match orders_cell {
                     Value::Table(inner) => assert_eq!(inner.num_rows(), 0),
-                    other => panic!("expected table cell, got {:?}", other),
+                    other => panic!("expected table cell, got {other:?}"),
                 }
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -2207,7 +2201,7 @@ mod tests {
                 assert_eq!(t.column_names(), vec!["id", "a", "b"]);
                 assert_eq!(t.num_rows(), 3); // 2 + 1
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -2223,7 +2217,7 @@ mod tests {
             Value::Table(t) => {
                 assert_eq!(t.column_names(), vec!["id", "renamed"]);
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -2238,7 +2232,7 @@ mod tests {
                 assert_eq!(t.column_names(), vec!["id", "xs"]);
                 assert_eq!(t.num_rows(), 3);
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -2253,7 +2247,7 @@ mod tests {
                 // Row 2 (empty list) drops; result has 3 rows total (10,20,30).
                 assert_eq!(t.num_rows(), 3);
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -2269,7 +2263,7 @@ mod tests {
                 assert_eq!(t.column_names(), vec!["id", "a", "b"]);
                 assert_eq!(t.num_rows(), 2);
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -2283,7 +2277,7 @@ mod tests {
             Value::Table(t) => {
                 assert_eq!(t.column_names(), vec!["id", "x", "y"]);
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -2299,7 +2293,7 @@ mod tests {
                 assert_eq!(t.column_names(), vec!["id", "attr", "val"]);
                 assert_eq!(t.num_rows(), 4);
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -2315,7 +2309,7 @@ mod tests {
                 assert_eq!(t.column_names(), vec!["id", "attr", "val"]);
                 assert_eq!(t.num_rows(), 4);
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -2335,7 +2329,7 @@ mod tests {
                 assert_eq!(t.column_names(), vec!["id", "q1", "q2"]);
                 assert_eq!(t.num_rows(), 2);
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -2365,10 +2359,10 @@ mod tests {
                 };
                 match &rows[0][1] {
                     Value::Number(n) => assert_eq!(*n, 15.0),
-                    other => panic!("expected number for q1, got {:?}", other),
+                    other => panic!("expected number for q1, got {other:?}"),
                 }
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -2386,7 +2380,7 @@ mod tests {
                 assert_eq!(t.num_rows(), 4);
                 assert!(matches!(t.repr, super::TableRepr::Rows { .. }));
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -2406,7 +2400,7 @@ mod tests {
                 assert_eq!(t.column_names(), vec!["val".to_string()]);
                 assert_eq!(t.num_rows(), 3);
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -2420,7 +2414,7 @@ mod tests {
             Value::Table(t) => {
                 assert_eq!(t.column_names(), vec!["val".to_string()]);
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -2434,7 +2428,7 @@ mod tests {
             Value::Table(t) => {
                 assert_eq!(t.column_names(), vec!["k".to_string(), "v".to_string()]);
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -2449,7 +2443,7 @@ mod tests {
                 assert_eq!(t.num_rows(), 1);
                 assert!(matches!(t.repr, super::TableRepr::Rows { .. }));
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -2464,7 +2458,7 @@ mod tests {
                 assert_eq!(t.column_names(), vec!["name", "val", "len"]);
                 assert_eq!(t.num_rows(), 3);
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -2479,7 +2473,7 @@ mod tests {
                 assert!(matches!(t.repr, super::TableRepr::Arrow(_)));
                 assert_eq!(t.num_rows(), 2);
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -2498,7 +2492,7 @@ mod tests {
                 assert!(matches!(t.repr, super::TableRepr::Rows { .. }));
                 assert_eq!(t.num_rows(), 4);
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -2513,10 +2507,9 @@ mod tests {
         match eval_str(&src) {
             Err(MError::Other(msg)) => assert!(
                 msg.contains("heterogeneous") || msg.contains("cast"),
-                "expected cast error, got: {}",
-                msg
+                "expected cast error, got: {msg}"
             ),
-            other => panic!("expected error, got {:?}", other),
+            other => panic!("expected error, got {other:?}"),
         }
     }
 
@@ -2531,7 +2524,7 @@ mod tests {
             Value::Table(t) => {
                 assert_eq!(t.num_rows(), 3);
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -2545,7 +2538,7 @@ mod tests {
                 assert_eq!(t.num_rows(), 2);
                 assert_eq!(t.column_names(), vec!["x".to_string()]);
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -2556,7 +2549,7 @@ mod tests {
                 assert!(matches!(t.repr, super::TableRepr::Rows { .. }));
                 assert_eq!(t.num_rows(), 1);
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -2567,7 +2560,7 @@ mod tests {
                 assert!(matches!(t.repr, super::TableRepr::Rows { .. }));
                 assert_eq!(t.num_rows(), 1);
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -2581,7 +2574,7 @@ mod tests {
                 assert_eq!(r.fields[1].0, "y");
                 assert!(matches!(r.fields[1].1, Value::Number(n) if n == 2.0));
             }
-            other => panic!("expected record, got {:?}", other),
+            other => panic!("expected record, got {other:?}"),
         }
     }
 
@@ -2603,7 +2596,7 @@ mod tests {
                 assert!(matches!(t.repr, super::TableRepr::Rows { .. }));
                 assert_eq!(t.num_rows(), 3);
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -2620,7 +2613,7 @@ mod tests {
                 use arrow::datatypes::DataType;
                 assert_eq!(t.as_arrow().unwrap().schema().field(1).data_type(), &DataType::Float64);
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -2644,7 +2637,7 @@ mod tests {
                 let vals: Vec<f64> = (0..col.len()).map(|i| col.value(i)).collect();
                 assert_eq!(vals, vec![3.0, 4.0]);
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -2660,7 +2653,7 @@ mod tests {
                 let names: Vec<String> = t.column_names();
                 assert_eq!(names, vec!["c", "a", "b"]);
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -2669,8 +2662,8 @@ mod tests {
         match eval_str(
             r#"Table.ReorderColumns(#table({"a","b"}, {{1,2}}), {"a","missing"})"#,
         ) {
-            Err(MError::Other(msg)) => assert!(msg.contains("column not found"), "got: {}", msg),
-            other => panic!("expected error, got {:?}", other),
+            Err(MError::Other(msg)) => assert!(msg.contains("column not found"), "got: {msg}"),
+            other => panic!("expected error, got {other:?}"),
         }
     }
 
@@ -2683,7 +2676,7 @@ mod tests {
                 assert!(matches!(&xs[1], Value::Text(s) if s == "two"));
                 assert!(matches!(xs[2], Value::Logical(true)));
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -2764,7 +2757,7 @@ mod tests {
                     .collect();
                 assert_eq!(nums, vec![1.0, 3.0]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -2784,7 +2777,7 @@ mod tests {
                     .collect();
                 assert_eq!(strs, vec!["a", "b", "c"]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -2801,7 +2794,7 @@ mod tests {
                     .collect();
                 assert_eq!(nums, vec![1.0, 2.0, 3.0, 4.0]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -2818,7 +2811,7 @@ mod tests {
                     .collect();
                 assert_eq!(strs, vec!["a", "b", "c"]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -2835,7 +2828,7 @@ mod tests {
                     .collect();
                 assert_eq!(nums, vec![10.0, 20.0]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -2852,7 +2845,7 @@ mod tests {
                     .collect();
                 assert_eq!(nums, vec![30.0, 40.0]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -2866,12 +2859,12 @@ mod tests {
     fn list_first_basic() {
         match eval_str("List.First({3, 1, 4})").unwrap() {
             Value::Number(n) => assert_eq!(n, 3.0),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
         // Empty + default
         match eval_str(r#"List.First({}, "fallback")"#).unwrap() {
             Value::Text(s) => assert_eq!(s, "fallback"),
-            other => panic!("expected text, got {:?}", other),
+            other => panic!("expected text, got {other:?}"),
         }
         // Empty + no default → null
         assert!(matches!(eval_str("List.First({})").unwrap(), Value::Null));
@@ -2881,7 +2874,7 @@ mod tests {
     fn list_last_basic() {
         match eval_str("List.Last({3, 1, 4})").unwrap() {
             Value::Number(n) => assert_eq!(n, 4.0),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
         assert!(matches!(eval_str("List.Last({})").unwrap(), Value::Null));
     }
@@ -2899,7 +2892,7 @@ mod tests {
                     .collect();
                 assert_eq!(nums, vec![3.0, 2.0, 1.0]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -2917,7 +2910,7 @@ mod tests {
                 assert_eq!(t.column_names(), vec!["id", "name", "amt"]);
                 assert_eq!(t.num_rows(), 3);
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -2935,7 +2928,7 @@ mod tests {
                 // alice → 1 row; ghost → 1 row with null amt; total 2.
                 assert_eq!(t.num_rows(), 2);
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -2952,7 +2945,7 @@ mod tests {
                 assert_eq!(t.column_names(), vec!["a", "b"]);
                 assert_eq!(t.num_rows(), 2);
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -2970,7 +2963,7 @@ mod tests {
                 assert_eq!(t.column_names(), vec!["a", "b"]);
                 assert_eq!(t.num_rows(), 2);
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -2979,11 +2972,11 @@ mod tests {
         let src = r#"
             #table({"a", "b"}, {{1, "x"}, {2, "y"}, {1, "x"}, {3, "z"}})
         "#;
-        match eval_str(&format!("Table.Distinct({})", src)).unwrap() {
+        match eval_str(&format!("Table.Distinct({src})")).unwrap() {
             Value::Table(t) => {
                 assert_eq!(t.num_rows(), 3);
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -2992,11 +2985,11 @@ mod tests {
         let src = r#"
             #table({"a"}, {{1}, {2}, {3}, {4}, {5}})
         "#;
-        match eval_str(&format!("Table.FirstN({}, 2)", src)).unwrap() {
+        match eval_str(&format!("Table.FirstN({src}, 2)")).unwrap() {
             Value::Table(t) => {
                 assert_eq!(t.num_rows(), 2);
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -3014,7 +3007,7 @@ mod tests {
                 }).collect();
                 assert_eq!(texts, vec!["x", "y", "z"]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -3022,11 +3015,11 @@ mod tests {
     fn table_is_empty_true_and_false() {
         match eval_str("Table.IsEmpty(#table({\"a\"}, {}))").unwrap() {
             Value::Logical(b) => assert!(b),
-            other => panic!("expected logical, got {:?}", other),
+            other => panic!("expected logical, got {other:?}"),
         }
         match eval_str("Table.IsEmpty(#table({\"a\"}, {{1}}))").unwrap() {
             Value::Logical(b) => assert!(!b),
-            other => panic!("expected logical, got {:?}", other),
+            other => panic!("expected logical, got {other:?}"),
         }
     }
 
@@ -3047,7 +3040,7 @@ mod tests {
                 }).collect();
                 assert_eq!(idxs, vec![0.0, 1.0, 2.0]);
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -3066,7 +3059,7 @@ mod tests {
                 }).collect();
                 assert_eq!(idxs, vec![100.0, 105.0, 110.0]);
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -3074,7 +3067,7 @@ mod tests {
     fn number_from_text_integer() {
         match eval_str("Number.FromText(\"42\")").unwrap() {
             Value::Number(n) => assert_eq!(n, 42.0),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
     }
 
@@ -3082,7 +3075,7 @@ mod tests {
     fn number_from_text_decimal() {
         match eval_str("Number.FromText(\"3.14\")").unwrap() {
             Value::Number(n) => assert!((n - 3.14).abs() < 1e-9),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
     }
 
@@ -3095,7 +3088,7 @@ mod tests {
     fn number_bitwise_and_basic() {
         match eval_str("Number.BitwiseAnd(12, 10)").unwrap() {
             Value::Number(n) => assert_eq!(n, 8.0), // 1100 & 1010 = 1000
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
     }
 
@@ -3103,7 +3096,7 @@ mod tests {
     fn number_bitwise_or_basic() {
         match eval_str("Number.BitwiseOr(12, 10)").unwrap() {
             Value::Number(n) => assert_eq!(n, 14.0), // 1100 | 1010 = 1110
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
     }
 
@@ -3111,7 +3104,7 @@ mod tests {
     fn number_bitwise_shift_left_basic() {
         match eval_str("Number.BitwiseShiftLeft(1, 4)").unwrap() {
             Value::Number(n) => assert_eq!(n, 16.0),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
     }
 
@@ -3119,7 +3112,7 @@ mod tests {
     fn number_exp_zero() {
         match eval_str("Number.Exp(0)").unwrap() {
             Value::Number(n) => assert_eq!(n, 1.0),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
     }
 
@@ -3128,7 +3121,7 @@ mod tests {
         let src = format!("Number.Ln({})", std::f64::consts::E);
         match eval_str(&src).unwrap() {
             Value::Number(n) => assert!((n - 1.0).abs() < 1e-12),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
     }
 
@@ -3136,7 +3129,7 @@ mod tests {
     fn number_factorial_five() {
         match eval_str("Number.Factorial(5)").unwrap() {
             Value::Number(n) => assert_eq!(n, 120.0),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
     }
 
@@ -3144,7 +3137,7 @@ mod tests {
     fn number_combinations_5_2() {
         match eval_str("Number.Combinations(5, 2)").unwrap() {
             Value::Number(n) => assert_eq!(n, 10.0),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
     }
 
@@ -3152,7 +3145,7 @@ mod tests {
     fn number_sin_zero() {
         match eval_str("Number.Sin(0)").unwrap() {
             Value::Number(n) => assert_eq!(n, 0.0),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
     }
 
@@ -3160,7 +3153,7 @@ mod tests {
     fn number_acos_of_one() {
         match eval_str("Number.Acos(1)").unwrap() {
             Value::Number(n) => assert!(n.abs() < 1e-12),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
     }
 
@@ -3168,7 +3161,7 @@ mod tests {
     fn number_atan2_quadrant() {
         match eval_str("Number.Atan2(1, 1)").unwrap() {
             Value::Number(n) => assert!((n - std::f64::consts::FRAC_PI_4).abs() < 1e-12),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
     }
 
@@ -3176,7 +3169,7 @@ mod tests {
     fn number_round_up_basic() {
         match eval_str("Number.RoundUp(3.1)").unwrap() {
             Value::Number(n) => assert_eq!(n, 4.0),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
     }
 
@@ -3184,7 +3177,7 @@ mod tests {
     fn number_round_down_basic() {
         match eval_str("Number.RoundDown(3.9)").unwrap() {
             Value::Number(n) => assert_eq!(n, 3.0),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
     }
 
@@ -3192,7 +3185,7 @@ mod tests {
     fn number_round_toward_zero_basic() {
         match eval_str("Number.RoundTowardZero(-3.7)").unwrap() {
             Value::Number(n) => assert_eq!(n, -3.0),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
     }
 
@@ -3200,11 +3193,11 @@ mod tests {
     fn number_round_away_from_zero_basic() {
         match eval_str("Number.RoundAwayFromZero(2.5)").unwrap() {
             Value::Number(n) => assert_eq!(n, 3.0),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
         match eval_str("Number.RoundAwayFromZero(-2.5)").unwrap() {
             Value::Number(n) => assert_eq!(n, -3.0),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
     }
 
@@ -3213,7 +3206,7 @@ mod tests {
         // Floor mod: -7 mod 3 = 2 (since -7 = -3*3 + 2)
         match eval_str("Number.Mod(-7, 3)").unwrap() {
             Value::Number(n) => assert_eq!(n, 2.0),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
     }
 
@@ -3221,7 +3214,7 @@ mod tests {
     fn number_integer_divide_basic() {
         match eval_str("Number.IntegerDivide(17, 5)").unwrap() {
             Value::Number(n) => assert_eq!(n, 3.0),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
     }
 
@@ -3229,11 +3222,11 @@ mod tests {
     fn number_is_nan_logical() {
         match eval_str("Number.IsNaN(Number.Sqrt(-1))").unwrap() {
             Value::Logical(b) => assert!(b),
-            other => panic!("expected logical, got {:?}", other),
+            other => panic!("expected logical, got {other:?}"),
         }
         match eval_str("Number.IsNaN(3.14)").unwrap() {
             Value::Logical(b) => assert!(!b),
-            other => panic!("expected logical, got {:?}", other),
+            other => panic!("expected logical, got {other:?}"),
         }
     }
 
@@ -3241,9 +3234,9 @@ mod tests {
     fn number_random_between_in_range() {
         match eval_str("Number.RandomBetween(10, 20)").unwrap() {
             Value::Number(n) => {
-                assert!(n >= 10.0 && n < 20.0);
+                assert!((10.0..20.0).contains(&n));
             }
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
     }
 
@@ -3251,7 +3244,7 @@ mod tests {
     fn text_clean_strips_control_char() {
         match eval_str("Text.Clean(\"a\u{0001}b\u{007F}c\")").unwrap() {
             Value::Text(s) => assert_eq!(s, "abc"),
-            other => panic!("expected text, got {:?}", other),
+            other => panic!("expected text, got {other:?}"),
         }
     }
 
@@ -3259,7 +3252,7 @@ mod tests {
     fn text_format_positional() {
         match eval_str(r##"Text.Format("hello #{0}, you are #{1}", {"world", 42})"##).unwrap() {
             Value::Text(s) => assert_eq!(s, "hello world, you are 42"),
-            other => panic!("expected text, got {:?}", other),
+            other => panic!("expected text, got {other:?}"),
         }
     }
 
@@ -3267,7 +3260,7 @@ mod tests {
     fn text_format_named() {
         match eval_str(r##"Text.Format("#{name} = #{val}", [name = "x", val = 7])"##).unwrap() {
             Value::Text(s) => assert_eq!(s, "x = 7"),
-            other => panic!("expected text, got {:?}", other),
+            other => panic!("expected text, got {other:?}"),
         }
     }
 
@@ -3281,7 +3274,7 @@ mod tests {
                 }).collect();
                 assert_eq!(parts, vec!["a", "b", "c", "d"]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -3289,7 +3282,7 @@ mod tests {
     fn text_before_delimiter_first() {
         match eval_str(r#"Text.BeforeDelimiter("a.b.c", ".")"#).unwrap() {
             Value::Text(s) => assert_eq!(s, "a"),
-            other => panic!("expected text, got {:?}", other),
+            other => panic!("expected text, got {other:?}"),
         }
     }
 
@@ -3297,7 +3290,7 @@ mod tests {
     fn text_after_delimiter_first() {
         match eval_str(r#"Text.AfterDelimiter("a.b.c", ".")"#).unwrap() {
             Value::Text(s) => assert_eq!(s, "b.c"),
-            other => panic!("expected text, got {:?}", other),
+            other => panic!("expected text, got {other:?}"),
         }
     }
 
@@ -3305,7 +3298,7 @@ mod tests {
     fn text_between_delimiters_basic() {
         match eval_str(r#"Text.BetweenDelimiters("(hello) (world)", "(", ")")"#).unwrap() {
             Value::Text(s) => assert_eq!(s, "hello"),
-            other => panic!("expected text, got {:?}", other),
+            other => panic!("expected text, got {other:?}"),
         }
     }
 
@@ -3313,7 +3306,7 @@ mod tests {
     fn text_range_basic() {
         match eval_str(r#"Text.Range("hello world", 6, 5)"#).unwrap() {
             Value::Text(s) => assert_eq!(s, "world"),
-            other => panic!("expected text, got {:?}", other),
+            other => panic!("expected text, got {other:?}"),
         }
     }
 
@@ -3321,7 +3314,7 @@ mod tests {
     fn text_insert_at_offset() {
         match eval_str(r#"Text.Insert("abef", 2, "cd")"#).unwrap() {
             Value::Text(s) => assert_eq!(s, "abcdef"),
-            other => panic!("expected text, got {:?}", other),
+            other => panic!("expected text, got {other:?}"),
         }
     }
 
@@ -3329,7 +3322,7 @@ mod tests {
     fn text_replace_range_basic() {
         match eval_str(r#"Text.ReplaceRange("hello world", 6, 5, "there")"#).unwrap() {
             Value::Text(s) => assert_eq!(s, "hello there"),
-            other => panic!("expected text, got {:?}", other),
+            other => panic!("expected text, got {other:?}"),
         }
     }
 
@@ -3343,7 +3336,7 @@ mod tests {
                 }).collect();
                 assert_eq!(parts, vec!["a", "b", "c"]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -3351,7 +3344,7 @@ mod tests {
     fn text_repeat_basic() {
         match eval_str(r#"Text.Repeat("ab", 3)"#).unwrap() {
             Value::Text(s) => assert_eq!(s, "ababab"),
-            other => panic!("expected text, got {:?}", other),
+            other => panic!("expected text, got {other:?}"),
         }
     }
 
@@ -3359,7 +3352,7 @@ mod tests {
     fn text_pad_start_basic() {
         match eval_str(r#"Text.PadStart("42", 5, "0")"#).unwrap() {
             Value::Text(s) => assert_eq!(s, "00042"),
-            other => panic!("expected text, got {:?}", other),
+            other => panic!("expected text, got {other:?}"),
         }
     }
 
@@ -3367,11 +3360,11 @@ mod tests {
     fn text_trim_start_default_and_chars() {
         match eval_str(r#"Text.TrimStart("   hello")"#).unwrap() {
             Value::Text(s) => assert_eq!(s, "hello"),
-            other => panic!("expected text, got {:?}", other),
+            other => panic!("expected text, got {other:?}"),
         }
         match eval_str(r#"Text.TrimStart("xxxabc", "x")"#).unwrap() {
             Value::Text(s) => assert_eq!(s, "abc"),
-            other => panic!("expected text, got {:?}", other),
+            other => panic!("expected text, got {other:?}"),
         }
     }
 
@@ -3379,7 +3372,7 @@ mod tests {
     fn text_reverse_basic() {
         match eval_str(r#"Text.Reverse("abc")"#).unwrap() {
             Value::Text(s) => assert_eq!(s, "cba"),
-            other => panic!("expected text, got {:?}", other),
+            other => panic!("expected text, got {other:?}"),
         }
     }
 
@@ -3387,7 +3380,7 @@ mod tests {
     fn text_proper_capitalises_each_word() {
         match eval_str(r#"Text.Proper("hello WORLD from RUST")"#).unwrap() {
             Value::Text(s) => assert_eq!(s, "Hello World From Rust"),
-            other => panic!("expected text, got {:?}", other),
+            other => panic!("expected text, got {other:?}"),
         }
     }
 
@@ -3401,7 +3394,7 @@ mod tests {
     fn character_from_number_ascii() {
         match eval_str("Character.FromNumber(65)").unwrap() {
             Value::Text(s) => assert_eq!(s, "A"),
-            other => panic!("expected text, got {:?}", other),
+            other => panic!("expected text, got {other:?}"),
         }
     }
 
@@ -3409,7 +3402,7 @@ mod tests {
     fn character_to_number_ascii() {
         match eval_str("Character.ToNumber(\"A\")").unwrap() {
             Value::Number(n) => assert_eq!(n, 65.0),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
     }
 
@@ -3417,7 +3410,7 @@ mod tests {
     fn guid_from_normalises() {
         match eval_str("Guid.From(\"12345678-1234-5678-9ABC-DEF012345678\")").unwrap() {
             Value::Text(s) => assert_eq!(s, "12345678-1234-5678-9abc-def012345678"),
-            other => panic!("expected text, got {:?}", other),
+            other => panic!("expected text, got {other:?}"),
         }
         assert!(eval_str("Guid.From(\"not-a-guid\")").is_err());
     }
@@ -3435,7 +3428,7 @@ mod tests {
                 assert!(matches!(v, b'8' | b'9' | b'a' | b'b'));
                 assert_eq!(s.as_bytes()[23], b'-');
             }
-            other => panic!("expected text, got {:?}", other),
+            other => panic!("expected text, got {other:?}"),
         }
     }
 
@@ -3443,7 +3436,7 @@ mod tests {
     fn int32_from_text() {
         match eval_str("Int32.From(\"42\")").unwrap() {
             Value::Number(n) => assert_eq!(n, 42.0),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
     }
 
@@ -3451,7 +3444,7 @@ mod tests {
     fn decimal_from_logical() {
         match eval_str("Decimal.From(true)").unwrap() {
             Value::Number(n) => assert_eq!(n, 1.0),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
     }
 
@@ -3459,7 +3452,7 @@ mod tests {
     fn dtz_utc_now_not_null() {
         match eval_str("DateTimeZone.UtcNow()").unwrap() {
             Value::Datetimezone(_) => {}
-            other => panic!("expected datetimezone, got {:?}", other),
+            other => panic!("expected datetimezone, got {other:?}"),
         }
     }
 
@@ -3469,7 +3462,7 @@ mod tests {
             Value::Datetimezone(dt) => {
                 assert_eq!(dt.offset().local_minus_utc(), 2 * 3600);
             }
-            other => panic!("expected datetimezone, got {:?}", other),
+            other => panic!("expected datetimezone, got {other:?}"),
         }
     }
 
@@ -3479,7 +3472,7 @@ mod tests {
             Value::Datetime(dt) => {
                 assert_eq!(dt.to_string(), "2024-06-15 10:30:00");
             }
-            other => panic!("expected datetime, got {:?}", other),
+            other => panic!("expected datetime, got {other:?}"),
         }
     }
 
@@ -3489,7 +3482,7 @@ mod tests {
             Value::Datetimezone(dt) => {
                 assert_eq!(dt.offset().local_minus_utc(), 5 * 3600);
             }
-            other => panic!("expected datetimezone, got {:?}", other),
+            other => panic!("expected datetimezone, got {other:?}"),
         }
     }
 
@@ -3497,7 +3490,7 @@ mod tests {
     fn dtz_zone_hours_basic() {
         match eval_str(r#"DateTimeZone.ZoneHours(DateTimeZone.FromText("2024-01-01T00:00:00-05:00"))"#).unwrap() {
             Value::Number(n) => assert_eq!(n, -5.0),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
     }
 
@@ -3512,7 +3505,7 @@ mod tests {
         );
         match eval_str(&src).unwrap() {
             Value::Logical(b) => assert!(b),
-            other => panic!("expected logical, got {:?}", other),
+            other => panic!("expected logical, got {other:?}"),
         }
     }
 
@@ -3527,7 +3520,7 @@ mod tests {
         );
         match eval_str(&src).unwrap() {
             Value::Logical(b) => assert!(b),
-            other => panic!("expected logical, got {:?}", other),
+            other => panic!("expected logical, got {other:?}"),
         }
     }
 
@@ -3542,7 +3535,7 @@ mod tests {
         );
         match eval_str(&src).unwrap() {
             Value::Logical(_) => {} // tolerant: depends on alignment with second boundary
-            other => panic!("expected logical, got {:?}", other),
+            other => panic!("expected logical, got {other:?}"),
         }
     }
 
@@ -3550,7 +3543,7 @@ mod tests {
     fn datetime_date_extracts() {
         match eval_str("DateTime.Date(#datetime(2024, 6, 15, 14, 30, 0))").unwrap() {
             Value::Date(d) => assert_eq!(d, chrono::NaiveDate::from_ymd_opt(2024, 6, 15).unwrap()),
-            other => panic!("expected date, got {:?}", other),
+            other => panic!("expected date, got {other:?}"),
         }
     }
 
@@ -3558,7 +3551,7 @@ mod tests {
     fn datetime_time_extracts() {
         match eval_str("DateTime.Time(#datetime(2024, 6, 15, 14, 30, 45))").unwrap() {
             Value::Time(t) => assert_eq!(t, chrono::NaiveTime::from_hms_opt(14, 30, 45).unwrap()),
-            other => panic!("expected time, got {:?}", other),
+            other => panic!("expected time, got {other:?}"),
         }
     }
 
@@ -3566,7 +3559,7 @@ mod tests {
     fn datetime_from_text_iso() {
         match eval_str(r#"DateTime.FromText("2024-06-15T14:30:00")"#).unwrap() {
             Value::Datetime(dt) => assert_eq!(dt.to_string(), "2024-06-15 14:30:00"),
-            other => panic!("expected datetime, got {:?}", other),
+            other => panic!("expected datetime, got {other:?}"),
         }
     }
 
@@ -3577,7 +3570,7 @@ mod tests {
                 let names: Vec<&str> = r.fields.iter().map(|(n, _)| n.as_str()).collect();
                 assert_eq!(names, vec!["Year", "Month", "Day", "Hour", "Minute", "Second"]);
             }
-            other => panic!("expected record, got {:?}", other),
+            other => panic!("expected record, got {other:?}"),
         }
     }
 
@@ -3585,7 +3578,7 @@ mod tests {
     fn datetime_local_now_not_null() {
         match eval_str("DateTime.LocalNow()").unwrap() {
             Value::Datetime(_) => {}
-            other => panic!("expected datetime, got {:?}", other),
+            other => panic!("expected datetime, got {other:?}"),
         }
     }
 
@@ -3593,7 +3586,7 @@ mod tests {
     fn duration_days_basic() {
         match eval_str(r#"Duration.Days(Duration.FromText("3.04:30:00"))"#).unwrap() {
             Value::Number(n) => assert_eq!(n, 3.0),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
     }
 
@@ -3601,7 +3594,7 @@ mod tests {
     fn duration_total_hours_basic() {
         match eval_str(r#"Duration.TotalHours(Duration.FromText("1.00:00:00"))"#).unwrap() {
             Value::Number(n) => assert_eq!(n, 24.0),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
     }
 
@@ -3609,7 +3602,7 @@ mod tests {
     fn duration_from_text_round_trip() {
         match eval_str(r#"Duration.ToText(Duration.FromText("2.03:04:05"))"#).unwrap() {
             Value::Text(s) => assert_eq!(s, "2.03:04:05"),
-            other => panic!("expected text, got {:?}", other),
+            other => panic!("expected text, got {other:?}"),
         }
     }
 
@@ -3620,7 +3613,7 @@ mod tests {
                 let names: Vec<&str> = r.fields.iter().map(|(n, _)| n.as_str()).collect();
                 assert_eq!(names, vec!["Days", "Hours", "Minutes", "Seconds"]);
             }
-            other => panic!("expected record, got {:?}", other),
+            other => panic!("expected record, got {other:?}"),
         }
     }
 
@@ -3629,7 +3622,7 @@ mod tests {
         // 1.5 days = 36 hours
         match eval_str("Duration.TotalHours(Duration.From(1.5))").unwrap() {
             Value::Number(n) => assert_eq!(n, 36.0),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
     }
 
@@ -3637,7 +3630,7 @@ mod tests {
     fn time_from_text_hms() {
         match eval_str(r#"Time.FromText("14:30:45")"#).unwrap() {
             Value::Time(t) => assert_eq!(t.to_string(), "14:30:45"),
-            other => panic!("expected time, got {:?}", other),
+            other => panic!("expected time, got {other:?}"),
         }
     }
 
@@ -3645,7 +3638,7 @@ mod tests {
     fn time_hour_from_datetime() {
         match eval_str(r#"Time.Hour(#datetime(2024, 1, 1, 15, 30, 0))"#).unwrap() {
             Value::Number(n) => assert_eq!(n, 15.0),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
     }
 
@@ -3653,7 +3646,7 @@ mod tests {
     fn time_to_text_round_trip() {
         match eval_str(r#"Time.ToText(Time.FromText("09:15:30"))"#).unwrap() {
             Value::Text(s) => assert_eq!(s, "09:15:30"),
-            other => panic!("expected text, got {:?}", other),
+            other => panic!("expected text, got {other:?}"),
         }
     }
 
@@ -3661,7 +3654,7 @@ mod tests {
     fn time_start_of_hour_basic() {
         match eval_str(r#"Time.StartOfHour(Time.FromText("14:30:45"))"#).unwrap() {
             Value::Time(t) => assert_eq!(t.to_string(), "14:00:00"),
-            other => panic!("expected time, got {:?}", other),
+            other => panic!("expected time, got {other:?}"),
         }
     }
 
@@ -3672,7 +3665,7 @@ mod tests {
             chrono::Datelike::year(&t), chrono::Datelike::month(&t), chrono::Datelike::day(&t));
         match eval_str(&src).unwrap() {
             Value::Logical(b) => assert!(b),
-            other => panic!("expected logical, got {:?}", other),
+            other => panic!("expected logical, got {other:?}"),
         }
     }
 
@@ -3684,7 +3677,7 @@ mod tests {
             chrono::Datelike::year(&in3), chrono::Datelike::month(&in3), chrono::Datelike::day(&in3));
         match eval_str(&src).unwrap() {
             Value::Logical(b) => assert!(b),
-            other => panic!("expected logical, got {:?}", other),
+            other => panic!("expected logical, got {other:?}"),
         }
     }
 
@@ -3698,7 +3691,7 @@ mod tests {
         // If it IS Jan 1, yesterday is last year, which is outside. Allow either result.
         match eval_str(&src).unwrap() {
             Value::Logical(_) => {} // doesn't actually matter, just verify it returns logical
-            other => panic!("expected logical, got {:?}", other),
+            other => panic!("expected logical, got {other:?}"),
         }
     }
 
@@ -3708,7 +3701,7 @@ mod tests {
             Value::Date(d) => {
                 assert_eq!(d, chrono::NaiveDate::from_ymd_opt(2024, 6, 1).unwrap());
             }
-            other => panic!("expected date, got {:?}", other),
+            other => panic!("expected date, got {other:?}"),
         }
     }
 
@@ -3719,7 +3712,7 @@ mod tests {
                 // 2024 is leap → Feb has 29 days
                 assert_eq!(d, chrono::NaiveDate::from_ymd_opt(2024, 2, 29).unwrap());
             }
-            other => panic!("expected date, got {:?}", other),
+            other => panic!("expected date, got {other:?}"),
         }
     }
 
@@ -3729,7 +3722,7 @@ mod tests {
             Value::Date(d) => {
                 assert_eq!(d, chrono::NaiveDate::from_ymd_opt(2024, 4, 1).unwrap());
             }
-            other => panic!("expected date, got {:?}", other),
+            other => panic!("expected date, got {other:?}"),
         }
     }
 
@@ -3739,7 +3732,7 @@ mod tests {
             Value::Date(d) => {
                 assert_eq!(d, chrono::NaiveDate::from_ymd_opt(2024, 1, 1).unwrap());
             }
-            other => panic!("expected date, got {:?}", other),
+            other => panic!("expected date, got {other:?}"),
         }
     }
 
@@ -3750,7 +3743,7 @@ mod tests {
             Value::Date(d) => {
                 assert_eq!(d, chrono::NaiveDate::from_ymd_opt(2024, 1, 7).unwrap());
             }
-            other => panic!("expected date, got {:?}", other),
+            other => panic!("expected date, got {other:?}"),
         }
     }
 
@@ -3759,7 +3752,7 @@ mod tests {
         // 2024-01-07 is a Sunday. Sunday=0 with default firstDayOfWeek.
         match eval_str("Date.DayOfWeek(#date(2024, 1, 7))").unwrap() {
             Value::Number(n) => assert_eq!(n, 0.0),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
     }
 
@@ -3767,7 +3760,7 @@ mod tests {
     fn date_day_of_week_name() {
         match eval_str("Date.DayOfWeekName(#date(2024, 1, 1))").unwrap() {
             Value::Text(s) => assert_eq!(s, "Monday"),
-            other => panic!("expected text, got {:?}", other),
+            other => panic!("expected text, got {other:?}"),
         }
     }
 
@@ -3775,11 +3768,11 @@ mod tests {
     fn date_is_leap_year_basic() {
         match eval_str("Date.IsLeapYear(#date(2024, 1, 1))").unwrap() {
             Value::Logical(b) => assert!(b),
-            other => panic!("expected logical, got {:?}", other),
+            other => panic!("expected logical, got {other:?}"),
         }
         match eval_str("Date.IsLeapYear(#date(2023, 1, 1))").unwrap() {
             Value::Logical(b) => assert!(!b),
-            other => panic!("expected logical, got {:?}", other),
+            other => panic!("expected logical, got {other:?}"),
         }
     }
 
@@ -3790,7 +3783,7 @@ mod tests {
                 let names: Vec<&str> = r.fields.iter().map(|(n, _)| n.as_str()).collect();
                 assert_eq!(names, vec!["Year", "Month", "Day"]);
             }
-            other => panic!("expected record, got {:?}", other),
+            other => panic!("expected record, got {other:?}"),
         }
     }
 
@@ -3798,7 +3791,7 @@ mod tests {
     fn date_quarter_of_year_basic() {
         match eval_str("Date.QuarterOfYear(#date(2024, 5, 15))").unwrap() {
             Value::Number(n) => assert_eq!(n, 2.0),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
     }
 
@@ -3808,7 +3801,7 @@ mod tests {
             Value::Date(d) => {
                 assert_eq!(d, chrono::NaiveDate::from_ymd_opt(2025, 6, 15).unwrap());
             }
-            other => panic!("expected date, got {:?}", other),
+            other => panic!("expected date, got {other:?}"),
         }
     }
 
@@ -3819,7 +3812,7 @@ mod tests {
             Value::Date(d) => {
                 assert_eq!(d, chrono::NaiveDate::from_ymd_opt(2025, 5, 15).unwrap());
             }
-            other => panic!("expected date, got {:?}", other),
+            other => panic!("expected date, got {other:?}"),
         }
     }
 
@@ -3829,7 +3822,7 @@ mod tests {
             Value::Date(d) => {
                 assert_eq!(d, chrono::NaiveDate::from_ymd_opt(2024, 1, 1).unwrap());
             }
-            other => panic!("expected date, got {:?}", other),
+            other => panic!("expected date, got {other:?}"),
         }
     }
 
@@ -3839,7 +3832,7 @@ mod tests {
             Value::Date(d) => {
                 assert_eq!(d, chrono::NaiveDate::from_ymd_opt(2024, 2, 4).unwrap());
             }
-            other => panic!("expected date, got {:?}", other),
+            other => panic!("expected date, got {other:?}"),
         }
     }
 
@@ -3849,7 +3842,7 @@ mod tests {
             Value::Date(d) => {
                 assert_eq!(d, chrono::NaiveDate::from_ymd_opt(2023, 12, 26).unwrap());
             }
-            other => panic!("expected date, got {:?}", other),
+            other => panic!("expected date, got {other:?}"),
         }
     }
 
@@ -3859,7 +3852,7 @@ mod tests {
             Value::Date(d) => {
                 assert_eq!(d, chrono::NaiveDate::from_ymd_opt(2025, 2, 15).unwrap());
             }
-            other => panic!("expected date, got {:?}", other),
+            other => panic!("expected date, got {other:?}"),
         }
     }
 
@@ -3874,7 +3867,7 @@ mod tests {
                 let b = r.fields.iter().find(|(n, _)| n == "b").unwrap();
                 assert!(matches!(b.1, Value::Number(n) if n == 99.0));
             }
-            other => panic!("expected record, got {:?}", other),
+            other => panic!("expected record, got {other:?}"),
         }
     }
 
@@ -3882,17 +3875,17 @@ mod tests {
     fn record_field_or_default_present_and_missing() {
         match eval_str(r#"Record.FieldOrDefault([a = 1], "a")"#).unwrap() {
             Value::Number(n) => assert_eq!(n, 1.0),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
         // Missing field with explicit default.
         match eval_str(r#"Record.FieldOrDefault([a = 1], "missing", 42)"#).unwrap() {
             Value::Number(n) => assert_eq!(n, 42.0),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
         // Missing field with no default → null.
         match eval_str(r#"Record.FieldOrDefault([a = 1], "missing")"#).unwrap() {
             Value::Null => {}
-            other => panic!("expected null, got {:?}", other),
+            other => panic!("expected null, got {other:?}"),
         }
     }
 
@@ -3904,7 +3897,7 @@ mod tests {
                 let names: Vec<&str> = r.fields.iter().map(|(n, _)| n.as_str()).collect();
                 assert_eq!(names, vec!["b"]);
             }
-            other => panic!("expected record, got {:?}", other),
+            other => panic!("expected record, got {other:?}"),
         }
     }
 
@@ -3919,12 +3912,12 @@ mod tests {
                     .iter()
                     .map(|(n, v)| match v {
                         Value::Number(x) => (n.as_str(), *x),
-                        _ => panic!("expected number, got {:?}", v),
+                        _ => panic!("expected number, got {v:?}"),
                     })
                     .collect();
                 assert_eq!(pairs, vec![("a", 1.0), ("b", 2.0), ("c", 3.0)]);
             }
-            other => panic!("expected record, got {:?}", other),
+            other => panic!("expected record, got {other:?}"),
         }
     }
 
@@ -3948,7 +3941,7 @@ mod tests {
                 assert_eq!(rec.fields[2].0, "c");
                 assert!(matches!(rec.fields[2].1, Value::Logical(true)));
             }
-            other => panic!("expected record, got {:?}", other),
+            other => panic!("expected record, got {other:?}"),
         }
     }
 
@@ -3960,7 +3953,7 @@ mod tests {
                 let names: Vec<&str> = r.fields.iter().map(|(n, _)| n.as_str()).collect();
                 assert_eq!(names, vec!["x", "y"]);
             }
-            other => panic!("expected record, got {:?}", other),
+            other => panic!("expected record, got {other:?}"),
         }
     }
 
@@ -3973,7 +3966,7 @@ mod tests {
                 let names: Vec<&str> = r.fields.iter().map(|(n, _)| n.as_str()).collect();
                 assert_eq!(names, vec!["c", "a"]);
             }
-            other => panic!("expected record, got {:?}", other),
+            other => panic!("expected record, got {other:?}"),
         }
     }
 
@@ -3987,12 +3980,12 @@ mod tests {
                     .iter()
                     .map(|(n, v)| match v {
                         Value::Number(x) => (n.as_str(), *x),
-                        _ => panic!("expected number, got {:?}", v),
+                        _ => panic!("expected number, got {v:?}"),
                     })
                     .collect();
                 assert_eq!(nums, vec![("a", 10.0), ("b", 7.0)]);
             }
-            other => panic!("expected record, got {:?}", other),
+            other => panic!("expected record, got {other:?}"),
         }
     }
 
@@ -4000,7 +3993,7 @@ mod tests {
     fn number_to_text_whole() {
         match eval_str("Number.ToText(2)").unwrap() {
             Value::Text(s) => assert_eq!(s, "2"),
-            other => panic!("expected text, got {:?}", other),
+            other => panic!("expected text, got {other:?}"),
         }
     }
 
@@ -4008,7 +4001,7 @@ mod tests {
     fn number_to_text_decimal() {
         match eval_str("Number.ToText(3.14)").unwrap() {
             Value::Text(s) => assert_eq!(s, "3.14"),
-            other => panic!("expected text, got {:?}", other),
+            other => panic!("expected text, got {other:?}"),
         }
     }
 
@@ -4022,7 +4015,7 @@ mod tests {
                 }).collect();
                 assert_eq!(nums, vec![1.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 9.0]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -4036,7 +4029,7 @@ mod tests {
                 }).collect();
                 assert_eq!(texts, vec!["apple", "banana", "cherry"]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -4050,7 +4043,7 @@ mod tests {
                 }).collect();
                 assert_eq!(nums, vec![40.0]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -4064,7 +4057,7 @@ mod tests {
                 }).collect();
                 assert_eq!(nums, vec![30.0, 40.0]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -4072,7 +4065,7 @@ mod tests {
     fn list_average_basic() {
         match eval_str("List.Average({1, 2, 3, 4})").unwrap() {
             Value::Number(n) => assert_eq!(n, 2.5),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
     }
 
@@ -4080,7 +4073,7 @@ mod tests {
     fn list_average_ignores_nulls() {
         match eval_str("List.Average({1, null, 3, null, 5})").unwrap() {
             Value::Number(n) => assert_eq!(n, 3.0),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
     }
 
@@ -4097,7 +4090,7 @@ mod tests {
                     _ => panic!("expected inner list"),
                 }
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -4115,7 +4108,7 @@ mod tests {
                     _ => panic!("expected inner list"),
                 }
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -4129,7 +4122,7 @@ mod tests {
                 }).collect();
                 assert_eq!(nums, vec![2.0, 3.0, 4.0]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -4143,7 +4136,7 @@ mod tests {
                 }).collect();
                 assert_eq!(nums, vec![4.0]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -4157,7 +4150,7 @@ mod tests {
                 }).collect();
                 assert_eq!(nums, vec![1.0, 3.0]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -4174,7 +4167,7 @@ mod tests {
                 }).collect();
                 assert_eq!(dates, vec!["2024-01-01", "2024-01-02", "2024-01-03"]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -4191,7 +4184,7 @@ mod tests {
                     _ => panic!("expected datetime"),
                 }
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -4208,7 +4201,7 @@ mod tests {
                     _ => panic!("expected duration"),
                 }
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -4229,7 +4222,7 @@ mod tests {
                 }).collect();
                 assert_eq!(nums, vec![1.0, 10.0, 2.0, 20.0, 3.0, 30.0]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -4249,7 +4242,7 @@ mod tests {
                 }).collect();
                 assert_eq!(nums, vec![1.0, 2.0, 3.0, 4.0, 5.0]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -4270,7 +4263,7 @@ mod tests {
                 }).collect();
                 assert_eq!(nums, vec![10.0, 20.0, 30.0]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -4278,7 +4271,7 @@ mod tests {
     fn list_single_one_elem() {
         match eval_str("List.Single({42})").unwrap() {
             Value::Number(n) => assert_eq!(n, 42.0),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
         assert!(eval_str("List.Single({1, 2})").is_err());
         assert!(eval_str("List.Single({})").is_err());
@@ -4288,11 +4281,11 @@ mod tests {
     fn list_single_or_default_basic() {
         match eval_str("List.SingleOrDefault({}, 99)").unwrap() {
             Value::Number(n) => assert_eq!(n, 99.0),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
         match eval_str("List.SingleOrDefault({})").unwrap() {
             Value::Null => {}
-            other => panic!("expected null, got {:?}", other),
+            other => panic!("expected null, got {other:?}"),
         }
     }
 
@@ -4300,7 +4293,7 @@ mod tests {
     fn list_median_odd_count() {
         match eval_str("List.Median({3, 1, 5, 2, 4})").unwrap() {
             Value::Number(n) => assert_eq!(n, 3.0),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
     }
 
@@ -4308,7 +4301,7 @@ mod tests {
     fn list_product_basic() {
         match eval_str("List.Product({2, 3, 4})").unwrap() {
             Value::Number(n) => assert_eq!(n, 24.0),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
     }
 
@@ -4321,7 +4314,7 @@ mod tests {
                 }).collect();
                 assert_eq!(nums, vec![9.0, 6.0, 5.0]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -4329,7 +4322,7 @@ mod tests {
     fn list_non_null_count_basic() {
         match eval_str("List.NonNullCount({1, null, 2, null, 3})").unwrap() {
             Value::Number(n) => assert_eq!(n, 3.0),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
     }
 
@@ -4342,7 +4335,7 @@ mod tests {
                 }).collect();
                 assert_eq!(nums, vec![1.0, 3.0, 5.0]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -4355,7 +4348,7 @@ mod tests {
                 }).collect();
                 assert_eq!(nums, vec![2.0, 3.0]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -4368,7 +4361,7 @@ mod tests {
                 }).collect();
                 assert_eq!(nums, vec![1.0, 2.0, 3.0, 4.0]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -4381,7 +4374,7 @@ mod tests {
                 }).collect();
                 assert_eq!(nums, vec![20.0, 30.0, 40.0]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -4394,7 +4387,7 @@ mod tests {
                 }).collect();
                 assert_eq!(nums, vec![1.0, 2.0, 3.0]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -4407,7 +4400,7 @@ mod tests {
                 }).collect();
                 assert_eq!(nums, vec![1.0, 2.0, 3.0]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -4422,7 +4415,7 @@ mod tests {
                 }).collect();
                 assert_eq!(nums, vec![1.0, 99.0, 3.0, 99.0, 1.0]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -4435,7 +4428,7 @@ mod tests {
                 }).collect();
                 assert_eq!(nums, vec![1.0, 2.0, 1.0, 2.0, 1.0, 2.0]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -4451,7 +4444,7 @@ mod tests {
                     _ => panic!("expected list"),
                 }
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -4459,11 +4452,11 @@ mod tests {
     fn list_contains_basic() {
         match eval_str("List.Contains({1, 2, 3}, 2)").unwrap() {
             Value::Logical(b) => assert!(b),
-            other => panic!("expected logical, got {:?}", other),
+            other => panic!("expected logical, got {other:?}"),
         }
         match eval_str("List.Contains({1, 2, 3}, 99)").unwrap() {
             Value::Logical(b) => assert!(!b),
-            other => panic!("expected logical, got {:?}", other),
+            other => panic!("expected logical, got {other:?}"),
         }
     }
 
@@ -4471,11 +4464,11 @@ mod tests {
     fn list_contains_all_basic() {
         match eval_str("List.ContainsAll({1, 2, 3, 4}, {2, 4})").unwrap() {
             Value::Logical(b) => assert!(b),
-            other => panic!("expected logical, got {:?}", other),
+            other => panic!("expected logical, got {other:?}"),
         }
         match eval_str("List.ContainsAll({1, 2}, {2, 99})").unwrap() {
             Value::Logical(b) => assert!(!b),
-            other => panic!("expected logical, got {:?}", other),
+            other => panic!("expected logical, got {other:?}"),
         }
     }
 
@@ -4483,11 +4476,11 @@ mod tests {
     fn list_matches_all_basic() {
         match eval_str("List.MatchesAll({1, 2, 3}, each _ > 0)").unwrap() {
             Value::Logical(b) => assert!(b),
-            other => panic!("expected logical, got {:?}", other),
+            other => panic!("expected logical, got {other:?}"),
         }
         match eval_str("List.MatchesAll({1, -2, 3}, each _ > 0)").unwrap() {
             Value::Logical(b) => assert!(!b),
-            other => panic!("expected logical, got {:?}", other),
+            other => panic!("expected logical, got {other:?}"),
         }
     }
 
@@ -4501,7 +4494,7 @@ mod tests {
                 }).collect();
                 assert_eq!(names, vec!["banana"]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -4515,7 +4508,7 @@ mod tests {
                 }).collect();
                 assert_eq!(nums, vec![0.0, 1.0, 2.0]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -4523,7 +4516,7 @@ mod tests {
     fn list_position_of_found() {
         match eval_str("List.PositionOf({\"a\", \"b\", \"c\"}, \"b\")").unwrap() {
             Value::Number(n) => assert_eq!(n, 1.0),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
     }
 
@@ -4531,7 +4524,7 @@ mod tests {
     fn list_position_of_not_found() {
         match eval_str("List.PositionOf({1, 2, 3}, 99)").unwrap() {
             Value::Number(n) => assert_eq!(n, -1.0),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
     }
 
@@ -4545,7 +4538,7 @@ mod tests {
                 }).collect();
                 assert_eq!(nums, vec![1.0, 2.0, 3.0, 4.0, 5.0]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -4560,7 +4553,7 @@ mod tests {
                 }).collect();
                 assert_eq!(nums, vec![10.0, 7.0, 4.0, 1.0]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -4577,7 +4570,7 @@ mod tests {
                     .collect();
                 assert_eq!(nums, vec![1.0, 2.0, 3.0]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -4585,7 +4578,7 @@ mod tests {
     fn date_to_text_iso_default() {
         match eval_str("Date.ToText(#date(2024, 1, 15))").unwrap() {
             Value::Text(s) => assert_eq!(s, "2024-01-15"),
-            other => panic!("expected text, got {:?}", other),
+            other => panic!("expected text, got {other:?}"),
         }
     }
 
@@ -4593,15 +4586,15 @@ mod tests {
     fn date_to_text_uk_format() {
         match eval_str(r#"Date.ToText(#date(2024, 1, 15), "dd/MM/yyyy")"#).unwrap() {
             Value::Text(s) => assert_eq!(s, "15/01/2024"),
-            other => panic!("expected text, got {:?}", other),
+            other => panic!("expected text, got {other:?}"),
         }
     }
 
     #[test]
     fn date_to_text_unknown_format_errors() {
         match eval_str(r#"Date.ToText(#date(2024, 1, 15), "yyyy.MM.dd")"#) {
-            Err(MError::Other(msg)) => assert!(msg.contains("unsupported format"), "got: {}", msg),
-            other => panic!("expected error, got {:?}", other),
+            Err(MError::Other(msg)) => assert!(msg.contains("unsupported format"), "got: {msg}"),
+            other => panic!("expected error, got {other:?}"),
         }
     }
 
@@ -4609,11 +4602,11 @@ mod tests {
     fn date_from_passthrough_and_datetime_drop() {
         match eval_str("Date.From(#date(2024, 3, 15))").unwrap() {
             Value::Date(d) => assert_eq!(d.to_string(), "2024-03-15"),
-            other => panic!("expected date, got {:?}", other),
+            other => panic!("expected date, got {other:?}"),
         }
         match eval_str("Date.From(#datetime(2024, 3, 15, 10, 30, 45))").unwrap() {
             Value::Date(d) => assert_eq!(d.to_string(), "2024-03-15"),
-            other => panic!("expected date, got {:?}", other),
+            other => panic!("expected date, got {other:?}"),
         }
     }
 
@@ -4621,7 +4614,7 @@ mod tests {
     fn date_year_extract() {
         match eval_str("Date.Year(#date(2024, 3, 15))").unwrap() {
             Value::Number(n) => assert_eq!(n, 2024.0),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
     }
 
@@ -4629,7 +4622,7 @@ mod tests {
     fn date_month_extract() {
         match eval_str("Date.Month(#date(2024, 3, 15))").unwrap() {
             Value::Number(n) => assert_eq!(n, 3.0),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
     }
 
@@ -4637,7 +4630,7 @@ mod tests {
     fn date_day_extract() {
         match eval_str("Date.Day(#date(2024, 3, 15))").unwrap() {
             Value::Number(n) => assert_eq!(n, 15.0),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
     }
 
@@ -4645,12 +4638,12 @@ mod tests {
     fn date_from_text_iso_and_uk() {
         match eval_str(r#"Date.FromText("2024-01-15")"#).unwrap() {
             Value::Date(d) => assert_eq!(d.to_string(), "2024-01-15"),
-            other => panic!("expected date, got {:?}", other),
+            other => panic!("expected date, got {other:?}"),
         }
         // DD-MM-YYYY fallback (corpus pattern after Text.Replace).
         match eval_str(r#"Date.FromText("15-01-2024")"#).unwrap() {
             Value::Date(d) => assert_eq!(d.to_string(), "2024-01-15"),
-            other => panic!("expected date, got {:?}", other),
+            other => panic!("expected date, got {other:?}"),
         }
     }
 
@@ -4662,7 +4655,7 @@ mod tests {
         .unwrap()
         {
             Value::List(xs) => assert_eq!(xs.len(), 3),
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -4674,7 +4667,7 @@ mod tests {
         .unwrap()
         {
             Value::Table(t) => assert_eq!(t.num_rows(), 2),
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -4688,10 +4681,10 @@ mod tests {
                         assert_eq!(n, "a");
                         assert_eq!(*v, 1.0);
                     }
-                    other => panic!("unexpected: {:?}", other),
+                    other => panic!("unexpected: {other:?}"),
                 }
             }
-            other => panic!("expected record, got {:?}", other),
+            other => panic!("expected record, got {other:?}"),
         }
     }
 
@@ -4706,7 +4699,7 @@ mod tests {
             Value::Duration(d) => {
                 assert_eq!(d.num_microseconds(), Some(93_784_000_000));
             }
-            other => panic!("expected duration, got {:?}", other),
+            other => panic!("expected duration, got {other:?}"),
         }
     }
 
@@ -4719,7 +4712,7 @@ mod tests {
         .unwrap()
         {
             Value::Datetime(dt) => assert_eq!(dt.to_string(), "2024-03-15 10:30:45"),
-            other => panic!("expected datetime, got {:?}", other),
+            other => panic!("expected datetime, got {other:?}"),
         }
     }
 
@@ -4732,7 +4725,7 @@ mod tests {
         .unwrap()
         {
             Value::Date(d) => assert_eq!(d.to_string(), "2024-01-15"),
-            other => panic!("expected date, got {:?}", other),
+            other => panic!("expected date, got {other:?}"),
         }
     }
 
@@ -4740,7 +4733,7 @@ mod tests {
     fn text_combine_with_separator() {
         match eval_str(r#"Text.Combine({"a", "b", "c"}, "-")"#).unwrap() {
             Value::Text(s) => assert_eq!(s, "a-b-c"),
-            other => panic!("expected text, got {:?}", other),
+            other => panic!("expected text, got {other:?}"),
         }
     }
 
@@ -4748,7 +4741,7 @@ mod tests {
     fn text_combine_no_separator() {
         match eval_str(r#"Text.Combine({"a", "b", "c"})"#).unwrap() {
             Value::Text(s) => assert_eq!(s, "abc"),
-            other => panic!("expected text, got {:?}", other),
+            other => panic!("expected text, got {other:?}"),
         }
     }
 
@@ -4757,7 +4750,7 @@ mod tests {
         // List.Accumulate is a left-fold: ((seed + 1) + 2) + 3 = 6.
         match eval_str(r#"List.Accumulate({1, 2, 3}, 0, (acc, x) => acc + x)"#).unwrap() {
             Value::Number(n) => assert_eq!(n, 6.0),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
     }
 
@@ -4765,7 +4758,7 @@ mod tests {
     fn list_accumulate_empty_returns_seed() {
         match eval_str(r#"List.Accumulate({}, 42, (acc, x) => acc + x)"#).unwrap() {
             Value::Number(n) => assert_eq!(n, 42.0),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
     }
 
@@ -4782,7 +4775,7 @@ mod tests {
                 use arrow::datatypes::DataType;
                 assert_eq!(t.as_arrow().unwrap().schema().field(1).data_type(), &DataType::Utf8);
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -4813,15 +4806,15 @@ mod tests {
                 assert_eq!(t.num_rows(), 2);
                 assert_eq!(t.num_columns(), 1);
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
     #[test]
     fn table_combine_empty_errors() {
         match eval_str("Table.Combine({})") {
-            Err(MError::Other(msg)) => assert!(msg.contains("empty"), "got: {}", msg),
-            other => panic!("expected error, got {:?}", other),
+            Err(MError::Other(msg)) => assert!(msg.contains("empty"), "got: {msg}"),
+            other => panic!("expected error, got {other:?}"),
         }
     }
 
@@ -4838,7 +4831,7 @@ mod tests {
                 let names: Vec<String> = t.column_names();
                 assert_eq!(names, vec!["b".to_string(), "a".to_string()]);
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -4850,7 +4843,7 @@ mod tests {
         .unwrap()
         {
             Value::Table(t) => assert_eq!(t.num_rows(), 2),
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -4865,7 +4858,7 @@ mod tests {
                 assert_eq!(t.num_columns(), 2);
                 assert_eq!(t.as_arrow().unwrap().schema().field(1).name(), "doubled");
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -4876,7 +4869,7 @@ mod tests {
                 assert_eq!(t.num_rows(), 2);
                 assert_eq!(t.num_columns(), 2);
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -4893,7 +4886,7 @@ mod tests {
                 assert_eq!(names, vec!["a".to_string(), "b".to_string()]);
                 assert_eq!(t.num_rows(), 1);
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -4906,7 +4899,7 @@ mod tests {
                 assert_eq!(t.num_rows(), 2);
                 assert_eq!(t.num_columns(), 2);
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -4918,7 +4911,7 @@ mod tests {
                 assert_eq!(t.num_rows(), 0);
                 assert_eq!(t.num_columns(), 2);
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
         // Empty schema works too (special-cased via try_new_with_options).
         match eval_str("#table({}, {})").unwrap() {
@@ -4926,7 +4919,7 @@ mod tests {
                 assert_eq!(t.num_rows(), 0);
                 assert_eq!(t.num_columns(), 0);
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -4938,12 +4931,12 @@ mod tests {
                     .iter()
                     .map(|v| match v {
                         Value::Text(s) => s.as_str(),
-                        other => panic!("expected text, got {:?}", other),
+                        other => panic!("expected text, got {other:?}"),
                     })
                     .collect();
                 assert_eq!(names, vec!["a", "b"]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -4958,7 +4951,7 @@ mod tests {
                 let names: Vec<String> = t.column_names();
                 assert_eq!(names, vec!["x".to_string(), "b".to_string()]);
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -4973,7 +4966,7 @@ mod tests {
                 assert_eq!(t.num_columns(), 1);
                 assert_eq!(t.as_arrow().unwrap().schema().field(0).name(), "b");
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -4982,16 +4975,16 @@ mod tests {
         match eval_str(
             r#"Table.RenameColumns(#table({"a"}, {}), {{"z", "x"}})"#,
         ) {
-            Err(MError::Other(msg)) => assert!(msg.contains("column not found"), "got: {}", msg),
-            other => panic!("expected error, got {:?}", other),
+            Err(MError::Other(msg)) => assert!(msg.contains("column not found"), "got: {msg}"),
+            other => panic!("expected error, got {other:?}"),
         }
     }
 
     #[test]
     fn table_remove_missing_column_errors() {
         match eval_str(r#"Table.RemoveColumns(#table({"a"}, {}), {"z"})"#) {
-            Err(MError::Other(msg)) => assert!(msg.contains("column not found"), "got: {}", msg),
-            other => panic!("expected error, got {:?}", other),
+            Err(MError::Other(msg)) => assert!(msg.contains("column not found"), "got: {msg}"),
+            other => panic!("expected error, got {other:?}"),
         }
     }
 
@@ -5023,8 +5016,8 @@ mod tests {
 
     #[test]
     fn text_contains_basic() {
-        assert_eq!(eval_bool(r#"Text.Contains("hello world", "world")"#), true);
-        assert_eq!(eval_bool(r#"Text.Contains("hello", "x")"#), false);
+        assert!(eval_bool(r#"Text.Contains("hello world", "world")"#));
+        assert!(!eval_bool(r#"Text.Contains("hello", "x")"#));
     }
 
     #[test]
@@ -5050,8 +5043,8 @@ mod tests {
 
     #[test]
     fn text_ends_with_basic() {
-        assert_eq!(eval_bool(r#"Text.EndsWith("hello", "lo")"#), true);
-        assert_eq!(eval_bool(r#"Text.EndsWith("hello", "x")"#), false);
+        assert!(eval_bool(r#"Text.EndsWith("hello", "lo")"#));
+        assert!(!eval_bool(r#"Text.EndsWith("hello", "x")"#));
     }
 
     #[test]
@@ -5062,12 +5055,12 @@ mod tests {
                     .iter()
                     .map(|v| match v {
                         Value::Number(n) => *n,
-                        other => panic!("expected number, got {:?}", other),
+                        other => panic!("expected number, got {other:?}"),
                     })
                     .collect();
                 assert_eq!(nums, vec![2.0, 4.0, 6.0]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -5079,12 +5072,12 @@ mod tests {
                     .iter()
                     .map(|v| match v {
                         Value::Number(n) => *n,
-                        other => panic!("expected number, got {:?}", other),
+                        other => panic!("expected number, got {other:?}"),
                     })
                     .collect();
                 assert_eq!(nums, vec![3.0, 4.0]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -5120,26 +5113,26 @@ mod tests {
                     .iter()
                     .map(|v| match v {
                         Value::Text(s) => s.as_str(),
-                        other => panic!("expected text, got {:?}", other),
+                        other => panic!("expected text, got {other:?}"),
                     })
                     .collect();
                 assert_eq!(names, vec!["a", "b"]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
     #[test]
     fn logical_from_text_basic() {
-        assert_eq!(eval_bool(r#"Logical.FromText("true")"#), true);
-        assert_eq!(eval_bool(r#"Logical.FromText("false")"#), false);
+        assert!(eval_bool(r#"Logical.FromText("true")"#));
+        assert!(!eval_bool(r#"Logical.FromText("false")"#));
     }
 
     #[test]
     fn nan_constant_is_nan() {
         match eval_str("#nan").unwrap() {
             Value::Number(n) => assert!(n.is_nan()),
-            other => panic!("expected NaN number, got {:?}", other),
+            other => panic!("expected NaN number, got {other:?}"),
         }
     }
 
@@ -5147,7 +5140,7 @@ mod tests {
     fn infinity_constant_is_inf() {
         match eval_str("#infinity").unwrap() {
             Value::Number(n) => assert!(n.is_infinite() && n > 0.0),
-            other => panic!("expected +inf number, got {:?}", other),
+            other => panic!("expected +inf number, got {other:?}"),
         }
     }
 
@@ -5157,7 +5150,7 @@ mod tests {
     fn type_construction_primitive() {
         match eval_str("type number").unwrap() {
             Value::Type(TypeRep::Number) => {}
-            other => panic!("expected Type(Number), got {:?}", other),
+            other => panic!("expected Type(Number), got {other:?}"),
         }
     }
 
@@ -5166,9 +5159,9 @@ mod tests {
         match eval_str("type nullable number").unwrap() {
             Value::Type(TypeRep::Nullable(inner)) => match *inner {
                 TypeRep::Number => {}
-                other => panic!("expected Nullable(Number), got {:?}", other),
+                other => panic!("expected Nullable(Number), got {other:?}"),
             },
-            other => panic!("expected Type(Nullable(...)), got {:?}", other),
+            other => panic!("expected Type(Nullable(...)), got {other:?}"),
         }
     }
 
@@ -5176,28 +5169,28 @@ mod tests {
     fn type_construction_any() {
         match eval_str("type any").unwrap() {
             Value::Type(TypeRep::Any) => {}
-            other => panic!("expected Type(Any), got {:?}", other),
+            other => panic!("expected Type(Any), got {other:?}"),
         }
     }
 
     #[test]
     fn is_tests_true() {
-        assert_eq!(eval_bool("1 is number"), true);
-        assert_eq!(eval_bool(r#""x" is text"#), true);
-        assert_eq!(eval_bool("true is logical"), true);
-        assert_eq!(eval_bool("null is null"), true);
-        assert_eq!(eval_bool("null is nullable number"), true);
-        assert_eq!(eval_bool("1 is nullable number"), true);
-        assert_eq!(eval_bool("1 is any"), true);
-        assert_eq!(eval_bool("null is any"), true);
+        assert!(eval_bool("1 is number"));
+        assert!(eval_bool(r#""x" is text"#));
+        assert!(eval_bool("true is logical"));
+        assert!(eval_bool("null is null"));
+        assert!(eval_bool("null is nullable number"));
+        assert!(eval_bool("1 is nullable number"));
+        assert!(eval_bool("1 is any"));
+        assert!(eval_bool("null is any"));
     }
 
     #[test]
     fn is_tests_false() {
-        assert_eq!(eval_bool("1 is text"), false);
-        assert_eq!(eval_bool("null is number"), false);
-        assert_eq!(eval_bool("null is anynonnull"), false);
-        assert_eq!(eval_bool("1 is logical"), false);
+        assert!(!eval_bool("1 is text"));
+        assert!(!eval_bool("null is number"));
+        assert!(!eval_bool("null is anynonnull"));
+        assert!(!eval_bool("1 is logical"));
     }
 
     #[test]
@@ -5211,16 +5204,16 @@ mod tests {
     #[test]
     fn as_failure_errors() {
         match eval_str(r#"1 as text"#) {
-            Err(MError::Other(msg)) => assert!(msg.contains("does not conform"), "got: {}", msg),
-            other => panic!("expected conformance error, got {:?}", other),
+            Err(MError::Other(msg)) => assert!(msg.contains("does not conform"), "got: {msg}"),
+            other => panic!("expected conformance error, got {other:?}"),
         }
     }
 
     #[test]
     fn unknown_type_name_errors() {
         match eval_str("1 is foo") {
-            Err(MError::Other(msg)) => assert!(msg.contains("unknown primitive type"), "got: {}", msg),
-            other => panic!("expected unknown-type error, got {:?}", other),
+            Err(MError::Other(msg)) => assert!(msg.contains("unknown primitive type"), "got: {msg}"),
+            other => panic!("expected unknown-type error, got {other:?}"),
         }
     }
 
@@ -5235,23 +5228,23 @@ mod tests {
         let env = EnvNode::empty();
         match evaluate(&ast, &env, &NoIoHost) {
             Err(MError::Other(msg)) => {
-                assert!(msg.contains("nullable"), "got: {}", msg);
+                assert!(msg.contains("nullable"), "got: {msg}");
             }
-            other => panic!("expected bare-nullable error, got {:?}", other),
+            other => panic!("expected bare-nullable error, got {other:?}"),
         }
     }
 
     #[test]
     fn list_is_list_record_is_record() {
-        assert_eq!(eval_bool("{1, 2, 3} is list"), true);
-        assert_eq!(eval_bool("[a = 1] is record"), true);
+        assert!(eval_bool("{1, 2, 3} is list"));
+        assert!(eval_bool("[a = 1] is record"));
     }
 
     #[test]
     fn function_literal_evaluates_to_function_value() {
         match eval_str("(x) => x + 1") {
             Ok(Value::Function(_)) => {}
-            other => panic!("expected Function value, got {:?}", other),
+            other => panic!("expected Function value, got {other:?}"),
         }
     }
 
@@ -5269,7 +5262,7 @@ mod tests {
                     .collect();
                 assert_eq!(parts, vec!["hello, world"]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -5287,7 +5280,7 @@ mod tests {
                     .collect();
                 assert_eq!(parts, vec!["a", "b", "c"]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -5306,7 +5299,7 @@ mod tests {
                     .collect();
                 assert_eq!(parts, vec!["a", "b", "c", "d"]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -5325,7 +5318,7 @@ mod tests {
                     .collect();
                 assert_eq!(parts, vec!["ab", "cde", "fg"]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -5334,7 +5327,7 @@ mod tests {
         let src = r#"Combiner.CombineTextByDelimiter(", ")({"a", "b", "c"})"#;
         match eval_str(src).unwrap() {
             Value::Text(s) => assert_eq!(s, "a, b, c"),
-            other => panic!("expected text, got {:?}", other),
+            other => panic!("expected text, got {other:?}"),
         }
     }
 
@@ -5344,7 +5337,7 @@ mod tests {
         let src = r#"Combiner.CombineTextByEachDelimiter({"-", "/"})({"a", "b", "c", "d"})"#;
         match eval_str(src).unwrap() {
             Value::Text(s) => assert_eq!(s, "a-b/c-d"),
-            other => panic!("expected text, got {:?}", other),
+            other => panic!("expected text, got {other:?}"),
         }
     }
 
@@ -5354,7 +5347,7 @@ mod tests {
         let src = r#"Combiner.CombineTextByLengths({4, 3})({"ab", "longer"})"#;
         match eval_str(src).unwrap() {
             Value::Text(s) => assert_eq!(s, "ab  lon"),
-            other => panic!("expected text, got {:?}", other),
+            other => panic!("expected text, got {other:?}"),
         }
     }
 
@@ -5364,7 +5357,7 @@ mod tests {
         let src = r#"Replacer.ReplaceText()("foo bar", "o", "0")"#;
         match eval_str(src).unwrap() {
             Value::Text(s) => assert_eq!(s, "f00 bar"),
-            other => panic!("expected text, got {:?}", other),
+            other => panic!("expected text, got {other:?}"),
         }
     }
 
@@ -5426,7 +5419,7 @@ mod tests {
                 assert_eq!(r.fields[1].0, "b");
                 assert!(matches!(r.fields[1].1, Value::Number(n) if n == 2.0));
             }
-            other => panic!("expected record, got {:?}", other),
+            other => panic!("expected record, got {other:?}"),
         }
     }
 
@@ -5450,7 +5443,7 @@ mod tests {
                 assert!(matches!(xs[0], Value::Logical(true)));
                 assert!(matches!(xs[1], Value::Logical(false)));
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -5468,7 +5461,7 @@ mod tests {
                 assert!(matches!(xs[0], Value::Logical(true)));
                 assert!(matches!(xs[1], Value::Logical(false)));
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -5483,7 +5476,7 @@ mod tests {
             Value::Table(t) => {
                 assert_eq!(t.num_rows(), 1); // only "banana" contains "an"
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -5498,7 +5491,7 @@ mod tests {
                 assert!(matches!(&r.fields[1].1, Value::Text(s) if s == "boom"));
                 assert!(matches!(r.fields[2].1, Value::Null));
             }
-            other => panic!("expected record, got {:?}", other),
+            other => panic!("expected record, got {other:?}"),
         }
     }
 
@@ -5518,10 +5511,10 @@ mod tests {
                         let names: Vec<&str> = er.fields.iter().map(|(n, _)| n.as_str()).collect();
                         assert_eq!(names, vec!["Reason", "Message", "Detail"]);
                     }
-                    other => panic!("expected error record, got {:?}", other),
+                    other => panic!("expected error record, got {other:?}"),
                 }
             }
-            other => panic!("expected try record, got {:?}", other),
+            other => panic!("expected try record, got {other:?}"),
         }
     }
 
@@ -5571,7 +5564,7 @@ mod tests {
     #[test]
     fn function_is_data_source_false() {
         let src = r#"Function.IsDataSource((x) => x)"#;
-        assert_eq!(eval_bool(src), false);
+        assert!(!eval_bool(src));
     }
 
     #[test]
@@ -5599,7 +5592,7 @@ mod tests {
                 }).collect();
                 assert_eq!(nums, vec![10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -5632,7 +5625,7 @@ mod tests {
                 }).collect();
                 assert_eq!(nums, vec![1.0, 2.0, 3.0]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -5678,7 +5671,7 @@ mod tests {
                 }).collect();
                 assert_eq!(nums, vec![10.0, 20.0, 30.0]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -5704,7 +5697,7 @@ mod tests {
                 }).collect();
                 assert_eq!(nums, vec![20.0, 30.0, 40.0]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -5713,7 +5706,7 @@ mod tests {
         let src = r#"Value.Metadata(42)"#;
         match eval_str(src).unwrap() {
             Value::Record(r) => assert!(r.fields.is_empty()),
-            other => panic!("expected record, got {:?}", other),
+            other => panic!("expected record, got {other:?}"),
         }
     }
 
@@ -5725,7 +5718,7 @@ mod tests {
                 assert_eq!(r.fields.len(), 1);
                 assert_eq!(r.fields[0].0, "k");
             }
-            other => panic!("expected record, got {:?}", other),
+            other => panic!("expected record, got {other:?}"),
         }
     }
 
@@ -5740,7 +5733,7 @@ mod tests {
         "#;
         match eval_str(src).unwrap() {
             Value::Record(r) => assert!(r.fields.is_empty()),
-            other => panic!("expected record, got {:?}", other),
+            other => panic!("expected record, got {other:?}"),
         }
     }
 
@@ -5754,7 +5747,7 @@ mod tests {
                 assert_eq!(r.fields.len(), 1);
                 assert_eq!(r.fields[0].0, "k");
             }
-            other => panic!("expected record, got {:?}", other),
+            other => panic!("expected record, got {other:?}"),
         }
     }
 
@@ -5775,7 +5768,7 @@ mod tests {
         let src = r#"Value.Type(42)"#;
         match eval_str(src).unwrap() {
             Value::Type(t) => assert_eq!(t, TypeRep::Number),
-            other => panic!("expected type, got {:?}", other),
+            other => panic!("expected type, got {other:?}"),
         }
     }
 
@@ -5802,7 +5795,7 @@ mod tests {
                 assert_eq!(d.month(), 1);
                 assert_eq!(d.day(), 8);
             }
-            other => panic!("expected date, got {:?}", other),
+            other => panic!("expected date, got {other:?}"),
         }
     }
 
@@ -5810,9 +5803,9 @@ mod tests {
     fn value_equals_deep_lists() {
         // List/list deep equality (extends primitive equality).
         let src = r#"Value.Equals({1, 2, {3, 4}}, {1, 2, {3, 4}})"#;
-        assert_eq!(eval_bool(src), true);
+        assert!(eval_bool(src));
         let src = r#"Value.Equals({1, 2, {3, 4}}, {1, 2, {3, 5}})"#;
-        assert_eq!(eval_bool(src), false);
+        assert!(!eval_bool(src));
     }
 
     #[test]
@@ -5824,22 +5817,22 @@ mod tests {
 
     #[test]
     fn value_nullable_equals_null_null() {
-        assert_eq!(eval_bool("Value.NullableEquals(null, null)"), true);
-        assert_eq!(eval_bool("Value.NullableEquals(null, 0)"), false);
-        assert_eq!(eval_bool("Value.NullableEquals(5, 5)"), true);
+        assert!(eval_bool("Value.NullableEquals(null, null)"));
+        assert!(!eval_bool("Value.NullableEquals(null, 0)"));
+        assert!(eval_bool("Value.NullableEquals(5, 5)"));
     }
 
     #[test]
     fn type_is_runtime_check() {
-        assert_eq!(eval_bool("Type.Is(42, type number)"), true);
-        assert_eq!(eval_bool(r#"Type.Is("x", type number)"#), false);
+        assert!(eval_bool("Type.Is(42, type number)"));
+        assert!(!eval_bool(r#"Type.Is("x", type number)"#));
     }
 
     #[test]
     fn type_non_nullable_strips_wrapper() {
         // type nullable number → number after NonNullable.
         let src = r#"Type.Is(42, Type.NonNullable(type nullable number))"#;
-        assert_eq!(eval_bool(src), true);
+        assert!(eval_bool(src));
     }
 
     #[test]
@@ -5850,7 +5843,7 @@ mod tests {
                 let names: Vec<&str> = r.fields.iter().map(|(n, _)| n.as_str()).collect();
                 assert_eq!(names, vec!["a", "b"]);
             }
-            other => panic!("expected record, got {:?}", other),
+            other => panic!("expected record, got {other:?}"),
         }
     }
 
@@ -5858,36 +5851,36 @@ mod tests {
     fn type_list_item_unwraps() {
         // ListItem(type {number}) → number type.
         let src = r#"Type.Is(42, Type.ListItem(type {number}))"#;
-        assert_eq!(eval_bool(src), true);
+        assert!(eval_bool(src));
     }
 
     #[test]
     fn type_table_column_lookup() {
         // Table type column lookup returns the column's type.
         let src = r#"Type.Is(42, Type.TableColumn(type table [a = number, b = text], "a"))"#;
-        assert_eq!(eval_bool(src), true);
+        assert!(eval_bool(src));
     }
 
     #[test]
     fn type_function_return_extracts_return() {
         let src = r#"Type.Is("x", Type.FunctionReturn(type function (n as number) as text))"#;
-        assert_eq!(eval_bool(src), true);
+        assert!(eval_bool(src));
     }
 
     #[test]
     fn type_list_of_number_conforms_to_list_only() {
         // {number} accepts a list of numbers but rejects a list with text.
-        assert_eq!(eval_bool("{1, 2, 3} is {number}"), true);
-        assert_eq!(eval_bool(r#"{1, "x"} is {number}"#), false);
-        assert_eq!(eval_bool("42 is {number}"), false);
+        assert!(eval_bool("{1, 2, 3} is {number}"));
+        assert!(!eval_bool(r#"{1, "x"} is {number}"#));
+        assert!(!eval_bool("42 is {number}"));
     }
 
     #[test]
     fn type_record_of_a_number_conformance() {
         // Closed record-type: extra fields make it fail.
-        assert_eq!(eval_bool("[a = 1] is [a = number]"), true);
-        assert_eq!(eval_bool(r#"[a = 1, b = "x"] is [a = number]"#), false);
-        assert_eq!(eval_bool("[a = 1] is [a = text]"), false);
+        assert!(eval_bool("[a = 1] is [a = number]"));
+        assert!(!eval_bool(r#"[a = 1, b = "x"] is [a = number]"#));
+        assert!(!eval_bool("[a = 1] is [a = text]"));
     }
 
     #[test]
@@ -5919,7 +5912,7 @@ mod tests {
     fn table_fuzzy_group_errors_not_implemented() {
         let src = r#"Table.FuzzyGroup(#table({"k"}, {{"a"}}), "k", {})"#;
         let err = eval_str(src).unwrap_err();
-        assert!(matches!(err, MError::NotImplemented(_)), "got {:?}", err);
+        assert!(matches!(err, MError::NotImplemented(_)), "got {err:?}");
     }
 
     #[test]
@@ -5943,7 +5936,7 @@ mod tests {
                 assert_eq!(names, vec!["n"]);
                 assert!(matches!(xs[1], Value::Number(n) if n == 2.0));
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -5973,7 +5966,7 @@ mod tests {
                 assert_eq!(nums(&xs[0]), vec![0.0, 2.0]); // hash mod 2 = 0
                 assert_eq!(nums(&xs[1]), vec![1.0, 3.0]); // hash mod 2 = 1
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -5994,7 +5987,7 @@ mod tests {
                 }).collect();
                 assert_eq!(nums, vec![1.0, 2.0, 3.0, 4.0, 5.0]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -6020,7 +6013,7 @@ mod tests {
                 assert_eq!(names, vec!["id"]);
                 assert!(matches!(xs[1], Value::Number(n) if n == 2.0));
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -6053,7 +6046,7 @@ mod tests {
                 assert_eq!(keys, vec!["a", "b"]);
                 assert_eq!(sums, vec![9.0, 6.0]); // a=1+3+5, b=2+4
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -6075,7 +6068,7 @@ mod tests {
                 // Row 0 has n=3 → rank 3; row 1 has n=1 → rank 1; row 2 has n=2 → rank 2.
                 assert_eq!(nums, vec![3.0, 1.0, 2.0]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -6099,7 +6092,7 @@ mod tests {
                 }).collect();
                 assert_eq!(nums, vec![3.0, 2.0, 2.0, 1.0]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -6124,7 +6117,7 @@ mod tests {
                 assert_eq!(names, vec!["n"]);
                 assert!(matches!(xs[1], Value::Number(n) if n == 3.0));
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -6148,7 +6141,7 @@ mod tests {
                 assert_eq!(names, vec!["Column1", "Column2"]);
                 assert!(matches!(xs[1], Value::Number(n) if n == 3.0));
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -6175,7 +6168,7 @@ mod tests {
                 assert_eq!(nums(&cols[0]), vec![1.0, 2.0, 3.0]);
                 assert_eq!(nums(&cols[1]), vec![10.0, 20.0, 30.0]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -6187,7 +6180,7 @@ mod tests {
                 assert_eq!(t.column_names(), vec!["Value"]);
                 assert_eq!(t.num_rows(), 1);
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -6204,7 +6197,7 @@ mod tests {
                 assert_eq!(t.column_names(), vec!["Name", "TypeName"]);
                 assert_eq!(t.num_rows(), 2);
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -6222,7 +6215,7 @@ mod tests {
                 assert_eq!(tbl.column_names(), vec!["Column", "Count", "NullCount", "DistinctCount"]);
                 assert_eq!(tbl.num_rows(), 1);
             }
-            other => panic!("expected table, got {:?}", other),
+            other => panic!("expected table, got {other:?}"),
         }
     }
 
@@ -6249,7 +6242,7 @@ mod tests {
                 assert_eq!(names, vec!["Column1", "Column2"]);
                 assert!(matches!(xs[1], Value::Number(n) if n == 3.0)); // header + 2 data
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -6281,7 +6274,7 @@ mod tests {
                 };
                 assert_eq!(nums, vec![1.0, 2.0, 3.0]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -6298,7 +6291,7 @@ mod tests {
                 }).collect();
                 assert_eq!(names, vec!["x.a", "x.b"]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -6332,7 +6325,7 @@ mod tests {
                 };
                 assert_eq!(nums, vec![1.0, 2.0]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -6349,7 +6342,7 @@ mod tests {
                 }).collect();
                 assert_eq!(names, vec!["ABC", "DEF"]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -6377,7 +6370,7 @@ mod tests {
                 assert_eq!(nums(&xs[0]), vec![2.0, 3.0, 4.0]);
                 assert_eq!(nums(&xs[1]), vec![3.0, 4.0]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -6397,7 +6390,7 @@ mod tests {
                 }).collect();
                 assert_eq!(nums, vec![1.0, 4.0, 5.0]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -6418,7 +6411,7 @@ mod tests {
                 }).collect();
                 assert_eq!(texts, vec!["f00", "bar", "b00"]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -6451,7 +6444,7 @@ mod tests {
                 assert_eq!(nums, vec![1.0, 99.0, 3.0]);
                 assert_eq!(texts, vec!["x", "qq", "z"]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -6467,7 +6460,7 @@ mod tests {
                 assert_eq!(r.fields.len(), 1);
                 assert!(matches!(r.fields[0].1, Value::Number(n) if n == 1.0));
             }
-            other => panic!("expected record, got {:?}", other),
+            other => panic!("expected record, got {other:?}"),
         }
     }
 
@@ -6487,7 +6480,7 @@ mod tests {
                 }).collect();
                 assert_eq!(nums, vec![9.0, 7.0, 5.0]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -6503,7 +6496,7 @@ mod tests {
             Value::Record(r) => {
                 assert!(matches!(&r.fields[0].1, Value::Text(s) if s == "apple"));
             }
-            other => panic!("expected record, got {:?}", other),
+            other => panic!("expected record, got {other:?}"),
         }
     }
 
@@ -6523,11 +6516,11 @@ mod tests {
             Value::List(xs) => {
                 let nums: Vec<f64> = xs.iter().map(|v| match v {
                     Value::Number(n) => *n,
-                    _ => panic!("expected number, got {:?}", v),
+                    _ => panic!("expected number, got {v:?}"),
                 }).collect();
                 assert_eq!(nums, vec![6.0, 30.0]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -6547,7 +6540,7 @@ mod tests {
                 }).collect();
                 assert_eq!(nums, vec![1.0, 2.0, 3.0]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -6563,11 +6556,11 @@ mod tests {
             Value::List(xs) => {
                 let texts: Vec<&str> = xs.iter().map(|v| match v {
                     Value::Text(s) => s.as_str(),
-                    _ => panic!("expected text, got {:?}", v),
+                    _ => panic!("expected text, got {v:?}"),
                 }).collect();
                 assert_eq!(texts, vec!["a", "a", "a", "b", "b"]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -6587,7 +6580,7 @@ mod tests {
                 }).collect();
                 assert_eq!(nums, vec![3.0, 2.0, 1.0]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -6605,7 +6598,7 @@ mod tests {
                 assert!(matches!(xs[0], Value::Number(n) if n == 2.0));
                 assert!(matches!(xs[1], Value::Number(n) if n == 3.0));
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -6618,7 +6611,7 @@ mod tests {
                 assert_eq!(r.fields[0].0, "x");
                 assert!(matches!(r.fields[0].1, Value::Number(n) if n == 42.0));
             }
-            other => panic!("expected record, got {:?}", other),
+            other => panic!("expected record, got {other:?}"),
         }
         // Two-row table errors.
         let src = r#"Table.SingleRow(#table({"x"}, {{1}, {2}}))"#;
@@ -6643,7 +6636,7 @@ mod tests {
                     .collect();
                 assert_eq!(names, vec!["n"]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -6662,7 +6655,7 @@ mod tests {
                     .collect();
                 assert_eq!(parts, vec!["a", "b", "c", "d"]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -6671,7 +6664,7 @@ mod tests {
         let src = r#"Lines.ToText({"x", "y", "z"})"#;
         match eval_str(src).unwrap() {
             Value::Text(s) => assert_eq!(s, "x\r\ny\r\nz"),
-            other => panic!("expected text, got {:?}", other),
+            other => panic!("expected text, got {other:?}"),
         }
     }
 
@@ -6696,7 +6689,7 @@ mod tests {
                     .collect();
                 assert_eq!(parts, vec!["foo", "bar", "baz"]);
             }
-            other => panic!("expected list, got {:?}", other),
+            other => panic!("expected list, got {other:?}"),
         }
     }
 
@@ -6721,18 +6714,18 @@ mod tests {
                         assert_eq!(qr.fields[0].0, "k");
                         assert!(matches!(&qr.fields[0].1, Value::Text(s) if s == "v"));
                     }
-                    other => panic!("Query should be record, got {:?}", other),
+                    other => panic!("Query should be record, got {other:?}"),
                 }
             }
-            other => panic!("expected record, got {:?}", other),
+            other => panic!("expected record, got {other:?}"),
         }
     }
 
     #[test]
     fn comparer_equals_wraps_comparer() {
         // Comparer.Equals returns true iff comparer(x,y) == 0.
-        assert_eq!(eval_bool(r#"Comparer.Equals(Comparer.OrdinalIgnoreCase(), "ABC", "abc")"#), true);
-        assert_eq!(eval_bool(r#"Comparer.Equals(Comparer.Ordinal(), "ABC", "abc")"#), false);
+        assert!(eval_bool(r#"Comparer.Equals(Comparer.OrdinalIgnoreCase(), "ABC", "abc")"#));
+        assert!(!eval_bool(r#"Comparer.Equals(Comparer.Ordinal(), "ABC", "abc")"#));
     }
 
     #[test]
@@ -6740,11 +6733,11 @@ mod tests {
         // Equal → replaced; not equal → unchanged.
         match eval_str(r#"Replacer.ReplaceValue()(5, 5, 99)"#).unwrap() {
             Value::Number(n) => assert_eq!(n, 99.0),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
         match eval_str(r#"Replacer.ReplaceValue()(5, 3, 99)"#).unwrap() {
             Value::Number(n) => assert_eq!(n, 5.0),
-            other => panic!("expected number, got {:?}", other),
+            other => panic!("expected number, got {other:?}"),
         }
     }
 

@@ -144,7 +144,7 @@ fn constructor(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let d = expect_int(&args[2], "#date: day")?;
     chrono::NaiveDate::from_ymd_opt(y as i32, mo as u32, d as u32)
         .map(Value::Date)
-        .ok_or_else(|| MError::Other(format!("#date: invalid date {}-{:02}-{:02}", y, mo, d)))
+        .ok_or_else(|| MError::Other(format!("#date: invalid date {y}-{mo:02}-{d:02}")))
 }
 
 
@@ -164,8 +164,7 @@ fn to_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             "yyyy/MM/dd" => "%Y/%m/%d",
             other => {
                 return Err(MError::Other(format!(
-                    "Date.ToText: unsupported format {:?}; supported: yyyy-MM-dd, dd/MM/yyyy, dd-MM-yyyy, MM/dd/yyyy, yyyy/MM/dd",
-                    other
+                    "Date.ToText: unsupported format {other:?}; supported: yyyy-MM-dd, dd/MM/yyyy, dd-MM-yyyy, MM/dd/yyyy, yyyy/MM/dd"
                 )));
             }
         },
@@ -216,7 +215,6 @@ fn day(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 /// Helper: extract a NaiveDate from a Date or Datetime cell.
-
 fn extract_naive_date(v: &Value, ctx: &str) -> Result<chrono::NaiveDate, MError> {
     match v {
         Value::Date(d) => Ok(*d),
@@ -369,7 +367,6 @@ fn is_leap_year(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 /// Apply a date-shape function while preserving Date vs Datetime kind.
 /// For Datetime, `start` controls whether the returned time is 00:00:00
 /// (start of day) or 23:59:59.999999 (end of day).
-
 fn shape_date(v: &Value, ctx: &str, start: bool, f: impl Fn(chrono::NaiveDate) -> chrono::NaiveDate) -> Result<Value, MError> {
     match v {
         Value::Null => Ok(Value::Null),
@@ -918,8 +915,7 @@ fn from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         }
     }
     Err(MError::Other(format!(
-        "Date.FromText: cannot parse {:?}",
-        text
+        "Date.FromText: cannot parse {text:?}"
     )))
 }
 

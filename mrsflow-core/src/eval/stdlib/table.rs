@@ -668,8 +668,7 @@ fn rename_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     for (old, _new) in &pairs {
         if !existing.contains(old) {
             return Err(MError::Other(format!(
-                "Table.RenameColumns: column not found: {}",
-                old
+                "Table.RenameColumns: column not found: {old}"
             )));
         }
     }
@@ -698,7 +697,7 @@ fn rename_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             let new_schema = Arc::new(Schema::new(new_fields));
             let columns: Vec<ArrayRef> = batch.columns().to_vec();
             let new_batch = RecordBatch::try_new(new_schema, columns)
-                .map_err(|e| MError::Other(format!("Table.RenameColumns: rebuild failed: {}", e)))?;
+                .map_err(|e| MError::Other(format!("Table.RenameColumns: rebuild failed: {e}")))?;
             Ok(Value::Table(Table::from_arrow(new_batch)))
         }
         super::super::value::TableRepr::Rows { rows, .. } => {
@@ -715,8 +714,7 @@ fn remove_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     for n in &names {
         if !existing.contains(n) {
             return Err(MError::Other(format!(
-                "Table.RemoveColumns: column not found: {}",
-                n
+                "Table.RemoveColumns: column not found: {n}"
             )));
         }
     }
@@ -731,7 +729,6 @@ fn remove_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 /// Project a table to the columns named by `keep_indices` (in order). Works
 /// for both Arrow- and Rows-backed inputs; preserves the input backing.
 /// Used by Table.RemoveColumns, Table.SelectColumns, Table.ReorderColumns.
-
 fn select_columns_by_index(
     table: &Table,
     keep_indices: &[usize],
@@ -750,7 +747,7 @@ fn select_columns_by_index(
             let new_columns: Vec<ArrayRef> =
                 keep_indices.iter().map(|&i| batch.column(i).clone()).collect();
             let new_batch = RecordBatch::try_new(new_schema, new_columns)
-                .map_err(|e| MError::Other(format!("{}: rebuild failed: {}", ctx, e)))?;
+                .map_err(|e| MError::Other(format!("{ctx}: rebuild failed: {e}")))?;
             Ok(Value::Table(Table::from_arrow(new_batch)))
         }
         super::super::value::TableRepr::Rows { rows, .. } => {
@@ -776,7 +773,7 @@ pub(super) fn values_to_table(column_names: &[String], rows: &[Vec<Value>]) -> R
         let options =
             arrow::record_batch::RecordBatchOptions::new().with_row_count(Some(n_rows));
         let batch = RecordBatch::try_new_with_options(schema, vec![], &options)
-            .map_err(|e| MError::Other(format!("#table: empty-cols rebuild failed: {}", e)))?;
+            .map_err(|e| MError::Other(format!("#table: empty-cols rebuild failed: {e}")))?;
         return Ok(Table::from_arrow(batch));
     }
 
@@ -801,7 +798,7 @@ pub(super) fn values_to_table(column_names: &[String], rows: &[Vec<Value>]) -> R
     }
     let schema = Arc::new(Schema::new(fields));
     let batch = RecordBatch::try_new(schema, columns)
-        .map_err(|e| MError::Other(format!("#table: build failed: {}", e)))?;
+        .map_err(|e| MError::Other(format!("#table: build failed: {e}")))?;
     Ok(Table::from_arrow(batch))
 }
 
@@ -810,7 +807,6 @@ pub(super) fn values_to_table(column_names: &[String], rows: &[Vec<Value>]) -> R
 /// `Ok(None)` — cells need a Rows-backed fallback (compound values, mixed
 /// primitive types, or Binary). Caller decides what to do with the signal.
 /// `Err(...)` — reserved for genuine internal errors (none currently).
-
 pub(crate) fn infer_cells(
     cells: &[&Value],
 ) -> Result<Option<(DataType, ArrayRef)>, MError> {
@@ -926,8 +922,7 @@ pub(crate) fn infer_cells(
                         Some(us) => values.push(Some(us)),
                         None => {
                             return Err(MError::Other(format!(
-                                "duration overflows i64 microseconds: {:?}",
-                                d
+                                "duration overflows i64 microseconds: {d:?}"
                             )));
                         }
                     },
@@ -946,7 +941,6 @@ pub(crate) fn infer_cells(
 /// Materialise a table as row-major Value cells. Works for both backings:
 /// Arrow variant decodes via cell_to_value; Rows variant clones. Used by
 /// Table.* ops that need to land their result in the Rows representation.
-
 pub(crate) fn table_to_rows(table: &Table) -> Result<(Vec<String>, Vec<Vec<Value>>), MError> {
     let names = table.column_names();
     let n_rows = table.num_rows();
@@ -965,7 +959,6 @@ pub(crate) fn table_to_rows(table: &Table) -> Result<(Vec<String>, Vec<Vec<Value
 /// Convert a single cell of a table back to a Value. Dispatches on the
 /// table's `TableRepr`: Arrow-backed reads via Array downcast (existing
 /// path); Rows-backed just clones the stored cell value.
-
 pub fn cell_to_value(table: &Table, col: usize, row: usize) -> Result<Value, MError> {
     let batch = match &table.repr {
         super::super::value::TableRepr::Arrow(b) => b,
@@ -1006,7 +999,7 @@ pub fn cell_to_value(table: &Table, col: usize, row: usize) -> Result<Value, MEr
             let epoch = chrono::NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
             let d = epoch
                 .checked_add_signed(chrono::Duration::days(days as i64))
-                .ok_or_else(|| MError::Other(format!("Date32 out of range: {} days", days)))?;
+                .ok_or_else(|| MError::Other(format!("Date32 out of range: {days} days")))?;
             Ok(Value::Date(d))
         }
         DataType::Timestamp(arrow::datatypes::TimeUnit::Microsecond, None) => {
@@ -1016,7 +1009,7 @@ pub fn cell_to_value(table: &Table, col: usize, row: usize) -> Result<Value, MEr
                 .expect("TimestampMicrosecond");
             let micros = a.value(row);
             let dt = chrono::DateTime::from_timestamp_micros(micros)
-                .ok_or_else(|| MError::Other(format!("Timestamp out of range: {} us", micros)))?
+                .ok_or_else(|| MError::Other(format!("Timestamp out of range: {micros} us")))?
                 .naive_utc();
             Ok(Value::Datetime(dt))
         }
@@ -1053,8 +1046,7 @@ fn select_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             Some(i) => indices.push(i),
             None => {
                 return Err(MError::Other(format!(
-                    "Table.SelectColumns: column not found: {}",
-                    n
+                    "Table.SelectColumns: column not found: {n}"
                 )));
             }
         }
@@ -1090,12 +1082,12 @@ fn select_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
                 .iter()
                 .map(|c| {
                     arrow::compute::take(c.as_ref(), &indices, None).map_err(|e| {
-                        MError::Other(format!("Table.SelectRows: take failed: {}", e))
+                        MError::Other(format!("Table.SelectRows: take failed: {e}"))
                     })
                 })
                 .collect::<Result<_, _>>()?;
             let new_batch = RecordBatch::try_new(batch.schema(), new_columns)
-                .map_err(|e| MError::Other(format!("Table.SelectRows: rebuild failed: {}", e)))?;
+                .map_err(|e| MError::Other(format!("Table.SelectRows: rebuild failed: {e}")))?;
             Ok(Value::Table(Table::from_arrow(new_batch)))
         }
         super::super::value::TableRepr::Rows { columns, rows } => {
@@ -1216,7 +1208,7 @@ fn column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         .column_names()
         .iter()
         .position(|n| n == name)
-        .ok_or_else(|| MError::Other(format!("Table.Column: column not found: {}", name)))?;
+        .ok_or_else(|| MError::Other(format!("Table.Column: column not found: {name}")))?;
     let n = table.num_rows();
     let mut out: Vec<Value> = Vec::with_capacity(n);
     for row in 0..n {
@@ -1248,8 +1240,7 @@ fn add_index_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError>
     let (mut names, mut rows) = table_to_rows(table)?;
     if names.iter().any(|n| n == &new_name) {
         return Err(MError::Other(format!(
-            "Table.AddIndexColumn: column already exists: {}",
-            new_name
+            "Table.AddIndexColumn: column already exists: {new_name}"
         )));
     }
     names.push(new_name);
@@ -1288,8 +1279,7 @@ fn add_column(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
                 let (target_dtype, target_nullable) = type_rep_to_datatype(t)?;
                 let cast = arrow::compute::cast(inferred_array, &target_dtype).map_err(|e| {
                     MError::Other(format!(
-                        "Table.AddColumn: cast {} to {:?} failed: {}",
-                        new_name, target_dtype, e
+                        "Table.AddColumn: cast {new_name} to {target_dtype:?} failed: {e}"
                     ))
                 })?;
                 (target_dtype, cast, target_nullable)
@@ -1308,7 +1298,7 @@ fn add_column(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
         let mut new_columns: Vec<ArrayRef> = batch.columns().to_vec();
         new_columns.push(new_array);
         let new_batch = RecordBatch::try_new(new_schema, new_columns)
-            .map_err(|e| MError::Other(format!("Table.AddColumn: rebuild failed: {}", e)))?;
+            .map_err(|e| MError::Other(format!("Table.AddColumn: rebuild failed: {e}")))?;
         return Ok(Value::Table(Table::from_arrow(new_batch)));
     }
 
@@ -1386,7 +1376,7 @@ fn promote_headers(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> 
                 .collect();
             let new_schema = Arc::new(Schema::new(new_fields));
             let new_batch = RecordBatch::try_new(new_schema, new_columns).map_err(|e| {
-                MError::Other(format!("Table.PromoteHeaders: rebuild failed: {}", e))
+                MError::Other(format!("Table.PromoteHeaders: rebuild failed: {e}"))
             })?;
             Ok(Value::Table(Table::from_arrow(new_batch)))
         }
@@ -1399,7 +1389,6 @@ fn promote_headers(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> 
 
 /// Build a record Value from one row of a table — column name → cell.
 /// Dispatches on `TableRepr`.
-
 pub(crate) fn row_to_record(table: &Table, row: usize) -> Result<Value, MError> {
     let names = table.column_names();
     let mut fields: Vec<(String, Value)> = Vec::with_capacity(names.len());
@@ -1417,7 +1406,6 @@ pub(crate) fn row_to_record(table: &Table, row: usize) -> Result<Value, MError> 
 /// when a Table.* op invokes its callback in a context where the original
 /// host should propagate (so an Odbc-using row predicate could in theory
 /// work — though none of slice 7d's tests exercise that).
-
 fn transform_column_types(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let transforms = expect_list(&args[1])?;
@@ -1440,8 +1428,7 @@ fn transform_column_types(args: &[Value], _host: &dyn IoHost) -> Result<Value, M
             for (name, target) in &pairs {
                 let idx = schema.index_of(name).map_err(|_| {
                     MError::Other(format!(
-                        "Table.TransformColumnTypes: column not found: {}",
-                        name
+                        "Table.TransformColumnTypes: column not found: {name}"
                     ))
                 })?;
                 let Some((target_dtype, target_nullable)) = target else {
@@ -1449,8 +1436,7 @@ fn transform_column_types(args: &[Value], _host: &dyn IoHost) -> Result<Value, M
                 };
                 let cast = arrow::compute::cast(&new_columns[idx], target_dtype).map_err(|e| {
                     MError::Other(format!(
-                        "Table.TransformColumnTypes: cast {} to {:?} failed: {}",
-                        name, target_dtype, e
+                        "Table.TransformColumnTypes: cast {name} to {target_dtype:?} failed: {e}"
                     ))
                 })?;
                 new_columns[idx] = cast;
@@ -1458,7 +1444,7 @@ fn transform_column_types(args: &[Value], _host: &dyn IoHost) -> Result<Value, M
             }
             let new_schema = Arc::new(Schema::new(new_fields));
             let new_batch = RecordBatch::try_new(new_schema, new_columns).map_err(|e| {
-                MError::Other(format!("Table.TransformColumnTypes: rebuild failed: {}", e))
+                MError::Other(format!("Table.TransformColumnTypes: rebuild failed: {e}"))
             })?;
             Ok(Value::Table(Table::from_arrow(new_batch)))
         }
@@ -1472,8 +1458,7 @@ fn transform_column_types(args: &[Value], _host: &dyn IoHost) -> Result<Value, M
             for (name, target) in &pairs {
                 let idx = columns.iter().position(|c| c == name).ok_or_else(|| {
                     MError::Other(format!(
-                        "Table.TransformColumnTypes: column not found: {}",
-                        name
+                        "Table.TransformColumnTypes: column not found: {name}"
                     ))
                 })?;
                 let Some(_) = target else {
@@ -1502,32 +1487,27 @@ fn transform_column_types(args: &[Value], _host: &dyn IoHost) -> Result<Value, M
 /// Helper: pull the TypeRep for `name` out of the original (un-parsed)
 /// transforms list. Only used on the Rows-path of TransformColumnTypes
 /// to recover a TypeRep we already validated.
-
 fn find_typerep_for_name(
     transforms: &[Value],
     name: &str,
 ) -> Result<super::super::value::TypeRep, MError> {
     for t in transforms {
-        if let Value::List(xs) = t {
-            if xs.len() == 2 {
-                if let (Value::Text(n), Value::Type(tr)) = (&xs[0], &xs[1]) {
-                    if n == name {
+        if let Value::List(xs) = t
+            && xs.len() == 2
+                && let (Value::Text(n), Value::Type(tr)) = (&xs[0], &xs[1])
+                    && n == name {
                         return Ok(tr.clone());
                     }
-                }
-            }
-        }
     }
     Err(MError::Other(format!(
-        "Table.TransformColumnTypes: lost track of type for column {}",
-        name
+        "Table.TransformColumnTypes: lost track of type for column {name}"
     )))
 }
 
 
-fn parse_col_type_pairs(
-    transforms: &[Value],
-) -> Result<Vec<(String, Option<(DataType, bool)>)>, MError> {
+type ColTypePairs = Vec<(String, Option<(DataType, bool)>)>;
+
+fn parse_col_type_pairs(transforms: &[Value]) -> Result<ColTypePairs, MError> {
     let mut out = Vec::with_capacity(transforms.len());
     for t in transforms {
         let inner = match t {
@@ -1563,7 +1543,6 @@ fn parse_col_type_pairs(
 
 /// Map a TypeRep to (DataType, nullable). Compound and non-primitive types
 /// error — eval-7e supports the primitive set only.
-
 fn type_rep_to_datatype(t: &super::super::value::TypeRep) -> Result<(DataType, bool), MError> {
     use super::super::value::TypeRep;
     match t {
@@ -1590,8 +1569,7 @@ fn type_rep_to_datatype(t: &super::super::value::TypeRep) -> Result<(DataType, b
         | TypeRep::ListOf(_) | TypeRep::RecordOf { .. } | TypeRep::TableOf { .. }
         | TypeRep::FunctionOf { .. } => {
             Err(MError::Other(format!(
-                "Table.TransformColumnTypes: type {:?} is not a castable primitive",
-                t
+                "Table.TransformColumnTypes: type {t:?} is not a castable primitive"
             )))
         }
     }
@@ -1621,7 +1599,7 @@ fn transform_columns(args: &[Value], host: &dyn IoHost) -> Result<Value, MError>
 
     for (name, closure, type_opt) in &pairs {
         let idx = names.iter().position(|n| n == name).ok_or_else(|| {
-            MError::Other(format!("Table.TransformColumns: column not found: {}", name))
+            MError::Other(format!("Table.TransformColumns: column not found: {name}"))
         })?;
         let mut new_cells: Vec<Value> = Vec::with_capacity(n_rows);
         for row in &rows {
@@ -1650,7 +1628,6 @@ fn transform_columns(args: &[Value], host: &dyn IoHost) -> Result<Value, MError>
 /// Cast a column of Values to a target M type by round-tripping through
 /// Arrow's `cast`. Errors when the column is heterogeneous (no uniform
 /// Arrow dtype) or when the cast itself fails (cells don't fit the type).
-
 fn cast_cells_to_type(
     cells: &[Value],
     t: &super::super::value::TypeRep,
@@ -1661,20 +1638,18 @@ fn cast_cells_to_type(
     let cell_refs: Vec<&Value> = cells.iter().collect();
     let (_, inferred_array) = infer_cells(&cell_refs)?.ok_or_else(|| {
         MError::Other(format!(
-            "{}: cast {} to {:?} failed: column has heterogeneous cells",
-            ctx, col_name, target_dtype
+            "{ctx}: cast {col_name} to {target_dtype:?} failed: column has heterogeneous cells"
         ))
     })?;
     let cast = arrow::compute::cast(&inferred_array, &target_dtype).map_err(|e| {
         MError::Other(format!(
-            "{}: cast {} to {:?} failed: {}",
-            ctx, col_name, target_dtype, e
+            "{ctx}: cast {col_name} to {target_dtype:?} failed: {e}"
         ))
     })?;
     // Decode the cast result back to Values via a temporary single-column table.
     let field = Field::new(col_name, target_dtype, target_nullable);
     let temp_batch = RecordBatch::try_new(Arc::new(Schema::new(vec![field])), vec![cast])
-        .map_err(|e| MError::Other(format!("{}: temp batch failed: {}", ctx, e)))?;
+        .map_err(|e| MError::Other(format!("{ctx}: temp batch failed: {e}")))?;
     let temp_table = Table::from_arrow(temp_batch);
     let mut decoded = Vec::with_capacity(cells.len());
     for r in 0..cells.len() {
@@ -1702,9 +1677,9 @@ fn is_single_col_type_pair(xs: &[Value]) -> bool {
 }
 
 
-fn parse_col_fn_pairs<'a>(
-    transforms: &'a [Value],
-) -> Result<Vec<(String, &'a Closure, Option<super::super::value::TypeRep>)>, MError> {
+type ColFnPairs<'a> = Vec<(String, &'a Closure, Option<super::super::value::TypeRep>)>;
+
+fn parse_col_fn_pairs(transforms: &[Value]) -> Result<ColFnPairs<'_>, MError> {
     let mut out = Vec::with_capacity(transforms.len());
     for t in transforms {
         let inner = match t {
@@ -1761,7 +1736,7 @@ fn skip(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             let new_columns: Vec<ArrayRef> =
                 batch.columns().iter().map(|c| c.slice(skip, remaining)).collect();
             let new_batch = RecordBatch::try_new(batch.schema(), new_columns)
-                .map_err(|e| MError::Other(format!("Table.Skip: rebuild failed: {}", e)))?;
+                .map_err(|e| MError::Other(format!("Table.Skip: rebuild failed: {e}")))?;
             Ok(Value::Table(Table::from_arrow(new_batch)))
         }
         super::super::value::TableRepr::Rows { columns, rows } => {
@@ -1784,8 +1759,7 @@ fn reorder_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> 
     for name in &order {
         let idx = existing.iter().position(|e| e == name).ok_or_else(|| {
             MError::Other(format!(
-                "Table.ReorderColumns: column not found: {}",
-                name
+                "Table.ReorderColumns: column not found: {name}"
             ))
         })?;
         new_indices.push(idx);
@@ -1821,8 +1795,7 @@ fn expand_record_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MEr
     let (existing, rows) = table_to_rows(table)?;
     let col_idx = existing.iter().position(|n| n == &column).ok_or_else(|| {
         MError::Other(format!(
-            "Table.ExpandRecordColumn: column not found: {}",
-            column
+            "Table.ExpandRecordColumn: column not found: {column}"
         ))
     })?;
 
@@ -1874,8 +1847,7 @@ fn expand_list_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MErro
     let (names, rows) = table_to_rows(table)?;
     let col_idx = names.iter().position(|n| n == &column).ok_or_else(|| {
         MError::Other(format!(
-            "Table.ExpandListColumn: column not found: {}",
-            column
+            "Table.ExpandListColumn: column not found: {column}"
         ))
     })?;
 
@@ -1926,8 +1898,7 @@ fn expand_table_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MErr
     let (outer_names, outer_rows) = table_to_rows(table)?;
     let col_idx = outer_names.iter().position(|n| n == &column).ok_or_else(|| {
         MError::Other(format!(
-            "Table.ExpandTableColumn: column not found: {}",
-            column
+            "Table.ExpandTableColumn: column not found: {column}"
         ))
     })?;
 
@@ -1949,8 +1920,7 @@ fn expand_table_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MErr
                     .map(|n| {
                         inner_names.iter().position(|x| x == n).ok_or_else(|| {
                             MError::Other(format!(
-                                "Table.ExpandTableColumn: inner column not found: {}",
-                                n
+                                "Table.ExpandTableColumn: inner column not found: {n}"
                             ))
                         })
                     })
@@ -2021,7 +1991,6 @@ fn unpivot_other_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, ME
 
 /// Shared core for both Unpivot variants. For each input row, for each
 /// pivot column, emit one output row: [non-pivoted columns..., attribute, value].
-
 fn do_unpivot(
     table: &Table,
     pivot_columns: &[String],
@@ -2037,7 +2006,7 @@ fn do_unpivot(
             names
                 .iter()
                 .position(|n| n == p)
-                .ok_or_else(|| MError::Other(format!("{}: column not found: {}", ctx, p)))
+                .ok_or_else(|| MError::Other(format!("{ctx}: column not found: {p}")))
         })
         .collect::<Result<_, _>>()?;
     let keep_indices: Vec<usize> = (0..names.len())
@@ -2069,7 +2038,6 @@ fn do_unpivot(
 /// multiple input rows match the same (group, pivotValue) pair, apply the
 /// optional aggregationFunction; otherwise default to the *last* matching
 /// value (PQ's documented default).
-
 fn pivot(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let pivot_values = expect_text_list(&args[1], "Table.Pivot: pivotValues")?;
@@ -2087,14 +2055,12 @@ fn pivot(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
         .position(|n| n == &attribute_column)
         .ok_or_else(|| {
             MError::Other(format!(
-                "Table.Pivot: attributeColumn not found: {}",
-                attribute_column
+                "Table.Pivot: attributeColumn not found: {attribute_column}"
             ))
         })?;
     let val_idx = names.iter().position(|n| n == &value_column).ok_or_else(|| {
         MError::Other(format!(
-            "Table.Pivot: valueColumn not found: {}",
-            value_column
+            "Table.Pivot: valueColumn not found: {value_column}"
         ))
     })?;
     let key_indices: Vec<usize> = (0..names.len())
@@ -2172,7 +2138,6 @@ fn pivot(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
 /// Table.Join — flat join. Like NestedJoin but matched rows merge into a
 /// single output row whose columns are the union of both tables'. The
 /// right-side key column is dropped.
-
 fn join(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table1 = expect_table(&args[0])?;
     let key1 = match &args[1] {
@@ -2211,10 +2176,10 @@ fn join(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let (right_names, right_rows) = table_to_rows(table2)?;
 
     let key1_idx = left_names.iter().position(|n| n == &key1).ok_or_else(|| {
-        MError::Other(format!("Table.Join: key1 column not found: {}", key1))
+        MError::Other(format!("Table.Join: key1 column not found: {key1}"))
     })?;
     let key2_idx = right_names.iter().position(|n| n == &key2).ok_or_else(|| {
-        MError::Other(format!("Table.Join: key2 column not found: {}", key2))
+        MError::Other(format!("Table.Join: key2 column not found: {key2}"))
     })?;
     let right_keep: Vec<usize> = (0..right_names.len()).filter(|i| *i != key2_idx).collect();
 
@@ -2289,14 +2254,12 @@ fn nested_join(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 
     let key1_idx = left_names.iter().position(|n| n == &key1).ok_or_else(|| {
         MError::Other(format!(
-            "Table.NestedJoin: key1 column not found: {}",
-            key1
+            "Table.NestedJoin: key1 column not found: {key1}"
         ))
     })?;
     let key2_idx = right_names.iter().position(|n| n == &key2).ok_or_else(|| {
         MError::Other(format!(
-            "Table.NestedJoin: key2 column not found: {}",
-            key2
+            "Table.NestedJoin: key2 column not found: {key2}"
         ))
     })?;
 
@@ -2372,7 +2335,7 @@ fn combine(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         let schemas_match = batches.iter().skip(1).all(|b| b.schema() == schema);
         if schemas_match {
             let combined = arrow::compute::concat_batches(&schema, &batches)
-                .map_err(|e| MError::Other(format!("Table.Combine: concat failed: {}", e)))?;
+                .map_err(|e| MError::Other(format!("Table.Combine: concat failed: {e}")))?;
             return Ok(Value::Table(Table::from_arrow(combined)));
         }
         // Schemas mismatch — fall through to Rows path which unions columns.
@@ -2385,8 +2348,7 @@ fn combine(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     for (i, t) in tables.iter().enumerate().skip(1) {
         if t.column_names() != names {
             return Err(MError::Other(format!(
-                "Table.Combine: column set of table {} does not match table 0",
-                i
+                "Table.Combine: column set of table {i} does not match table 0"
             )));
         }
     }
@@ -2422,8 +2384,7 @@ fn insert_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let n_existing = table.num_rows();
     if offset > n_existing {
         return Err(MError::Other(format!(
-            "Table.InsertRows: offset {} exceeds row count {}",
-            offset, n_existing
+            "Table.InsertRows: offset {offset} exceeds row count {n_existing}"
         )));
     }
 
@@ -2860,7 +2821,7 @@ fn sort(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         let idx = names
             .iter()
             .position(|n| n == &col_name)
-            .ok_or_else(|| MError::Other(format!("Table.Sort: column not found: {}", col_name)))?;
+            .ok_or_else(|| MError::Other(format!("Table.Sort: column not found: {col_name}")))?;
         keys.push((idx, desc));
     }
     let (_, mut rows) = table_to_rows(table)?;
@@ -2889,7 +2850,7 @@ fn parse_fill_columns(arg: &Value, names: &[String], ctx: &str) -> Result<Vec<us
         let idx = names
             .iter()
             .position(|h| h == n)
-            .ok_or_else(|| MError::Other(format!("{}: column not found: {}", ctx, n)))?;
+            .ok_or_else(|| MError::Other(format!("{ctx}: column not found: {n}")))?;
         out.push(idx);
     }
     Ok(out)
@@ -3022,7 +2983,7 @@ fn parse_min_max_criteria(arg: &Value, names: &[String], ctx: &str) -> Result<us
         Value::Text(name) => names
             .iter()
             .position(|n| n == name)
-            .ok_or_else(|| MError::Other(format!("{}: column not found: {}", ctx, name))),
+            .ok_or_else(|| MError::Other(format!("{ctx}: column not found: {name}"))),
         _ => Err(MError::NotImplemented(
             "Table.Min/Max: comparisonCriteria must be a text column name in v1",
         )),
@@ -3069,8 +3030,7 @@ fn min_max_n_count(arg: &Value, ctx: &str) -> Result<usize, MError> {
     match arg {
         Value::Number(n) if n.is_finite() && *n >= 0.0 && n.fract() == 0.0 => Ok(*n as usize),
         _ => Err(MError::Other(format!(
-            "{}: countOrCondition must be a non-negative integer in v1",
-            ctx
+            "{ctx}: countOrCondition must be a non-negative integer in v1"
         ))),
     }
 }
@@ -3107,8 +3067,7 @@ fn aggregate_table_column(args: &[Value], host: &dyn IoHost) -> Result<Value, ME
         .position(|n| n == &col_name)
         .ok_or_else(|| {
             MError::Other(format!(
-                "Table.AggregateTableColumn: column not found: {}",
-                col_name
+                "Table.AggregateTableColumn: column not found: {col_name}"
             ))
         })?;
 
@@ -3420,7 +3379,7 @@ fn replace_value(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
         let idx = names
             .iter()
             .position(|h| h == n)
-            .ok_or_else(|| MError::Other(format!("Table.ReplaceValue: column not found: {}", n)))?;
+            .ok_or_else(|| MError::Other(format!("Table.ReplaceValue: column not found: {n}")))?;
         col_indices.push(idx);
     }
     for row in rows.iter_mut() {
@@ -3456,7 +3415,7 @@ fn combine_columns(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
             names
                 .iter()
                 .position(|h| h == n)
-                .ok_or_else(|| MError::Other(format!("Table.CombineColumns: column not found: {}", n)))
+                .ok_or_else(|| MError::Other(format!("Table.CombineColumns: column not found: {n}")))
         })
         .collect::<Result<_, _>>()?;
     let keep: Vec<usize> = (0..names.len()).filter(|i| !src_indices.contains(i)).collect();
@@ -3483,8 +3442,7 @@ fn combine_columns_to_record(args: &[Value], _host: &dyn IoHost) -> Result<Value
         .map(|n| {
             names.iter().position(|h| h == n).ok_or_else(|| {
                 MError::Other(format!(
-                    "Table.CombineColumnsToRecord: column not found: {}",
-                    n
+                    "Table.CombineColumnsToRecord: column not found: {n}"
                 ))
             })
         })
@@ -3513,7 +3471,7 @@ fn demote_headers(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let names = table.column_names();
     let n_cols = names.len();
     // New headers: Column1, Column2, ...
-    let new_names: Vec<String> = (1..=n_cols).map(|i| format!("Column{}", i)).collect();
+    let new_names: Vec<String> = (1..=n_cols).map(|i| format!("Column{i}")).collect();
     // First row: original header names as text cells.
     let header_row: Vec<Value> = names.iter().cloned().map(Value::Text).collect();
     let (_, mut rows) = table_to_rows(table)?;
@@ -3529,11 +3487,10 @@ fn duplicate_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError>
     let idx = names
         .iter()
         .position(|n| n == &src)
-        .ok_or_else(|| MError::Other(format!("Table.DuplicateColumn: column not found: {}", src)))?;
+        .ok_or_else(|| MError::Other(format!("Table.DuplicateColumn: column not found: {src}")))?;
     if names.iter().any(|n| n == &new_name) {
         return Err(MError::Other(format!(
-            "Table.DuplicateColumn: new column name already exists: {}",
-            new_name
+            "Table.DuplicateColumn: new column name already exists: {new_name}"
         )));
     }
     let mut out_names = names.clone();
@@ -3551,7 +3508,7 @@ fn prefix_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let prefix = expect_text(&args[1])?;
     let (names, rows) = table_to_rows(table)?;
-    let new_names: Vec<String> = names.iter().map(|n| format!("{}.{}", prefix, n)).collect();
+    let new_names: Vec<String> = names.iter().map(|n| format!("{prefix}.{n}")).collect();
     Ok(Value::Table(values_to_table(&new_names, &rows)?))
 }
 
@@ -3585,7 +3542,7 @@ fn split_column(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let src_idx = names
         .iter()
         .position(|n| n == &source)
-        .ok_or_else(|| MError::Other(format!("Table.SplitColumn: column not found: {}", source)))?;
+        .ok_or_else(|| MError::Other(format!("Table.SplitColumn: column not found: {source}")))?;
 
     // First pass: run the splitter on each row to capture results and infer width.
     let mut split_results: Vec<Vec<Value>> = Vec::with_capacity(rows.len());
@@ -3606,7 +3563,7 @@ fn split_column(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let new_col_names: Vec<String> = match out_names_opt {
         Some(v) => v,
         None => (1..=width)
-            .map(|i| format!("{}.{}", source, i))
+            .map(|i| format!("{source}.{i}"))
             .collect(),
     };
     if new_col_names.len() != width {
@@ -3648,7 +3605,7 @@ fn split_column(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
 
 fn transform_column_names(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
-    let gen = expect_function(&args[1])?;
+    let name_fn = expect_function(&args[1])?;
     if !matches!(args.get(2), Some(Value::Null) | None) {
         return Err(MError::NotImplemented(
             "Table.TransformColumnNames: options not yet supported",
@@ -3657,7 +3614,7 @@ fn transform_column_names(args: &[Value], host: &dyn IoHost) -> Result<Value, ME
     let (names, rows) = table_to_rows(table)?;
     let mut new_names: Vec<String> = Vec::with_capacity(names.len());
     for n in &names {
-        let result = invoke_callback_with_host(gen, vec![Value::Text(n.clone())], host)?;
+        let result = invoke_callback_with_host(name_fn, vec![Value::Text(n.clone())], host)?;
         match result {
             Value::Text(s) => new_names.push(s),
             other => return Err(type_mismatch("text (column name)", &other)),
@@ -3671,7 +3628,7 @@ fn transpose(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let n_cols = table.num_columns();
     let n_rows = table.num_rows();
     // Each new row corresponds to one source column; new column count = old row count.
-    let new_names: Vec<String> = (1..=n_rows).map(|i| format!("Column{}", i)).collect();
+    let new_names: Vec<String> = (1..=n_rows).map(|i| format!("Column{i}")).collect();
     let mut new_rows: Vec<Vec<Value>> = Vec::with_capacity(n_cols);
     for col in 0..n_cols {
         let mut row: Vec<Value> = Vec::with_capacity(n_rows);
@@ -3694,11 +3651,11 @@ fn add_join_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> 
     let k1_idx = names1
         .iter()
         .position(|n| n == &key1)
-        .ok_or_else(|| MError::Other(format!("Table.AddJoinColumn: key1 column not found: {}", key1)))?;
+        .ok_or_else(|| MError::Other(format!("Table.AddJoinColumn: key1 column not found: {key1}")))?;
     let k2_idx = names2
         .iter()
         .position(|n| n == &key2)
-        .ok_or_else(|| MError::Other(format!("Table.AddJoinColumn: key2 column not found: {}", key2)))?;
+        .ok_or_else(|| MError::Other(format!("Table.AddJoinColumn: key2 column not found: {key2}")))?;
     let mut out_names = names1.clone();
     out_names.push(new_col);
     let mut out_rows: Vec<Vec<Value>> = Vec::with_capacity(rows1.len());
@@ -3740,7 +3697,7 @@ fn from_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         }
     }
     let names: Vec<String> = match args.get(1) {
-        Some(Value::Null) | None => (1..=col_lists.len()).map(|i| format!("Column{}", i)).collect(),
+        Some(Value::Null) | None => (1..=col_lists.len()).map(|i| format!("Column{i}")).collect(),
         Some(v) => expect_text_list(v, "Table.FromColumns: columnNames")?,
     };
     if names.len() != col_lists.len() {
@@ -3852,12 +3809,12 @@ fn to_list(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
                     .map(|v| match v {
                         Value::Text(s) => s.clone(),
                         Value::Number(n) => {
-                            let s = format!("{:?}", n);
+                            let s = format!("{n:?}");
                             s.trim_end_matches(".0").to_string()
                         }
                         Value::Null => String::new(),
                         Value::Logical(b) => (if *b { "true" } else { "false" }).to_string(),
-                        _ => format!("{:?}", v),
+                        _ => format!("{v:?}"),
                     })
                     .collect();
                 Value::Text(strs.join(","))
@@ -3958,10 +3915,7 @@ fn profile(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
                 null_count += 1;
                 continue;
             }
-            let already = seen.iter().any(|v| match values_equal_primitive(v, &cell) {
-                Ok(b) => b,
-                Err(_) => false,
-            });
+            let already = seen.iter().any(|v| values_equal_primitive(v, &cell).unwrap_or_default());
             if !already {
                 seen.push(cell);
             }
@@ -4033,7 +3987,7 @@ fn group(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
         .iter()
         .map(|k| {
             names.iter().position(|n| n == k).ok_or_else(|| {
-                MError::Other(format!("Table.Group: key column not found: {}", k))
+                MError::Other(format!("Table.Group: key column not found: {k}"))
             })
         })
         .collect::<Result<_, _>>()?;
@@ -4110,7 +4064,7 @@ fn add_rank_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> 
     let col_idx = names
         .iter()
         .position(|n| n == &col_name)
-        .ok_or_else(|| MError::Other(format!("Table.AddRankColumn: column not found: {}", col_name)))?;
+        .ok_or_else(|| MError::Other(format!("Table.AddRankColumn: column not found: {col_name}")))?;
 
     let (names_owned, rows) = table_to_rows(table)?;
     // Sort row indices by the criterion column, preserving original index for tie order.
@@ -4182,7 +4136,7 @@ fn partition(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let col_idx = names
         .iter()
         .position(|n| n == &col_name)
-        .ok_or_else(|| MError::Other(format!("Table.Partition: column not found: {}", col_name)))?;
+        .ok_or_else(|| MError::Other(format!("Table.Partition: column not found: {col_name}")))?;
     let mut buckets: Vec<Vec<Vec<Value>>> = (0..groups).map(|_| Vec::new()).collect();
     for row in rows {
         let key = row[col_idx].clone();
@@ -4255,8 +4209,7 @@ fn from_partitions(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> 
             Some(existing) if *existing == n => {}
             Some(_) => {
                 return Err(MError::Other(format!(
-                    "Table.FromPartitions: partition {} has different column set",
-                    i
+                    "Table.FromPartitions: partition {i} has different column set"
                 )));
             }
         }

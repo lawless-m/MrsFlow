@@ -95,9 +95,9 @@ fn constructor(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let mn = expect_int(&args[4], "#datetime: minute")?;
     let s = expect_int(&args[5], "#datetime: second")?;
     let date = chrono::NaiveDate::from_ymd_opt(y as i32, mo as u32, d as u32)
-        .ok_or_else(|| MError::Other(format!("#datetime: invalid date {}-{:02}-{:02}", y, mo, d)))?;
+        .ok_or_else(|| MError::Other(format!("#datetime: invalid date {y}-{mo:02}-{d:02}")))?;
     let time = chrono::NaiveTime::from_hms_opt(h as u32, mn as u32, s as u32)
-        .ok_or_else(|| MError::Other(format!("#datetime: invalid time {:02}:{:02}:{:02}", h, mn, s)))?;
+        .ok_or_else(|| MError::Other(format!("#datetime: invalid time {h:02}:{mn:02}:{s:02}")))?;
     Ok(Value::Datetime(chrono::NaiveDateTime::new(date, time)))
 }
 
@@ -164,7 +164,7 @@ fn from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             ));
         }
     }
-    Err(MError::Other(format!("DateTime.FromText: cannot parse {:?}", text)))
+    Err(MError::Other(format!("DateTime.FromText: cannot parse {text:?}")))
 }
 
 

@@ -116,7 +116,7 @@ fn from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             return Ok(Value::Datetimezone(dt));
         }
     }
-    Err(MError::Other(format!("DateTimeZone.FromText: cannot parse {:?}", text)))
+    Err(MError::Other(format!("DateTimeZone.FromText: cannot parse {text:?}")))
 }
 
 

@@ -355,8 +355,8 @@ impl<'src> Lexer<'src> {
         }
 
         // Optional exponent: e|E, optional sign, mandatory digits.
-        if let Some(&(e_pos, e_ch)) = self.chars.peek() {
-            if e_ch == 'e' || e_ch == 'E' {
+        if let Some(&(e_pos, e_ch)) = self.chars.peek()
+            && (e_ch == 'e' || e_ch == 'E') {
                 let after_sign = match self.peek_offset(1) {
                     Some('+') | Some('-') => Some(self.peek_offset(2)),
                     other => Some(other),
@@ -378,7 +378,6 @@ impl<'src> Lexer<'src> {
                     }
                 }
             }
-        }
 
         let lexeme = self.source[start..end].to_string();
         Ok(Token {

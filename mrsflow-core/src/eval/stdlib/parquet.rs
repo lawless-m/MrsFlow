@@ -31,7 +31,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
 fn document(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let path = expect_text(&args[0])?;
     host.parquet_read(path).map_err(|e| {
-        MError::Other(format!("Parquet.Document({:?}): {:?}", path, e))
+        MError::Other(format!("Parquet.Document({path:?}): {e:?}"))
     })
 }
 

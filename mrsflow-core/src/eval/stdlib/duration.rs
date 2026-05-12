@@ -164,7 +164,6 @@ fn from(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 /// Parse PQ duration text: "[d.]hh:mm:ss[.fff]" or just "hh:mm:ss".
-
 fn from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?.trim();
     let (negative, body) = if let Some(rest) = text.strip_prefix('-') {
@@ -187,7 +186,7 @@ fn from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     };
     let parts: Vec<&str> = time_part.split(':').collect();
     if parts.len() != 3 {
-        return Err(MError::Other(format!("Duration.FromText: expected hh:mm:ss[.fff], got {:?}", text)));
+        return Err(MError::Other(format!("Duration.FromText: expected hh:mm:ss[.fff], got {text:?}")));
     }
     let h: i64 = parts[0].parse().map_err(|_| MError::Other(format!(
         "Duration.FromText: bad hours {:?}", parts[0])))?;
@@ -198,10 +197,10 @@ fn from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         Some(i) => {
             let (a, b) = s_full.split_at(i);
             (a.parse::<i64>().map_err(|_| MError::Other(format!(
-                "Duration.FromText: bad seconds {:?}", a)))?, b)
+                "Duration.FromText: bad seconds {a:?}")))?, b)
         }
         None => (s_full.parse::<i64>().map_err(|_| MError::Other(format!(
-            "Duration.FromText: bad seconds {:?}", s_full)))?, ""),
+            "Duration.FromText: bad seconds {s_full:?}")))?, ""),
     };
     let mut total = days * 86400 + h * 3600 + m * 60 + s;
     if negative { total = -total; }
@@ -245,9 +244,9 @@ fn to_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let m = (abs % 3600) / 60;
     let s = abs % 60;
     let body = if days != 0 {
-        format!("{}{}.{:02}:{:02}:{:02}", sign_str, days, h, m, s)
+        format!("{sign_str}{days}.{h:02}:{m:02}:{s:02}")
     } else {
-        format!("{}{:02}:{:02}:{:02}", sign_str, h, m, s)
+        format!("{sign_str}{h:02}:{m:02}:{s:02}")
     };
     Ok(Value::Text(body))
 }

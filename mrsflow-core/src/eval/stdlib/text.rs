@@ -180,16 +180,14 @@ fn character_from_number(args: &[Value], _host: &dyn IoHost) -> Result<Value, ME
         Value::Number(n) => {
             if !n.is_finite() || *n < 0.0 || n.fract() != 0.0 || *n > u32::MAX as f64 {
                 return Err(MError::Other(format!(
-                    "Character.FromNumber: not a valid codepoint: {}",
-                    n
+                    "Character.FromNumber: not a valid codepoint: {n}"
                 )));
             }
             let cp = *n as u32;
             char::from_u32(cp)
                 .map(|c| Value::Text(c.to_string()))
                 .ok_or_else(|| MError::Other(format!(
-                    "Character.FromNumber: invalid Unicode codepoint U+{:04X}",
-                    cp
+                    "Character.FromNumber: invalid Unicode codepoint U+{cp:04X}"
                 )))
         }
         other => Err(type_mismatch("number", other)),
@@ -226,7 +224,7 @@ fn guid_from(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
                     .enumerate()
                     .all(|(i, &b)| dashes_at.contains(&i) || b.is_ascii_hexdigit())
             {
-                return Err(MError::Other(format!("Guid.From: invalid GUID: {:?}", s)));
+                return Err(MError::Other(format!("Guid.From: invalid GUID: {s:?}")));
             }
             Ok(Value::Text(lower))
         }
@@ -261,7 +259,7 @@ fn from(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         // {:?} for f64 matches `value_dump`'s canonical num format
         // (always-trailing fractional digit). Keeping parity here so
         // Text.From(42) prints the same as the differential's `(num 42.0)`.
-        Value::Number(n) => Ok(Value::Text(format!("{:?}", n))),
+        Value::Number(n) => Ok(Value::Text(format!("{n:?}"))),
         Value::Logical(b) => Ok(Value::Text(
             if *b { "true" } else { "false" }.to_string(),
         )),
@@ -346,7 +344,6 @@ fn trim_end(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 /// Helper: extract chars from a text-or-list-of-text "chars" argument.
-
 fn chars_from_arg(v: &Value, ctx: &'static str) -> Result<Vec<char>, MError> {
     match v {
         Value::Text(s) => Ok(s.chars().collect()),
@@ -377,7 +374,7 @@ fn at(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     text.chars()
         .nth(idx)
         .map(|c| Value::Text(c.to_string()))
-        .ok_or_else(|| MError::Other(format!("Text.At: index {} out of range", idx)))
+        .ok_or_else(|| MError::Other(format!("Text.At: index {idx} out of range")))
 }
 
 
@@ -487,7 +484,7 @@ fn pad_start(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     if n >= target {
         Ok(Value::Text(text.to_string()))
     } else {
-        let mut out: String = std::iter::repeat(pad_char).take(target - n).collect();
+        let mut out: String = std::iter::repeat_n(pad_char, target - n).collect();
         out.push_str(text);
         Ok(Value::Text(out))
     }
@@ -511,7 +508,7 @@ fn pad_end(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         Ok(Value::Text(text.to_string()))
     } else {
         let mut out = text.to_string();
-        out.extend(std::iter::repeat(pad_char).take(target - n));
+        out.extend(std::iter::repeat_n(pad_char, target - n));
         Ok(Value::Text(out))
     }
 }
@@ -571,7 +568,6 @@ fn position_of_any(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> 
 }
 
 /// Find the byte offsets of every occurrence of `delim` in `text`.
-
 fn delimiter_byte_offsets(text: &str, delim: &str) -> Vec<usize> {
     if delim.is_empty() {
         return Vec::new();
@@ -686,7 +682,6 @@ fn clean(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 /// Stringify a value for Text.Format substitution.
-
 fn format_arg_to_text(v: &Value) -> String {
     match v {
         Value::Null => "".into(),
@@ -701,8 +696,8 @@ fn format_arg_to_text(v: &Value) -> String {
         Value::Logical(b) => if *b { "true".into() } else { "false".into() },
         Value::Date(d) => d.to_string(),
         Value::Datetime(dt) => dt.to_string(),
-        Value::Duration(d) => format!("{}", d),
-        other => format!("{:?}", other),
+        Value::Duration(d) => format!("{d}"),
+        other => format!("{other:?}"),
     }
 }
 
@@ -731,10 +726,10 @@ fn format(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
             let value = match &args[1] {
                 Value::List(xs) => {
                     let idx: usize = key.parse().map_err(|_| MError::Other(format!(
-                        "Text.Format: index {:?} not a number for list arguments", key
+                        "Text.Format: index {key:?} not a number for list arguments"
                     )))?;
                     xs.get(idx).cloned().ok_or_else(|| MError::Other(format!(
-                        "Text.Format: index {} out of range", idx
+                        "Text.Format: index {idx} out of range"
                     )))?
                 }
                 Value::Record(r) => {
@@ -744,7 +739,7 @@ fn format(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
                         .find(|(n, _)| n == &key)
                         .map(|(_, v)| v.clone())
                         .ok_or_else(|| MError::Other(format!(
-                            "Text.Format: field {:?} not in arguments record", key
+                            "Text.Format: field {key:?} not in arguments record"
                         )))?;
                     super::super::force(raw, &mut |e, env| super::super::evaluate(e, env, host))?
                 }
@@ -765,8 +760,7 @@ fn infer_number_type(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError
         Ok(Value::Type(super::super::value::TypeRep::Number))
     } else {
         Err(MError::Other(format!(
-            "Text.InferNumberType: cannot infer numeric type from {:?}",
-            text
+            "Text.InferNumberType: cannot infer numeric type from {text:?}"
         )))
     }
 }

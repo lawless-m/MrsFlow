@@ -36,7 +36,7 @@ fn percent_encode(s: &str) -> String {
         if is_unreserved(b) {
             out.push(b as char);
         } else {
-            out.push_str(&format!("%{:02X}", b));
+            out.push_str(&format!("%{b:02X}"));
         }
     }
     out
@@ -52,13 +52,12 @@ fn percent_decode(s: &str) -> String {
     let mut out: Vec<u8> = Vec::with_capacity(bytes.len());
     let mut i = 0;
     while i < bytes.len() {
-        if bytes[i] == b'%' && i + 2 < bytes.len() {
-            if let (Some(h), Some(l)) = (hex(bytes[i + 1]), hex(bytes[i + 2])) {
+        if bytes[i] == b'%' && i + 2 < bytes.len()
+            && let (Some(h), Some(l)) = (hex(bytes[i + 1]), hex(bytes[i + 2])) {
                 out.push(h * 16 + l);
                 i += 3;
                 continue;
             }
-        }
         if bytes[i] == b'+' {
             out.push(b' ');
             i += 1;
@@ -108,7 +107,7 @@ fn combine_str(base: &str, rel: &str) -> String {
     }
     // Relative path: strip last segment of base, append.
     if base.ends_with('/') {
-        format!("{}{}", base, rel)
+        format!("{base}{rel}")
     } else {
         let cut = base.rfind('/').map(|i| i + 1).unwrap_or(0);
         format!("{}{}", &base[..cut], rel)
@@ -160,7 +159,7 @@ fn build_query_string(args: &[Value], _host: &dyn IoHost) -> Result<Value, MErro
 fn value_to_query_text(v: &Value) -> Result<String, MError> {
     match v {
         Value::Text(s) => Ok(s.clone()),
-        Value::Number(n) => Ok(format!("{:?}", n).trim_end_matches(".0").to_string()),
+        Value::Number(n) => Ok(format!("{n:?}").trim_end_matches(".0").to_string()),
         Value::Logical(b) => Ok((if *b { "true" } else { "false" }).to_string()),
         Value::Null => Ok(String::new()),
         other => Err(type_mismatch("text/number/logical/null (query value)", other)),

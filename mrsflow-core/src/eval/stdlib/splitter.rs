@@ -276,7 +276,7 @@ fn split_text_by_repeated_lengths(
 }
 
 fn split_text_by_whitespace(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    if !matches!(args.get(0), Some(Value::Null) | None) {
+    if !matches!(args.first(), Some(Value::Null) | None) {
         return Err(MError::NotImplemented(
             "Splitter.SplitTextByWhitespace: quoteStyle not yet supported",
         ));
@@ -351,8 +351,7 @@ fn split_text_by_each_delimiter_impl(args: &[Value], _host: &dyn IoHost) -> Resu
             rest = rest[pos + d.len()..].to_string();
         } else {
             return Err(MError::Other(format!(
-                "Splitter.SplitTextByEachDelimiter: delimiter not found: {:?}",
-                d
+                "Splitter.SplitTextByEachDelimiter: delimiter not found: {d:?}"
             )));
         }
     }
@@ -467,7 +466,7 @@ fn split_text_by_character_transition_impl(
     // in `after`. Split immediately before the `after` char.
     let chars: Vec<char> = text.chars().collect();
     let in_set = |s: &[String], ch: char| -> bool {
-        s.iter().any(|t| t.chars().next() == Some(ch) && t.chars().count() == 1)
+        s.iter().any(|t| t.starts_with(ch) && t.chars().count() == 1)
     };
     let mut parts: Vec<String> = Vec::new();
     let mut buf = String::new();

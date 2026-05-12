@@ -1364,7 +1364,7 @@ mod tests {
         // parse as a comparison — the `=` is leftover and trailing-garbage
         // errors. User must paren as `(x as T) = 5`.
         let toks = tokenize("x as number = 5").unwrap();
-        assert!(matches!(parse(&toks), Err(_)));
+        assert!(parse(&toks).is_err());
         assert_eq!(
             s("(x as number) = 5"),
             r#"(eq (as (ref "x") (ref "number")) (num "5"))"#
@@ -1613,7 +1613,7 @@ mod tests {
             assert_eq!(bindings[1].0, "filtered");
             assert_eq!(*body, Expr::Identifier("filtered".into()));
         } else {
-            panic!("expected let expression at top level, got {:?}", ast);
+            panic!("expected let expression at top level, got {ast:?}");
         }
     }
 }

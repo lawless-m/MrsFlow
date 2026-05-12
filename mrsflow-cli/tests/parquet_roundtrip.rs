@@ -60,12 +60,12 @@ fn parquet_document_reads_column_names() {
                 .into_iter()
                 .map(|v| match v {
                     Value::Text(s) => s,
-                    other => panic!("expected text, got {:?}", other),
+                    other => panic!("expected text, got {other:?}"),
                 })
                 .collect();
             assert_eq!(names, vec!["name".to_string(), "score".to_string()]);
         }
-        other => panic!("expected list of column names, got {:?}", other),
+        other => panic!("expected list of column names, got {other:?}"),
     }
 }
 
@@ -93,13 +93,13 @@ fn parquet_roundtrip_preserves_schema() {
         &host,
     ) {
         Value::List(xs) => xs,
-        other => panic!("expected list, got {:?}", other),
+        other => panic!("expected list, got {other:?}"),
     };
     let names: Vec<String> = names
         .into_iter()
         .map(|v| match v {
             Value::Text(s) => s,
-            other => panic!("expected text, got {:?}", other),
+            other => panic!("expected text, got {other:?}"),
         })
         .collect();
     assert_eq!(names, vec!["name".to_string(), "score".to_string()]);
@@ -115,7 +115,7 @@ fn tempdir() -> std::path::PathBuf {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_nanos();
-    p.push(format!("mrsflow-test-{}", nanos));
+    p.push(format!("mrsflow-test-{nanos}"));
     std::fs::create_dir_all(&p).unwrap();
     p
 }

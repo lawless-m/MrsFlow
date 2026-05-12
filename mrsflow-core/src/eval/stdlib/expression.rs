@@ -43,7 +43,7 @@ fn render_constant(v: &Value) -> String {
             } else if n.fract() == 0.0 && n.abs() < 1e16 {
                 format!("{}", *n as i64)
             } else {
-                format!("{}", n)
+                format!("{n}")
             }
         }
         Value::Text(s) => format!("\"{}\"", s.replace('"', "\"\"")),
@@ -81,7 +81,7 @@ fn render_constant(v: &Value) -> String {
             let hours = rem / 3600;
             let minutes = (rem / 60) % 60;
             let seconds = rem % 60;
-            format!("#duration({}, {}, {}, {})", days, hours, minutes, seconds)
+            format!("#duration({days}, {hours}, {minutes}, {seconds})")
         }
         Value::Binary(_) => "#binary({...})".to_string(),
         Value::List(xs) => {
@@ -116,7 +116,7 @@ fn quote_identifier(name: &str) -> String {
         name.to_string()
     } else {
         let escaped = name.replace('"', "\"\"");
-        format!("#\"{}\"", escaped)
+        format!("#\"{escaped}\"")
     }
 }
 
@@ -132,9 +132,9 @@ fn is_valid_m_identifier(s: &str) -> bool {
 fn evaluate(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let document = expect_text(&args[0])?;
     let tokens = tokenize(document)
-        .map_err(|e| MError::Other(format!("Expression.Evaluate: lex error: {:?}", e)))?;
+        .map_err(|e| MError::Other(format!("Expression.Evaluate: lex error: {e:?}")))?;
     let ast = parse(&tokens)
-        .map_err(|e| MError::Other(format!("Expression.Evaluate: parse error: {:?}", e)))?;
+        .map_err(|e| MError::Other(format!("Expression.Evaluate: parse error: {e:?}")))?;
     // Build the env: stdlib root + any bindings from the supplied environment record.
     let mut env = super::root_env();
     if let Some(env_val) = args.get(1) {
