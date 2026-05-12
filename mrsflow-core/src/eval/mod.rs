@@ -582,7 +582,7 @@ fn evaluate_as_type(expr: &Expr) -> Result<TypeRep, MError> {
 
 /// Conformance test between a value and a type. Matches the Prolog
 /// type_conforms/2; both sides must agree byte-for-byte on the boolean.
-fn type_conforms(v: &Value, t: &TypeRep) -> bool {
+pub(crate) fn type_conforms(v: &Value, t: &TypeRep) -> bool {
     match t {
         TypeRep::Any => true,
         TypeRep::AnyNonNull => !matches!(v, Value::Null),
@@ -5461,6 +5461,51 @@ mod tests {
             }
             other => panic!("expected table, got {:?}", other),
         }
+    }
+
+    #[test]
+    fn type_is_runtime_check() {
+        assert_eq!(eval_bool("Type.Is(42, type number)"), true);
+        assert_eq!(eval_bool(r#"Type.Is("x", type number)"#), false);
+    }
+
+    #[test]
+    fn type_non_nullable_strips_wrapper() {
+        // type nullable number → number after NonNullable.
+        let src = r#"Type.Is(42, Type.NonNullable(type nullable number))"#;
+        assert_eq!(eval_bool(src), true);
+    }
+
+    #[test]
+    fn type_record_fields_returns_info_record() {
+        let src = r#"Type.RecordFields(type [a = number, optional b = text])"#;
+        match eval_str(src).unwrap() {
+            Value::Record(r) => {
+                let names: Vec<&str> = r.fields.iter().map(|(n, _)| n.as_str()).collect();
+                assert_eq!(names, vec!["a", "b"]);
+            }
+            other => panic!("expected record, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn type_list_item_unwraps() {
+        // ListItem(type {number}) → number type.
+        let src = r#"Type.Is(42, Type.ListItem(type {number}))"#;
+        assert_eq!(eval_bool(src), true);
+    }
+
+    #[test]
+    fn type_table_column_lookup() {
+        // Table type column lookup returns the column's type.
+        let src = r#"Type.Is(42, Type.TableColumn(type table [a = number, b = text], "a"))"#;
+        assert_eq!(eval_bool(src), true);
+    }
+
+    #[test]
+    fn type_function_return_extracts_return() {
+        let src = r#"Type.Is("x", Type.FunctionReturn(type function (n as number) as text))"#;
+        assert_eq!(eval_bool(src), true);
     }
 
     #[test]
