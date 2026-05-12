@@ -87,6 +87,7 @@ fn kind(v: &Value) -> &'static str {
         Value::Text(_) => "text",
         Value::Date(_) => "date",
         Value::Datetime(_) => "datetime",
+        Value::Datetimezone(_) => "datetimezone",
         Value::Time(_) => "time",
         Value::Duration(_) => "duration",
         Value::Binary(_) => "binary",

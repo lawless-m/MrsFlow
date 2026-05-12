@@ -48,6 +48,20 @@ pub fn write_value(out: &mut String, v: &Value) {
                 dt.second()
             ));
         }
+        Value::Datetimezone(dt) => {
+            use chrono::{Datelike, Timelike};
+            let off = dt.offset().local_minus_utc();
+            out.push_str(&format!(
+                "(datetimezone {} {} {} {} {} {} {})",
+                dt.year(),
+                dt.month(),
+                dt.day(),
+                dt.hour(),
+                dt.minute(),
+                dt.second(),
+                off
+            ));
+        }
         Value::Time(t) => {
             use chrono::Timelike;
             out.push_str(&format!(
@@ -134,6 +148,7 @@ fn write_type(out: &mut String, t: &TypeRep) {
         TypeRep::Text => out.push_str("text"),
         TypeRep::Date => out.push_str("date"),
         TypeRep::Datetime => out.push_str("datetime"),
+        TypeRep::Datetimezone => out.push_str("datetimezone"),
         TypeRep::Time => out.push_str("time"),
         TypeRep::Duration => out.push_str("duration"),
         TypeRep::Binary => out.push_str("binary"),

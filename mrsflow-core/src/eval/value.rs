@@ -22,9 +22,10 @@ pub enum Value {
     Number(f64),
     Text(String),
     Date(chrono::NaiveDate),
-    /// Naive (timezone-less) datetime. A tz-bearing `Datetimezone` variant
-    /// can land later if the corpus calls for it.
+    /// Naive (timezone-less) datetime.
     Datetime(chrono::NaiveDateTime),
+    /// Tz-bearing datetime — DateTime with a fixed UTC offset.
+    Datetimezone(chrono::DateTime<chrono::FixedOffset>),
     Time(chrono::NaiveTime),
     Duration(chrono::Duration),
     Binary(Vec<u8>),
@@ -98,6 +99,7 @@ pub enum TypeRep {
     Text,
     Date,
     Datetime,
+    Datetimezone,
     Time,
     Duration,
     Binary,

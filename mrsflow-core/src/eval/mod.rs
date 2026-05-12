@@ -549,6 +549,7 @@ fn type_conforms(v: &Value, t: &TypeRep) -> bool {
         TypeRep::Text => matches!(v, Value::Text(_)),
         TypeRep::Date => matches!(v, Value::Date(_)),
         TypeRep::Datetime => matches!(v, Value::Datetime(_)),
+        TypeRep::Datetimezone => matches!(v, Value::Datetimezone(_)),
         TypeRep::Time => matches!(v, Value::Time(_)),
         TypeRep::Duration => matches!(v, Value::Duration(_)),
         TypeRep::Binary => matches!(v, Value::Binary(_)),
@@ -572,6 +573,7 @@ fn type_rep_name(t: &TypeRep) -> String {
         TypeRep::Text => "text".into(),
         TypeRep::Date => "date".into(),
         TypeRep::Datetime => "datetime".into(),
+        TypeRep::Datetimezone => "datetimezone".into(),
         TypeRep::Time => "time".into(),
         TypeRep::Duration => "duration".into(),
         TypeRep::Binary => "binary".into(),
@@ -783,6 +785,7 @@ pub(crate) fn type_name(v: &Value) -> &'static str {
         Value::Text(_) => "text",
         Value::Date(_) => "date",
         Value::Datetime(_) => "datetime",
+        Value::Datetimezone(_) => "datetimezone",
         Value::Time(_) => "time",
         Value::Duration(_) => "duration",
         Value::Binary(_) => "binary",
@@ -3302,6 +3305,52 @@ mod tests {
     fn decimal_from_logical() {
         match eval_str("Decimal.From(true)").unwrap() {
             Value::Number(n) => assert_eq!(n, 1.0),
+            other => panic!("expected number, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn dtz_utc_now_not_null() {
+        match eval_str("DateTimeZone.UtcNow()").unwrap() {
+            Value::Datetimezone(_) => {}
+            other => panic!("expected datetimezone, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn dtz_from_text_rfc3339() {
+        match eval_str(r#"DateTimeZone.FromText("2024-06-15T10:30:00+02:00")"#).unwrap() {
+            Value::Datetimezone(dt) => {
+                assert_eq!(dt.offset().local_minus_utc(), 2 * 3600);
+            }
+            other => panic!("expected datetimezone, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn dtz_remove_zone_strips_offset() {
+        match eval_str(r#"DateTimeZone.RemoveZone(DateTimeZone.FromText("2024-06-15T10:30:00+02:00"))"#).unwrap() {
+            Value::Datetime(dt) => {
+                assert_eq!(dt.to_string(), "2024-06-15 10:30:00");
+            }
+            other => panic!("expected datetime, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn dtz_switch_zone_changes_offset() {
+        match eval_str(r#"DateTimeZone.SwitchZone(DateTimeZone.FromText("2024-06-15T10:30:00+00:00"), 5)"#).unwrap() {
+            Value::Datetimezone(dt) => {
+                assert_eq!(dt.offset().local_minus_utc(), 5 * 3600);
+            }
+            other => panic!("expected datetimezone, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn dtz_zone_hours_basic() {
+        match eval_str(r#"DateTimeZone.ZoneHours(DateTimeZone.FromText("2024-01-01T00:00:00-05:00"))"#).unwrap() {
+            Value::Number(n) => assert_eq!(n, -5.0),
             other => panic!("expected number, got {:?}", other),
         }
     }
