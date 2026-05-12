@@ -48,6 +48,15 @@ pub fn write_value(out: &mut String, v: &Value) {
                 dt.second()
             ));
         }
+        Value::Time(t) => {
+            use chrono::Timelike;
+            out.push_str(&format!(
+                "(time {} {} {})",
+                t.hour(),
+                t.minute(),
+                t.second()
+            ));
+        }
         Value::Duration(dur) => {
             let s = dur.num_seconds() as f64;
             out.push_str(&format!("(duration {:?})", s));
@@ -125,6 +134,7 @@ fn write_type(out: &mut String, t: &TypeRep) {
         TypeRep::Text => out.push_str("text"),
         TypeRep::Date => out.push_str("date"),
         TypeRep::Datetime => out.push_str("datetime"),
+        TypeRep::Time => out.push_str("time"),
         TypeRep::Duration => out.push_str("duration"),
         TypeRep::Binary => out.push_str("binary"),
         TypeRep::List => out.push_str("list"),

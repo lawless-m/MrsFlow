@@ -549,6 +549,7 @@ fn type_conforms(v: &Value, t: &TypeRep) -> bool {
         TypeRep::Text => matches!(v, Value::Text(_)),
         TypeRep::Date => matches!(v, Value::Date(_)),
         TypeRep::Datetime => matches!(v, Value::Datetime(_)),
+        TypeRep::Time => matches!(v, Value::Time(_)),
         TypeRep::Duration => matches!(v, Value::Duration(_)),
         TypeRep::Binary => matches!(v, Value::Binary(_)),
         TypeRep::List => matches!(v, Value::List(_)),
@@ -571,6 +572,7 @@ fn type_rep_name(t: &TypeRep) -> String {
         TypeRep::Text => "text".into(),
         TypeRep::Date => "date".into(),
         TypeRep::Datetime => "datetime".into(),
+        TypeRep::Time => "time".into(),
         TypeRep::Duration => "duration".into(),
         TypeRep::Binary => "binary".into(),
         TypeRep::List => "list".into(),
@@ -781,6 +783,7 @@ pub(crate) fn type_name(v: &Value) -> &'static str {
         Value::Text(_) => "text",
         Value::Date(_) => "date",
         Value::Datetime(_) => "datetime",
+        Value::Time(_) => "time",
         Value::Duration(_) => "duration",
         Value::Binary(_) => "binary",
         Value::List(_) => "list",
@@ -3300,6 +3303,38 @@ mod tests {
         match eval_str("Decimal.From(true)").unwrap() {
             Value::Number(n) => assert_eq!(n, 1.0),
             other => panic!("expected number, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn time_from_text_hms() {
+        match eval_str(r#"Time.FromText("14:30:45")"#).unwrap() {
+            Value::Time(t) => assert_eq!(t.to_string(), "14:30:45"),
+            other => panic!("expected time, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn time_hour_from_datetime() {
+        match eval_str(r#"Time.Hour(#datetime(2024, 1, 1, 15, 30, 0))"#).unwrap() {
+            Value::Number(n) => assert_eq!(n, 15.0),
+            other => panic!("expected number, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn time_to_text_round_trip() {
+        match eval_str(r#"Time.ToText(Time.FromText("09:15:30"))"#).unwrap() {
+            Value::Text(s) => assert_eq!(s, "09:15:30"),
+            other => panic!("expected text, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn time_start_of_hour_basic() {
+        match eval_str(r#"Time.StartOfHour(Time.FromText("14:30:45"))"#).unwrap() {
+            Value::Time(t) => assert_eq!(t.to_string(), "14:00:00"),
+            other => panic!("expected time, got {:?}", other),
         }
     }
 

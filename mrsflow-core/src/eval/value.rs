@@ -25,6 +25,7 @@ pub enum Value {
     /// Naive (timezone-less) datetime. A tz-bearing `Datetimezone` variant
     /// can land later if the corpus calls for it.
     Datetime(chrono::NaiveDateTime),
+    Time(chrono::NaiveTime),
     Duration(chrono::Duration),
     Binary(Vec<u8>),
     List(Vec<Value>),
@@ -97,6 +98,7 @@ pub enum TypeRep {
     Text,
     Date,
     Datetime,
+    Time,
     Duration,
     Binary,
     List,
