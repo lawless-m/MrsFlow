@@ -3763,6 +3763,94 @@ mod tests {
     }
 
     #[test]
+    fn record_add_field_appends() {
+        let src = r#"Record.AddField([a = 1, b = 2], "c", 3)"#;
+        let v = deep_force(eval_str(src).unwrap(), &NoIoHost).unwrap();
+        match v {
+            Value::Record(r) => {
+                let pairs: Vec<(&str, f64)> = r
+                    .fields
+                    .iter()
+                    .map(|(n, v)| match v {
+                        Value::Number(x) => (n.as_str(), *x),
+                        _ => panic!("expected number, got {:?}", v),
+                    })
+                    .collect();
+                assert_eq!(pairs, vec![("a", 1.0), ("b", 2.0), ("c", 3.0)]);
+            }
+            other => panic!("expected record, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn record_from_table_to_table_roundtrip() {
+        // ToTable then FromTable should reproduce the original record.
+        let src = r#"
+            let
+                r = [a = 1, b = "two", c = true],
+                t = Record.ToTable(r),
+                back = Record.FromTable(t)
+            in back
+        "#;
+        match eval_str(src).unwrap() {
+            Value::Record(rec) => {
+                assert_eq!(rec.fields.len(), 3);
+                assert_eq!(rec.fields[0].0, "a");
+                assert!(matches!(rec.fields[0].1, Value::Number(n) if n == 1.0));
+                assert_eq!(rec.fields[1].0, "b");
+                assert!(matches!(&rec.fields[1].1, Value::Text(s) if s == "two"));
+                assert_eq!(rec.fields[2].0, "c");
+                assert!(matches!(rec.fields[2].1, Value::Logical(true)));
+            }
+            other => panic!("expected record, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn record_rename_fields_basic() {
+        let src = r#"Record.RenameFields([a = 1, b = 2], {{"a", "x"}, {"b", "y"}})"#;
+        match eval_str(src).unwrap() {
+            Value::Record(r) => {
+                let names: Vec<&str> = r.fields.iter().map(|(n, _)| n.as_str()).collect();
+                assert_eq!(names, vec!["x", "y"]);
+            }
+            other => panic!("expected record, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn record_select_fields_keeps_only_named() {
+        let src = r#"Record.SelectFields([a = 1, b = 2, c = 3], {"c", "a"})"#;
+        match eval_str(src).unwrap() {
+            Value::Record(r) => {
+                // Order should follow the selection list.
+                let names: Vec<&str> = r.fields.iter().map(|(n, _)| n.as_str()).collect();
+                assert_eq!(names, vec!["c", "a"]);
+            }
+            other => panic!("expected record, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn record_transform_fields_applies_callback() {
+        let src = r#"Record.TransformFields([a = 1, b = 2], {{"a", each _ * 10}, {"b", each _ + 5}})"#;
+        match eval_str(src).unwrap() {
+            Value::Record(r) => {
+                let nums: Vec<(&str, f64)> = r
+                    .fields
+                    .iter()
+                    .map(|(n, v)| match v {
+                        Value::Number(x) => (n.as_str(), *x),
+                        _ => panic!("expected number, got {:?}", v),
+                    })
+                    .collect();
+                assert_eq!(nums, vec![("a", 10.0), ("b", 7.0)]);
+            }
+            other => panic!("expected record, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn number_to_text_whole() {
         match eval_str("Number.ToText(2)").unwrap() {
             Value::Text(s) => assert_eq!(s, "2"),

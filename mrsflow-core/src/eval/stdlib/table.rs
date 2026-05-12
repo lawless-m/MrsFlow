@@ -316,7 +316,7 @@ fn select_columns_by_index(
 }
 
 
-fn values_to_table(column_names: &[String], rows: &[Vec<Value>]) -> Result<Table, MError> {
+pub(super) fn values_to_table(column_names: &[String], rows: &[Vec<Value>]) -> Result<Table, MError> {
     let n_rows = rows.len();
     let n_cols = column_names.len();
 
