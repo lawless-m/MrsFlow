@@ -3304,6 +3304,54 @@ mod tests {
     }
 
     #[test]
+    fn date_day_of_week_default_sunday() {
+        // 2024-01-07 is a Sunday. Sunday=0 with default firstDayOfWeek.
+        match eval_str("Date.DayOfWeek(#date(2024, 1, 7))").unwrap() {
+            Value::Number(n) => assert_eq!(n, 0.0),
+            other => panic!("expected number, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn date_day_of_week_name() {
+        match eval_str("Date.DayOfWeekName(#date(2024, 1, 1))").unwrap() {
+            Value::Text(s) => assert_eq!(s, "Monday"),
+            other => panic!("expected text, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn date_is_leap_year_basic() {
+        match eval_str("Date.IsLeapYear(#date(2024, 1, 1))").unwrap() {
+            Value::Logical(b) => assert!(b),
+            other => panic!("expected logical, got {:?}", other),
+        }
+        match eval_str("Date.IsLeapYear(#date(2023, 1, 1))").unwrap() {
+            Value::Logical(b) => assert!(!b),
+            other => panic!("expected logical, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn date_to_record_basic() {
+        match eval_str("Date.ToRecord(#date(2024, 6, 15))").unwrap() {
+            Value::Record(r) => {
+                let names: Vec<&str> = r.fields.iter().map(|(n, _)| n.as_str()).collect();
+                assert_eq!(names, vec!["Year", "Month", "Day"]);
+            }
+            other => panic!("expected record, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn date_quarter_of_year_basic() {
+        match eval_str("Date.QuarterOfYear(#date(2024, 5, 15))").unwrap() {
+            Value::Number(n) => assert_eq!(n, 2.0),
+            other => panic!("expected number, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn date_add_years_positive() {
         match eval_str("Date.AddYears(#date(2020, 6, 15), 5)").unwrap() {
             Value::Date(d) => {

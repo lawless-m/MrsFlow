@@ -80,6 +80,19 @@ pub fn root_env() -> Env {
     ] {
         env = env.extend(name.to_string(), Value::Number(n));
     }
+
+    // Day.* constants — Date.DayOfWeek's firstDayOfWeek argument.
+    for (name, n) in [
+        ("Day.Sunday",    0.0),
+        ("Day.Monday",    1.0),
+        ("Day.Tuesday",   2.0),
+        ("Day.Wednesday", 3.0),
+        ("Day.Thursday",  4.0),
+        ("Day.Friday",    5.0),
+        ("Day.Saturday",  6.0),
+    ] {
+        env = env.extend(name.to_string(), Value::Number(n));
+    }
     env
 }
 
@@ -690,6 +703,44 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ("Date.AddYears", two("date", "numberOfYears"), date_add_years),
         ("Date.AddQuarters", two("date", "numberOfQuarters"), date_add_quarters),
         ("Date.AddWeeks", two("date", "numberOfWeeks"), date_add_weeks),
+        (
+            "Date.DayOfWeek",
+            vec![
+                Param { name: "date".into(),            optional: false, type_annotation: None },
+                Param { name: "firstDayOfWeek".into(),  optional: true,  type_annotation: None },
+            ],
+            date_day_of_week,
+        ),
+        (
+            "Date.DayOfWeekName",
+            vec![
+                Param { name: "date".into(),    optional: false, type_annotation: None },
+                Param { name: "culture".into(), optional: true,  type_annotation: None },
+            ],
+            date_day_of_week_name,
+        ),
+        ("Date.DayOfYear", one("date"), date_day_of_year),
+        ("Date.DaysInMonth", one("date"), date_days_in_month),
+        (
+            "Date.MonthName",
+            vec![
+                Param { name: "date".into(),    optional: false, type_annotation: None },
+                Param { name: "culture".into(), optional: true,  type_annotation: None },
+            ],
+            date_month_name,
+        ),
+        ("Date.QuarterOfYear", one("date"), date_quarter_of_year),
+        ("Date.WeekOfMonth", one("date"), date_week_of_month),
+        (
+            "Date.WeekOfYear",
+            vec![
+                Param { name: "date".into(),           optional: false, type_annotation: None },
+                Param { name: "firstDayOfWeek".into(), optional: true,  type_annotation: None },
+            ],
+            date_week_of_year,
+        ),
+        ("Date.IsLeapYear", one("date"), date_is_leap_year),
+        ("Date.ToRecord", one("date"), date_to_record),
         ("Date.From", one("value"), date_from),
         ("Date.Year", one("date"), date_year),
         ("Date.Month", one("date"), date_month),
@@ -4489,6 +4540,163 @@ fn date_day(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         Value::Date(d) => Ok(Value::Number(d.day() as f64)),
         other => Err(type_mismatch("date", other)),
     }
+}
+
+/// Helper: extract a NaiveDate from a Date or Datetime cell.
+fn extract_naive_date(v: &Value, ctx: &str) -> Result<chrono::NaiveDate, MError> {
+    match v {
+        Value::Date(d) => Ok(*d),
+        Value::Datetime(dt) => Ok(dt.date()),
+        other => Err(MError::Other(format!(
+            "{}: argument must be a date or datetime (got {})",
+            ctx,
+            super::type_name(other)
+        ))),
+    }
+}
+
+fn date_day_of_week(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    use chrono::Datelike;
+    if matches!(args[0], Value::Null) {
+        return Ok(Value::Null);
+    }
+    let d = extract_naive_date(&args[0], "Date.DayOfWeek")?;
+    let first = match args.get(1) {
+        Some(Value::Number(n)) if n.fract() == 0.0 && *n >= 0.0 && *n <= 6.0 => *n as u32,
+        Some(Value::Null) | None => 0, // Sunday
+        Some(other) => return Err(type_mismatch("integer 0..6 (Day.*)", other)),
+    };
+    // chrono's Weekday::num_days_from_monday returns 0..6 starting Monday=0.
+    let from_monday = d.weekday().num_days_from_monday();
+    // Sunday(0), Monday(1), ..., Saturday(6) → want days since `first`.
+    let dow_sunday_first = (from_monday + 1) % 7; // 0=Sunday, 1=Monday, ...
+    let result = (dow_sunday_first + 7 - first) % 7;
+    Ok(Value::Number(result as f64))
+}
+
+fn date_day_of_week_name(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    use chrono::Datelike;
+    if matches!(args[0], Value::Null) {
+        return Ok(Value::Null);
+    }
+    let d = extract_naive_date(&args[0], "Date.DayOfWeekName")?;
+    let name = match d.weekday() {
+        chrono::Weekday::Mon => "Monday",
+        chrono::Weekday::Tue => "Tuesday",
+        chrono::Weekday::Wed => "Wednesday",
+        chrono::Weekday::Thu => "Thursday",
+        chrono::Weekday::Fri => "Friday",
+        chrono::Weekday::Sat => "Saturday",
+        chrono::Weekday::Sun => "Sunday",
+    };
+    Ok(Value::Text(name.into()))
+}
+
+fn date_day_of_year(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    use chrono::Datelike;
+    if matches!(args[0], Value::Null) {
+        return Ok(Value::Null);
+    }
+    let d = extract_naive_date(&args[0], "Date.DayOfYear")?;
+    Ok(Value::Number(d.ordinal() as f64))
+}
+
+fn date_days_in_month(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    use chrono::Datelike;
+    if matches!(args[0], Value::Null) {
+        return Ok(Value::Null);
+    }
+    let d = extract_naive_date(&args[0], "Date.DaysInMonth")?;
+    let (year, month) = (d.year(), d.month());
+    // Days in month: chrono helper isn't directly available without features; compute.
+    let next = if month == 12 {
+        chrono::NaiveDate::from_ymd_opt(year + 1, 1, 1)
+    } else {
+        chrono::NaiveDate::from_ymd_opt(year, month + 1, 1)
+    };
+    let first = chrono::NaiveDate::from_ymd_opt(year, month, 1).unwrap();
+    let n = next.unwrap().signed_duration_since(first).num_days();
+    Ok(Value::Number(n as f64))
+}
+
+fn date_month_name(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    use chrono::Datelike;
+    if matches!(args[0], Value::Null) {
+        return Ok(Value::Null);
+    }
+    let d = extract_naive_date(&args[0], "Date.MonthName")?;
+    let name = match d.month() {
+        1 => "January",
+        2 => "February",
+        3 => "March",
+        4 => "April",
+        5 => "May",
+        6 => "June",
+        7 => "July",
+        8 => "August",
+        9 => "September",
+        10 => "October",
+        11 => "November",
+        12 => "December",
+        _ => unreachable!(),
+    };
+    Ok(Value::Text(name.into()))
+}
+
+fn date_quarter_of_year(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    use chrono::Datelike;
+    if matches!(args[0], Value::Null) {
+        return Ok(Value::Null);
+    }
+    let d = extract_naive_date(&args[0], "Date.QuarterOfYear")?;
+    Ok(Value::Number(((d.month() - 1) / 3 + 1) as f64))
+}
+
+fn date_week_of_month(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    use chrono::Datelike;
+    if matches!(args[0], Value::Null) {
+        return Ok(Value::Null);
+    }
+    let d = extract_naive_date(&args[0], "Date.WeekOfMonth")?;
+    Ok(Value::Number(((d.day() - 1) / 7 + 1) as f64))
+}
+
+fn date_week_of_year(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    use chrono::Datelike;
+    if matches!(args[0], Value::Null) {
+        return Ok(Value::Null);
+    }
+    let d = extract_naive_date(&args[0], "Date.WeekOfYear")?;
+    // PQ's WeekOfYear with default first-day-of-week is approximately ISO week.
+    // For v1, return ISO week number (1..53).
+    Ok(Value::Number(d.iso_week().week() as f64))
+}
+
+fn date_is_leap_year(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    use chrono::Datelike;
+    if matches!(args[0], Value::Null) {
+        return Ok(Value::Null);
+    }
+    let d = extract_naive_date(&args[0], "Date.IsLeapYear")?;
+    let y = d.year();
+    let leap = (y % 4 == 0 && y % 100 != 0) || (y % 400 == 0);
+    Ok(Value::Logical(leap))
+}
+
+fn date_to_record(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    use chrono::Datelike;
+    if matches!(args[0], Value::Null) {
+        return Ok(Value::Null);
+    }
+    let d = extract_naive_date(&args[0], "Date.ToRecord")?;
+    Ok(Value::Record(Record {
+        fields: vec![
+            ("Year".into(),  Value::Number(d.year() as f64)),
+            ("Month".into(), Value::Number(d.month() as f64)),
+            ("Day".into(),   Value::Number(d.day() as f64)),
+        ],
+        env: super::env::EnvNode::empty(),
+    }))
 }
 
 fn date_add_days(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
