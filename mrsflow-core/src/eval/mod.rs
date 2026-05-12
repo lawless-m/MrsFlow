@@ -5488,6 +5488,67 @@ mod tests {
     }
 
     #[test]
+    fn binary_length_basic() {
+        let src = r#"Binary.Length(Binary.FromList({1, 2, 3, 4, 5}))"#;
+        assert_eq!(eval_number(src), 5.0);
+    }
+
+    #[test]
+    fn binary_from_text_base64_round_trip() {
+        // "Hello" → "SGVsbG8=" → bytes → text.
+        let src = r#"Binary.ToText(Binary.FromText("SGVsbG8=", BinaryEncoding.Base64))"#;
+        assert_eq!(eval_text(src), "SGVsbG8=");
+    }
+
+    #[test]
+    fn binary_from_text_hex_decodes() {
+        // "DEADBEEF" → 4-byte binary.
+        let src = r#"Binary.Length(Binary.FromText("DEADBEEF", BinaryEncoding.Hex))"#;
+        assert_eq!(eval_number(src), 4.0);
+    }
+
+    #[test]
+    fn binary_from_list_round_trip() {
+        let src = r#"Binary.ToList(Binary.FromList({10, 20, 30}))"#;
+        match eval_str(src).unwrap() {
+            Value::List(xs) => {
+                let nums: Vec<f64> = xs.iter().map(|v| match v {
+                    Value::Number(n) => *n,
+                    _ => panic!(),
+                }).collect();
+                assert_eq!(nums, vec![10.0, 20.0, 30.0]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn binary_combine_concatenates() {
+        let src = r#"
+            Binary.Length(Binary.Combine({Binary.FromList({1, 2}), Binary.FromList({3, 4, 5})}))
+        "#;
+        assert_eq!(eval_number(src), 5.0);
+    }
+
+    #[test]
+    fn binary_range_slices() {
+        // From [10, 20, 30, 40, 50], take offset=1, count=3 → [20, 30, 40].
+        let src = r#"
+            Binary.ToList(Binary.Range(Binary.FromList({10, 20, 30, 40, 50}), 1, 3))
+        "#;
+        match eval_str(src).unwrap() {
+            Value::List(xs) => {
+                let nums: Vec<f64> = xs.iter().map(|v| match v {
+                    Value::Number(n) => *n,
+                    _ => panic!(),
+                }).collect();
+                assert_eq!(nums, vec![20.0, 30.0, 40.0]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn value_metadata_default_is_empty_record() {
         let src = r#"Value.Metadata(42)"#;
         match eval_str(src).unwrap() {

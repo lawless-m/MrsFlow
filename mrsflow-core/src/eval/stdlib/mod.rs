@@ -36,6 +36,7 @@ mod uri;
 mod lines;
 mod type_ops;
 mod value_ops;
+mod binary;
 
 // External callers of the old `stdlib::*` API expect these names at this path.
 // `table_to_rows` is only reached from #[cfg(test)] code in eval::mod, hence
@@ -103,6 +104,14 @@ pub fn root_env() -> Env {
         env = env.extend(name.to_string(), Value::Number(n));
     }
 
+    // BinaryEncoding.* constants — Binary.FromText/ToText encoding arg.
+    for (name, n) in [
+        ("BinaryEncoding.Base64", 0.0),
+        ("BinaryEncoding.Hex",    1.0),
+    ] {
+        env = env.extend(name.to_string(), Value::Number(n));
+    }
+
     // Order.* constants — Table.Sort's per-column order argument.
     for (name, n) in [
         ("Order.Ascending",  0.0),
@@ -151,6 +160,7 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         lines::bindings(),
         type_ops::bindings(),
         value_ops::bindings(),
+        binary::bindings(),
     ] {
         all.extend(slice);
     }
