@@ -35,7 +35,7 @@ mod comparer;
 mod uri;
 mod lines;
 mod type_ops;
-mod value_ops;
+pub(super) mod value_ops;
 mod binary;
 mod function_ops;
 mod expression;

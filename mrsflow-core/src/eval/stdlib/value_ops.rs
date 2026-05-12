@@ -302,8 +302,8 @@ fn remove_metadata(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> 
 
 // --- Slice #169 impls ---
 
-fn add(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    match (&args[0], &args[1]) {
+pub(crate) fn value_add(a: &Value, b: &Value) -> Result<Value, MError> {
+    match (a, b) {
         (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a + b)),
         (Value::Text(a), Value::Text(b)) => Ok(Value::Text(format!("{a}{b}"))),
         (Value::Date(d), Value::Duration(dur)) | (Value::Duration(dur), Value::Date(d)) => {
@@ -342,8 +342,8 @@ fn add(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     }
 }
 
-fn subtract(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    match (&args[0], &args[1]) {
+pub(crate) fn value_subtract(a: &Value, b: &Value) -> Result<Value, MError> {
+    match (a, b) {
         (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a - b)),
         (Value::Date(a), Value::Date(b)) => {
             let dur = a.and_hms_opt(0, 0, 0).unwrap() - b.and_hms_opt(0, 0, 0).unwrap();
@@ -369,6 +369,14 @@ fn subtract(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             super::super::type_name(a),
         ))),
     }
+}
+
+fn add(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    value_add(&args[0], &args[1])
+}
+
+fn subtract(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    value_subtract(&args[0], &args[1])
 }
 
 fn multiply(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {

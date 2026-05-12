@@ -807,8 +807,8 @@ fn apply_binary(op: BinaryOp, lv: Value, rv: Value) -> Result<Value, MError> {
     match op {
         BinaryOp::Multiply => arithmetic(lv, rv, |a, b| a * b),
         BinaryOp::Divide => arithmetic(lv, rv, |a, b| a / b),
-        BinaryOp::Add => arithmetic(lv, rv, |a, b| a + b),
-        BinaryOp::Subtract => arithmetic(lv, rv, |a, b| a - b),
+        BinaryOp::Add => stdlib::value_ops::value_add(&lv, &rv),
+        BinaryOp::Subtract => stdlib::value_ops::value_subtract(&lv, &rv),
         BinaryOp::Concat => match (lv, rv) {
             (Value::Text(l), Value::Text(r)) => Ok(Value::Text(l + &r)),
             // List concat is reachable only once eval-3 introduces list values.
@@ -1109,8 +1109,8 @@ mod tests {
     #[test]
     fn arithmetic_type_mismatch() {
         match eval_str(r#""hi" + 1"#) {
-            Err(MError::TypeMismatch { expected: "number", .. }) => {}
-            other => panic!("expected TypeMismatch, got {other:?}"),
+            Err(MError::Other(msg)) if msg.contains("cannot add") => {}
+            other => panic!("expected Value.Add type error, got {other:?}"),
         }
     }
 
