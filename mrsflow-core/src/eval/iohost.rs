@@ -50,6 +50,20 @@ pub trait IoHost {
         use_headers: bool,
         delay_types: bool,
     ) -> Result<Value, IoError>;
+    /// Fetch `url` with the supplied request headers; return the response
+    /// body. If `content` is `Some`, the request is POST with that body
+    /// (matches M's `Web.Contents(_, [Content=<binary>])` semantics);
+    /// otherwise it's GET. Status codes in 2xx return Ok; codes in
+    /// `manual_status` also return Ok (caller chose to handle them); any
+    /// other status returns Err. Auth providers / timeout config aren't
+    /// supported in v1; the caller sets Content-Type via Headers if needed.
+    fn web_contents(
+        &self,
+        url: &str,
+        headers: &[(String, String)],
+        manual_status: &[u16],
+        content: Option<&[u8]>,
+    ) -> Result<Vec<u8>, IoError>;
 }
 
 /// Always-fail IoHost — for evaluator unit tests on pure expressions where
@@ -79,6 +93,15 @@ impl IoHost for NoIoHost {
         Err(IoError::NotSupported)
     }
     fn excel_workbook(&self, _: &[u8], _: bool, _: bool) -> Result<Value, IoError> {
+        Err(IoError::NotSupported)
+    }
+    fn web_contents(
+        &self,
+        _: &str,
+        _: &[(String, String)],
+        _: &[u16],
+        _: Option<&[u8]>,
+    ) -> Result<Vec<u8>, IoError> {
         Err(IoError::NotSupported)
     }
 }

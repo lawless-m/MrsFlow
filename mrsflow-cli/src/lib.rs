@@ -297,6 +297,69 @@ impl IoHost for CliIoHost {
     ) -> Result<Value, IoError> {
         excel_workbook_impl(bytes, use_headers, delay_types)
     }
+
+    fn web_contents(
+        &self,
+        url: &str,
+        headers: &[(String, String)],
+        manual_status: &[u16],
+        content: Option<&[u8]>,
+    ) -> Result<Vec<u8>, IoError> {
+        web_contents_impl(url, headers, manual_status, content)
+    }
+}
+
+fn web_contents_impl(
+    url: &str,
+    headers: &[(String, String)],
+    manual_status: &[u16],
+    content: Option<&[u8]>,
+) -> Result<Vec<u8>, IoError> {
+    use reqwest::blocking::Client;
+    use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
+
+    let mut hm = HeaderMap::with_capacity(headers.len());
+    for (k, v) in headers {
+        // Empty value: PQ uses this as "use ambient credentials". reqwest
+        // can't supply those; skip the header so the request still goes
+        // out, just unauthenticated.
+        if v.is_empty() {
+            continue;
+        }
+        let name = HeaderName::try_from(k.as_str())
+            .map_err(|e| IoError::Other(format!("invalid header name {k:?}: {e}")))?;
+        let value = HeaderValue::from_str(v)
+            .map_err(|e| IoError::Other(format!("invalid header value for {k:?}: {e}")))?;
+        hm.insert(name, value);
+    }
+
+    let client = Client::builder()
+        .default_headers(hm)
+        .build()
+        .map_err(|e| IoError::Other(format!("http client init: {e}")))?;
+
+    // M's contract: presence of `Content` switches the verb to POST.
+    let (req, method_label) = match content {
+        None => (client.get(url), "GET"),
+        Some(body) => (client.post(url).body(body.to_vec()), "POST"),
+    };
+    let resp = req
+        .send()
+        .map_err(|e| IoError::Other(format!("{method_label} {url}: {e}")))?;
+
+    let status = resp.status().as_u16();
+    let body = resp
+        .bytes()
+        .map_err(|e| IoError::Other(format!("read body {url}: {e}")))?
+        .to_vec();
+
+    let ok = (200..300).contains(&status) || manual_status.contains(&status);
+    if !ok {
+        return Err(IoError::Other(format!(
+            "{method_label} {url}: HTTP {status} (not in ManualStatusHandling)"
+        )));
+    }
+    Ok(body)
 }
 
 fn excel_workbook_impl(

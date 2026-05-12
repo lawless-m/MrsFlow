@@ -2075,6 +2075,15 @@ mod tests {
         fn excel_workbook(&self, _: &[u8], _: bool, _: bool) -> Result<Value, IoError> {
             Err(IoError::NotSupported)
         }
+        fn web_contents(
+            &self,
+            _: &str,
+            _: &[(String, String)],
+            _: &[u16],
+            _: Option<&[u8]>,
+        ) -> Result<Vec<u8>, IoError> {
+            Err(IoError::NotSupported)
+        }
     }
 
     #[test]
