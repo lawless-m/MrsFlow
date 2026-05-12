@@ -166,6 +166,68 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
             list_position_of_any,
         ),
         ("List.Positions", one("list"), list_positions),
+        (
+            "List.Range",
+            vec![
+                Param { name: "list".into(),   optional: false, type_annotation: None },
+                Param { name: "offset".into(), optional: false, type_annotation: None },
+                Param { name: "count".into(),  optional: true,  type_annotation: None },
+            ],
+            list_range,
+        ),
+        (
+            "List.RemoveLastN",
+            vec![
+                Param { name: "list".into(),             optional: false, type_annotation: None },
+                Param { name: "countOrCondition".into(), optional: true,  type_annotation: None },
+            ],
+            list_remove_last_n,
+        ),
+        ("List.RemoveNulls", one("list"), list_remove_nulls),
+        (
+            "List.RemoveRange",
+            vec![
+                Param { name: "list".into(),   optional: false, type_annotation: None },
+                Param { name: "offset".into(), optional: false, type_annotation: None },
+                Param { name: "count".into(),  optional: true,  type_annotation: None },
+            ],
+            list_remove_range,
+        ),
+        ("List.InsertRange", three("list", "offset", "values"), list_insert_range),
+        ("List.ReplaceMatchingItems", two("list", "replacements"), list_replace_matching_items),
+        (
+            "List.ReplaceRange",
+            vec![
+                Param { name: "list".into(),      optional: false, type_annotation: None },
+                Param { name: "offset".into(),    optional: false, type_annotation: None },
+                Param { name: "count".into(),     optional: false, type_annotation: None },
+                Param { name: "newValues".into(), optional: false, type_annotation: None },
+            ],
+            list_replace_range,
+        ),
+        (
+            "List.ReplaceValue",
+            vec![
+                Param { name: "list".into(),     optional: false, type_annotation: None },
+                Param { name: "oldValue".into(), optional: false, type_annotation: None },
+                Param { name: "newValue".into(), optional: false, type_annotation: None },
+                Param { name: "replacer".into(), optional: false, type_annotation: None },
+            ],
+            list_replace_value,
+        ),
+        ("List.Repeat", two("list", "count"), list_repeat),
+        ("List.Alternate", four_with_opts("list", "count", "repeatInterval", "offset"), list_alternate),
+        ("List.Split", two("list", "pageSize"), list_split),
+        ("List.Buffer", one("list"), list_buffer),
+    ]
+}
+
+fn four_with_opts(a: &str, b: &str, c: &str, d: &str) -> Vec<Param> {
+    vec![
+        Param { name: a.into(), optional: false, type_annotation: None },
+        Param { name: b.into(), optional: false, type_annotation: None },
+        Param { name: c.into(), optional: true,  type_annotation: None },
+        Param { name: d.into(), optional: true,  type_annotation: None },
     ]
 }
 
@@ -734,5 +796,212 @@ fn list_position_of_any(args: &[Value], _host: &dyn IoHost) -> Result<Value, MEr
 fn list_positions(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     Ok(Value::List((0..list.len()).map(|i| Value::Number(i as f64)).collect()))
+}
+
+fn list_range(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let list = expect_list(&args[0])?;
+    let offset = match &args[1] {
+        Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
+        other => return Err(type_mismatch("non-negative integer", other)),
+    };
+    let count = match args.get(2) {
+        Some(Value::Number(n)) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
+        Some(Value::Null) | None => list.len().saturating_sub(offset),
+        Some(other) => return Err(type_mismatch("non-negative integer or null", other)),
+    };
+    let end = (offset + count).min(list.len());
+    let start = offset.min(list.len());
+    Ok(Value::List(list[start..end].to_vec()))
+}
+
+fn list_remove_last_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let list = expect_list(&args[0])?;
+    let n = match args.get(1) {
+        Some(Value::Number(n)) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
+        Some(Value::Function(_)) => {
+            return Err(MError::NotImplemented("List.RemoveLastN: predicate form not yet supported"));
+        }
+        Some(Value::Null) | None => 1,
+        Some(other) => return Err(type_mismatch("non-negative integer", other)),
+    };
+    let keep = list.len().saturating_sub(n);
+    Ok(Value::List(list[..keep].to_vec()))
+}
+
+fn list_remove_nulls(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let list = expect_list(&args[0])?;
+    Ok(Value::List(list.iter().filter(|v| !matches!(v, Value::Null)).cloned().collect()))
+}
+
+fn list_remove_range(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let list = expect_list(&args[0])?;
+    let offset = match &args[1] {
+        Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
+        other => return Err(type_mismatch("non-negative integer", other)),
+    };
+    let count = match args.get(2) {
+        Some(Value::Number(n)) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
+        Some(Value::Null) | None => 1,
+        Some(other) => return Err(type_mismatch("non-negative integer", other)),
+    };
+    let mut out: Vec<Value> = Vec::with_capacity(list.len());
+    out.extend_from_slice(&list[..offset.min(list.len())]);
+    let end = (offset + count).min(list.len());
+    if end < list.len() {
+        out.extend_from_slice(&list[end..]);
+    }
+    Ok(Value::List(out))
+}
+
+fn list_insert_range(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let list = expect_list(&args[0])?;
+    let offset = match &args[1] {
+        Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
+        other => return Err(type_mismatch("non-negative integer", other)),
+    };
+    let values = expect_list(&args[2])?;
+    if offset > list.len() {
+        return Err(MError::Other("List.InsertRange: offset out of range".into()));
+    }
+    let mut out: Vec<Value> = Vec::with_capacity(list.len() + values.len());
+    out.extend_from_slice(&list[..offset]);
+    out.extend_from_slice(values);
+    out.extend_from_slice(&list[offset..]);
+    Ok(Value::List(out))
+}
+
+fn list_replace_matching_items(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let list = expect_list(&args[0])?;
+    let replacements = expect_list(&args[1])?;
+    // Build a (old, new) lookup. Each replacement is a 2-elem list.
+    let pairs: Vec<(Value, Value)> = replacements.iter().map(|r| match r {
+        Value::List(xs) if xs.len() == 2 => Ok((xs[0].clone(), xs[1].clone())),
+        other => Err(MError::Other(format!(
+            "List.ReplaceMatchingItems: each replacement must be a 2-elem list (got {})",
+            super::super::type_name(other)
+        ))),
+    }).collect::<Result<_, _>>()?;
+    let mut out: Vec<Value> = Vec::with_capacity(list.len());
+    for v in list {
+        let mut replaced = false;
+        for (old, new) in &pairs {
+            if values_equal_primitive(v, old)? {
+                out.push(new.clone());
+                replaced = true;
+                break;
+            }
+        }
+        if !replaced {
+            out.push(v.clone());
+        }
+    }
+    Ok(Value::List(out))
+}
+
+fn list_replace_range(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let list = expect_list(&args[0])?;
+    let offset = match &args[1] {
+        Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
+        other => return Err(type_mismatch("non-negative integer", other)),
+    };
+    let count = match &args[2] {
+        Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
+        other => return Err(type_mismatch("non-negative integer", other)),
+    };
+    let new_values = expect_list(&args[3])?;
+    if offset > list.len() {
+        return Err(MError::Other("List.ReplaceRange: offset out of range".into()));
+    }
+    let mut out: Vec<Value> = Vec::with_capacity(list.len() - count + new_values.len());
+    out.extend_from_slice(&list[..offset]);
+    out.extend_from_slice(new_values);
+    let end = (offset + count).min(list.len());
+    if end < list.len() {
+        out.extend_from_slice(&list[end..]);
+    }
+    Ok(Value::List(out))
+}
+
+fn list_replace_value(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+    let list = expect_list(&args[0])?;
+    let old_value = &args[1];
+    let new_value = &args[2];
+    let replacer = expect_function(&args[3])?;
+    let mut out: Vec<Value> = Vec::with_capacity(list.len());
+    for v in list {
+        let r = invoke_callback_with_host(
+            replacer,
+            vec![v.clone(), old_value.clone(), new_value.clone()],
+            host,
+        )?;
+        out.push(r);
+    }
+    Ok(Value::List(out))
+}
+
+fn list_repeat(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let list = expect_list(&args[0])?;
+    let count = match &args[1] {
+        Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
+        other => return Err(type_mismatch("non-negative integer", other)),
+    };
+    let mut out: Vec<Value> = Vec::with_capacity(list.len() * count);
+    for _ in 0..count {
+        out.extend_from_slice(list);
+    }
+    Ok(Value::List(out))
+}
+
+fn list_alternate(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let list = expect_list(&args[0])?;
+    let count = match &args[1] {
+        Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
+        other => return Err(type_mismatch("non-negative integer (count)", other)),
+    };
+    let repeat_interval = match args.get(2) {
+        Some(Value::Number(n)) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
+        Some(Value::Null) | None => count + 1,
+        Some(other) => return Err(type_mismatch("non-negative integer (repeatInterval)", other)),
+    };
+    let offset = match args.get(3) {
+        Some(Value::Number(n)) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
+        Some(Value::Null) | None => 0,
+        Some(other) => return Err(type_mismatch("non-negative integer (offset)", other)),
+    };
+    if repeat_interval == 0 {
+        return Err(MError::Other("List.Alternate: repeatInterval must be > 0".into()));
+    }
+    let mut out: Vec<Value> = Vec::with_capacity(list.len());
+    for (i, v) in list.iter().enumerate() {
+        // Position within the cycle starting at offset; values within `count`
+        // window are dropped, rest kept.
+        if i < offset {
+            out.push(v.clone());
+            continue;
+        }
+        let cycle_pos = (i - offset) % repeat_interval;
+        if cycle_pos >= count {
+            out.push(v.clone());
+        }
+    }
+    Ok(Value::List(out))
+}
+
+fn list_split(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let list = expect_list(&args[0])?;
+    let page = match &args[1] {
+        Value::Number(n) if n.fract() == 0.0 && *n > 0.0 => *n as usize,
+        other => return Err(type_mismatch("positive integer (pageSize)", other)),
+    };
+    let chunks: Vec<Value> = list
+        .chunks(page)
+        .map(|c| Value::List(c.to_vec()))
+        .collect();
+    Ok(Value::List(chunks))
+}
+
+fn list_buffer(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let list = expect_list(&args[0])?;
+    Ok(Value::List(list.clone()))
 }
 

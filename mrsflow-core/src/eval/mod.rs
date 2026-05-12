@@ -3928,6 +3928,89 @@ mod tests {
     }
 
     #[test]
+    fn list_range_basic() {
+        match eval_str("List.Range({10, 20, 30, 40, 50}, 1, 3)").unwrap() {
+            Value::List(xs) => {
+                let nums: Vec<f64> = xs.iter().map(|v| match v {
+                    Value::Number(n) => *n, _ => panic!(),
+                }).collect();
+                assert_eq!(nums, vec![20.0, 30.0, 40.0]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn list_remove_last_n_basic() {
+        match eval_str("List.RemoveLastN({1, 2, 3, 4, 5}, 2)").unwrap() {
+            Value::List(xs) => {
+                let nums: Vec<f64> = xs.iter().map(|v| match v {
+                    Value::Number(n) => *n, _ => panic!(),
+                }).collect();
+                assert_eq!(nums, vec![1.0, 2.0, 3.0]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn list_remove_nulls_basic() {
+        match eval_str("List.RemoveNulls({1, null, 2, null, 3})").unwrap() {
+            Value::List(xs) => {
+                let nums: Vec<f64> = xs.iter().map(|v| match v {
+                    Value::Number(n) => *n, _ => panic!(),
+                }).collect();
+                assert_eq!(nums, vec![1.0, 2.0, 3.0]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn list_replace_value_basic() {
+        // Inline replacer: returns newValue when item == oldValue, else item.
+        let src = "List.ReplaceValue({1, 2, 3, 2, 1}, 2, 99, (item, old, new) => if item = old then new else item)";
+        match eval_str(src).unwrap() {
+            Value::List(xs) => {
+                let nums: Vec<f64> = xs.iter().map(|v| match v {
+                    Value::Number(n) => *n, _ => panic!(),
+                }).collect();
+                assert_eq!(nums, vec![1.0, 99.0, 3.0, 99.0, 1.0]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn list_repeat_basic() {
+        match eval_str("List.Repeat({1, 2}, 3)").unwrap() {
+            Value::List(xs) => {
+                let nums: Vec<f64> = xs.iter().map(|v| match v {
+                    Value::Number(n) => *n, _ => panic!(),
+                }).collect();
+                assert_eq!(nums, vec![1.0, 2.0, 1.0, 2.0, 1.0, 2.0]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn list_split_basic() {
+        match eval_str("List.Split({1, 2, 3, 4, 5}, 2)").unwrap() {
+            Value::List(chunks) => {
+                assert_eq!(chunks.len(), 3);
+                match &chunks[2] {
+                    Value::List(c) => {
+                        assert_eq!(c.len(), 1);
+                    }
+                    _ => panic!("expected list"),
+                }
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn list_contains_basic() {
         match eval_str("List.Contains({1, 2, 3}, 2)").unwrap() {
             Value::Logical(b) => assert!(b),
