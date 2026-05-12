@@ -5488,6 +5488,36 @@ mod tests {
     }
 
     #[test]
+    fn expression_constant_number_text_list() {
+        assert_eq!(eval_text(r#"Expression.Constant(42)"#), "42");
+        assert_eq!(eval_text(r#"Expression.Constant("hi")"#), r#""hi""#);
+        assert_eq!(eval_text(r#"Expression.Constant({1, 2, 3})"#), "{1, 2, 3}");
+    }
+
+    #[test]
+    fn expression_identifier_quotes_when_needed() {
+        // Bare for valid ident, #"..." for names that need quoting.
+        assert_eq!(eval_text(r#"Expression.Identifier("Foo")"#), "Foo");
+        assert_eq!(
+            eval_text(r#"Expression.Identifier("with space")"#),
+            "#\"with space\""
+        );
+    }
+
+    #[test]
+    fn expression_evaluate_simple_arithmetic() {
+        let src = r#"Expression.Evaluate("1 + 2")"#;
+        assert_eq!(eval_number(src), 3.0);
+    }
+
+    #[test]
+    fn expression_evaluate_with_env_binding() {
+        // Pass x=10 in the env record; the document references x.
+        let src = r#"Expression.Evaluate("x * 5", [x = 10])"#;
+        assert_eq!(eval_number(src), 50.0);
+    }
+
+    #[test]
     fn function_invoke_passes_args() {
         let src = r#"Function.Invoke((x, y) => x + y, {3, 4})"#;
         assert_eq!(eval_number(src), 7.0);
