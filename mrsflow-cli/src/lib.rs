@@ -379,55 +379,251 @@ fn concatenate_batches(batches: &[RecordBatch]) -> Result<RecordBatch, arrow::er
 // the feature is on; an actual ODBC driver must be installed at runtime
 // for any given DSN to resolve.
 
+// Shared ODBC environment — one per process, lazily initialised. Used by
+// both the columnar and row-at-a-time query paths plus DataSource catalog
+// enumeration.
+#[cfg(feature = "odbc")]
+fn odbc_env() -> &'static odbc_api::Environment {
+    use std::sync::OnceLock;
+    static ENV: OnceLock<odbc_api::Environment> = OnceLock::new();
+    ENV.get_or_init(|| {
+        odbc_api::Environment::new()
+            .expect("ODBC environment allocation failed — check libodbc install")
+    })
+}
+
+// Cache of connection strings whose driver panics through odbc-api's
+// columnar text/binary buffers (DBISAM is the corpus case: it returns a
+// non-standard negative SQLLEN indicator, odbc-api 13 hard-panics in
+// `Indicator::from_isize`). Once we've caught the panic for a given
+// connection string we skip the columnar fast path for it.
+#[cfg(feature = "odbc")]
+fn columnar_blocklist() -> &'static std::sync::Mutex<std::collections::HashSet<String>> {
+    use std::sync::OnceLock;
+    static BL: OnceLock<std::sync::Mutex<std::collections::HashSet<String>>> = OnceLock::new();
+    BL.get_or_init(|| std::sync::Mutex::new(std::collections::HashSet::new()))
+}
+
 #[cfg(feature = "odbc")]
 fn odbc_query_impl(connection_string: &str, sql: &str) -> Result<Value, IoError> {
-    use std::sync::OnceLock;
+    // Try columnar fast path unless this connection has previously panicked.
+    // The columnar path bulks rows via bind_buffer / ColumnarAnyBuffer and
+    // is roughly 100× faster than row-at-a-time for wide tables.
+    let known_broken = columnar_blocklist()
+        .lock()
+        .map(|set| set.contains(connection_string))
+        .unwrap_or(false);
 
+    if !known_broken {
+        // Silence the default panic hook for the duration of the columnar
+        // attempt — odbc-api's `Indicator::from_isize` panic on a
+        // misbehaving driver (DBISAM) is expected and recoverable here.
+        // Restore the original hook after the catch_unwind returns so
+        // genuine panics elsewhere still get the normal treatment.
+        let original_hook = std::panic::take_hook();
+        std::panic::set_hook(Box::new(|_| {}));
+        let conn_owned = connection_string.to_string();
+        let sql_owned = sql.to_string();
+        let attempt = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
+            odbc_query_columnar(&conn_owned, &sql_owned)
+        }));
+        std::panic::set_hook(original_hook);
+        match attempt {
+            Ok(result) => return result,
+            Err(_panic) => {
+                if let Ok(mut set) = columnar_blocklist().lock() {
+                    set.insert(connection_string.to_string());
+                }
+                eprintln!(
+                    "Odbc.Query: columnar fetch panicked for `{connection_string}`; \
+                     falling back to row-at-a-time (driver indicator quirk)"
+                );
+            }
+        }
+    }
+
+    odbc_query_row_at_a_time(connection_string, sql)
+}
+
+#[cfg(feature = "odbc")]
+fn odbc_query_columnar(connection_string: &str, sql: &str) -> Result<Value, IoError> {
     use arrow::array::{Float64Array, StringArray};
-    use arrow::datatypes::{DataType, Field, Schema};
+    use arrow::datatypes::{DataType, Schema};
     use odbc_api::{
-        buffers::BufferDesc,
-        ConnectionOptions, Cursor, Environment, ResultSetMetadata,
+        buffers::ColumnarAnyBuffer,
+        ConnectionOptions, Cursor,
     };
 
-    // Lazy-init env: an Environment is the entry point for all ODBC ops.
-    // Sharing one per process is the common pattern; odbc-api supports
-    // multi-threading by way of Environment::shared() etc., but for the
-    // CLI shell a single-threaded OnceLock is enough.
-    static ENV: OnceLock<Environment> = OnceLock::new();
-    let env = ENV.get_or_init(|| {
-        Environment::new()
-            .expect("ODBC environment allocation failed — check libodbc install")
-    });
-
+    let env = odbc_env();
     let conn = env
         .connect_with_connection_string(connection_string, ConnectionOptions::default())
         .map_err(|e| IoError::Other(format!("Odbc.Query connect: {}", e)))?;
-
     let cursor = conn
         .execute(sql, (), None)
         .map_err(|e| IoError::Other(format!("Odbc.Query execute: {}", e)))?;
-
     let Some(mut cursor) = cursor else {
-        // Statement didn't produce a result set (DDL, etc.). Return an
-        // empty-table value rather than an error, so callers can chain.
-        let schema = std::sync::Arc::new(Schema::empty());
-        let options =
-            arrow::record_batch::RecordBatchOptions::new().with_row_count(Some(0));
-        let batch = arrow::record_batch::RecordBatch::try_new_with_options(
-            schema, vec![], &options,
-        )
-        .map_err(|e| IoError::Other(format!("Odbc.Query empty: {}", e)))?;
-        return Ok(Value::Table(Table::from_arrow(batch)));
+        return Ok(empty_table());
     };
 
-    // Build the Arrow schema from the cursor's column descriptions. SQL
-    // type → Arrow DataType mapping (first pass, expand as corpus needs):
+    let (fields, buf_descs) = describe_columns(&mut cursor)?;
+    let n_cols = fields.len();
+
+    const BATCH_SIZE: usize = 1024;
+    let buffer = ColumnarAnyBuffer::from_descs(BATCH_SIZE, buf_descs);
+    let mut row_set_cursor = cursor
+        .bind_buffer(buffer)
+        .map_err(|e| IoError::Other(format!("Odbc.Query bind: {}", e)))?;
+
+    let mut accumulated_columns: Vec<Vec<Option<f64>>> = vec![Vec::new(); n_cols];
+    let mut accumulated_strings: Vec<Vec<Option<String>>> = vec![Vec::new(); n_cols];
+
+    while let Some(batch) = row_set_cursor
+        .fetch()
+        .map_err(|e| IoError::Other(format!("Odbc.Query fetch: {}", e)))?
+    {
+        let n_rows = batch.num_rows();
+        for col_idx in 0..n_cols {
+            match fields[col_idx].data_type() {
+                DataType::Float64 => {
+                    let view = batch
+                        .column(col_idx)
+                        .as_nullable_slice::<f64>()
+                        .expect("F64 buffer");
+                    for opt in view {
+                        accumulated_columns[col_idx].push(opt.copied());
+                    }
+                    let _ = n_rows;
+                }
+                DataType::Utf8 => {
+                    let view = batch
+                        .column(col_idx)
+                        .as_text_view()
+                        .expect("Text buffer");
+                    for row in 0..n_rows {
+                        let s = view
+                            .get(row)
+                            .map(|b| String::from_utf8_lossy(b).into_owned());
+                        accumulated_strings[col_idx].push(s);
+                    }
+                }
+                _ => unreachable!("schema only contains Float64/Utf8 in this slice"),
+            }
+        }
+    }
+
+    let columns: Vec<arrow::array::ArrayRef> = fields
+        .iter()
+        .enumerate()
+        .map(|(i, f)| match f.data_type() {
+            DataType::Float64 => std::sync::Arc::new(Float64Array::from(std::mem::take(
+                &mut accumulated_columns[i],
+            ))) as arrow::array::ArrayRef,
+            DataType::Utf8 => std::sync::Arc::new(StringArray::from(std::mem::take(
+                &mut accumulated_strings[i],
+            ))) as arrow::array::ArrayRef,
+            _ => unreachable!(),
+        })
+        .collect();
+
+    let schema = std::sync::Arc::new(Schema::new(fields));
+    let batch = arrow::record_batch::RecordBatch::try_new(schema, columns)
+        .map_err(|e| IoError::Other(format!("Odbc.Query batch: {}", e)))?;
+    Ok(Value::Table(Table::from_arrow(batch)))
+}
+
+#[cfg(feature = "odbc")]
+fn odbc_query_row_at_a_time(connection_string: &str, sql: &str) -> Result<Value, IoError> {
+    use arrow::array::{Float64Array, StringArray};
+    use arrow::datatypes::{DataType, Schema};
+    use odbc_api::{ConnectionOptions, Cursor};
+
+    let env = odbc_env();
+    let conn = env
+        .connect_with_connection_string(connection_string, ConnectionOptions::default())
+        .map_err(|e| IoError::Other(format!("Odbc.Query connect: {}", e)))?;
+    let cursor = conn
+        .execute(sql, (), None)
+        .map_err(|e| IoError::Other(format!("Odbc.Query execute: {}", e)))?;
+    let Some(mut cursor) = cursor else {
+        return Ok(empty_table());
+    };
+
+    let (fields, _buf_descs) = describe_columns(&mut cursor)?;
+    let n_cols = fields.len();
+
+    let mut accumulated_columns: Vec<Vec<Option<f64>>> = vec![Vec::new(); n_cols];
+    let mut accumulated_strings: Vec<Vec<Option<String>>> = vec![Vec::new(); n_cols];
+
+    let mut buf = Vec::<u8>::new();
+    while let Some(mut row) = cursor
+        .next_row()
+        .map_err(|e| IoError::Other(format!("Odbc.Query fetch: {}", e)))?
+    {
+        for col_idx in 0..n_cols {
+            buf.clear();
+            let has_data = row
+                .get_text((col_idx + 1) as u16, &mut buf)
+                .map_err(|e| {
+                    IoError::Other(format!(
+                        "Odbc.Query read col {}: {}",
+                        col_idx + 1,
+                        e
+                    ))
+                })?;
+            match fields[col_idx].data_type() {
+                DataType::Float64 => {
+                    let cell = if !has_data {
+                        None
+                    } else {
+                        String::from_utf8_lossy(&buf).trim().parse::<f64>().ok()
+                    };
+                    accumulated_columns[col_idx].push(cell);
+                }
+                DataType::Utf8 => {
+                    let cell = if !has_data {
+                        None
+                    } else {
+                        Some(String::from_utf8_lossy(&buf).into_owned())
+                    };
+                    accumulated_strings[col_idx].push(cell);
+                }
+                _ => unreachable!("schema only contains Float64/Utf8 in this slice"),
+            }
+        }
+    }
+
+    let columns: Vec<arrow::array::ArrayRef> = fields
+        .iter()
+        .enumerate()
+        .map(|(i, f)| match f.data_type() {
+            DataType::Float64 => std::sync::Arc::new(Float64Array::from(std::mem::take(
+                &mut accumulated_columns[i],
+            ))) as arrow::array::ArrayRef,
+            DataType::Utf8 => std::sync::Arc::new(StringArray::from(std::mem::take(
+                &mut accumulated_strings[i],
+            ))) as arrow::array::ArrayRef,
+            _ => unreachable!(),
+        })
+        .collect();
+
+    let schema = std::sync::Arc::new(Schema::new(fields));
+    let batch = arrow::record_batch::RecordBatch::try_new(schema, columns)
+        .map_err(|e| IoError::Other(format!("Odbc.Query batch: {}", e)))?;
+    Ok(Value::Table(Table::from_arrow(batch)))
+}
+
+#[cfg(feature = "odbc")]
+fn describe_columns<C: odbc_api::Cursor + odbc_api::ResultSetMetadata>(
+    cursor: &mut C,
+) -> Result<(Vec<arrow::datatypes::Field>, Vec<odbc_api::buffers::BufferDesc>), IoError> {
+    use arrow::datatypes::{DataType, Field};
+    use odbc_api::buffers::BufferDesc;
+
     let n_cols = cursor
         .num_result_cols()
         .map_err(|e| IoError::Other(format!("Odbc.Query cols: {}", e)))?;
-    let mut fields: Vec<Field> = Vec::with_capacity(n_cols as usize);
-    let mut buf_descs: Vec<BufferDesc> = Vec::with_capacity(n_cols as usize);
+    let mut fields = Vec::with_capacity(n_cols as usize);
+    let mut buf_descs = Vec::with_capacity(n_cols as usize);
     let mut desc = odbc_api::ColumnDescription::default();
     for col_idx in 1..=n_cols {
         cursor
@@ -460,77 +656,16 @@ fn odbc_query_impl(connection_string: &str, sql: &str) -> Result<Value, IoError>
         fields.push(Field::new(name, arrow_dtype, true));
         buf_descs.push(buf_desc);
     }
+    Ok((fields, buf_descs))
+}
 
-    // `buf_descs` was used by the abandoned columnar-fetch path. Drop it
-    // explicitly so clippy doesn't grumble.
-    let _ = buf_descs;
-
-    // Row-at-a-time fetch via `row.get_text` / `row.get_data`. The
-    // columnar `bind_buffer` path panics on DBISAM (negative SQLLEN
-    // indicator from the driver, odbc-api 13 rejects it). Going one row
-    // at a time bypasses that path entirely. Numeric columns come back
-    // as text and we parse to f64 here.
-    let mut accumulated_columns: Vec<Vec<Option<f64>>> = vec![Vec::new(); n_cols as usize];
-    let mut accumulated_strings: Vec<Vec<Option<String>>> = vec![Vec::new(); n_cols as usize];
-
-    let mut buf = Vec::<u8>::new();
-    while let Some(mut row) = cursor
-        .next_row()
-        .map_err(|e| IoError::Other(format!("Odbc.Query fetch: {}", e)))?
-    {
-        for col_idx in 0..n_cols as usize {
-            buf.clear();
-            let has_data = row
-                .get_text((col_idx + 1) as u16, &mut buf)
-                .map_err(|e| {
-                    IoError::Other(format!(
-                        "Odbc.Query read col {}: {}",
-                        col_idx + 1,
-                        e
-                    ))
-                })?;
-            match fields[col_idx].data_type() {
-                DataType::Float64 => {
-                    let cell = if !has_data {
-                        None
-                    } else {
-                        let text = String::from_utf8_lossy(&buf);
-                        text.trim().parse::<f64>().ok()
-                    };
-                    accumulated_columns[col_idx].push(cell);
-                }
-                DataType::Utf8 => {
-                    let cell = if !has_data {
-                        None
-                    } else {
-                        Some(String::from_utf8_lossy(&buf).into_owned())
-                    };
-                    accumulated_strings[col_idx].push(cell);
-                }
-                _ => unreachable!("schema only contains Float64/Utf8 in this slice"),
-            }
-        }
-    }
-
-    // Build Arrow columns from accumulated buffers.
-    let columns: Vec<arrow::array::ArrayRef> = fields
-        .iter()
-        .enumerate()
-        .map(|(i, f)| match f.data_type() {
-            DataType::Float64 => std::sync::Arc::new(Float64Array::from(
-                std::mem::take(&mut accumulated_columns[i]),
-            )) as arrow::array::ArrayRef,
-            DataType::Utf8 => std::sync::Arc::new(StringArray::from(
-                std::mem::take(&mut accumulated_strings[i]),
-            )) as arrow::array::ArrayRef,
-            _ => unreachable!(),
-        })
-        .collect();
-
-    let schema = std::sync::Arc::new(Schema::new(fields));
-    let batch = arrow::record_batch::RecordBatch::try_new(schema, columns)
-        .map_err(|e| IoError::Other(format!("Odbc.Query batch: {}", e)))?;
-    Ok(Value::Table(Table::from_arrow(batch)))
+#[cfg(feature = "odbc")]
+fn empty_table() -> Value {
+    let schema = std::sync::Arc::new(arrow::datatypes::Schema::empty());
+    let options = arrow::record_batch::RecordBatchOptions::new().with_row_count(Some(0));
+    let batch = arrow::record_batch::RecordBatch::try_new_with_options(schema, vec![], &options)
+        .expect("empty batch always valid");
+    Value::Table(Table::from_arrow(batch))
 }
 
 // --- ODBC navigation table (Odbc.DataSource, feature-gated) ---
@@ -547,15 +682,11 @@ fn odbc_data_source_impl(connection_string: &str) -> Result<Value, IoError> {
     use std::cell::RefCell;
     use std::collections::BTreeMap;
     use std::rc::Rc;
-    use std::sync::OnceLock;
 
     use mrsflow_core::eval::{MError, ThunkState};
-    use odbc_api::{ConnectionOptions, Cursor, Environment, ResultSetMetadata};
+    use odbc_api::{ConnectionOptions, Cursor, ResultSetMetadata};
 
-    static ENV: OnceLock<Environment> = OnceLock::new();
-    let env = ENV.get_or_init(|| {
-        Environment::new().expect("ODBC environment allocation failed — check libodbc install")
-    });
+    let env = odbc_env();
 
     let conn = env
         .connect_with_connection_string(connection_string, ConnectionOptions::default())
