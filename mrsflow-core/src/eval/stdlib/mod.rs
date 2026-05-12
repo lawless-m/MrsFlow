@@ -33,6 +33,7 @@ mod combiner;
 mod replacer;
 mod comparer;
 mod uri;
+mod lines;
 
 // External callers of the old `stdlib::*` API expect these names at this path.
 // `table_to_rows` is only reached from #[cfg(test)] code in eval::mod, hence
@@ -137,6 +138,7 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         replacer::bindings(),
         comparer::bindings(),
         uri::bindings(),
+        lines::bindings(),
     ] {
         all.extend(slice);
     }

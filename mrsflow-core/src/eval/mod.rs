@@ -5266,6 +5266,59 @@ mod tests {
     }
 
     #[test]
+    fn lines_from_text_mixed_endings() {
+        // Mix of \r\n, \n, and lone \r should all split.
+        let src = r#"Lines.FromText("a#(cr,lf)b#(lf)c#(cr)d")"#;
+        match eval_str(src).unwrap() {
+            Value::List(xs) => {
+                let parts: Vec<&str> = xs
+                    .iter()
+                    .map(|v| match v {
+                        Value::Text(s) => s.as_str(),
+                        _ => panic!("expected text"),
+                    })
+                    .collect();
+                assert_eq!(parts, vec!["a", "b", "c", "d"]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn lines_to_text_joins_with_crlf() {
+        let src = r#"Lines.ToText({"x", "y", "z"})"#;
+        match eval_str(src).unwrap() {
+            Value::Text(s) => assert_eq!(s, "x\r\ny\r\nz"),
+            other => panic!("expected text, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn lines_from_binary_roundtrip() {
+        // ToBinary(default "\r\n" separator, no terminator) + FromBinary should
+        // round-trip back to the original list.
+        let src = r#"
+            let
+                bin = Lines.ToBinary({"foo", "bar", "baz"}),
+                out = Lines.FromBinary(bin)
+            in out
+        "#;
+        match eval_str(src).unwrap() {
+            Value::List(xs) => {
+                let parts: Vec<&str> = xs
+                    .iter()
+                    .map(|v| match v {
+                        Value::Text(s) => s.as_str(),
+                        _ => panic!("expected text"),
+                    })
+                    .collect();
+                assert_eq!(parts, vec!["foo", "bar", "baz"]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn uri_parts_full_decomposition() {
         let src = r#"Uri.Parts("https://user:pass@example.com:8080/p/q?k=v#frag")"#;
         match eval_str(src).unwrap() {
