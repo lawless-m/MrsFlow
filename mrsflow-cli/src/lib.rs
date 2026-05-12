@@ -1,13 +1,167 @@
 //! CLI shell for mrsflow. Implements the `IoHost` trait against the real
 //! filesystem and the `parquet` crate. ODBC plumbing lands in eval-8.
 
+use std::collections::HashMap;
 use std::fs::File;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use arrow::record_batch::RecordBatch;
-use mrsflow_core::eval::{IoError, IoHost, Table, Value};
+use mrsflow_core::eval::{deep_force, root_env, EnvOps, IoError, IoHost, Table, Value};
+use mrsflow_core::lexer::tokenize;
+use mrsflow_core::parser::{parse, Expr};
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use parquet::arrow::ArrowWriter;
+
+/// Errors that can happen while running the multi-query CLI mode. The CLI
+/// shell maps these to exit codes; the library exposes them so callers
+/// (tests, future shells) can inspect them.
+#[derive(Debug)]
+pub enum MultiQueryError {
+    Io(String),
+    Lex(String),
+    Parse(String),
+    Eval(String),
+    /// Two input paths share the same filename stem — they would collide
+    /// as binding names in the shared env.
+    DuplicateStem {
+        name: String,
+        first: PathBuf,
+        second: PathBuf,
+    },
+    /// `--out NAME` references a stem not present in the input list.
+    UnknownOutName(String),
+    /// `--out NAME` query evaluated to a non-Table value.
+    NotATable { name: String, kind: &'static str },
+    Write(String),
+}
+
+impl std::fmt::Display for MultiQueryError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            MultiQueryError::Io(s) => write!(f, "IO ERROR: {s}"),
+            MultiQueryError::Lex(s) => write!(f, "LEX ERROR: {s}"),
+            MultiQueryError::Parse(s) => write!(f, "PARSE ERROR: {s}"),
+            MultiQueryError::Eval(s) => write!(f, "EVAL ERROR: {s}"),
+            MultiQueryError::DuplicateStem { name, first, second } => write!(
+                f,
+                "duplicate binding name '{name}' from two input paths: {} and {}",
+                first.display(),
+                second.display()
+            ),
+            MultiQueryError::UnknownOutName(name) => write!(
+                f,
+                "--out names '{name}' which is not in the input set",
+            ),
+            MultiQueryError::NotATable { name, kind } => write!(
+                f,
+                "--out {name}: expected Table, got {kind}",
+            ),
+            MultiQueryError::Write(s) => write!(f, "WRITE ERROR: {s}"),
+        }
+    }
+}
+
+/// Multi-query CLI mode. Each input file's stem becomes a binding in a
+/// shared env so the queries can reference each other (`query2.m` can say
+/// `Table.SelectRows(query1, …)`). M's laziness means non-`--out` inputs
+/// only evaluate if a `--out` query transitively references them.
+///
+/// For each name in `outs`, look up the binding, force it to a Value, and
+/// write `<out_dir>/<name>.parquet`. Returns the paths actually written.
+pub fn run_multi_query(
+    inputs: &[PathBuf],
+    outs: &[String],
+    out_dir: &Path,
+    host: &dyn IoHost,
+) -> Result<Vec<PathBuf>, MultiQueryError> {
+    let mut bindings: Vec<(String, Expr)> = Vec::with_capacity(inputs.len());
+    let mut seen: HashMap<String, PathBuf> = HashMap::with_capacity(inputs.len());
+    for path in inputs {
+        let stem = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .ok_or_else(|| MultiQueryError::Io(format!("no valid stem for {}", path.display())))?
+            .to_string();
+        if let Some(prev) = seen.get(&stem) {
+            return Err(MultiQueryError::DuplicateStem {
+                name: stem,
+                first: prev.clone(),
+                second: path.clone(),
+            });
+        }
+        let src = std::fs::read_to_string(path)
+            .map_err(|e| MultiQueryError::Io(format!("read {}: {e}", path.display())))?;
+        let toks = tokenize(&src)
+            .map_err(|e| MultiQueryError::Lex(format!("{}: {e:?}", path.display())))?;
+        let expr = parse(&toks)
+            .map_err(|e| MultiQueryError::Parse(format!("{}: {e:?}", path.display())))?;
+        seen.insert(stem.clone(), path.clone());
+        bindings.push((stem, expr));
+    }
+
+    for name in outs {
+        if !seen.contains_key(name) {
+            return Err(MultiQueryError::UnknownOutName(name.clone()));
+        }
+    }
+
+    let env = root_env().extend_lazy(bindings);
+
+    std::fs::create_dir_all(out_dir)
+        .map_err(|e| MultiQueryError::Io(format!("mkdir {}: {e}", out_dir.display())))?;
+
+    let mut written: Vec<PathBuf> = Vec::with_capacity(outs.len());
+    for name in outs {
+        let raw = env
+            .lookup(name)
+            .expect("presence validated against `seen` above");
+        let value = deep_force(raw, host)
+            .map_err(|e| MultiQueryError::Eval(format!("{name}: {e:?}")))?;
+        match &value {
+            Value::Table(_) => {
+                let path = out_dir.join(format!("{name}.parquet"));
+                let path_str = path.to_str().ok_or_else(|| {
+                    MultiQueryError::Io(format!("non-utf8 path: {}", path.display()))
+                })?;
+                host.parquet_write(path_str, &value).map_err(|e| {
+                    MultiQueryError::Write(format!("{}: {e:?}", path.display()))
+                })?;
+                written.push(path);
+            }
+            other => {
+                return Err(MultiQueryError::NotATable {
+                    name: name.clone(),
+                    kind: value_kind(other),
+                });
+            }
+        }
+    }
+    Ok(written)
+}
+
+/// Single-character classification for diagnostic messages. Mirrors the
+/// `kind()` in main.rs and `type_name()` in core.
+fn value_kind(v: &Value) -> &'static str {
+    match v {
+        Value::Null => "null",
+        Value::Logical(_) => "logical",
+        Value::Number(_) => "number",
+        Value::Text(_) => "text",
+        Value::Date(_) => "date",
+        Value::Datetime(_) => "datetime",
+        Value::Datetimezone(_) => "datetimezone",
+        Value::Time(_) => "time",
+        Value::Duration(_) => "duration",
+        Value::Binary(_) => "binary",
+        Value::List(_) => "list",
+        Value::Record(_) => "record",
+        Value::Table(_) => "table",
+        Value::Function(_) => "function",
+        Value::Type(_) => "type",
+        Value::Thunk(_) => "thunk",
+        Value::WithMetadata { inner, .. } => value_kind(inner),
+    }
+}
 
 pub struct CliIoHost;
 
