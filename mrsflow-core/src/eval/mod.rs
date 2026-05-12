@@ -2940,6 +2940,30 @@ mod tests {
     }
 
     #[test]
+    fn number_bitwise_and_basic() {
+        match eval_str("Number.BitwiseAnd(12, 10)").unwrap() {
+            Value::Number(n) => assert_eq!(n, 8.0), // 1100 & 1010 = 1000
+            other => panic!("expected number, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn number_bitwise_or_basic() {
+        match eval_str("Number.BitwiseOr(12, 10)").unwrap() {
+            Value::Number(n) => assert_eq!(n, 14.0), // 1100 | 1010 = 1110
+            other => panic!("expected number, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn number_bitwise_shift_left_basic() {
+        match eval_str("Number.BitwiseShiftLeft(1, 4)").unwrap() {
+            Value::Number(n) => assert_eq!(n, 16.0),
+            other => panic!("expected number, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn number_exp_zero() {
         match eval_str("Number.Exp(0)").unwrap() {
             Value::Number(n) => assert_eq!(n, 1.0),

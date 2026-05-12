@@ -213,6 +213,12 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ("Number.Factorial", one("number"), number_factorial),
         ("Number.Combinations", two("setSize", "combinationSize"), number_combinations),
         ("Number.Permutations", two("setSize", "combinationSize"), number_permutations),
+        ("Number.BitwiseAnd", two("a", "b"), number_bitwise_and),
+        ("Number.BitwiseOr", two("a", "b"), number_bitwise_or),
+        ("Number.BitwiseXor", two("a", "b"), number_bitwise_xor),
+        ("Number.BitwiseNot", one("a"), number_bitwise_not),
+        ("Number.BitwiseShiftLeft", two("a", "n"), number_bitwise_shift_left),
+        ("Number.BitwiseShiftRight", two("a", "n"), number_bitwise_shift_right),
         ("Byte.From", one("value"), number_from),
         ("Currency.From", one("value"), number_from),
         ("Decimal.From", one("value"), number_from),
@@ -860,6 +866,42 @@ fn number_is_even(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         }
         other => Err(type_mismatch("number", other)),
     }
+}
+
+fn int_arg(v: &Value, ctx: &str) -> Result<i64, MError> {
+    match v {
+        Value::Number(n) if n.is_finite() && n.fract() == 0.0 => Ok(*n as i64),
+        Value::Null => Err(MError::Other(format!("{}: null argument", ctx))),
+        other => Err(MError::Other(format!(
+            "{}: argument must be an integer (got {})", ctx, super::type_name(other)
+        ))),
+    }
+}
+
+fn number_bitwise_and(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    Ok(Value::Number((int_arg(&args[0], "Number.BitwiseAnd")?
+        & int_arg(&args[1], "Number.BitwiseAnd")?) as f64))
+}
+fn number_bitwise_or(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    Ok(Value::Number((int_arg(&args[0], "Number.BitwiseOr")?
+        | int_arg(&args[1], "Number.BitwiseOr")?) as f64))
+}
+fn number_bitwise_xor(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    Ok(Value::Number((int_arg(&args[0], "Number.BitwiseXor")?
+        ^ int_arg(&args[1], "Number.BitwiseXor")?) as f64))
+}
+fn number_bitwise_not(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    Ok(Value::Number((!int_arg(&args[0], "Number.BitwiseNot")?) as f64))
+}
+fn number_bitwise_shift_left(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let a = int_arg(&args[0], "Number.BitwiseShiftLeft")?;
+    let n = int_arg(&args[1], "Number.BitwiseShiftLeft")?;
+    Ok(Value::Number((a.wrapping_shl(n as u32)) as f64))
+}
+fn number_bitwise_shift_right(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let a = int_arg(&args[0], "Number.BitwiseShiftRight")?;
+    let n = int_arg(&args[1], "Number.BitwiseShiftRight")?;
+    Ok(Value::Number((a.wrapping_shr(n as u32)) as f64))
 }
 
 fn number_exp(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> { unary_f64(args, f64::exp) }
