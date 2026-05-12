@@ -2940,6 +2940,45 @@ mod tests {
     }
 
     #[test]
+    fn number_mod_negative_dividend() {
+        // Floor mod: -7 mod 3 = 2 (since -7 = -3*3 + 2)
+        match eval_str("Number.Mod(-7, 3)").unwrap() {
+            Value::Number(n) => assert_eq!(n, 2.0),
+            other => panic!("expected number, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn number_integer_divide_basic() {
+        match eval_str("Number.IntegerDivide(17, 5)").unwrap() {
+            Value::Number(n) => assert_eq!(n, 3.0),
+            other => panic!("expected number, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn number_is_nan_logical() {
+        match eval_str("Number.IsNaN(Number.Sqrt(-1))").unwrap() {
+            Value::Logical(b) => assert!(b),
+            other => panic!("expected logical, got {:?}", other),
+        }
+        match eval_str("Number.IsNaN(3.14)").unwrap() {
+            Value::Logical(b) => assert!(!b),
+            other => panic!("expected logical, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn number_random_between_in_range() {
+        match eval_str("Number.RandomBetween(10, 20)").unwrap() {
+            Value::Number(n) => {
+                assert!(n >= 10.0 && n < 20.0);
+            }
+            other => panic!("expected number, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn text_clean_strips_control_char() {
         match eval_str("Text.Clean(\"a\u{0001}b\u{007F}c\")").unwrap() {
             Value::Text(s) => assert_eq!(s, "abc"),

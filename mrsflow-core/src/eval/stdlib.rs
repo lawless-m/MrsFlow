@@ -134,6 +134,29 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ("Guid.From", one("value"), guid_from),
         ("Text.NewGuid", vec![], text_new_guid),
         ("Number.From", one("value"), number_from),
+        (
+            "Number.Mod",
+            vec![
+                Param { name: "number".into(),    optional: false, type_annotation: None },
+                Param { name: "divisor".into(),   optional: false, type_annotation: None },
+                Param { name: "precision".into(), optional: true,  type_annotation: None },
+            ],
+            number_mod,
+        ),
+        (
+            "Number.IntegerDivide",
+            vec![
+                Param { name: "number".into(),    optional: false, type_annotation: None },
+                Param { name: "divisor".into(),   optional: false, type_annotation: None },
+                Param { name: "precision".into(), optional: true,  type_annotation: None },
+            ],
+            number_integer_divide,
+        ),
+        ("Number.IsNaN", one("number"), number_is_nan),
+        ("Number.IsOdd", one("number"), number_is_odd),
+        ("Number.IsEven", one("number"), number_is_even),
+        ("Number.Random", vec![], number_random),
+        ("Number.RandomBetween", two("bottom", "top"), number_random_between),
         ("Byte.From", one("value"), number_from),
         ("Currency.From", one("value"), number_from),
         ("Decimal.From", one("value"), number_from),
@@ -708,6 +731,100 @@ fn text_new_guid(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]
     );
     Ok(Value::Text(s))
+}
+
+fn number_mod(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let a = match &args[0] {
+        Value::Number(n) => *n,
+        Value::Null => return Ok(Value::Null),
+        other => return Err(type_mismatch("number", other)),
+    };
+    let b = match &args[1] {
+        Value::Number(n) => *n,
+        Value::Null => return Ok(Value::Null),
+        other => return Err(type_mismatch("number", other)),
+    };
+    if b == 0.0 {
+        return Err(MError::Other("Number.Mod: division by zero".into()));
+    }
+    // Mathematical (floor) mod: result has the same sign as divisor.
+    Ok(Value::Number(a - b * (a / b).floor()))
+}
+
+fn number_integer_divide(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let a = match &args[0] {
+        Value::Number(n) => *n,
+        Value::Null => return Ok(Value::Null),
+        other => return Err(type_mismatch("number", other)),
+    };
+    let b = match &args[1] {
+        Value::Number(n) => *n,
+        Value::Null => return Ok(Value::Null),
+        other => return Err(type_mismatch("number", other)),
+    };
+    if b == 0.0 {
+        return Err(MError::Other("Number.IntegerDivide: division by zero".into()));
+    }
+    Ok(Value::Number((a / b).floor()))
+}
+
+fn number_is_nan(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    match &args[0] {
+        Value::Null => Ok(Value::Null),
+        Value::Number(n) => Ok(Value::Logical(n.is_nan())),
+        other => Err(type_mismatch("number", other)),
+    }
+}
+
+fn number_is_odd(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    match &args[0] {
+        Value::Null => Ok(Value::Null),
+        Value::Number(n) => {
+            if !n.is_finite() || n.fract() != 0.0 {
+                return Err(MError::Other(format!(
+                    "Number.IsOdd: argument must be an integer (got {})", n
+                )));
+            }
+            Ok(Value::Logical((*n as i64) % 2 != 0))
+        }
+        other => Err(type_mismatch("number", other)),
+    }
+}
+
+fn number_is_even(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    match &args[0] {
+        Value::Null => Ok(Value::Null),
+        Value::Number(n) => {
+            if !n.is_finite() || n.fract() != 0.0 {
+                return Err(MError::Other(format!(
+                    "Number.IsEven: argument must be an integer (got {})", n
+                )));
+            }
+            Ok(Value::Logical((*n as i64) % 2 == 0))
+        }
+        other => Err(type_mismatch("number", other)),
+    }
+}
+
+fn number_random(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    Ok(Value::Number(rand::random::<f64>()))
+}
+
+fn number_random_between(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let bottom = match &args[0] {
+        Value::Number(n) => *n,
+        other => return Err(type_mismatch("number", other)),
+    };
+    let top = match &args[1] {
+        Value::Number(n) => *n,
+        other => return Err(type_mismatch("number", other)),
+    };
+    if !(bottom <= top) {
+        return Err(MError::Other(format!(
+            "Number.RandomBetween: bottom ({}) must be <= top ({})", bottom, top
+        )));
+    }
+    Ok(Value::Number(bottom + rand::random::<f64>() * (top - bottom)))
 }
 
 fn number_from(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
