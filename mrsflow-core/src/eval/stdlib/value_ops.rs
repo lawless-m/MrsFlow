@@ -6,15 +6,57 @@ use chrono::{Datelike, Duration as ChronoDuration, NaiveDate, NaiveDateTime, Nai
 
 use crate::parser::Param;
 
+use super::super::env::EnvNode;
 use super::super::iohost::IoHost;
-use super::super::value::{BuiltinFn, MError, Value};
+use super::super::value::{BuiltinFn, MError, Record, TypeRep, Value};
 use super::common::{
-    expect_function, invoke_callback_with_host, one, three, two, type_mismatch,
+    expect_function, expect_text, invoke_callback_with_host, one, three, two, type_mismatch,
     values_equal_primitive,
 };
 
 pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
     vec![
+        // --- Slice #170: type / inspect ---
+        ("Value.As", two("value", "type"), value_as),
+        ("Value.Is", two("value", "type"), value_is),
+        ("Value.Type", one("value"), value_type),
+        ("Value.ReplaceType", two("value", "type"), value_replace_type),
+        (
+            "Value.FromText",
+            vec![
+                Param { name: "text".into(),    optional: false, type_annotation: None },
+                Param { name: "culture".into(), optional: true,  type_annotation: None },
+            ],
+            value_from_text,
+        ),
+        ("Value.Expression", one("value"), value_expression),
+        ("Value.Lineage", one("value"), value_lineage),
+        ("Value.Traits", one("value"), value_traits),
+        ("Value.VersionIdentity", one("value"), value_version_identity),
+        ("Value.Versions", one("value"), value_versions),
+        (
+            "Value.NativeQuery",
+            vec![
+                Param { name: "target".into(),     optional: false, type_annotation: None },
+                Param { name: "query".into(),      optional: false, type_annotation: None },
+                Param { name: "parameters".into(), optional: true,  type_annotation: None },
+                Param { name: "options".into(),    optional: true,  type_annotation: None },
+            ],
+            value_native_query,
+        ),
+        ("Value.Optimize", one("value"), value_passthrough),
+        (
+            "Value.Firewall",
+            vec![
+                Param { name: "value".into(),       optional: false, type_annotation: None },
+                Param { name: "trustLevel".into(),  optional: true,  type_annotation: None },
+            ],
+            value_firewall,
+        ),
+        ("Value.Alternates", one("value"), value_alternates),
+        ("Value.ViewError", one("value"), value_passthrough),
+        ("Value.ViewFunction", one("value"), value_passthrough),
+        // --- Slice #169: arithmetic + equality ---
         (
             "Value.Add",
             vec![
@@ -80,6 +122,143 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ),
     ]
 }
+
+// --- Slice #170 impls ---
+
+fn expect_typerep(v: &Value) -> Result<&TypeRep, MError> {
+    match v {
+        Value::Type(t) => Ok(t),
+        other => Err(type_mismatch("type", other)),
+    }
+}
+
+fn value_as(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let t = expect_typerep(&args[1])?;
+    if super::super::type_conforms(&args[0], t) {
+        Ok(args[0].clone())
+    } else {
+        Err(MError::Other(format!(
+            "Value.As: value does not conform to type {}",
+            super::super::type_rep_name(t)
+        )))
+    }
+}
+
+fn value_is(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let t = expect_typerep(&args[1])?;
+    Ok(Value::Logical(super::super::type_conforms(&args[0], t)))
+}
+
+fn value_type(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    Ok(Value::Type(typerep_of(&args[0])))
+}
+
+fn typerep_of(v: &Value) -> TypeRep {
+    match v {
+        Value::Null => TypeRep::Null,
+        Value::Logical(_) => TypeRep::Logical,
+        Value::Number(_) => TypeRep::Number,
+        Value::Text(_) => TypeRep::Text,
+        Value::Date(_) => TypeRep::Date,
+        Value::Datetime(_) => TypeRep::Datetime,
+        Value::Datetimezone(_) => TypeRep::Datetimezone,
+        Value::Time(_) => TypeRep::Time,
+        Value::Duration(_) => TypeRep::Duration,
+        Value::Binary(_) => TypeRep::Binary,
+        Value::List(_) => TypeRep::List,
+        Value::Record(_) => TypeRep::Record,
+        Value::Table(_) => TypeRep::Table,
+        Value::Function(_) => TypeRep::Function,
+        Value::Type(_) => TypeRep::Type,
+        Value::Thunk(_) => TypeRep::Any,
+    }
+}
+
+fn value_replace_type(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    // v1: we don't track ascribed type metadata — return value unchanged.
+    let _ = expect_typerep(&args[1])?;
+    Ok(args[0].clone())
+}
+
+fn value_from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let s = expect_text(&args[0])?.trim();
+    if !matches!(args.get(1), Some(Value::Null) | None) {
+        return Err(MError::NotImplemented(
+            "Value.FromText: culture argument not yet supported",
+        ));
+    }
+    if s.eq_ignore_ascii_case("null") {
+        return Ok(Value::Null);
+    }
+    if s.eq_ignore_ascii_case("true") {
+        return Ok(Value::Logical(true));
+    }
+    if s.eq_ignore_ascii_case("false") {
+        return Ok(Value::Logical(false));
+    }
+    if let Ok(n) = s.parse::<f64>() {
+        return Ok(Value::Number(n));
+    }
+    // Quoted text: strip leading/trailing double-quote pair.
+    if s.starts_with('"') && s.ends_with('"') && s.len() >= 2 {
+        return Ok(Value::Text(s[1..s.len() - 1].to_string()));
+    }
+    Err(MError::Other(format!(
+        "Value.FromText: could not parse: {}",
+        s
+    )))
+}
+
+fn value_expression(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    Err(MError::NotImplemented(
+        "Value.Expression: source expression introspection requires cloud-PQ infra",
+    ))
+}
+
+fn value_lineage(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    // v1: no fold lineage tracking.
+    Ok(Value::List(Vec::new()))
+}
+
+fn value_traits(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    Ok(Value::Record(Record {
+        fields: Vec::new(),
+        env: EnvNode::empty(),
+    }))
+}
+
+fn value_version_identity(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    Err(MError::NotImplemented(
+        "Value.VersionIdentity: requires versioning machinery not built in v1",
+    ))
+}
+
+fn value_versions(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    Err(MError::NotImplemented(
+        "Value.Versions: requires versioning machinery not built in v1",
+    ))
+}
+
+fn value_native_query(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    Err(MError::NotImplemented(
+        "Value.NativeQuery: query folding not available without a fold-aware data source",
+    ))
+}
+
+fn value_passthrough(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    Ok(args[0].clone())
+}
+
+fn value_firewall(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    // v1: no privacy levels — values pass through unchanged.
+    Ok(args[0].clone())
+}
+
+fn value_alternates(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    Ok(Value::List(vec![args[0].clone()]))
+}
+
+// --- Slice #169 impls ---
 
 fn value_add(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     match (&args[0], &args[1]) {

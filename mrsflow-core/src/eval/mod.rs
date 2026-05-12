@@ -656,7 +656,7 @@ pub(crate) fn type_conforms(v: &Value, t: &TypeRep) -> bool {
 }
 
 /// Human-readable name of a TypeRep, used in error messages.
-fn type_rep_name(t: &TypeRep) -> String {
+pub(crate) fn type_rep_name(t: &TypeRep) -> String {
     match t {
         TypeRep::Any => "any".into(),
         TypeRep::AnyNonNull => "anynonnull".into(),
@@ -5461,6 +5461,34 @@ mod tests {
             }
             other => panic!("expected table, got {:?}", other),
         }
+    }
+
+    #[test]
+    fn value_as_succeeds_for_conformant() {
+        let src = r#"Value.As(42, type number)"#;
+        assert!(matches!(eval_str(src).unwrap(), Value::Number(n) if n == 42.0));
+    }
+
+    #[test]
+    fn value_as_errors_for_mismatch() {
+        let src = r#"Value.As("x", type number)"#;
+        assert!(eval_str(src).is_err());
+    }
+
+    #[test]
+    fn value_type_returns_typerep() {
+        let src = r#"Value.Type(42)"#;
+        match eval_str(src).unwrap() {
+            Value::Type(t) => assert_eq!(t, TypeRep::Number),
+            other => panic!("expected type, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn value_from_text_parses_primitives() {
+        assert!(matches!(eval_str(r#"Value.FromText("null")"#).unwrap(), Value::Null));
+        assert!(matches!(eval_str(r#"Value.FromText("true")"#).unwrap(), Value::Logical(true)));
+        assert!(matches!(eval_str(r#"Value.FromText("42")"#).unwrap(), Value::Number(n) if n == 42.0));
     }
 
     #[test]
