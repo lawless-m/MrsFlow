@@ -3928,6 +3928,70 @@ mod tests {
     }
 
     #[test]
+    fn list_contains_basic() {
+        match eval_str("List.Contains({1, 2, 3}, 2)").unwrap() {
+            Value::Logical(b) => assert!(b),
+            other => panic!("expected logical, got {:?}", other),
+        }
+        match eval_str("List.Contains({1, 2, 3}, 99)").unwrap() {
+            Value::Logical(b) => assert!(!b),
+            other => panic!("expected logical, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn list_contains_all_basic() {
+        match eval_str("List.ContainsAll({1, 2, 3, 4}, {2, 4})").unwrap() {
+            Value::Logical(b) => assert!(b),
+            other => panic!("expected logical, got {:?}", other),
+        }
+        match eval_str("List.ContainsAll({1, 2}, {2, 99})").unwrap() {
+            Value::Logical(b) => assert!(!b),
+            other => panic!("expected logical, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn list_matches_all_basic() {
+        match eval_str("List.MatchesAll({1, 2, 3}, each _ > 0)").unwrap() {
+            Value::Logical(b) => assert!(b),
+            other => panic!("expected logical, got {:?}", other),
+        }
+        match eval_str("List.MatchesAll({1, -2, 3}, each _ > 0)").unwrap() {
+            Value::Logical(b) => assert!(!b),
+            other => panic!("expected logical, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn list_find_text_basic() {
+        match eval_str("List.FindText({\"apple\", \"banana\", \"cherry\"}, \"an\")").unwrap() {
+            Value::List(xs) => {
+                let names: Vec<&str> = xs.iter().map(|v| match v {
+                    Value::Text(s) => s.as_str(),
+                    _ => panic!(),
+                }).collect();
+                assert_eq!(names, vec!["banana"]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn list_positions_basic() {
+        match eval_str("List.Positions({\"a\", \"b\", \"c\"})").unwrap() {
+            Value::List(xs) => {
+                let nums: Vec<f64> = xs.iter().map(|v| match v {
+                    Value::Number(n) => *n,
+                    _ => panic!(),
+                }).collect();
+                assert_eq!(nums, vec![0.0, 1.0, 2.0]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn list_position_of_found() {
         match eval_str("List.PositionOf({\"a\", \"b\", \"c\"}, \"b\")").unwrap() {
             Value::Number(n) => assert_eq!(n, 1.0),
