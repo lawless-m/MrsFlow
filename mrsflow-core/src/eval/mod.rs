@@ -5342,6 +5342,38 @@ mod tests {
     }
 
     #[test]
+    fn table_fuzzy_group_errors_not_implemented() {
+        let src = r#"Table.FuzzyGroup(#table({"k"}, {{"a"}}), "k", {})"#;
+        let err = eval_str(src).unwrap_err();
+        assert!(matches!(err, MError::NotImplemented(_)), "got {:?}", err);
+    }
+
+    #[test]
+    fn table_view_returns_input_unchanged() {
+        let src = r#"
+            let
+                t = #table({"n"}, {{1}, {2}}),
+                v = Table.View(t, [])
+            in
+                {Table.ColumnNames(v), Table.RowCount(v)}
+        "#;
+        match eval_str(src).unwrap() {
+            Value::List(xs) => {
+                let names = match &xs[0] {
+                    Value::List(ns) => ns.iter().map(|v| match v {
+                        Value::Text(s) => s.clone(),
+                        _ => panic!(),
+                    }).collect::<Vec<_>>(),
+                    _ => panic!(),
+                };
+                assert_eq!(names, vec!["n"]);
+                assert!(matches!(xs[1], Value::Number(n) if n == 2.0));
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn table_partition_splits_by_hash() {
         // Use a hash that returns the column value itself; verify partitioning
         // by mod 2 puts the right rows in each bucket.

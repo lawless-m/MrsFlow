@@ -560,6 +560,55 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
             table_select_rows_with_errors,
         ),
         ("Table.WithErrorContext", two("table", "errorContext"), table_identity_passthrough),
+        // --- Slice #166: fuzzy + view stubs ---
+        (
+            "Table.AddFuzzyClusterColumn",
+            vec![
+                Param { name: "table".into(),         optional: false, type_annotation: None },
+                Param { name: "columnName".into(),    optional: false, type_annotation: None },
+                Param { name: "newColumnName".into(), optional: false, type_annotation: None },
+                Param { name: "options".into(),       optional: true,  type_annotation: None },
+            ],
+            table_fuzzy_not_implemented,
+        ),
+        (
+            "Table.FuzzyGroup",
+            vec![
+                Param { name: "table".into(),             optional: false, type_annotation: None },
+                Param { name: "key".into(),               optional: false, type_annotation: None },
+                Param { name: "aggregatedColumns".into(), optional: false, type_annotation: None },
+                Param { name: "options".into(),           optional: true,  type_annotation: None },
+            ],
+            table_fuzzy_not_implemented,
+        ),
+        (
+            "Table.FuzzyJoin",
+            vec![
+                Param { name: "table1".into(),    optional: false, type_annotation: None },
+                Param { name: "key1".into(),      optional: false, type_annotation: None },
+                Param { name: "table2".into(),    optional: false, type_annotation: None },
+                Param { name: "key2".into(),      optional: false, type_annotation: None },
+                Param { name: "joinKind".into(),  optional: true,  type_annotation: None },
+                Param { name: "options".into(),   optional: true,  type_annotation: None },
+            ],
+            table_fuzzy_not_implemented,
+        ),
+        (
+            "Table.FuzzyNestedJoin",
+            vec![
+                Param { name: "table1".into(),        optional: false, type_annotation: None },
+                Param { name: "key1".into(),          optional: false, type_annotation: None },
+                Param { name: "table2".into(),        optional: false, type_annotation: None },
+                Param { name: "key2".into(),          optional: false, type_annotation: None },
+                Param { name: "newColumnName".into(), optional: false, type_annotation: None },
+                Param { name: "joinKind".into(),      optional: true,  type_annotation: None },
+                Param { name: "options".into(),       optional: true,  type_annotation: None },
+            ],
+            table_fuzzy_not_implemented,
+        ),
+        ("Table.View", two("table", "handlers"), table_view_identity),
+        ("Table.ViewError", one("record"), table_view_error_identity),
+        ("Table.ViewFunction", one("function"), table_view_function_identity),
     ]
 }
 
@@ -4218,6 +4267,30 @@ fn table_select_rows_with_errors(args: &[Value], _host: &dyn IoHost) -> Result<V
     let table = expect_table(&args[0])?;
     let (names, _rows) = table_to_rows(table)?;
     Ok(Value::Table(values_to_table(&names, &[])?))
+}
+
+// --- Slice #166: fuzzy + view stubs ---
+
+fn table_fuzzy_not_implemented(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    Err(MError::NotImplemented(
+        "Table.Fuzzy*: fuzzy-match functions require similarity infra not built in v1",
+    ))
+}
+
+fn table_view_identity(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    // v1: View is purely a folding hook with no off-cloud effect.
+    let _ = expect_table(&args[0])?;
+    Ok(args[0].clone())
+}
+
+fn table_view_error_identity(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    // Pass the supplied record back; without metadata machinery we can't
+    // attach the view-error tag, but the value is preserved.
+    Ok(args[0].clone())
+}
+
+fn table_view_function_identity(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    Ok(args[0].clone())
 }
 
 fn type_matches(t: &super::super::value::TypeRep, v: &Value) -> bool {
