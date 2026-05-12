@@ -1348,10 +1348,24 @@ dependencies = [
  "chrono",
  "csv",
  "flate2",
+ "getrandom 0.2.17",
  "insta",
  "rand 0.8.6",
  "serde_json",
  "unicode-general-category",
+]
+
+[[package]]
+name = "mrsflow-wasm"
+version = "0.1.0"
+dependencies = [
+ "arrow",
+ "bytes",
+ "chrono",
+ "js-sys",
+ "mrsflow-core",
+ "parquet",
+ "wasm-bindgen",
 ]
 
 [[package]]

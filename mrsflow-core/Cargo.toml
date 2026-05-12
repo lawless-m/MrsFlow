@@ -18,5 +18,14 @@ flate2 = "1"
 serde_json = { version = "1", default-features = false, features = ["std", "preserve_order"] }
 csv = "1"
 
+# Enable the `js` feature on getrandom only when targeting the browser.
+# Both `rand` (direct) and `arrow`'s `ahash → const-random` chain pull
+# getrandom 0.2 in; on wasm32-unknown-unknown it refuses to build unless
+# the `js` feature is enabled, which routes RNG through wasm-bindgen
+# to the browser's `crypto.getRandomValues`. This dep has no effect on
+# non-wasm targets — feature unification means the CLI build is unchanged.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.2", features = ["js"] }
+
 [dev-dependencies]
 insta = "1"

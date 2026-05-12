@@ -2,11 +2,13 @@
 
 #![allow(unused_imports)]
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use arrow::array::{
-    Array, ArrayRef, BooleanArray, Date32Array, DurationMicrosecondArray, Float64Array,
-    Int64Array, NullArray, StringArray, TimestampMicrosecondArray,
+    Array, ArrayRef, BooleanArray, Date32Array, DurationMicrosecondArray, Float32Array,
+    Float64Array, Int16Array, Int32Array, Int64Array, Int8Array, NullArray, StringArray,
+    TimestampMicrosecondArray, UInt16Array, UInt32Array, UInt64Array, UInt8Array,
 };
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
@@ -989,6 +991,37 @@ pub fn cell_to_value(table: &Table, col: usize, row: usize) -> Result<Value, MEr
                 .expect("Float64");
             Ok(Value::Number(a.value(row)))
         }
+        // M has only one numeric type (`Number` = f64); all Arrow integer
+        // widths and the lone Float32 width collapse into it. Int64/UInt64
+        // can exceed f64's 2^53 lossless range — for now we accept the
+        // narrowing rather than introducing a separate integer Value.
+        DataType::Float32 => Ok(Value::Number(
+            array.as_any().downcast_ref::<Float32Array>().expect("Float32").value(row) as f64,
+        )),
+        DataType::Int8 => Ok(Value::Number(
+            array.as_any().downcast_ref::<Int8Array>().expect("Int8").value(row) as f64,
+        )),
+        DataType::Int16 => Ok(Value::Number(
+            array.as_any().downcast_ref::<Int16Array>().expect("Int16").value(row) as f64,
+        )),
+        DataType::Int32 => Ok(Value::Number(
+            array.as_any().downcast_ref::<Int32Array>().expect("Int32").value(row) as f64,
+        )),
+        DataType::Int64 => Ok(Value::Number(
+            array.as_any().downcast_ref::<Int64Array>().expect("Int64").value(row) as f64,
+        )),
+        DataType::UInt8 => Ok(Value::Number(
+            array.as_any().downcast_ref::<UInt8Array>().expect("UInt8").value(row) as f64,
+        )),
+        DataType::UInt16 => Ok(Value::Number(
+            array.as_any().downcast_ref::<UInt16Array>().expect("UInt16").value(row) as f64,
+        )),
+        DataType::UInt32 => Ok(Value::Number(
+            array.as_any().downcast_ref::<UInt32Array>().expect("UInt32").value(row) as f64,
+        )),
+        DataType::UInt64 => Ok(Value::Number(
+            array.as_any().downcast_ref::<UInt64Array>().expect("UInt64").value(row) as f64,
+        )),
         DataType::Utf8 => {
             let a = array.as_any().downcast_ref::<StringArray>().expect("Utf8");
             Ok(Value::Text(a.value(row).to_string()))
@@ -2266,26 +2299,73 @@ fn join(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
+/// Hashable projection of a primitive `Value`, used as a join key. Must
+/// give the same equality answer as [`values_equal_primitive`]; compound
+/// values (List/Record/Table) error rather than join-by-identity.
+///
+/// `f64` becomes `to_bits()` so it implements `Eq` and `Hash`. This treats
+/// `NaN` as never equal to itself (NaN bits compare as equal only to the
+/// same bit pattern; different NaN encodings collide via `Hash` but
+/// distinct keys still won't match in the bucket). Matches the linear-scan
+/// behaviour where `NaN == NaN` was already `false`.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+enum JoinKey {
+    Null,
+    Bool(bool),
+    NumberBits(u64),
+    Text(String),
+    Date(chrono::NaiveDate),
+    Datetime(chrono::NaiveDateTime),
+    Duration(chrono::Duration),
+}
+
+fn join_key_from(v: &Value) -> Result<JoinKey, MError> {
+    match v {
+        Value::Null => Ok(JoinKey::Null),
+        Value::Logical(b) => Ok(JoinKey::Bool(*b)),
+        Value::Number(n) => Ok(JoinKey::NumberBits(n.to_bits())),
+        Value::Text(s) => Ok(JoinKey::Text(s.clone())),
+        Value::Date(d) => Ok(JoinKey::Date(*d)),
+        Value::Datetime(dt) => Ok(JoinKey::Datetime(*dt)),
+        Value::Duration(d) => Ok(JoinKey::Duration(*d)),
+        _ => Err(MError::NotImplemented(
+            "Table.NestedJoin: join key must be a primitive (list/record/table not supported)",
+        )),
+    }
+}
+
 fn nested_join(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table1 = expect_table(&args[0])?;
     let key1 = match &args[1] {
         Value::Text(s) => s.clone(),
+        // Power Query's GUI emits `{"col"}` even for single-key joins, so
+        // a 1-element text list is just the bare-text form. True
+        // multi-column composite keys still aren't implemented — that
+        // needs tuple equality in the row-matching loop below.
+        Value::List(items) if items.len() == 1 => match &items[0] {
+            Value::Text(s) => s.clone(),
+            other => return Err(type_mismatch("text", other)),
+        },
         Value::List(_) => {
             return Err(MError::NotImplemented(
-                "Table.NestedJoin: composite keys (text-list form) not yet supported",
+                "Table.NestedJoin: composite keys (multi-column) not yet supported",
             ));
         }
-        other => return Err(type_mismatch("text", other)),
+        other => return Err(type_mismatch("text or text list", other)),
     };
     let table2 = expect_table(&args[2])?;
     let key2 = match &args[3] {
         Value::Text(s) => s.clone(),
+        Value::List(items) if items.len() == 1 => match &items[0] {
+            Value::Text(s) => s.clone(),
+            other => return Err(type_mismatch("text", other)),
+        },
         Value::List(_) => {
             return Err(MError::NotImplemented(
-                "Table.NestedJoin: composite keys (text-list form) not yet supported",
+                "Table.NestedJoin: composite keys (multi-column) not yet supported",
             ));
         }
-        other => return Err(type_mismatch("text", other)),
+        other => return Err(type_mismatch("text or text list", other)),
     };
     let new_column_name = expect_text(&args[4])?.to_string();
     // joinKind: 0=Inner, 1=LeftOuter, 2=RightOuter, 3=FullOuter, 4=LeftAnti, 5=RightAnti
@@ -2314,25 +2394,29 @@ fn nested_join(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         ))
     })?;
 
-    // Linear-scan match (O(n*m), fine for corpus-scale tables — no Hash on
-    // Value yet, and primitive-only equality keeps the code simple).
+    // Hash join: O(n+m). Build a bucket map on the right side keyed by
+    // `key2_idx`, then probe with each left row's `key1_idx`. The corpus's
+    // dominant pattern is 100K+ left × 10K+ right; the previous O(n*m)
+    // scan was effectively useless at that scale.
+    let mut buckets: HashMap<JoinKey, Vec<usize>> = HashMap::with_capacity(right_rows.len());
+    for (i, right_row) in right_rows.iter().enumerate() {
+        let key = join_key_from(&right_row[key2_idx])?;
+        buckets.entry(key).or_default().push(i);
+    }
+
     let mut out_names: Vec<String> = left_names.clone();
     out_names.push(new_column_name);
     let mut out_rows: Vec<Vec<Value>> = Vec::with_capacity(left_rows.len());
 
     for left_row in &left_rows {
-        let lkey = &left_row[key1_idx];
-        let mut matched: Vec<Vec<Value>> = Vec::new();
-        for right_row in &right_rows {
-            if values_equal_primitive(lkey, &right_row[key2_idx])? {
-                matched.push(right_row.clone());
-            }
-        }
-        let inner_table =
-            Table::from_rows(right_names.clone(), matched.clone());
+        let lkey = join_key_from(&left_row[key1_idx])?;
+        let matched: Vec<Vec<Value>> = buckets
+            .get(&lkey)
+            .map(|idx| idx.iter().map(|&i| right_rows[i].clone()).collect())
+            .unwrap_or_default();
+        let inner_table = Table::from_rows(right_names.clone(), matched.clone());
         match join_kind {
             0 => {
-                // Inner: drop left rows with no matches.
                 if matched.is_empty() {
                     continue;
                 }
@@ -2341,7 +2425,6 @@ fn nested_join(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
                 out_rows.push(new_row);
             }
             1 => {
-                // LeftOuter: keep every left row, even with empty nested table.
                 let mut new_row = left_row.clone();
                 new_row.push(Value::Table(inner_table));
                 out_rows.push(new_row);

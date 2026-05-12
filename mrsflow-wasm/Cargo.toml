@@ -1,0 +1,30 @@
+[package]
+name = "mrsflow-wasm"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Browser shell for mrsflow — exposes the M evaluator via wasm-bindgen with an in-memory IoHost."
+
+[lints]
+workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+mrsflow-core = { path = "../mrsflow-core" }
+wasm-bindgen = "0.2"
+js-sys = "0.3"
+arrow = { version = "53", default-features = false }
+# Default parquet features pull in tokio/async which don't compile to
+# wasm32-unknown-unknown; keep the feature set minimal — Arrow integration
+# plus snappy (the dominant compression in our corpus). Add `flate2`,
+# `lz4`, `zstd` here later if a real parquet file fails to read.
+parquet = { version = "53", default-features = false, features = ["arrow", "snap"] }
+# `bytes::Bytes` is what implements `ChunkReader` for the in-memory parquet
+# read path — equivalent to `File` in the CLI shell.
+bytes = "1"
+# Needed only to spell the return type of `IoHost::file_modified` in the
+# trait impl signature; the WASM shell doesn't actually call into chrono.
+chrono = { version = "0.4", default-features = false }
