@@ -194,6 +194,58 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ),
         ("Text.Reverse", one("text"), text_reverse),
         ("Text.Proper", one("text"), text_proper),
+        ("Text.At", two("text", "index"), text_at),
+        (
+            "Text.Range",
+            vec![
+                Param { name: "text".into(),   optional: false, type_annotation: None },
+                Param { name: "offset".into(), optional: false, type_annotation: None },
+                Param { name: "count".into(),  optional: true,  type_annotation: None },
+            ],
+            text_range,
+        ),
+        ("Text.Remove", two("text", "removeChars"), text_remove),
+        (
+            "Text.RemoveRange",
+            vec![
+                Param { name: "text".into(),   optional: false, type_annotation: None },
+                Param { name: "offset".into(), optional: false, type_annotation: None },
+                Param { name: "count".into(),  optional: true,  type_annotation: None },
+            ],
+            text_remove_range,
+        ),
+        ("Text.Insert", three("text", "offset", "newText"), text_insert),
+        (
+            "Text.ReplaceRange",
+            vec![
+                Param { name: "text".into(),    optional: false, type_annotation: None },
+                Param { name: "offset".into(),  optional: false, type_annotation: None },
+                Param { name: "count".into(),   optional: false, type_annotation: None },
+                Param { name: "newText".into(), optional: false, type_annotation: None },
+            ],
+            text_replace_range,
+        ),
+        (
+            "Text.PadStart",
+            vec![
+                Param { name: "text".into(),      optional: false, type_annotation: None },
+                Param { name: "count".into(),     optional: false, type_annotation: None },
+                Param { name: "character".into(), optional: true,  type_annotation: None },
+            ],
+            text_pad_start,
+        ),
+        (
+            "Text.PadEnd",
+            vec![
+                Param { name: "text".into(),      optional: false, type_annotation: None },
+                Param { name: "count".into(),     optional: false, type_annotation: None },
+                Param { name: "character".into(), optional: true,  type_annotation: None },
+            ],
+            text_pad_end,
+        ),
+        ("Text.Repeat", two("text", "count"), text_repeat),
+        ("Text.Select", two("text", "selectChars"), text_select),
+        ("Text.ToList", one("text"), text_to_list),
         ("Text.Start", two("text", "count"), text_start),
         (
             "Text.Middle",
@@ -799,6 +851,188 @@ fn text_starts_with(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError>
 fn text_trim_end(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     Ok(Value::Text(text.trim_end().to_string()))
+}
+
+/// Helper: extract chars from a text-or-list-of-text "chars" argument.
+fn chars_from_arg(v: &Value, ctx: &'static str) -> Result<Vec<char>, MError> {
+    match v {
+        Value::Text(s) => Ok(s.chars().collect()),
+        Value::List(xs) => {
+            let mut out = Vec::new();
+            for x in xs {
+                match x {
+                    Value::Text(s) => out.extend(s.chars()),
+                    other => return Err(MError::Other(format!(
+                        "{}: list element must be text, got {}",
+                        ctx, super::type_name(other)
+                    ))),
+                }
+            }
+            Ok(out)
+        }
+        other => Err(type_mismatch("text or list of text", other)),
+    }
+}
+
+fn text_at(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let text = expect_text(&args[0])?;
+    let idx = match &args[1] {
+        Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
+        other => return Err(type_mismatch("non-negative integer", other)),
+    };
+    text.chars()
+        .nth(idx)
+        .map(|c| Value::Text(c.to_string()))
+        .ok_or_else(|| MError::Other(format!("Text.At: index {} out of range", idx)))
+}
+
+fn text_range(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let text = expect_text(&args[0])?;
+    let chars: Vec<char> = text.chars().collect();
+    let offset = match &args[1] {
+        Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
+        other => return Err(type_mismatch("non-negative integer", other)),
+    };
+    let count = match args.get(2) {
+        Some(Value::Number(n)) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
+        Some(Value::Null) | None => chars.len().saturating_sub(offset),
+        Some(other) => return Err(type_mismatch("non-negative integer or null", other)),
+    };
+    if offset > chars.len() {
+        return Err(MError::Other("Text.Range: offset out of range".into()));
+    }
+    let end = (offset + count).min(chars.len());
+    Ok(Value::Text(chars[offset..end].iter().collect()))
+}
+
+fn text_remove(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let text = expect_text(&args[0])?;
+    let drop = chars_from_arg(&args[1], "Text.Remove")?;
+    Ok(Value::Text(text.chars().filter(|c| !drop.contains(c)).collect()))
+}
+
+fn text_remove_range(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let text = expect_text(&args[0])?;
+    let chars: Vec<char> = text.chars().collect();
+    let offset = match &args[1] {
+        Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
+        other => return Err(type_mismatch("non-negative integer", other)),
+    };
+    let count = match args.get(2) {
+        Some(Value::Number(n)) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
+        Some(Value::Null) | None => 1,
+        Some(other) => return Err(type_mismatch("non-negative integer or null", other)),
+    };
+    if offset > chars.len() {
+        return Err(MError::Other("Text.RemoveRange: offset out of range".into()));
+    }
+    let end = (offset + count).min(chars.len());
+    let mut out: String = chars[..offset].iter().collect();
+    out.extend(chars[end..].iter());
+    Ok(Value::Text(out))
+}
+
+fn text_insert(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let text = expect_text(&args[0])?;
+    let chars: Vec<char> = text.chars().collect();
+    let offset = match &args[1] {
+        Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
+        other => return Err(type_mismatch("non-negative integer", other)),
+    };
+    let new_text = expect_text(&args[2])?;
+    if offset > chars.len() {
+        return Err(MError::Other("Text.Insert: offset out of range".into()));
+    }
+    let mut out: String = chars[..offset].iter().collect();
+    out.push_str(new_text);
+    out.extend(chars[offset..].iter());
+    Ok(Value::Text(out))
+}
+
+fn text_replace_range(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let text = expect_text(&args[0])?;
+    let chars: Vec<char> = text.chars().collect();
+    let offset = match &args[1] {
+        Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
+        other => return Err(type_mismatch("non-negative integer", other)),
+    };
+    let count = match &args[2] {
+        Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
+        other => return Err(type_mismatch("non-negative integer", other)),
+    };
+    let new_text = expect_text(&args[3])?;
+    if offset > chars.len() {
+        return Err(MError::Other("Text.ReplaceRange: offset out of range".into()));
+    }
+    let end = (offset + count).min(chars.len());
+    let mut out: String = chars[..offset].iter().collect();
+    out.push_str(new_text);
+    out.extend(chars[end..].iter());
+    Ok(Value::Text(out))
+}
+
+fn text_pad_start(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let text = expect_text(&args[0])?;
+    let target = match &args[1] {
+        Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
+        other => return Err(type_mismatch("non-negative integer", other)),
+    };
+    let pad_char = match args.get(2) {
+        Some(Value::Text(s)) => s.chars().next().ok_or_else(||
+            MError::Other("Text.PadStart: pad character is empty".into()))?,
+        Some(Value::Null) | None => ' ',
+        Some(other) => return Err(type_mismatch("text", other)),
+    };
+    let n = text.chars().count();
+    if n >= target {
+        Ok(Value::Text(text.to_string()))
+    } else {
+        let mut out: String = std::iter::repeat(pad_char).take(target - n).collect();
+        out.push_str(text);
+        Ok(Value::Text(out))
+    }
+}
+
+fn text_pad_end(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let text = expect_text(&args[0])?;
+    let target = match &args[1] {
+        Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
+        other => return Err(type_mismatch("non-negative integer", other)),
+    };
+    let pad_char = match args.get(2) {
+        Some(Value::Text(s)) => s.chars().next().ok_or_else(||
+            MError::Other("Text.PadEnd: pad character is empty".into()))?,
+        Some(Value::Null) | None => ' ',
+        Some(other) => return Err(type_mismatch("text", other)),
+    };
+    let n = text.chars().count();
+    if n >= target {
+        Ok(Value::Text(text.to_string()))
+    } else {
+        let mut out = text.to_string();
+        out.extend(std::iter::repeat(pad_char).take(target - n));
+        Ok(Value::Text(out))
+    }
+}
+
+fn text_repeat(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let text = expect_text(&args[0])?;
+    let count = match &args[1] {
+        Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
+        other => return Err(type_mismatch("non-negative integer", other)),
+    };
+    Ok(Value::Text(text.repeat(count)))
+}
+
+fn text_select(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let text = expect_text(&args[0])?;
+    let keep = chars_from_arg(&args[1], "Text.Select")?;
+    Ok(Value::Text(text.chars().filter(|c| keep.contains(c)).collect()))
+}
+
+fn text_to_list(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let text = expect_text(&args[0])?;
+    Ok(Value::List(text.chars().map(|c| Value::Text(c.to_string())).collect()))
 }
 
 fn text_trim_start(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {

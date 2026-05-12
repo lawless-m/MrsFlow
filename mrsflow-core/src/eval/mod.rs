@@ -2940,6 +2940,60 @@ mod tests {
     }
 
     #[test]
+    fn text_range_basic() {
+        match eval_str(r#"Text.Range("hello world", 6, 5)"#).unwrap() {
+            Value::Text(s) => assert_eq!(s, "world"),
+            other => panic!("expected text, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn text_insert_at_offset() {
+        match eval_str(r#"Text.Insert("abef", 2, "cd")"#).unwrap() {
+            Value::Text(s) => assert_eq!(s, "abcdef"),
+            other => panic!("expected text, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn text_replace_range_basic() {
+        match eval_str(r#"Text.ReplaceRange("hello world", 6, 5, "there")"#).unwrap() {
+            Value::Text(s) => assert_eq!(s, "hello there"),
+            other => panic!("expected text, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn text_to_list_basic() {
+        match eval_str(r#"Text.ToList("abc")"#).unwrap() {
+            Value::List(xs) => {
+                let parts: Vec<&str> = xs.iter().map(|v| match v {
+                    Value::Text(s) => s.as_str(),
+                    _ => panic!(),
+                }).collect();
+                assert_eq!(parts, vec!["a", "b", "c"]);
+            }
+            other => panic!("expected list, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn text_repeat_basic() {
+        match eval_str(r#"Text.Repeat("ab", 3)"#).unwrap() {
+            Value::Text(s) => assert_eq!(s, "ababab"),
+            other => panic!("expected text, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn text_pad_start_basic() {
+        match eval_str(r#"Text.PadStart("42", 5, "0")"#).unwrap() {
+            Value::Text(s) => assert_eq!(s, "00042"),
+            other => panic!("expected text, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn text_trim_start_default_and_chars() {
         match eval_str(r#"Text.TrimStart("   hello")"#).unwrap() {
             Value::Text(s) => assert_eq!(s, "hello"),
