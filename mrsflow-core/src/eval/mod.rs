@@ -3307,6 +3307,49 @@ mod tests {
     }
 
     #[test]
+    fn datetime_date_extracts() {
+        match eval_str("DateTime.Date(#datetime(2024, 6, 15, 14, 30, 0))").unwrap() {
+            Value::Date(d) => assert_eq!(d, chrono::NaiveDate::from_ymd_opt(2024, 6, 15).unwrap()),
+            other => panic!("expected date, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn datetime_time_extracts() {
+        match eval_str("DateTime.Time(#datetime(2024, 6, 15, 14, 30, 45))").unwrap() {
+            Value::Time(t) => assert_eq!(t, chrono::NaiveTime::from_hms_opt(14, 30, 45).unwrap()),
+            other => panic!("expected time, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn datetime_from_text_iso() {
+        match eval_str(r#"DateTime.FromText("2024-06-15T14:30:00")"#).unwrap() {
+            Value::Datetime(dt) => assert_eq!(dt.to_string(), "2024-06-15 14:30:00"),
+            other => panic!("expected datetime, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn datetime_to_record_basic() {
+        match eval_str("DateTime.ToRecord(#datetime(2024, 6, 15, 14, 30, 45))").unwrap() {
+            Value::Record(r) => {
+                let names: Vec<&str> = r.fields.iter().map(|(n, _)| n.as_str()).collect();
+                assert_eq!(names, vec!["Year", "Month", "Day", "Hour", "Minute", "Second"]);
+            }
+            other => panic!("expected record, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn datetime_local_now_not_null() {
+        match eval_str("DateTime.LocalNow()").unwrap() {
+            Value::Datetime(_) => {}
+            other => panic!("expected datetime, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn duration_days_basic() {
         match eval_str(r#"Duration.Days(Duration.FromText("3.04:30:00"))"#).unwrap() {
             Value::Number(n) => assert_eq!(n, 3.0),

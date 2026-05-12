@@ -835,6 +835,39 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
             ],
             duration_to_text,
         ),
+        ("DateTime.Date", one("datetime"), datetime_date),
+        ("DateTime.Time", one("datetime"), datetime_time),
+        ("DateTime.From", one("value"), datetime_from),
+        (
+            "DateTime.FromText",
+            vec![
+                Param { name: "text".into(),    optional: false, type_annotation: None },
+                Param { name: "culture".into(), optional: true,  type_annotation: None },
+            ],
+            datetime_from_text,
+        ),
+        (
+            "DateTime.ToText",
+            vec![
+                Param { name: "datetime".into(), optional: false, type_annotation: None },
+                Param { name: "format".into(),   optional: true,  type_annotation: None },
+                Param { name: "culture".into(),  optional: true,  type_annotation: None },
+            ],
+            datetime_to_text,
+        ),
+        ("DateTime.ToRecord", one("datetime"), datetime_to_record),
+        (
+            "DateTime.AddZone",
+            vec![
+                Param { name: "datetime".into(), optional: false, type_annotation: None },
+                Param { name: "hours".into(),    optional: false, type_annotation: None },
+                Param { name: "minutes".into(),  optional: true,  type_annotation: None },
+            ],
+            datetime_add_zone,
+        ),
+        ("DateTime.FromFileTime", one("fileTime"), datetime_from_file_time),
+        ("DateTime.LocalNow", vec![], datetime_local_now),
+        ("DateTime.FixedLocalNow", vec![], datetime_local_now),
         ("Date.From", one("value"), date_from),
         ("Date.Year", one("date"), date_year),
         ("Date.Month", one("date"), date_month),
@@ -4896,6 +4929,123 @@ fn date_end_of_week(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError>
         let start = d - chrono::Duration::days(back as i64);
         start + chrono::Duration::days(6)
     })
+}
+
+fn datetime_date(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    match &args[0] {
+        Value::Null => Ok(Value::Null),
+        Value::Datetime(dt) => Ok(Value::Date(dt.date())),
+        other => Err(type_mismatch("datetime", other)),
+    }
+}
+
+fn datetime_time(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    match &args[0] {
+        Value::Null => Ok(Value::Null),
+        Value::Datetime(dt) => Ok(Value::Time(dt.time())),
+        other => Err(type_mismatch("datetime", other)),
+    }
+}
+
+fn datetime_from(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+    match &args[0] {
+        Value::Null => Ok(Value::Null),
+        Value::Datetime(dt) => Ok(Value::Datetime(*dt)),
+        Value::Date(d) => Ok(Value::Datetime(
+            d.and_time(chrono::NaiveTime::from_hms_opt(0, 0, 0).unwrap())
+        )),
+        Value::Text(_) => datetime_from_text(args, host),
+        Value::Number(n) => {
+            // PQ treats Number as OLE Automation date (days since 1899-12-30).
+            let base = chrono::NaiveDate::from_ymd_opt(1899, 12, 30).unwrap()
+                .and_time(chrono::NaiveTime::from_hms_opt(0, 0, 0).unwrap());
+            let secs = (n * 86400.0) as i64;
+            Ok(Value::Datetime(base + chrono::Duration::seconds(secs)))
+        }
+        other => Err(type_mismatch("text/date/datetime/number/null", other)),
+    }
+}
+
+fn datetime_from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let text = expect_text(&args[0])?;
+    for fmt in &[
+        "%Y-%m-%dT%H:%M:%S%.f",
+        "%Y-%m-%dT%H:%M:%S",
+        "%Y-%m-%d %H:%M:%S%.f",
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%d %H:%M",
+        "%d/%m/%Y %H:%M:%S",
+        "%d/%m/%Y %H:%M",
+        "%m/%d/%Y %H:%M:%S",
+    ] {
+        if let Ok(dt) = chrono::NaiveDateTime::parse_from_str(text, fmt) {
+            return Ok(Value::Datetime(dt));
+        }
+    }
+    // Try parsing as a Date and promoting.
+    for fmt in &["%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y"] {
+        if let Ok(d) = chrono::NaiveDate::parse_from_str(text, fmt) {
+            return Ok(Value::Datetime(
+                d.and_time(chrono::NaiveTime::from_hms_opt(0, 0, 0).unwrap())
+            ));
+        }
+    }
+    Err(MError::Other(format!("DateTime.FromText: cannot parse {:?}", text)))
+}
+
+fn datetime_to_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    if matches!(args[0], Value::Null) { return Ok(Value::Null); }
+    let dt = match &args[0] {
+        Value::Datetime(dt) => *dt,
+        other => return Err(type_mismatch("datetime", other)),
+    };
+    if !matches!(args.get(1), Some(Value::Null) | None) {
+        return Err(MError::NotImplemented("DateTime.ToText: format string not yet supported"));
+    }
+    Ok(Value::Text(dt.format("%Y-%m-%dT%H:%M:%S").to_string()))
+}
+
+fn datetime_to_record(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    use chrono::{Datelike, Timelike};
+    if matches!(args[0], Value::Null) { return Ok(Value::Null); }
+    let dt = match &args[0] {
+        Value::Datetime(dt) => *dt,
+        other => return Err(type_mismatch("datetime", other)),
+    };
+    Ok(Value::Record(Record {
+        fields: vec![
+            ("Year".into(),   Value::Number(dt.year() as f64)),
+            ("Month".into(),  Value::Number(dt.month() as f64)),
+            ("Day".into(),    Value::Number(dt.day() as f64)),
+            ("Hour".into(),   Value::Number(dt.hour() as f64)),
+            ("Minute".into(), Value::Number(dt.minute() as f64)),
+            ("Second".into(), Value::Number(dt.second() as f64)),
+        ],
+        env: super::env::EnvNode::empty(),
+    }))
+}
+
+fn datetime_add_zone(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    Err(MError::NotImplemented(
+        "DateTime.AddZone: produces a Datetimezone; pending Datetimezone Value variant",
+    ))
+}
+
+fn datetime_from_file_time(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let ticks = match &args[0] {
+        Value::Number(n) => *n,
+        Value::Null => return Ok(Value::Null),
+        other => return Err(type_mismatch("number", other)),
+    };
+    // Windows FILETIME: 100ns ticks since 1601-01-01 UTC.
+    let base = chrono::NaiveDate::from_ymd_opt(1601, 1, 1).unwrap()
+        .and_time(chrono::NaiveTime::from_hms_opt(0, 0, 0).unwrap());
+    let nanos = (ticks * 100.0) as i64;
+    Ok(Value::Datetime(base + chrono::Duration::nanoseconds(nanos)))
+}
+
+fn datetime_local_now(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    Ok(Value::Datetime(chrono::Local::now().naive_local()))
 }
 
 fn extract_duration(v: &Value, ctx: &str) -> Result<chrono::Duration, MError> {
