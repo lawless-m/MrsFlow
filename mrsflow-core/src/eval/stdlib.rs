@@ -189,6 +189,16 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
             ],
             number_round_away_from_zero,
         ),
+        ("Number.Acos", one("number"), number_acos),
+        ("Number.Asin", one("number"), number_asin),
+        ("Number.Atan", one("number"), number_atan),
+        ("Number.Atan2", two("y", "x"), number_atan2),
+        ("Number.Cos", one("number"), number_cos),
+        ("Number.Cosh", one("number"), number_cosh),
+        ("Number.Sin", one("number"), number_sin),
+        ("Number.Sinh", one("number"), number_sinh),
+        ("Number.Tan", one("number"), number_tan),
+        ("Number.Tanh", one("number"), number_tanh),
         ("Byte.From", one("value"), number_from),
         ("Currency.From", one("value"), number_from),
         ("Decimal.From", one("value"), number_from),
@@ -836,6 +846,38 @@ fn number_is_even(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         }
         other => Err(type_mismatch("number", other)),
     }
+}
+
+fn unary_f64(args: &[Value], f: fn(f64) -> f64) -> Result<Value, MError> {
+    match &args[0] {
+        Value::Null => Ok(Value::Null),
+        Value::Number(n) => Ok(Value::Number(f(*n))),
+        other => Err(type_mismatch("number", other)),
+    }
+}
+
+fn number_acos(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> { unary_f64(args, f64::acos) }
+fn number_asin(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> { unary_f64(args, f64::asin) }
+fn number_atan(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> { unary_f64(args, f64::atan) }
+fn number_cos(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> { unary_f64(args, f64::cos) }
+fn number_cosh(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> { unary_f64(args, f64::cosh) }
+fn number_sin(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> { unary_f64(args, f64::sin) }
+fn number_sinh(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> { unary_f64(args, f64::sinh) }
+fn number_tan(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> { unary_f64(args, f64::tan) }
+fn number_tanh(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> { unary_f64(args, f64::tanh) }
+
+fn number_atan2(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let y = match &args[0] {
+        Value::Null => return Ok(Value::Null),
+        Value::Number(n) => *n,
+        other => return Err(type_mismatch("number", other)),
+    };
+    let x = match &args[1] {
+        Value::Null => return Ok(Value::Null),
+        Value::Number(n) => *n,
+        other => return Err(type_mismatch("number", other)),
+    };
+    Ok(Value::Number(y.atan2(x)))
 }
 
 fn apply_round_mode(args: &[Value], ctx: &str, mode: fn(f64) -> f64) -> Result<Value, MError> {

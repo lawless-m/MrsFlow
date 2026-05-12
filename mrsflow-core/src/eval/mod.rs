@@ -2940,6 +2940,30 @@ mod tests {
     }
 
     #[test]
+    fn number_sin_zero() {
+        match eval_str("Number.Sin(0)").unwrap() {
+            Value::Number(n) => assert_eq!(n, 0.0),
+            other => panic!("expected number, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn number_acos_of_one() {
+        match eval_str("Number.Acos(1)").unwrap() {
+            Value::Number(n) => assert!(n.abs() < 1e-12),
+            other => panic!("expected number, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn number_atan2_quadrant() {
+        match eval_str("Number.Atan2(1, 1)").unwrap() {
+            Value::Number(n) => assert!((n - std::f64::consts::FRAC_PI_4).abs() < 1e-12),
+            other => panic!("expected number, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn number_round_up_basic() {
         match eval_str("Number.RoundUp(3.1)").unwrap() {
             Value::Number(n) => assert_eq!(n, 4.0),
