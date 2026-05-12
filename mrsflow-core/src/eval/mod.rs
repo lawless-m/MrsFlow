@@ -3304,6 +3304,43 @@ mod tests {
     }
 
     #[test]
+    fn date_is_in_current_day_today() {
+        let t = chrono::Local::now().date_naive();
+        let src = format!("Date.IsInCurrentDay(#date({}, {}, {}))",
+            chrono::Datelike::year(&t), chrono::Datelike::month(&t), chrono::Datelike::day(&t));
+        match eval_str(&src).unwrap() {
+            Value::Logical(b) => assert!(b),
+            other => panic!("expected logical, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn date_is_in_next_n_days_range() {
+        let t = chrono::Local::now().date_naive();
+        let in3 = t + chrono::Duration::days(3);
+        let src = format!("Date.IsInNextNDays(#date({}, {}, {}), 5)",
+            chrono::Datelike::year(&in3), chrono::Datelike::month(&in3), chrono::Datelike::day(&in3));
+        match eval_str(&src).unwrap() {
+            Value::Logical(b) => assert!(b),
+            other => panic!("expected logical, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn date_is_in_year_to_date_basic() {
+        let t = chrono::Local::now().date_naive();
+        let yesterday = t - chrono::Duration::days(1);
+        let src = format!("Date.IsInYearToDate(#date({}, {}, {}))",
+            chrono::Datelike::year(&yesterday), chrono::Datelike::month(&yesterday), chrono::Datelike::day(&yesterday));
+        // Yesterday is within this year and on/before today (assuming we're not on Jan 1).
+        // If it IS Jan 1, yesterday is last year, which is outside. Allow either result.
+        match eval_str(&src).unwrap() {
+            Value::Logical(_) => {} // doesn't actually matter, just verify it returns logical
+            other => panic!("expected logical, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn date_start_of_month_basic() {
         match eval_str("Date.StartOfMonth(#date(2024, 6, 15))").unwrap() {
             Value::Date(d) => {

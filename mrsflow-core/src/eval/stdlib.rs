@@ -765,6 +765,32 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ("Date.EndOfQuarter", one("date"), date_end_of_quarter),
         ("Date.StartOfYear", one("date"), date_start_of_year),
         ("Date.EndOfYear", one("date"), date_end_of_year),
+        ("Date.IsInCurrentDay", one("date"), date_is_in_current_day),
+        ("Date.IsInCurrentWeek", one("date"), date_is_in_current_week),
+        ("Date.IsInCurrentMonth", one("date"), date_is_in_current_month),
+        ("Date.IsInCurrentQuarter", one("date"), date_is_in_current_quarter),
+        ("Date.IsInCurrentYear", one("date"), date_is_in_current_year),
+        ("Date.IsInNextDay", one("date"), date_is_in_next_day),
+        ("Date.IsInNextWeek", one("date"), date_is_in_next_week),
+        ("Date.IsInNextMonth", one("date"), date_is_in_next_month),
+        ("Date.IsInNextQuarter", one("date"), date_is_in_next_quarter),
+        ("Date.IsInNextYear", one("date"), date_is_in_next_year),
+        ("Date.IsInPreviousDay", one("date"), date_is_in_previous_day),
+        ("Date.IsInPreviousWeek", one("date"), date_is_in_previous_week),
+        ("Date.IsInPreviousMonth", one("date"), date_is_in_previous_month),
+        ("Date.IsInPreviousQuarter", one("date"), date_is_in_previous_quarter),
+        ("Date.IsInPreviousYear", one("date"), date_is_in_previous_year),
+        ("Date.IsInNextNDays", two("date", "numberOfDays"), date_is_in_next_n_days),
+        ("Date.IsInNextNWeeks", two("date", "numberOfWeeks"), date_is_in_next_n_weeks),
+        ("Date.IsInNextNMonths", two("date", "numberOfMonths"), date_is_in_next_n_months),
+        ("Date.IsInNextNQuarters", two("date", "numberOfQuarters"), date_is_in_next_n_quarters),
+        ("Date.IsInNextNYears", two("date", "numberOfYears"), date_is_in_next_n_years),
+        ("Date.IsInPreviousNDays", two("date", "numberOfDays"), date_is_in_previous_n_days),
+        ("Date.IsInPreviousNWeeks", two("date", "numberOfWeeks"), date_is_in_previous_n_weeks),
+        ("Date.IsInPreviousNMonths", two("date", "numberOfMonths"), date_is_in_previous_n_months),
+        ("Date.IsInPreviousNQuarters", two("date", "numberOfQuarters"), date_is_in_previous_n_quarters),
+        ("Date.IsInPreviousNYears", two("date", "numberOfYears"), date_is_in_previous_n_years),
+        ("Date.IsInYearToDate", one("date"), date_is_in_year_to_date),
         ("Date.From", one("value"), date_from),
         ("Date.Year", one("date"), date_year),
         ("Date.Month", one("date"), date_month),
@@ -4825,6 +4851,245 @@ fn date_end_of_week(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError>
         let start = d - chrono::Duration::days(back as i64);
         start + chrono::Duration::days(6)
     })
+}
+
+fn today() -> chrono::NaiveDate {
+    chrono::Local::now().date_naive()
+}
+
+fn extract_date_opt(v: &Value, ctx: &str) -> Result<Option<chrono::NaiveDate>, MError> {
+    match v {
+        Value::Null => Ok(None),
+        Value::Date(d) => Ok(Some(*d)),
+        Value::Datetime(dt) => Ok(Some(dt.date())),
+        other => Err(MError::Other(format!(
+            "{}: argument must be a date or datetime (got {})",
+            ctx, super::type_name(other)
+        ))),
+    }
+}
+
+fn int_n_arg(v: &Value, ctx: &str) -> Result<i64, MError> {
+    match v {
+        Value::Number(n) if n.is_finite() && n.fract() == 0.0 => Ok(*n as i64),
+        other => Err(MError::Other(format!(
+            "{}: count must be an integer (got {})", ctx, super::type_name(other)
+        ))),
+    }
+}
+
+fn start_of_week_naive(d: chrono::NaiveDate) -> chrono::NaiveDate {
+    use chrono::Datelike;
+    // Default Sunday-start, matching Date.StartOfWeek default.
+    let from_monday = d.weekday().num_days_from_monday();
+    let dow_sunday_first = (from_monday + 1) % 7;
+    d - chrono::Duration::days(dow_sunday_first as i64)
+}
+
+fn start_of_month_naive(d: chrono::NaiveDate) -> chrono::NaiveDate {
+    use chrono::Datelike;
+    chrono::NaiveDate::from_ymd_opt(d.year(), d.month(), 1).unwrap()
+}
+
+fn start_of_quarter_naive(d: chrono::NaiveDate) -> chrono::NaiveDate {
+    use chrono::Datelike;
+    let q = ((d.month() - 1) / 3) * 3 + 1;
+    chrono::NaiveDate::from_ymd_opt(d.year(), q, 1).unwrap()
+}
+
+fn start_of_year_naive(d: chrono::NaiveDate) -> chrono::NaiveDate {
+    use chrono::Datelike;
+    chrono::NaiveDate::from_ymd_opt(d.year(), 1, 1).unwrap()
+}
+
+fn end_of_month_naive(d: chrono::NaiveDate) -> chrono::NaiveDate {
+    use chrono::Datelike;
+    let next = if d.month() == 12 {
+        chrono::NaiveDate::from_ymd_opt(d.year() + 1, 1, 1).unwrap()
+    } else {
+        chrono::NaiveDate::from_ymd_opt(d.year(), d.month() + 1, 1).unwrap()
+    };
+    next.pred_opt().unwrap()
+}
+
+fn end_of_quarter_naive(d: chrono::NaiveDate) -> chrono::NaiveDate {
+    use chrono::Datelike;
+    let q_end = ((d.month() - 1) / 3) * 3 + 3;
+    let next = if q_end == 12 {
+        chrono::NaiveDate::from_ymd_opt(d.year() + 1, 1, 1).unwrap()
+    } else {
+        chrono::NaiveDate::from_ymd_opt(d.year(), q_end + 1, 1).unwrap()
+    };
+    next.pred_opt().unwrap()
+}
+
+fn end_of_year_naive(d: chrono::NaiveDate) -> chrono::NaiveDate {
+    use chrono::Datelike;
+    chrono::NaiveDate::from_ymd_opt(d.year(), 12, 31).unwrap()
+}
+
+fn date_in_range(target: chrono::NaiveDate, start: chrono::NaiveDate, end_inclusive: chrono::NaiveDate) -> bool {
+    target >= start && target <= end_inclusive
+}
+
+// ----- IsInCurrent* (single-unit, based on today) -----
+
+fn date_is_in_current_day(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let d = match extract_date_opt(&args[0], "Date.IsInCurrentDay")? { Some(d) => d, None => return Ok(Value::Null) };
+    Ok(Value::Logical(d == today()))
+}
+fn date_is_in_current_week(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let d = match extract_date_opt(&args[0], "Date.IsInCurrentWeek")? { Some(d) => d, None => return Ok(Value::Null) };
+    let s = start_of_week_naive(today());
+    Ok(Value::Logical(date_in_range(d, s, s + chrono::Duration::days(6))))
+}
+fn date_is_in_current_month(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let d = match extract_date_opt(&args[0], "Date.IsInCurrentMonth")? { Some(d) => d, None => return Ok(Value::Null) };
+    let t = today();
+    Ok(Value::Logical(date_in_range(d, start_of_month_naive(t), end_of_month_naive(t))))
+}
+fn date_is_in_current_quarter(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let d = match extract_date_opt(&args[0], "Date.IsInCurrentQuarter")? { Some(d) => d, None => return Ok(Value::Null) };
+    let t = today();
+    Ok(Value::Logical(date_in_range(d, start_of_quarter_naive(t), end_of_quarter_naive(t))))
+}
+fn date_is_in_current_year(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let d = match extract_date_opt(&args[0], "Date.IsInCurrentYear")? { Some(d) => d, None => return Ok(Value::Null) };
+    let t = today();
+    Ok(Value::Logical(date_in_range(d, start_of_year_naive(t), end_of_year_naive(t))))
+}
+
+// ----- IsInNext* (single-unit) -----
+
+fn date_is_in_next_day(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let d = match extract_date_opt(&args[0], "Date.IsInNextDay")? { Some(d) => d, None => return Ok(Value::Null) };
+    Ok(Value::Logical(d == today() + chrono::Duration::days(1)))
+}
+fn date_is_in_next_week(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let d = match extract_date_opt(&args[0], "Date.IsInNextWeek")? { Some(d) => d, None => return Ok(Value::Null) };
+    let s = start_of_week_naive(today()) + chrono::Duration::days(7);
+    Ok(Value::Logical(date_in_range(d, s, s + chrono::Duration::days(6))))
+}
+fn date_is_in_next_month(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let d = match extract_date_opt(&args[0], "Date.IsInNextMonth")? { Some(d) => d, None => return Ok(Value::Null) };
+    let next = shift_months_signed(start_of_month_naive(today()), 1).unwrap();
+    Ok(Value::Logical(date_in_range(d, next, end_of_month_naive(next))))
+}
+fn date_is_in_next_quarter(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let d = match extract_date_opt(&args[0], "Date.IsInNextQuarter")? { Some(d) => d, None => return Ok(Value::Null) };
+    let next = shift_months_signed(start_of_quarter_naive(today()), 3).unwrap();
+    Ok(Value::Logical(date_in_range(d, next, end_of_quarter_naive(next))))
+}
+fn date_is_in_next_year(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let d = match extract_date_opt(&args[0], "Date.IsInNextYear")? { Some(d) => d, None => return Ok(Value::Null) };
+    let next = shift_months_signed(start_of_year_naive(today()), 12).unwrap();
+    Ok(Value::Logical(date_in_range(d, next, end_of_year_naive(next))))
+}
+
+// ----- IsInPrevious* (single-unit) -----
+
+fn date_is_in_previous_day(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let d = match extract_date_opt(&args[0], "Date.IsInPreviousDay")? { Some(d) => d, None => return Ok(Value::Null) };
+    Ok(Value::Logical(d == today() - chrono::Duration::days(1)))
+}
+fn date_is_in_previous_week(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let d = match extract_date_opt(&args[0], "Date.IsInPreviousWeek")? { Some(d) => d, None => return Ok(Value::Null) };
+    let s = start_of_week_naive(today()) - chrono::Duration::days(7);
+    Ok(Value::Logical(date_in_range(d, s, s + chrono::Duration::days(6))))
+}
+fn date_is_in_previous_month(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let d = match extract_date_opt(&args[0], "Date.IsInPreviousMonth")? { Some(d) => d, None => return Ok(Value::Null) };
+    let prev = shift_months_signed(start_of_month_naive(today()), -1).unwrap();
+    Ok(Value::Logical(date_in_range(d, prev, end_of_month_naive(prev))))
+}
+fn date_is_in_previous_quarter(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let d = match extract_date_opt(&args[0], "Date.IsInPreviousQuarter")? { Some(d) => d, None => return Ok(Value::Null) };
+    let prev = shift_months_signed(start_of_quarter_naive(today()), -3).unwrap();
+    Ok(Value::Logical(date_in_range(d, prev, end_of_quarter_naive(prev))))
+}
+fn date_is_in_previous_year(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let d = match extract_date_opt(&args[0], "Date.IsInPreviousYear")? { Some(d) => d, None => return Ok(Value::Null) };
+    let prev = shift_months_signed(start_of_year_naive(today()), -12).unwrap();
+    Ok(Value::Logical(date_in_range(d, prev, end_of_year_naive(prev))))
+}
+
+// ----- IsInNextN* / IsInPreviousN* -----
+
+fn date_is_in_next_n_days(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let d = match extract_date_opt(&args[0], "Date.IsInNextNDays")? { Some(d) => d, None => return Ok(Value::Null) };
+    let n = int_n_arg(&args[1], "Date.IsInNextNDays")?;
+    let start = today() + chrono::Duration::days(1);
+    let end = today() + chrono::Duration::days(n);
+    Ok(Value::Logical(date_in_range(d, start, end)))
+}
+fn date_is_in_previous_n_days(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let d = match extract_date_opt(&args[0], "Date.IsInPreviousNDays")? { Some(d) => d, None => return Ok(Value::Null) };
+    let n = int_n_arg(&args[1], "Date.IsInPreviousNDays")?;
+    let start = today() - chrono::Duration::days(n);
+    let end = today() - chrono::Duration::days(1);
+    Ok(Value::Logical(date_in_range(d, start, end)))
+}
+fn date_is_in_next_n_weeks(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let d = match extract_date_opt(&args[0], "Date.IsInNextNWeeks")? { Some(d) => d, None => return Ok(Value::Null) };
+    let n = int_n_arg(&args[1], "Date.IsInNextNWeeks")?;
+    let start = start_of_week_naive(today()) + chrono::Duration::weeks(1);
+    let end = start + chrono::Duration::weeks(n) - chrono::Duration::days(1);
+    Ok(Value::Logical(date_in_range(d, start, end)))
+}
+fn date_is_in_previous_n_weeks(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let d = match extract_date_opt(&args[0], "Date.IsInPreviousNWeeks")? { Some(d) => d, None => return Ok(Value::Null) };
+    let n = int_n_arg(&args[1], "Date.IsInPreviousNWeeks")?;
+    let end = start_of_week_naive(today()) - chrono::Duration::days(1);
+    let start = end - chrono::Duration::weeks(n) + chrono::Duration::days(1);
+    Ok(Value::Logical(date_in_range(d, start, end)))
+}
+fn date_is_in_next_n_months(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let d = match extract_date_opt(&args[0], "Date.IsInNextNMonths")? { Some(d) => d, None => return Ok(Value::Null) };
+    let n = int_n_arg(&args[1], "Date.IsInNextNMonths")?;
+    let start = shift_months_signed(start_of_month_naive(today()), 1).unwrap();
+    let end_month_start = shift_months_signed(start, n - 1).unwrap();
+    Ok(Value::Logical(date_in_range(d, start, end_of_month_naive(end_month_start))))
+}
+fn date_is_in_previous_n_months(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let d = match extract_date_opt(&args[0], "Date.IsInPreviousNMonths")? { Some(d) => d, None => return Ok(Value::Null) };
+    let n = int_n_arg(&args[1], "Date.IsInPreviousNMonths")?;
+    let start = shift_months_signed(start_of_month_naive(today()), -n).unwrap();
+    let end = start_of_month_naive(today()) - chrono::Duration::days(1);
+    Ok(Value::Logical(date_in_range(d, start, end)))
+}
+fn date_is_in_next_n_quarters(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let d = match extract_date_opt(&args[0], "Date.IsInNextNQuarters")? { Some(d) => d, None => return Ok(Value::Null) };
+    let n = int_n_arg(&args[1], "Date.IsInNextNQuarters")?;
+    let start = shift_months_signed(start_of_quarter_naive(today()), 3).unwrap();
+    let end_q = shift_months_signed(start, (n - 1) * 3).unwrap();
+    Ok(Value::Logical(date_in_range(d, start, end_of_quarter_naive(end_q))))
+}
+fn date_is_in_previous_n_quarters(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let d = match extract_date_opt(&args[0], "Date.IsInPreviousNQuarters")? { Some(d) => d, None => return Ok(Value::Null) };
+    let n = int_n_arg(&args[1], "Date.IsInPreviousNQuarters")?;
+    let start = shift_months_signed(start_of_quarter_naive(today()), -n * 3).unwrap();
+    let end = start_of_quarter_naive(today()) - chrono::Duration::days(1);
+    Ok(Value::Logical(date_in_range(d, start, end)))
+}
+fn date_is_in_next_n_years(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let d = match extract_date_opt(&args[0], "Date.IsInNextNYears")? { Some(d) => d, None => return Ok(Value::Null) };
+    let n = int_n_arg(&args[1], "Date.IsInNextNYears")?;
+    let start = shift_months_signed(start_of_year_naive(today()), 12).unwrap();
+    let end_y = shift_months_signed(start, (n - 1) * 12).unwrap();
+    Ok(Value::Logical(date_in_range(d, start, end_of_year_naive(end_y))))
+}
+fn date_is_in_previous_n_years(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let d = match extract_date_opt(&args[0], "Date.IsInPreviousNYears")? { Some(d) => d, None => return Ok(Value::Null) };
+    let n = int_n_arg(&args[1], "Date.IsInPreviousNYears")?;
+    let start = shift_months_signed(start_of_year_naive(today()), -n * 12).unwrap();
+    let end = start_of_year_naive(today()) - chrono::Duration::days(1);
+    Ok(Value::Logical(date_in_range(d, start, end)))
+}
+
+fn date_is_in_year_to_date(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let d = match extract_date_opt(&args[0], "Date.IsInYearToDate")? { Some(d) => d, None => return Ok(Value::Null) };
+    let t = today();
+    Ok(Value::Logical(date_in_range(d, start_of_year_naive(t), t)))
 }
 
 fn date_to_record(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
