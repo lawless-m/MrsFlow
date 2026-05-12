@@ -38,10 +38,18 @@ pub trait IoHost {
         &self,
         path: &str,
     ) -> Result<chrono::DateTime<chrono::FixedOffset>, IoError>;
-    /// Parse XLSX bytes into M's Excel.Workbook shape — a Table of sheets
-    /// with columns `Name, Data, Item, Kind, Hidden`. Each `Data` cell is a
-    /// nested Table with default `Column1, Column2, …` headers.
-    fn excel_workbook(&self, bytes: &[u8]) -> Result<Value, IoError>;
+    /// Parse XLSX/XLS bytes into M's Excel.Workbook shape — a Table with
+    /// columns `Name, Data, Item, Kind, Hidden`. Kinds: `"Sheet"`,
+    /// `"Table"` (Excel ListObjects, xlsx only), `"DefinedName"`. With
+    /// `use_headers=true`, each Data table's first row becomes column
+    /// names. With `delay_types=false`, DateTime cells are decoded to
+    /// `Value::Datetime` instead of staying as Excel-serial floats.
+    fn excel_workbook(
+        &self,
+        bytes: &[u8],
+        use_headers: bool,
+        delay_types: bool,
+    ) -> Result<Value, IoError>;
 }
 
 /// Always-fail IoHost — for evaluator unit tests on pure expressions where
@@ -70,7 +78,7 @@ impl IoHost for NoIoHost {
     ) -> Result<chrono::DateTime<chrono::FixedOffset>, IoError> {
         Err(IoError::NotSupported)
     }
-    fn excel_workbook(&self, _: &[u8]) -> Result<Value, IoError> {
+    fn excel_workbook(&self, _: &[u8], _: bool, _: bool) -> Result<Value, IoError> {
         Err(IoError::NotSupported)
     }
 }

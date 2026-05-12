@@ -24,7 +24,7 @@ parquet = { version = "53", default-features = false, features = ["arrow", "snap
 # conversion, ODBC path uses it for date/timestamp parsing). The `clock`
 # feature comes from File.Modified's need to read filesystem mtimes.
 chrono = { version = "0.4", default-features = false, features = ["alloc", "clock"] }
-calamine = { version = "0.35", default-features = false }
+calamine = { version = "0.35", default-features = false, features = ["chrono"] }
 odbc-api = { version = "13", optional = true }
 
 [[bin]]

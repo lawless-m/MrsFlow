@@ -289,40 +289,97 @@ impl IoHost for CliIoHost {
         Ok(utc.with_timezone(&chrono::FixedOffset::east_opt(0).unwrap()))
     }
 
-    fn excel_workbook(&self, bytes: &[u8]) -> Result<Value, IoError> {
-        excel_workbook_impl(bytes)
+    fn excel_workbook(
+        &self,
+        bytes: &[u8],
+        use_headers: bool,
+        delay_types: bool,
+    ) -> Result<Value, IoError> {
+        excel_workbook_impl(bytes, use_headers, delay_types)
     }
 }
 
-fn excel_workbook_impl(bytes: &[u8]) -> Result<Value, IoError> {
+fn excel_workbook_impl(
+    bytes: &[u8],
+    use_headers: bool,
+    delay_types: bool,
+) -> Result<Value, IoError> {
     use std::io::Cursor;
-    use calamine::{open_workbook_from_rs, Reader, Xlsx};
+    use calamine::{open_workbook_auto_from_rs, Reader, Sheets, SheetVisible};
 
-    // calamine wants an owned `Read + Seek`. Cloning the bytes is cheap
-    // compared to parsing the XLSX — fine for v1.
+    // `open_workbook_auto_from_rs` requires `RS: Clone` — it tries each
+    // format in turn. `Cursor<Vec<u8>>` is Clone; the bytes get duplicated
+    // up to 4× during sniffing but the cost is dwarfed by actual parsing.
     let cursor = Cursor::new(bytes.to_vec());
-    let mut wb: Xlsx<_> = open_workbook_from_rs(cursor)
-        .map_err(|e| IoError::Other(format!("open xlsx: {e}")))?;
+    let mut wb = open_workbook_auto_from_rs(cursor)
+        .map_err(|e| IoError::Other(format!("open workbook: {e}")))?;
 
-    let sheet_names: Vec<String> = wb.sheet_names();
-    let mut sheet_rows: Vec<Vec<Value>> = Vec::with_capacity(sheet_names.len());
-    for name in &sheet_names {
+    // Sheet metadata (name + visibility) — snapshot before mutating wb.
+    let sheet_meta: Vec<(String, bool)> = wb
+        .sheets_metadata()
+        .iter()
+        .map(|s| (s.name.clone(), !matches!(s.visible, SheetVisible::Visible)))
+        .collect();
+
+    let mut all_rows: Vec<Vec<Value>> = Vec::new();
+
+    // --- Sheet rows ---
+    for (name, hidden) in &sheet_meta {
         let range = wb
             .worksheet_range(name)
             .map_err(|e| IoError::Other(format!("read sheet {name:?}: {e}")))?;
-        let (_, width) = range.get_size();
-        let columns: Vec<String> = (1..=width).map(|i| format!("Column{i}")).collect();
-        let data_rows: Vec<Vec<Value>> = range
-            .rows()
-            .map(|row| row.iter().map(cell_to_value).collect())
-            .collect();
-        let data_table = Table::from_rows(columns, data_rows);
-        sheet_rows.push(vec![
-            Value::Text(name.clone()),       // Name
-            Value::Table(data_table),         // Data
-            Value::Text(name.clone()),       // Item — same as Name for sheets
-            Value::Text("Sheet".into()),      // Kind
-            Value::Logical(false),            // Hidden — calamine doesn't expose this in 0.35
+        let data_table = range_to_table(&range, use_headers, delay_types);
+        all_rows.push(vec![
+            Value::Text(name.clone()),
+            Value::Table(data_table),
+            Value::Text(name.clone()),
+            Value::Text("Sheet".into()),
+            Value::Logical(*hidden),
+        ]);
+    }
+
+    // --- Table rows (ListObjects, xlsx only) ---
+    if let Sheets::Xlsx(xlsx) = &mut wb {
+        xlsx.load_tables()
+            .map_err(|e| IoError::Other(format!("load_tables: {e}")))?;
+        let names: Vec<String> = xlsx.table_names().into_iter().cloned().collect();
+        for tname in &names {
+            let tbl = xlsx
+                .table_by_name(tname)
+                .map_err(|e| IoError::Other(format!("table {tname:?}: {e}")))?;
+            // ListObjects always have headers — they're authored as named
+            // columns. We use those directly regardless of use_headers.
+            let columns: Vec<String> = tbl.columns().to_vec();
+            let data_rows: Vec<Vec<Value>> = tbl
+                .data()
+                .rows()
+                .map(|row| row.iter().map(|c| cell_to_value(c, delay_types)).collect())
+                .collect();
+            let data_table = Table::from_rows(columns, data_rows);
+            all_rows.push(vec![
+                Value::Text(tname.clone()),
+                Value::Table(data_table),
+                Value::Text(tname.clone()),
+                Value::Text("Table".into()),
+                Value::Logical(false),
+            ]);
+        }
+    }
+
+    // --- DefinedName rows ---
+    //
+    // Power Query's DefinedName rows expose the *value* the name resolves
+    // to. Evaluating XLSX formulas (`Sheet1!$A$1:$B$10` etc.) is a parser
+    // job we don't have. For now, surface the row so `Source{[Name=…,
+    // Kind="DefinedName"]}` finds it, with Data=Null. The formula text is
+    // stored as Item so a curious caller can read it.
+    for (n, formula) in wb.defined_names() {
+        all_rows.push(vec![
+            Value::Text(n.clone()),
+            Value::Null,
+            Value::Text(formula.clone()),
+            Value::Text("DefinedName".into()),
+            Value::Logical(false),
         ]);
     }
 
@@ -334,11 +391,66 @@ fn excel_workbook_impl(bytes: &[u8]) -> Result<Value, IoError> {
             "Kind".into(),
             "Hidden".into(),
         ],
-        sheet_rows,
+        all_rows,
     )))
 }
 
-fn cell_to_value(cell: &calamine::Data) -> Value {
+/// Build a Rows-backed Table from a calamine Range. With `use_headers`,
+/// the first row's text representations become column names and rows
+/// 1..N become data. Without `use_headers`, columns are `Column1..N`.
+/// With `delay_types=false`, attempts per-column type promotion.
+fn range_to_table(
+    range: &calamine::Range<calamine::Data>,
+    use_headers: bool,
+    delay_types: bool,
+) -> Table {
+    let (_, width) = range.get_size();
+    let mut row_iter = range.rows();
+
+    let (columns, data_rows): (Vec<String>, Vec<Vec<Value>>) = if use_headers {
+        let header = row_iter.next();
+        let columns: Vec<String> = match header {
+            Some(h) => h
+                .iter()
+                .enumerate()
+                .map(|(i, c)| cell_header_text(c, i))
+                .collect(),
+            None => (1..=width).map(|i| format!("Column{i}")).collect(),
+        };
+        let rows: Vec<Vec<Value>> = row_iter
+            .map(|r| r.iter().map(|c| cell_to_value(c, delay_types)).collect())
+            .collect();
+        (columns, rows)
+    } else {
+        let columns: Vec<String> = (1..=width).map(|i| format!("Column{i}")).collect();
+        let rows: Vec<Vec<Value>> = row_iter
+            .map(|r| r.iter().map(|c| cell_to_value(c, delay_types)).collect())
+            .collect();
+        (columns, rows)
+    };
+
+    Table::from_rows(columns, data_rows)
+}
+
+/// Header-row cell → column name. Mirrors Power Query's PromoteHeaders:
+/// empty/null cells fall back to `Column<n+1>`. Duplicate detection
+/// (suffixing `_1, _2…`) isn't implemented yet — corpus queries that hit
+/// dupe headers will need it.
+fn cell_header_text(cell: &calamine::Data, idx: usize) -> String {
+    use calamine::Data;
+    match cell {
+        Data::Empty | Data::Error(_) => format!("Column{}", idx + 1),
+        Data::String(s) if s.is_empty() => format!("Column{}", idx + 1),
+        Data::String(s) => s.clone(),
+        Data::Float(f) => format!("{f}"),
+        Data::Int(i) => format!("{i}"),
+        Data::Bool(b) => format!("{b}"),
+        Data::DateTime(d) => format!("{}", d.as_f64()),
+        Data::DateTimeIso(s) | Data::DurationIso(s) => s.clone(),
+    }
+}
+
+fn cell_to_value(cell: &calamine::Data, delay_types: bool) -> Value {
     use calamine::Data;
     match cell {
         Data::Empty => Value::Null,
@@ -346,13 +458,31 @@ fn cell_to_value(cell: &calamine::Data) -> Value {
         Data::Float(f) => Value::Number(*f),
         Data::Int(i) => Value::Number(*i as f64),
         Data::Bool(b) => Value::Logical(*b),
-        // delayTypes=true: dates stay as their Excel-serial float; downstream
-        // M code can decode via Date.From or similar if needed.
-        Data::DateTime(d) => Value::Number(d.as_f64()),
+        Data::DateTime(d) => {
+            if delay_types {
+                // PQ's delayTypes=true contract: keep the serial float.
+                Value::Number(d.as_f64())
+            } else {
+                // Decode via calamine. `as_datetime()` handles Excel's
+                // 1900-leap-year quirk and returns NaiveDateTime.
+                match d.as_datetime() {
+                    Some(ndt) => {
+                        let has_time = ndt.time() != chrono::NaiveTime::MIN;
+                        if has_time {
+                            Value::Datetime(ndt)
+                        } else {
+                            Value::Date(ndt.date())
+                        }
+                    }
+                    None => Value::Number(d.as_f64()),
+                }
+            }
+        }
         Data::DateTimeIso(s) | Data::DurationIso(s) => Value::Text(s.clone()),
         Data::Error(_) => Value::Null,
     }
 }
+
 
 /// Concatenate multiple `RecordBatch`es with the same schema into one.
 /// Single-batch input is returned cloned. Empty input produces an empty

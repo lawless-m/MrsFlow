@@ -2072,7 +2072,7 @@ mod tests {
         ) -> Result<chrono::DateTime<chrono::FixedOffset>, IoError> {
             Err(IoError::NotSupported)
         }
-        fn excel_workbook(&self, _: &[u8]) -> Result<Value, IoError> {
+        fn excel_workbook(&self, _: &[u8], _: bool, _: bool) -> Result<Value, IoError> {
             Err(IoError::NotSupported)
         }
     }
