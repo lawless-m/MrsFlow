@@ -31,6 +31,13 @@ pub trait IoHost {
         connection_string: &str,
         options: Option<&Value>,
     ) -> Result<Value, IoError>;
+    /// Read a file's bytes verbatim — backs `File.Contents`.
+    fn file_read(&self, path: &str) -> Result<Vec<u8>, IoError>;
+    /// Last-modified timestamp as a fixed-offset datetime — backs `File.Modified`.
+    fn file_modified(
+        &self,
+        path: &str,
+    ) -> Result<chrono::DateTime<chrono::FixedOffset>, IoError>;
 }
 
 /// Always-fail IoHost — for evaluator unit tests on pure expressions where
@@ -48,6 +55,15 @@ impl IoHost for NoIoHost {
         Err(IoError::NotSupported)
     }
     fn odbc_data_source(&self, _: &str, _: Option<&Value>) -> Result<Value, IoError> {
+        Err(IoError::NotSupported)
+    }
+    fn file_read(&self, _: &str) -> Result<Vec<u8>, IoError> {
+        Err(IoError::NotSupported)
+    }
+    fn file_modified(
+        &self,
+        _: &str,
+    ) -> Result<chrono::DateTime<chrono::FixedOffset>, IoError> {
         Err(IoError::NotSupported)
     }
 }

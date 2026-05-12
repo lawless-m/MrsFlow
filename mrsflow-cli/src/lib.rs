@@ -258,6 +258,24 @@ impl IoHost for CliIoHost {
     ) -> Result<Value, IoError> {
         Err(IoError::NotSupported)
     }
+
+    fn file_read(&self, path: &str) -> Result<Vec<u8>, IoError> {
+        std::fs::read(path).map_err(|e| IoError::Other(format!("read {path}: {e}")))
+    }
+
+    fn file_modified(
+        &self,
+        path: &str,
+    ) -> Result<chrono::DateTime<chrono::FixedOffset>, IoError> {
+        let modified = std::fs::metadata(path)
+            .and_then(|m| m.modified())
+            .map_err(|e| IoError::Other(format!("metadata {path}: {e}")))?;
+        // SystemTime → DateTime<Utc> → FixedOffset(0). Power Query's
+        // File.Modified returns datetimezone; we report UTC since std::fs
+        // doesn't expose the filesystem's local-time interpretation.
+        let utc: chrono::DateTime<chrono::Utc> = modified.into();
+        Ok(utc.with_timezone(&chrono::FixedOffset::east_opt(0).unwrap()))
+    }
 }
 
 /// Concatenate multiple `RecordBatch`es with the same schema into one.

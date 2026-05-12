@@ -1975,6 +1975,15 @@ mod tests {
         ) -> Result<Value, IoError> {
             Err(IoError::NotSupported)
         }
+        fn file_read(&self, _: &str) -> Result<Vec<u8>, IoError> {
+            Err(IoError::NotSupported)
+        }
+        fn file_modified(
+            &self,
+            _: &str,
+        ) -> Result<chrono::DateTime<chrono::FixedOffset>, IoError> {
+            Err(IoError::NotSupported)
+        }
     }
 
     #[test]

@@ -20,6 +20,7 @@ odbc = ["dep:odbc-api"]
 mrsflow-core = { path = "../mrsflow-core" }
 arrow = { version = "53", default-features = false, features = ["ipc"] }
 parquet = { version = "53", default-features = false, features = ["arrow", "snap"] }
+chrono = { version = "0.4", default-features = false, features = ["alloc", "clock"] }
 odbc-api = { version = "13", optional = true }
 
 [[bin]]
