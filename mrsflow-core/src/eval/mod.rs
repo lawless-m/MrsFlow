@@ -3307,6 +3307,50 @@ mod tests {
     }
 
     #[test]
+    fn duration_days_basic() {
+        match eval_str(r#"Duration.Days(Duration.FromText("3.04:30:00"))"#).unwrap() {
+            Value::Number(n) => assert_eq!(n, 3.0),
+            other => panic!("expected number, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn duration_total_hours_basic() {
+        match eval_str(r#"Duration.TotalHours(Duration.FromText("1.00:00:00"))"#).unwrap() {
+            Value::Number(n) => assert_eq!(n, 24.0),
+            other => panic!("expected number, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn duration_from_text_round_trip() {
+        match eval_str(r#"Duration.ToText(Duration.FromText("2.03:04:05"))"#).unwrap() {
+            Value::Text(s) => assert_eq!(s, "2.03:04:05"),
+            other => panic!("expected text, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn duration_to_record_basic() {
+        match eval_str(r#"Duration.ToRecord(Duration.FromText("1.02:03:04"))"#).unwrap() {
+            Value::Record(r) => {
+                let names: Vec<&str> = r.fields.iter().map(|(n, _)| n.as_str()).collect();
+                assert_eq!(names, vec!["Days", "Hours", "Minutes", "Seconds"]);
+            }
+            other => panic!("expected record, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn duration_from_number_is_days() {
+        // 1.5 days = 36 hours
+        match eval_str("Duration.TotalHours(Duration.From(1.5))").unwrap() {
+            Value::Number(n) => assert_eq!(n, 36.0),
+            other => panic!("expected number, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn time_from_text_hms() {
         match eval_str(r#"Time.FromText("14:30:45")"#).unwrap() {
             Value::Time(t) => assert_eq!(t.to_string(), "14:30:45"),
