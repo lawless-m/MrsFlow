@@ -5464,6 +5464,49 @@ mod tests {
     }
 
     #[test]
+    fn value_add_numbers() {
+        assert_eq!(eval_number("Value.Add(2, 3)"), 5.0);
+    }
+
+    #[test]
+    fn value_add_date_plus_duration() {
+        // 2024-01-01 + 7 days → 2024-01-08
+        let src = r#"Value.Add(#date(2024, 1, 1), #duration(7, 0, 0, 0))"#;
+        match eval_str(src).unwrap() {
+            Value::Date(d) => {
+                use chrono::Datelike;
+                assert_eq!(d.year(), 2024);
+                assert_eq!(d.month(), 1);
+                assert_eq!(d.day(), 8);
+            }
+            other => panic!("expected date, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn value_equals_deep_lists() {
+        // List/list deep equality (extends primitive equality).
+        let src = r#"Value.Equals({1, 2, {3, 4}}, {1, 2, {3, 4}})"#;
+        assert_eq!(eval_bool(src), true);
+        let src = r#"Value.Equals({1, 2, {3, 4}}, {1, 2, {3, 5}})"#;
+        assert_eq!(eval_bool(src), false);
+    }
+
+    #[test]
+    fn value_compare_numbers() {
+        assert_eq!(eval_number("Value.Compare(1, 2)"), -1.0);
+        assert_eq!(eval_number("Value.Compare(5, 5)"), 0.0);
+        assert_eq!(eval_number("Value.Compare(3, 1)"), 1.0);
+    }
+
+    #[test]
+    fn value_nullable_equals_null_null() {
+        assert_eq!(eval_bool("Value.NullableEquals(null, null)"), true);
+        assert_eq!(eval_bool("Value.NullableEquals(null, 0)"), false);
+        assert_eq!(eval_bool("Value.NullableEquals(5, 5)"), true);
+    }
+
+    #[test]
     fn type_is_runtime_check() {
         assert_eq!(eval_bool("Type.Is(42, type number)"), true);
         assert_eq!(eval_bool(r#"Type.Is("x", type number)"#), false);
