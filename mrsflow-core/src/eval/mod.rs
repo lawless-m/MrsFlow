@@ -52,7 +52,7 @@ pub fn evaluate(ast: &Expr, env: &Env, host: &dyn IoHost) -> Result<Value, MErro
         //     inner expression, since the operand is in TYPE context not
         //     VALUE context (`type number` doesn't look up `number`). ---
         Expr::Unary(UnaryOp::Type, inner) => {
-            let t = evaluate_as_type(inner)?;
+            let t = evaluate_as_type(inner, env, host)?;
             Ok(Value::Type(t))
         }
 
@@ -112,13 +112,13 @@ pub fn evaluate(ast: &Expr, env: &Env, host: &dyn IoHost) -> Result<Value, MErro
         Expr::Binary(BinaryOp::Is, l, r) => {
             let lv = evaluate(l, env, host)?;
             let lv = force(lv, &mut |e, env| evaluate(e, env, host))?;
-            let t = evaluate_as_type(r)?;
+            let t = evaluate_as_type(r, env, host)?;
             Ok(Value::Logical(type_conforms(&lv, &t)))
         }
         Expr::Binary(BinaryOp::As, l, r) => {
             let lv = evaluate(l, env, host)?;
             let lv = force(lv, &mut |e, env| evaluate(e, env, host))?;
-            let t = evaluate_as_type(r)?;
+            let t = evaluate_as_type(r, env, host)?;
             if type_conforms(&lv, &t) {
                 Ok(lv)
             } else {
@@ -493,7 +493,12 @@ fn try_failure_record(error_record: Value) -> Value {
 /// Interpret an Expr in TYPE context. `type X`, `X as Y`, `X is Y` all
 /// route their type-position operand through this rather than `evaluate`,
 /// since the operand names a type and shouldn't be looked up as a value.
-fn evaluate_as_type(expr: &Expr) -> Result<TypeRep, MError> {
+///
+/// Identifiers that aren't primitive type names fall back to env lookup,
+/// so a `let _t = type nullable text in type table [c = _t]` style binding
+/// resolves the way M's auto-generated query bodies expect. The bound value
+/// must be `Value::Type` (after thunk forcing).
+fn evaluate_as_type(expr: &Expr, env: &Env, host: &dyn IoHost) -> Result<TypeRep, MError> {
     match expr {
         // The `null` keyword reaches the parser as Expr::NullLit even in
         // type-position contexts; map it to the null type here.
@@ -514,21 +519,33 @@ fn evaluate_as_type(expr: &Expr) -> Result<TypeRep, MError> {
             "table" => Ok(TypeRep::Table),
             "function" => Ok(TypeRep::Function),
             "type" => Ok(TypeRep::Type),
-            other => Err(MError::Other(format!("unknown primitive type: {other}"))),
+            other => match env.lookup(other) {
+                Some(v) => {
+                    let forced = force(v, &mut |e, env| evaluate(e, env, host))?;
+                    match strip_metadata_owned(forced) {
+                        Value::Type(t) => Ok(t),
+                        non_type => Err(MError::Other(format!(
+                            "type position expects a type value, got {}: `{other}`",
+                            type_name(&non_type)
+                        ))),
+                    }
+                }
+                None => Err(MError::Other(format!("unknown primitive type: {other}"))),
+            },
         },
         Expr::Unary(UnaryOp::Nullable, inner) => {
-            let t = evaluate_as_type(inner)?;
+            let t = evaluate_as_type(inner, env, host)?;
             Ok(TypeRep::Nullable(Box::new(t)))
         }
         Expr::ListType(item) => {
-            let t = evaluate_as_type(item)?;
+            let t = evaluate_as_type(item, env, host)?;
             Ok(TypeRep::ListOf(Box::new(t)))
         }
         Expr::RecordType { fields, is_open } => {
             let mut out: Vec<(String, TypeRep, bool)> = Vec::with_capacity(fields.len());
             for f in fields {
                 let t = match &f.type_annotation {
-                    Some(ann) => evaluate_as_type(ann)?,
+                    Some(ann) => evaluate_as_type(ann, env, host)?,
                     None => TypeRep::Any,
                 };
                 out.push((f.name.clone(), t, f.optional));
@@ -542,7 +559,7 @@ fn evaluate_as_type(expr: &Expr) -> Result<TypeRep, MError> {
                     let mut cols: Vec<(String, TypeRep)> = Vec::with_capacity(fields.len());
                     for f in fields {
                         let t = match &f.type_annotation {
-                            Some(ann) => evaluate_as_type(ann)?,
+                            Some(ann) => evaluate_as_type(ann, env, host)?,
                             None => TypeRep::Any,
                         };
                         cols.push((f.name.clone(), t));
@@ -558,12 +575,12 @@ fn evaluate_as_type(expr: &Expr) -> Result<TypeRep, MError> {
             let mut ps: Vec<(TypeRep, bool)> = Vec::with_capacity(params.len());
             for p in params {
                 let t = match &p.type_annotation {
-                    Some(ann) => evaluate_as_type(ann)?,
+                    Some(ann) => evaluate_as_type(ann, env, host)?,
                     None => TypeRep::Any,
                 };
                 ps.push((t, p.optional));
             }
-            let r = evaluate_as_type(return_type)?;
+            let r = evaluate_as_type(return_type, env, host)?;
             Ok(TypeRep::FunctionOf {
                 params: ps,
                 return_type: Box::new(r),

@@ -15,6 +15,7 @@ arrow = { version = "53", default-features = false }
 chrono = { version = "0.4", default-features = false, features = ["alloc", "clock"] }
 rand = "0.8"
 flate2 = "1"
+serde_json = { version = "1", default-features = false, features = ["std", "preserve_order"] }
 
 [dev-dependencies]
 insta = "1"

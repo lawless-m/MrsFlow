@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use arrow::array::{
     Array, ArrayRef, BooleanArray, Date32Array, DurationMicrosecondArray, Float64Array,
-    NullArray, StringArray, TimestampMicrosecondArray,
+    Int64Array, NullArray, StringArray, TimestampMicrosecondArray,
 };
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
@@ -1322,9 +1322,16 @@ fn add_column(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
 
 
 fn from_rows(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    // Same as #table but with arg order (rows, columns).
+    // Same as #table but with arg order (rows, columns). The columns arg
+    // accepts either a list of text names or a `type table [...]` value,
+    // matching the M spec.
     let rows = expect_list_of_lists(&args[0], "Table.FromRows: rows")?;
-    let names = expect_text_list(&args[1], "Table.FromRows: columns")?;
+    let names: Vec<String> = match &args[1] {
+        Value::Type(super::super::value::TypeRep::TableOf { columns }) => {
+            columns.iter().map(|(n, _)| n.clone()).collect()
+        }
+        _ => expect_text_list(&args[1], "Table.FromRows: columns")?,
+    };
     for (i, row) in rows.iter().enumerate() {
         if row.len() != names.len() {
             return Err(MError::Other(format!(
@@ -1434,11 +1441,12 @@ fn transform_column_types(args: &[Value], _host: &dyn IoHost) -> Result<Value, M
                 let Some((target_dtype, target_nullable)) = target else {
                     continue; // type any → no cast
                 };
-                let cast = arrow::compute::cast(&new_columns[idx], target_dtype).map_err(|e| {
-                    MError::Other(format!(
-                        "Table.TransformColumnTypes: cast {name} to {target_dtype:?} failed: {e}"
-                    ))
-                })?;
+                let cast = cultural_cast(
+                    &new_columns[idx],
+                    target_dtype,
+                    name,
+                    "Table.TransformColumnTypes",
+                )?;
                 new_columns[idx] = cast;
                 new_fields[idx] = Field::new(name, target_dtype.clone(), *target_nullable);
             }
@@ -1641,11 +1649,7 @@ fn cast_cells_to_type(
             "{ctx}: cast {col_name} to {target_dtype:?} failed: column has heterogeneous cells"
         ))
     })?;
-    let cast = arrow::compute::cast(&inferred_array, &target_dtype).map_err(|e| {
-        MError::Other(format!(
-            "{ctx}: cast {col_name} to {target_dtype:?} failed: {e}"
-        ))
-    })?;
+    let cast = cultural_cast(&inferred_array, &target_dtype, col_name, ctx)?;
     // Decode the cast result back to Values via a temporary single-column table.
     let field = Field::new(col_name, target_dtype, target_nullable);
     let temp_batch = RecordBatch::try_new(Arc::new(Schema::new(vec![field])), vec![cast])
@@ -4305,5 +4309,134 @@ fn type_matches(t: &super::super::value::TypeRep, v: &Value) -> bool {
         (FunctionOf { .. }, Value::Function(_)) => true,
         _ => false,
     }
+}
+
+/// Wrap `arrow::compute::cast` with culture-aware text→date and text→int
+/// parsing. Arrow's built-in cast accepts only ISO-8601 dates and strict
+/// numeric forms; Power Query corpora regularly contain `"01/01/2024"`
+/// (DD/MM/YYYY) and `"3,106,463 "` (thousands separators, trailing space).
+/// Where the source is Utf8 and the target is one of those Power-Query
+/// idiomatic shapes, parse the cells ourselves; otherwise delegate.
+fn cultural_cast(
+    source: &ArrayRef,
+    target: &DataType,
+    col_name: &str,
+    ctx: &str,
+) -> Result<ArrayRef, MError> {
+    let is_utf8 = matches!(source.data_type(), DataType::Utf8 | DataType::LargeUtf8);
+    if is_utf8 {
+        if matches!(target, DataType::Date32) {
+            return parse_text_to_date(source, col_name, ctx);
+        }
+        if matches!(target, DataType::Int64) {
+            return parse_text_to_int(source, col_name, ctx);
+        }
+        if matches!(target, DataType::Float64) {
+            return parse_text_to_number(source, col_name, ctx);
+        }
+    }
+    arrow::compute::cast(source, target)
+        .map_err(|e| MError::Other(format!("{ctx}: cast {col_name} to {target:?} failed: {e}")))
+}
+
+fn parse_text_to_date(
+    source: &ArrayRef,
+    col_name: &str,
+    ctx: &str,
+) -> Result<ArrayRef, MError> {
+    let s = source
+        .as_any()
+        .downcast_ref::<StringArray>()
+        .ok_or_else(|| MError::Other(format!("{ctx}: {col_name}: expected Utf8 source")))?;
+    let epoch = chrono::NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
+    // Format priority: ISO first (machine-generated), then UK DD/MM/YYYY
+    // (what the user's Excel-emitted corpus tends to produce), then US
+    // MM/DD/YYYY (other locales). First match wins, per row. If none parse,
+    // raise — we'd rather a clear error than silent nulls.
+    let formats = ["%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y"];
+    let mut out: Vec<Option<i32>> = Vec::with_capacity(s.len());
+    for i in 0..s.len() {
+        if s.is_null(i) {
+            out.push(None);
+            continue;
+        }
+        let text = s.value(i).trim();
+        let mut parsed: Option<chrono::NaiveDate> = None;
+        for fmt in &formats {
+            if let Ok(d) = chrono::NaiveDate::parse_from_str(text, fmt) {
+                parsed = Some(d);
+                break;
+            }
+        }
+        let date = parsed.ok_or_else(|| {
+            MError::Other(format!(
+                "{ctx}: cast {col_name} to date failed: cannot parse `{text}`"
+            ))
+        })?;
+        let days = (date - epoch).num_days() as i32;
+        out.push(Some(days));
+    }
+    Ok(Arc::new(Date32Array::from(out)))
+}
+
+fn parse_text_to_int(
+    source: &ArrayRef,
+    col_name: &str,
+    ctx: &str,
+) -> Result<ArrayRef, MError> {
+    let s = source
+        .as_any()
+        .downcast_ref::<StringArray>()
+        .ok_or_else(|| MError::Other(format!("{ctx}: {col_name}: expected Utf8 source")))?;
+    let mut out: Vec<Option<i64>> = Vec::with_capacity(s.len());
+    for i in 0..s.len() {
+        if s.is_null(i) {
+            out.push(None);
+            continue;
+        }
+        let raw = s.value(i);
+        // Strip whitespace, thousands separators (',' UK/US, '\u{00a0}' NBSP).
+        let cleaned: String = raw
+            .chars()
+            .filter(|c| !c.is_whitespace() && *c != ',' && *c != '\u{00a0}')
+            .collect();
+        let n = cleaned.parse::<i64>().map_err(|e| {
+            MError::Other(format!(
+                "{ctx}: cast {col_name} to Int64 failed on `{raw}`: {e}"
+            ))
+        })?;
+        out.push(Some(n));
+    }
+    Ok(Arc::new(Int64Array::from(out)))
+}
+
+fn parse_text_to_number(
+    source: &ArrayRef,
+    col_name: &str,
+    ctx: &str,
+) -> Result<ArrayRef, MError> {
+    let s = source
+        .as_any()
+        .downcast_ref::<StringArray>()
+        .ok_or_else(|| MError::Other(format!("{ctx}: {col_name}: expected Utf8 source")))?;
+    let mut out: Vec<Option<f64>> = Vec::with_capacity(s.len());
+    for i in 0..s.len() {
+        if s.is_null(i) {
+            out.push(None);
+            continue;
+        }
+        let raw = s.value(i);
+        let cleaned: String = raw
+            .chars()
+            .filter(|c| !c.is_whitespace() && *c != ',' && *c != '\u{00a0}')
+            .collect();
+        let n = cleaned.parse::<f64>().map_err(|e| {
+            MError::Other(format!(
+                "{ctx}: cast {col_name} to number failed on `{raw}`: {e}"
+            ))
+        })?;
+        out.push(Some(n));
+    }
+    Ok(Arc::new(Float64Array::from(out)))
 }
 
