@@ -2940,6 +2940,54 @@ mod tests {
     }
 
     #[test]
+    fn logical_to_text_basic() {
+        assert!(matches!(eval_str("Logical.ToText(true)").unwrap(), Value::Text(s) if s == "true"));
+        assert!(matches!(eval_str("Logical.ToText(false)").unwrap(), Value::Text(s) if s == "false"));
+    }
+
+    #[test]
+    fn character_from_number_ascii() {
+        match eval_str("Character.FromNumber(65)").unwrap() {
+            Value::Text(s) => assert_eq!(s, "A"),
+            other => panic!("expected text, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn character_to_number_ascii() {
+        match eval_str("Character.ToNumber(\"A\")").unwrap() {
+            Value::Number(n) => assert_eq!(n, 65.0),
+            other => panic!("expected number, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn guid_from_normalises() {
+        match eval_str("Guid.From(\"12345678-1234-5678-9ABC-DEF012345678\")").unwrap() {
+            Value::Text(s) => assert_eq!(s, "12345678-1234-5678-9abc-def012345678"),
+            other => panic!("expected text, got {:?}", other),
+        }
+        assert!(eval_str("Guid.From(\"not-a-guid\")").is_err());
+    }
+
+    #[test]
+    fn text_new_guid_format() {
+        match eval_str("Text.NewGuid()").unwrap() {
+            Value::Text(s) => {
+                assert_eq!(s.len(), 36);
+                assert_eq!(s.as_bytes()[8], b'-');
+                assert_eq!(s.as_bytes()[13], b'-');
+                assert_eq!(s.as_bytes()[14], b'4'); // v4 marker
+                assert_eq!(s.as_bytes()[18], b'-');
+                let v = s.as_bytes()[19];
+                assert!(matches!(v, b'8' | b'9' | b'a' | b'b'));
+                assert_eq!(s.as_bytes()[23], b'-');
+            }
+            other => panic!("expected text, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn int32_from_text() {
         match eval_str("Int32.From(\"42\")").unwrap() {
             Value::Number(n) => assert_eq!(n, 42.0),

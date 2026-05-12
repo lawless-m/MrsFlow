@@ -128,6 +128,11 @@ fn three(a: &str, b: &str, c: &str) -> Vec<Param> {
 
 fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
     vec![
+        ("Logical.ToText", one("logical"), logical_to_text),
+        ("Character.FromNumber", one("number"), character_from_number),
+        ("Character.ToNumber", one("text"), character_to_number),
+        ("Guid.From", one("value"), guid_from),
+        ("Text.NewGuid", vec![], text_new_guid),
         ("Number.From", one("value"), number_from),
         ("Byte.From", one("value"), number_from),
         ("Currency.From", one("value"), number_from),
@@ -509,6 +514,89 @@ fn type_mismatch(expected: &'static str, found: &Value) -> MError {
 }
 
 // --- Number.* ---
+
+fn logical_to_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    match &args[0] {
+        Value::Null => Ok(Value::Null),
+        Value::Logical(b) => Ok(Value::Text(if *b { "true".into() } else { "false".into() })),
+        other => Err(type_mismatch("logical", other)),
+    }
+}
+
+fn character_from_number(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    match &args[0] {
+        Value::Null => Ok(Value::Null),
+        Value::Number(n) => {
+            if !n.is_finite() || *n < 0.0 || n.fract() != 0.0 || *n > u32::MAX as f64 {
+                return Err(MError::Other(format!(
+                    "Character.FromNumber: not a valid codepoint: {}",
+                    n
+                )));
+            }
+            let cp = *n as u32;
+            char::from_u32(cp)
+                .map(|c| Value::Text(c.to_string()))
+                .ok_or_else(|| MError::Other(format!(
+                    "Character.FromNumber: invalid Unicode codepoint U+{:04X}",
+                    cp
+                )))
+        }
+        other => Err(type_mismatch("number", other)),
+    }
+}
+
+fn character_to_number(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    match &args[0] {
+        Value::Null => Ok(Value::Null),
+        Value::Text(s) => s
+            .chars()
+            .next()
+            .map(|c| Value::Number(c as u32 as f64))
+            .ok_or_else(|| MError::Other("Character.ToNumber: empty text".into())),
+        other => Err(type_mismatch("text", other)),
+    }
+}
+
+fn guid_from(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    match &args[0] {
+        Value::Null => Ok(Value::Null),
+        Value::Text(s) => {
+            // Validate 8-4-4-4-12 hex format. PQ's Guid value is text-shaped;
+            // we keep it as Text but normalise to lowercase.
+            let lower = s.to_lowercase();
+            let bytes = lower.as_bytes();
+            let dashes_at = [8, 13, 18, 23];
+            if bytes.len() != 36
+                || !dashes_at.iter().all(|&i| bytes[i] == b'-')
+                || !bytes
+                    .iter()
+                    .enumerate()
+                    .all(|(i, &b)| dashes_at.contains(&i) || b.is_ascii_hexdigit())
+            {
+                return Err(MError::Other(format!("Guid.From: invalid GUID: {:?}", s)));
+            }
+            Ok(Value::Text(lower))
+        }
+        other => Err(type_mismatch("text", other)),
+    }
+}
+
+fn text_new_guid(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    use rand::RngCore;
+    let mut bytes = [0u8; 16];
+    rand::thread_rng().fill_bytes(&mut bytes);
+    // RFC 4122 v4: set version (high nibble of byte 6) and variant (high bits of byte 8).
+    bytes[6] = (bytes[6] & 0x0F) | 0x40;
+    bytes[8] = (bytes[8] & 0x3F) | 0x80;
+    let s = format!(
+        "{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
+        bytes[0], bytes[1], bytes[2], bytes[3],
+        bytes[4], bytes[5], bytes[6], bytes[7],
+        bytes[8], bytes[9],
+        bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]
+    );
+    Ok(Value::Text(s))
+}
 
 fn number_from(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let v = &args[0];
