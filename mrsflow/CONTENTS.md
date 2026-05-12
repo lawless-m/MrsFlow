@@ -13,6 +13,7 @@ This zip contains the design notes from a conversation scoping out the project.
 5. **`05-open-questions.md`** — Things to resolve in Claude Code with access to the real query corpus.
 6. **`06-resources.md`** — Links to the language spec, reference parser, relevant crates, prior art.
 7. **`07-evaluator-design.md`** — Load-bearing decisions for the evaluator (laziness, error model, environment, value/number representation), the Prolog evaluator companion as first-class differential, and the slicing plan.
+8. **`08-prolog-differential.md`** — How the parallel Prolog evaluator works as a differential oracle for the Rust implementation, and how the pattern transfers to other projects.
 
 ## Status
 
