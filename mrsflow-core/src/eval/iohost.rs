@@ -64,6 +64,20 @@ pub trait IoHost {
         manual_status: &[u16],
         content: Option<&[u8]>,
     ) -> Result<Vec<u8>, IoError>;
+    /// HEAD `url` and return the response headers as a list of
+    /// (name, value) pairs. Backs `Web.Headers`. Hosts that can't
+    /// perform HEAD requests (or have no HTTP at all) return
+    /// `IoError::NotSupported`. Default impl delegates to a GET via
+    /// `web_contents` and ignores the body — concrete shells should
+    /// override with a real HEAD if they care about the bandwidth.
+    fn web_headers(
+        &self,
+        url: &str,
+        headers: &[(String, String)],
+    ) -> Result<Vec<(String, String)>, IoError> {
+        let _ = (url, headers);
+        Err(IoError::NotSupported)
+    }
     /// Immediate directory contents — backs `Folder.Contents`. Returns a
     /// Table with columns `Content, Name, Extension, Date accessed,
     /// Date modified, Date created, Attributes, Folder Path`. Folder

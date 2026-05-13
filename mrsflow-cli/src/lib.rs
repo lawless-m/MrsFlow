@@ -311,6 +311,14 @@ impl IoHost for CliIoHost {
         web_contents_impl(url, headers, manual_status, content)
     }
 
+    fn web_headers(
+        &self,
+        url: &str,
+        headers: &[(String, String)],
+    ) -> Result<Vec<(String, String)>, IoError> {
+        web_headers_impl(url, headers)
+    }
+
     fn folder_contents(&self, path: &str) -> Result<Value, IoError> {
         folder_impl(path, /* recursive */ false)
     }
@@ -472,6 +480,44 @@ fn systime_to_datetime(t: Option<std::time::SystemTime>) -> Value {
         }
         None => Value::Null,
     }
+}
+
+fn web_headers_impl(
+    url: &str,
+    headers: &[(String, String)],
+) -> Result<Vec<(String, String)>, IoError> {
+    use reqwest::blocking::Client;
+    use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
+
+    let mut hm = HeaderMap::with_capacity(headers.len());
+    for (k, v) in headers {
+        if v.is_empty() {
+            continue;
+        }
+        let name = HeaderName::try_from(k.as_str())
+            .map_err(|e| IoError::Other(format!("invalid header name {k:?}: {e}")))?;
+        let value = HeaderValue::from_str(v)
+            .map_err(|e| IoError::Other(format!("invalid header value for {k:?}: {e}")))?;
+        hm.insert(name, value);
+    }
+
+    let client = Client::builder()
+        .default_headers(hm)
+        .build()
+        .map_err(|e| IoError::Other(format!("http client init: {e}")))?;
+
+    let resp = client
+        .head(url)
+        .send()
+        .map_err(|e| IoError::Other(format!("HEAD {url}: {e}")))?;
+
+    let mut out: Vec<(String, String)> = Vec::with_capacity(resp.headers().len());
+    for (k, v) in resp.headers() {
+        if let Ok(s) = v.to_str() {
+            out.push((k.as_str().to_string(), s.to_string()));
+        }
+    }
+    Ok(out)
 }
 
 fn web_contents_impl(

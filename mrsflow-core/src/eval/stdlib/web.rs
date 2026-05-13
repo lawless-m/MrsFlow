@@ -13,19 +13,51 @@
 
 use crate::parser::Param;
 
+use super::super::env::EnvNode;
 use super::super::iohost::IoHost;
 use super::super::value::{BuiltinFn, MError, Record, Value};
 use super::common::{expect_text, type_mismatch};
 
 pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
-    vec![(
-        "Web.Contents",
-        vec![
-            Param { name: "url".into(),     optional: false, type_annotation: None },
-            Param { name: "options".into(), optional: true,  type_annotation: None },
-        ],
-        contents,
-    )]
+    vec![
+        (
+            "Web.Contents",
+            vec![
+                Param { name: "url".into(),     optional: false, type_annotation: None },
+                Param { name: "options".into(), optional: true,  type_annotation: None },
+            ],
+            contents,
+        ),
+        (
+            "Web.Headers",
+            vec![
+                Param { name: "url".into(),     optional: false, type_annotation: None },
+                Param { name: "options".into(), optional: true,  type_annotation: None },
+            ],
+            headers,
+        ),
+    ]
+}
+
+fn headers(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+    let url = expect_text(&args[0])?;
+    // Reuse the Web.Contents options parser, but only the Headers field
+    // matters for a HEAD request — Content / ManualStatusHandling are
+    // ignored here.
+    let opts = match args.get(1) {
+        None | Some(Value::Null) => Options::default(),
+        Some(Value::Record(r)) => parse_options(r, host)?,
+        Some(other) => return Err(type_mismatch("record or null", other)),
+    };
+    let pairs = host
+        .web_headers(url, &opts.headers)
+        .map_err(|e| MError::Other(format!("Web.Headers({url:?}): {e:?}")))?;
+    // Returns a record of header-name = value, matching PQ's Web.Headers.
+    let fields: Vec<(String, Value)> = pairs
+        .into_iter()
+        .map(|(k, v)| (k, Value::Text(v)))
+        .collect();
+    Ok(Value::Record(Record { fields, env: EnvNode::empty() }))
 }
 
 fn contents(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
