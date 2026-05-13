@@ -2,7 +2,8 @@
 //!
 //! mrsflow has no host-managed trace sink — `Diagnostics.Trace` is a
 //! pass-through that returns `value` unchanged after eprinting the
-//! message.
+//! message. ActivityId / CorrelationId return a null-GUID string since
+//! mrsflow has no per-evaluation identifier to surface.
 
 #![allow(unused_imports)]
 
@@ -12,8 +13,12 @@ use super::super::iohost::IoHost;
 use super::super::value::{BuiltinFn, MError, Value};
 use super::common::type_mismatch;
 
+const NULL_GUID: &str = "00000000-0000-0000-0000-000000000000";
+
 pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
     vec![
+        ("Diagnostics.ActivityId", vec![], activity_id),
+        ("Diagnostics.CorrelationId", vec![], correlation_id),
         (
             "Diagnostics.Trace",
             vec![
@@ -25,6 +30,14 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
             trace,
         ),
     ]
+}
+
+fn activity_id(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    Ok(Value::Text(NULL_GUID.into()))
+}
+
+fn correlation_id(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    Ok(Value::Text(NULL_GUID.into()))
 }
 
 fn trace(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
