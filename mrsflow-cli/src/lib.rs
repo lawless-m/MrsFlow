@@ -1509,6 +1509,22 @@ fn parse_mysql_conn(
 
 #[cfg(feature = "mysql")]
 fn mysql_open(conn: &MySqlConn) -> Result<mysql::Conn, IoError> {
+    // First attempt honours `ssl_mode`. If that's `Preferred` and the
+    // server doesn't advertise TLS, retry once without TLS — matching
+    // PQ's "try secure, fall back to plain" semantics. Required /
+    // VerifyCA / VerifyFull do *not* fall back; surface the error.
+    let primary = mysql_open_inner(conn, /*ssl_attempt=*/ true);
+    match primary {
+        Ok(c) => Ok(c),
+        Err(e) if conn.ssl_mode == SslMode::Preferred && is_server_lacks_tls(&e) => {
+            mysql_open_inner(conn, /*ssl_attempt=*/ false).map_err(|e2| wrap_mysql_err(conn, &e2))
+        }
+        Err(e) => Err(wrap_mysql_err(conn, &e)),
+    }
+}
+
+#[cfg(feature = "mysql")]
+fn mysql_open_inner(conn: &MySqlConn, ssl_attempt: bool) -> Result<mysql::Conn, mysql::Error> {
     use mysql::{Conn, OptsBuilder, SslOpts};
     use std::time::Duration;
 
@@ -1523,26 +1539,43 @@ fn mysql_open(conn: &MySqlConn) -> Result<mysql::Conn, IoError> {
         builder = builder.tcp_connect_timeout(Some(Duration::from_secs(secs)));
     }
 
-    let ssl_opts = match conn.ssl_mode {
-        SslMode::None => None,
-        SslMode::Preferred | SslMode::Required => Some(SslOpts::default()),
-        SslMode::VerifyCa => Some(SslOpts::default().with_danger_accept_invalid_certs(false)),
-        SslMode::VerifyFull => {
-            Some(SslOpts::default()
-                .with_danger_skip_domain_validation(false)
-                .with_danger_accept_invalid_certs(false))
+    let ssl_opts = if !ssl_attempt {
+        None
+    } else {
+        match conn.ssl_mode {
+            SslMode::None => None,
+            SslMode::Preferred | SslMode::Required => Some(SslOpts::default()),
+            SslMode::VerifyCa => Some(SslOpts::default().with_danger_accept_invalid_certs(false)),
+            SslMode::VerifyFull => Some(
+                SslOpts::default()
+                    .with_danger_skip_domain_validation(false)
+                    .with_danger_accept_invalid_certs(false),
+            ),
         }
     };
     if let Some(opts) = ssl_opts {
         builder = builder.ssl_opts(opts);
     }
 
-    Conn::new(builder).map_err(|e| {
-        IoError::Other(format!(
-            "MySQL connect ({}:{} db={}): {e}",
-            conn.host, conn.port, conn.database
-        ))
-    })
+    Conn::new(builder)
+}
+
+#[cfg(feature = "mysql")]
+fn wrap_mysql_err(conn: &MySqlConn, e: &mysql::Error) -> IoError {
+    IoError::Other(format!(
+        "MySQL connect ({}:{} db={}): {e}",
+        conn.host, conn.port, conn.database
+    ))
+}
+
+/// Detect "server doesn't advertise the TLS extension". The mysql
+/// crate surfaces this as a DriverError whose Display string contains
+/// "does not have this capability". Matching on the string is more
+/// stable than depending on a specific DriverError variant whose name
+/// can change between crate versions.
+#[cfg(feature = "mysql")]
+fn is_server_lacks_tls(e: &mysql::Error) -> bool {
+    e.to_string().contains("does not have this capability")
 }
 
 #[cfg(feature = "mysql")]
