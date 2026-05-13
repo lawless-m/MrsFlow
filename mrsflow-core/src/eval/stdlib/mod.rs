@@ -52,9 +52,11 @@ mod mysql;
 mod postgres;
 mod xml;
 
-// External callers of the old `stdlib::*` API expect these names at this path.
-// `table_to_rows` is only reached from #[cfg(test)] code in eval::mod, hence
-// the explicit allow.
+// Facade re-exports so internal callers in eval::{mod, value, summary,
+// sexpr} can write `stdlib::cell_to_value` rather than reaching into
+// `stdlib::table::cell_to_value`. Nothing outside this crate calls
+// them. `table_to_rows` is currently only reached from #[cfg(test)]
+// code in eval::mod, hence the explicit allow.
 pub use table::cell_to_value;
 #[allow(unused_imports)]
 pub(crate) use table::{row_to_record, table_to_rows};
