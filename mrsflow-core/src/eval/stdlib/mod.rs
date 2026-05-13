@@ -46,6 +46,7 @@ mod excel;
 mod web;
 mod csv;
 mod folder;
+mod diagnostics;
 
 // External callers of the old `stdlib::*` API expect these names at this path.
 // `table_to_rows` is only reached from #[cfg(test)] code in eval::mod, hence
@@ -170,6 +171,17 @@ pub fn root_env() -> Env {
     ] {
         env = env.extend(name.to_string(), Value::Number(n));
     }
+
+    // TraceLevel.* constants — Diagnostics.Trace traceLevel argument.
+    for (name, n) in [
+        ("TraceLevel.Critical",    1.0),
+        ("TraceLevel.Error",       2.0),
+        ("TraceLevel.Warning",     3.0),
+        ("TraceLevel.Information", 4.0),
+        ("TraceLevel.Verbose",     5.0),
+    ] {
+        env = env.extend(name.to_string(), Value::Number(n));
+    }
     env
 }
 
@@ -208,6 +220,7 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         web::bindings(),
         csv::bindings(),
         folder::bindings(),
+        diagnostics::bindings(),
     ] {
         all.extend(slice);
     }
