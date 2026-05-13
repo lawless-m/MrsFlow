@@ -19,7 +19,8 @@ mod value;
 pub use env::{Env, EnvNode, EnvOps};
 pub use iohost::{IoError, IoHost, NoIoHost};
 pub use sexpr::{value_to_sexpr, write_value as write_sexpr};
-pub use stdlib::{cell_to_value, root_env};
+pub use stdlib::root_env;
+pub use stdlib::table::cell_to_value;
 pub use summary::value_summary;
 pub use value::{
     BuiltinFn, Closure, FnBody, MError, Record, Table, TableRepr, ThunkState, TypeRep, Value,
@@ -385,7 +386,7 @@ pub fn evaluate(ast: &Expr, env: &Env, host: &dyn IoHost) -> Result<Value, MErro
                                     ok = false;
                                     break;
                                 };
-                                let cell = stdlib::cell_to_value(&t, col_idx, r)?;
+                                let cell = stdlib::table::cell_to_value(&t, col_idx, r)?;
                                 let cell = force(cell, &mut |e, env| evaluate(e, env, host))?;
                                 let want = force(want.clone(), &mut |e, env| evaluate(e, env, host))?;
                                 if !values_equal(&cell, &want) {
@@ -401,7 +402,7 @@ pub fn evaluate(ast: &Expr, env: &Env, host: &dyn IoHost) -> Result<Value, MErro
                             }
                         }
                         match matches.len() {
-                            1 => stdlib::row_to_record(&t, matches[0]),
+                            1 => stdlib::table::row_to_record(&t, matches[0]),
                             0 if *optional => Ok(Value::Null),
                             0 => Err(MError::Other(
                                 "table{predicate}: no row matched".into(),
@@ -429,7 +430,7 @@ pub fn evaluate(ast: &Expr, env: &Env, host: &dyn IoHost) -> Result<Value, MErro
                                 )))
                             }
                         } else {
-                            stdlib::row_to_record(&t, idx)
+                            stdlib::table::row_to_record(&t, idx)
                         }
                     }
                 },
@@ -2369,7 +2370,7 @@ mod tests {
                 let t = t.force().unwrap().into_owned();
                 assert_eq!(t.num_rows(), 2);
                 // Row 0 (id=1) has nested orders with 1 row.
-                let r0 = match super::stdlib::row_to_record(&t, 0).unwrap() {
+                let r0 = match super::stdlib::table::row_to_record(&t, 0).unwrap() {
                     Value::Record(r) => r,
                     other => panic!("expected record, got {other:?}"),
                 };
@@ -2402,7 +2403,7 @@ mod tests {
             Value::Table(t) => {
                 let t = t.force().unwrap().into_owned();
                 assert_eq!(t.num_rows(), 2);
-                let r0 = match super::stdlib::row_to_record(&t, 0).unwrap() {
+                let r0 = match super::stdlib::table::row_to_record(&t, 0).unwrap() {
                     Value::Record(r) => r,
                     other => panic!("expected record, got {other:?}"),
                 };
@@ -2588,7 +2589,7 @@ mod tests {
                     super::TableRepr::Arrow(_) => {
                         // Allowed too — fetch via row_to_record path is overkill;
                         // accept either backing as long as the value is right.
-                        let (_, rs) = super::stdlib::table_to_rows(&t).unwrap();
+                        let (_, rs) = super::stdlib::table::table_to_rows(&t).unwrap();
                         rs
                     }
                     other => panic!("unexpected table backing for pivot result: {other:?}"),
@@ -3239,7 +3240,7 @@ mod tests {
                 let t = t.force().unwrap().into_owned();
                 assert_eq!(t.num_rows(), 2);
                 // Last two rows of 1..5 are 4 and 5.
-                let r0 = match super::stdlib::row_to_record(&t, 0).unwrap() {
+                let r0 = match super::stdlib::table::row_to_record(&t, 0).unwrap() {
                     Value::Record(r) => r,
                     other => panic!("expected record, got {other:?}"),
                 };
@@ -3305,7 +3306,7 @@ mod tests {
             Value::Table(t) => {
                 assert_eq!(t.column_names(), vec!["name", "idx"]);
                 assert_eq!(t.num_rows(), 3);
-                let (_, rows) = super::stdlib::table_to_rows(&t).unwrap();
+                let (_, rows) = super::stdlib::table::table_to_rows(&t).unwrap();
                 let idxs: Vec<f64> = rows.iter().map(|r| match &r[1] {
                     Value::Number(n) => *n,
                     _ => panic!(),
@@ -3324,7 +3325,7 @@ mod tests {
         "#;
         match eval_str(src).unwrap() {
             Value::Table(t) => {
-                let (_, rows) = super::stdlib::table_to_rows(&t).unwrap();
+                let (_, rows) = super::stdlib::table::table_to_rows(&t).unwrap();
                 let idxs: Vec<f64> = rows.iter().map(|r| match &r[1] {
                     Value::Number(n) => *n,
                     _ => panic!(),
@@ -4772,7 +4773,7 @@ mod tests {
                 // Top-level is a 1-row navtable; that row's Value is the
                 // child Table.
                 assert_eq!(t.num_rows(), 1);
-                let r0 = match super::stdlib::row_to_record(&t, 0).unwrap() {
+                let r0 = match super::stdlib::table::row_to_record(&t, 0).unwrap() {
                     Value::Record(r) => r,
                     other => panic!("expected record, got {other:?}"),
                 };
@@ -4801,7 +4802,7 @@ mod tests {
         match eval_str(src).unwrap() {
             Value::Table(t) => {
                 let t = t.force().unwrap().into_owned();
-                let r0 = match super::stdlib::row_to_record(&t, 0).unwrap() {
+                let r0 = match super::stdlib::table::row_to_record(&t, 0).unwrap() {
                     Value::Record(r) => r,
                     other => panic!("expected record, got {other:?}"),
                 };
@@ -4836,7 +4837,7 @@ mod tests {
         match eval_str(src).unwrap() {
             Value::Table(t) => {
                 let t = t.force().unwrap().into_owned();
-                let r0 = match super::stdlib::row_to_record(&t, 0).unwrap() {
+                let r0 = match super::stdlib::table::row_to_record(&t, 0).unwrap() {
                     Value::Record(r) => r,
                     other => panic!("expected record, got {other:?}"),
                 };

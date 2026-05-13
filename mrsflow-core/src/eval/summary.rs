@@ -17,7 +17,7 @@
 
 use super::iohost::IoHost;
 use super::sexpr::value_to_sexpr;
-use super::stdlib::cell_to_value;
+use super::stdlib::table::cell_to_value;
 use super::value::{MError, Table, Value};
 
 /// Render `v` as a human-readable summary. For Tables: row/col count

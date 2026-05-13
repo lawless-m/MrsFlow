@@ -603,8 +603,8 @@ pub(super) fn values_equal_deep(a: &Value, b: &Value) -> Result<bool, MError> {
             let n_cols = a.num_columns();
             for r in 0..a.num_rows() {
                 for c in 0..n_cols {
-                    let av = super::cell_to_value(a, c, r)?;
-                    let bv = super::cell_to_value(b, c, r)?;
+                    let av = super::table::cell_to_value(a, c, r)?;
+                    let bv = super::table::cell_to_value(b, c, r)?;
                     if !values_equal_deep(&av, &bv)? {
                         return Ok(false);
                     }

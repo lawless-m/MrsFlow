@@ -20,7 +20,7 @@ mod text;
 mod logical;
 mod list;
 mod record;
-mod table;
+pub(crate) mod table;
 mod date;
 mod time;
 mod datetime;
@@ -52,14 +52,6 @@ mod mysql;
 mod postgres;
 mod xml;
 
-// Facade re-exports so internal callers in eval::{mod, value, summary,
-// sexpr} can write `stdlib::cell_to_value` rather than reaching into
-// `stdlib::table::cell_to_value`. Nothing outside this crate calls
-// them. `table_to_rows` is currently only reached from #[cfg(test)]
-// code in eval::mod, hence the explicit allow.
-pub use table::cell_to_value;
-#[allow(unused_imports)]
-pub(crate) use table::{row_to_record, table_to_rows};
 
 /// Build the initial environment containing every stdlib intrinsic plus
 /// the two literal constants `#nan` and `#infinity`. Tests and shells pass

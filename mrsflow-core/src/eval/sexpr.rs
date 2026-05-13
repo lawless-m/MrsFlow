@@ -6,7 +6,7 @@
 //! Callers must `deep_force` before formatting — unforced thunks land in the
 //! catch-all `(thunk ...)` arm, which would diverge from the Prolog companion.
 
-use super::stdlib::cell_to_value;
+use super::stdlib::table::cell_to_value;
 use super::value::{TypeRep, Value};
 
 /// Render `v` to its canonical S-expression string.

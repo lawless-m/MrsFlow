@@ -308,12 +308,12 @@ fn from_table(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     })?;
     let mut fields: Vec<(String, Value)> = Vec::with_capacity(table.num_rows());
     for row in 0..table.num_rows() {
-        let n_cell = super::cell_to_value(&table, name_idx, row)?;
+        let n_cell = super::table::cell_to_value(&table, name_idx, row)?;
         let name = match n_cell {
             Value::Text(s) => s,
             other => return Err(type_mismatch("text (in Name column)", &other)),
         };
-        let v_cell = super::cell_to_value(&table, value_idx, row)?;
+        let v_cell = super::table::cell_to_value(&table, value_idx, row)?;
         let forced = super::super::force(v_cell, &mut |e, env| {
             super::super::evaluate(e, env, host)
         })?;

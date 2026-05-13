@@ -71,10 +71,10 @@ fn lookup(name: &str, host: &dyn IoHost) -> Result<Option<Value>, MError> {
         MError::Other("Variable: workbook missing 'Content' column".into())
     })?;
     for row in 0..forced.num_rows() {
-        let cell_name = super::cell_to_value(&forced, name_col, row)?;
+        let cell_name = super::table::cell_to_value(&forced, name_col, row)?;
         if let Value::Text(s) = cell_name {
             if s == name {
-                let content = super::cell_to_value(&forced, content_col, row)?;
+                let content = super::table::cell_to_value(&forced, content_col, row)?;
                 return extract_value_cell(&content).map(Some);
             }
         }
@@ -99,7 +99,7 @@ fn extract_value_cell(content: &Value) -> Result<Value, MError> {
                     "Variable: Content table is empty".into(),
                 ));
             }
-            super::cell_to_value(&forced, v_col, 0)
+            super::table::cell_to_value(&forced, v_col, 0)
         }
         Value::Record(r) => {
             for (n, v) in &r.fields {
