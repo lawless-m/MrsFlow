@@ -278,9 +278,13 @@ pub struct JoinViewState {
     /// computing matches requires decoding just the key columns of
     /// each side.
     pub matches: Vec<Vec<u32>>,
-    /// Join kind passed to NestedJoin (0 = Inner, 1 = LeftOuter; others
-    /// not yet supported per nested_join's existing check). Stored so
-    /// forcing can apply the Inner filter (drop unmatched left rows).
+    /// Indices of `right` rows that no left row matched. Used by the
+    /// RightOuter / FullOuter / RightAnti materialisation paths to
+    /// emit null-left rows for unmatched right entries. Computed once
+    /// in `nested_join` (same pass as `matches`).
+    pub unmatched_right: Vec<u32>,
+    /// Join kind passed to NestedJoin: 0=Inner, 1=LeftOuter,
+    /// 2=RightOuter, 3=FullOuter, 4=LeftAnti, 5=RightAnti.
     pub join_kind: i32,
 }
 
@@ -382,10 +386,25 @@ impl Table {
             TableRepr::Rows { rows, .. } => rows.len(),
             TableRepr::LazyParquet(s) => s.num_rows,
             TableRepr::JoinView(jv) => {
-                // Inner: row count = left rows that have ≥1 match.
-                // LeftOuter: every left row is kept = jv.left.num_rows().
+                // Row count per join kind:
+                //   Inner       = left rows with ≥1 match
+                //   LeftOuter   = all left rows
+                //   RightOuter  = sum(matches[i].len()) + unmatched_right
+                //                 (one row per (left, right) match pair,
+                //                 plus one null-left row per unmatched right)
+                //   FullOuter   = LeftOuter rows + unmatched_right
+                //   LeftAnti    = left rows with 0 matches
+                //   RightAnti   = unmatched_right
                 match jv.join_kind {
                     0 => jv.matches.iter().filter(|m| !m.is_empty()).count(),
+                    1 => jv.left.num_rows(),
+                    2 => {
+                        jv.matches.iter().map(|m| m.len()).sum::<usize>()
+                            + jv.unmatched_right.len()
+                    }
+                    3 => jv.left.num_rows() + jv.unmatched_right.len(),
+                    4 => jv.matches.iter().filter(|m| m.is_empty()).count(),
+                    5 => jv.unmatched_right.len(),
                     _ => jv.left.num_rows(),
                 }
             }
@@ -629,31 +648,138 @@ fn materialise_join_view(jv: &JoinViewState) -> Result<Table, MError> {
     let mut out_names: Vec<String> = left_names.clone();
     out_names.push(jv.new_column_name.clone());
 
-    let mut out_rows: Vec<Vec<Value>> = Vec::with_capacity(jv.left.num_rows());
-    for (left_idx, match_indices) in jv.matches.iter().enumerate() {
-        let nested_rows: Vec<Vec<Value>> = match_indices
-            .iter()
-            .map(|&i| read_row(right_table, i as usize))
-            .collect::<Result<_, _>>()?;
-        let nested_table = Table::from_rows(right_names.clone(), nested_rows.clone());
+    // Capacity estimate per kind. Avoids pathological reallocations on
+    // large outputs; cheap to slightly over-estimate.
+    let cap = match jv.join_kind {
+        0 => jv.matches.iter().filter(|m| !m.is_empty()).count(),
+        1 => jv.left.num_rows(),
+        2 => jv.matches.iter().map(|m| m.len()).sum::<usize>() + jv.unmatched_right.len(),
+        3 => jv.left.num_rows() + jv.unmatched_right.len(),
+        4 => jv.matches.iter().filter(|m| m.is_empty()).count(),
+        5 => jv.unmatched_right.len(),
+        _ => jv.left.num_rows(),
+    };
+    let mut out_rows: Vec<Vec<Value>> = Vec::with_capacity(cap);
 
-        match jv.join_kind {
-            0 => {
-                // Inner: drop unmatched left rows.
+    // null_left_row: reused for unmatched-right rows under
+    // RightOuter / FullOuter / RightAnti. Power Query convention: the
+    // left columns become null when the row comes from the right side
+    // with no match. Build once.
+    let null_left_row: Vec<Value> = vec![Value::Null; left_names.len()];
+
+    match jv.join_kind {
+        // Inner: emit one row per left row that has ≥1 match.
+        // Nested column = Table of matched right rows.
+        0 => {
+            for (left_idx, match_indices) in jv.matches.iter().enumerate() {
                 if match_indices.is_empty() {
                     continue;
                 }
+                let nested_rows: Vec<Vec<Value>> = match_indices
+                    .iter()
+                    .map(|&i| read_row(right_table, i as usize))
+                    .collect::<Result<_, _>>()?;
+                let nested_table = Table::from_rows(right_names.clone(), nested_rows);
                 let mut row = read_row(left_table, left_idx)?;
                 row.push(Value::Table(nested_table));
                 out_rows.push(row);
             }
-            _ => {
-                // LeftOuter (default): keep every left row, possibly with
-                // an empty nested table.
+        }
+        // LeftOuter: emit every left row, with matched-right Table
+        // (possibly empty) in the nested column.
+        1 => {
+            for (left_idx, match_indices) in jv.matches.iter().enumerate() {
+                let nested_rows: Vec<Vec<Value>> = match_indices
+                    .iter()
+                    .map(|&i| read_row(right_table, i as usize))
+                    .collect::<Result<_, _>>()?;
+                let nested_table = Table::from_rows(right_names.clone(), nested_rows);
                 let mut row = read_row(left_table, left_idx)?;
                 row.push(Value::Table(nested_table));
                 out_rows.push(row);
             }
+        }
+        // RightOuter: iterate (left, right) match pairs — one row per
+        // pair, left columns from the matching left row, nested
+        // contains just that one right row. Then append one row per
+        // unmatched right with null left columns.
+        2 => {
+            for (left_idx, match_indices) in jv.matches.iter().enumerate() {
+                for &right_idx in match_indices {
+                    let mut row = read_row(left_table, left_idx)?;
+                    let nested_table = Table::from_rows(
+                        right_names.clone(),
+                        vec![read_row(right_table, right_idx as usize)?],
+                    );
+                    row.push(Value::Table(nested_table));
+                    out_rows.push(row);
+                }
+            }
+            for &right_idx in &jv.unmatched_right {
+                let mut row = null_left_row.clone();
+                let nested_table = Table::from_rows(
+                    right_names.clone(),
+                    vec![read_row(right_table, right_idx as usize)?],
+                );
+                row.push(Value::Table(nested_table));
+                out_rows.push(row);
+            }
+        }
+        // FullOuter: LeftOuter rows (every left row, possibly empty
+        // nested) plus one null-left row per unmatched right.
+        3 => {
+            for (left_idx, match_indices) in jv.matches.iter().enumerate() {
+                let nested_rows: Vec<Vec<Value>> = match_indices
+                    .iter()
+                    .map(|&i| read_row(right_table, i as usize))
+                    .collect::<Result<_, _>>()?;
+                let nested_table = Table::from_rows(right_names.clone(), nested_rows);
+                let mut row = read_row(left_table, left_idx)?;
+                row.push(Value::Table(nested_table));
+                out_rows.push(row);
+            }
+            for &right_idx in &jv.unmatched_right {
+                let mut row = null_left_row.clone();
+                let nested_table = Table::from_rows(
+                    right_names.clone(),
+                    vec![read_row(right_table, right_idx as usize)?],
+                );
+                row.push(Value::Table(nested_table));
+                out_rows.push(row);
+            }
+        }
+        // LeftAnti: emit only left rows with NO match. Nested column
+        // is always an empty Table.
+        4 => {
+            for (left_idx, match_indices) in jv.matches.iter().enumerate() {
+                if !match_indices.is_empty() {
+                    continue;
+                }
+                let nested_table =
+                    Table::from_rows(right_names.clone(), Vec::new());
+                let mut row = read_row(left_table, left_idx)?;
+                row.push(Value::Table(nested_table));
+                out_rows.push(row);
+            }
+        }
+        // RightAnti: emit only unmatched-right rows, with null left
+        // columns and nested table containing the unmatched right row.
+        5 => {
+            for &right_idx in &jv.unmatched_right {
+                let mut row = null_left_row.clone();
+                let nested_table = Table::from_rows(
+                    right_names.clone(),
+                    vec![read_row(right_table, right_idx as usize)?],
+                );
+                row.push(Value::Table(nested_table));
+                out_rows.push(row);
+            }
+        }
+        _ => {
+            return Err(MError::Other(format!(
+                "Table.NestedJoin: invalid joinKind {} (must be 0–5)",
+                jv.join_kind
+            )));
         }
     }
 

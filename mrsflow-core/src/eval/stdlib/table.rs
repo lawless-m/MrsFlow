@@ -2140,14 +2140,19 @@ fn expand_table_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MErr
         )));
     }
 
-    // Fast path: expanding the JoinView's nested column. Pull only the
-    // requested columns from the lazy right side — for a LazyParquet
-    // right with 134 cols, this decodes 1–2 cols instead of all 134.
-    // RT-preserving: produces the byte-identical Rows-backed result the
-    // eager path would have, just without decoding columns no one asked
-    // for. See mrsflow/09-lazy-tables.md §4 (JoinView).
+    // Fast path: expanding the JoinView's nested column under
+    // Inner / LeftOuter (the corpus-dominant pair). Pulls only the
+    // requested columns from the lazy right side; RT-preserving.
+    //
+    // Other join kinds (RightOuter / FullOuter / LeftAnti / RightAnti)
+    // have different row iteration patterns — they fall through to
+    // the slow path which forces the JoinView via materialise_join_view
+    // (which already branches per join_kind) and then expands the
+    // resulting Rows-backed table. Less optimal but correct, and these
+    // kinds are uncommon in the corpus pattern (typically followed by
+    // RemoveColumns to drop the nested column rather than expand).
     if let super::super::value::TableRepr::JoinView(jv) = &table.repr {
-        if jv.new_column_name == column {
+        if jv.new_column_name == column && matches!(jv.join_kind, 0 | 1) {
             return expand_join_view_lazily(jv, &column_names, &new_column_names);
         }
     }
@@ -2609,10 +2614,10 @@ fn nested_join(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         Some(Value::Null) | None => 1, // default: LeftOuter
         Some(other) => return Err(type_mismatch("number (JoinKind)", other)),
     };
-    if !matches!(join_kind, 0 | 1) {
-        return Err(MError::NotImplemented(
-            "Table.NestedJoin: only Inner (0) and LeftOuter (1) join kinds supported",
-        ));
+    if !(0..=5).contains(&join_kind) {
+        return Err(MError::Other(format!(
+            "Table.NestedJoin: invalid joinKind {join_kind} (expected 0–5)"
+        )));
     }
 
     let left_names = table1.column_names();
@@ -2658,6 +2663,8 @@ fn nested_join(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     }
 
     let mut matches: Vec<Vec<u32>> = Vec::with_capacity(left_tuples.len());
+    let n_right = right_tuples.len();
+    let mut right_seen: Vec<bool> = vec![false; n_right];
     for tuple in &left_tuples {
         let key: Vec<JoinKey> = tuple
             .iter()
@@ -2665,10 +2672,22 @@ fn nested_join(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             .collect::<Result<_, _>>()?;
         let ms: Vec<u32> = buckets
             .get(&key)
-            .map(|idx| idx.iter().map(|&i| i as u32).collect())
+            .map(|idx| {
+                let v: Vec<u32> = idx.iter().map(|&i| i as u32).collect();
+                for &i in &v {
+                    right_seen[i as usize] = true;
+                }
+                v
+            })
             .unwrap_or_default();
         matches.push(ms);
     }
+    // Unmatched-right indices for RightOuter / FullOuter / RightAnti.
+    // Done in a single pass over the seen-vector, cheap on top of the
+    // matches we already have.
+    let unmatched_right: Vec<u32> = (0..n_right as u32)
+        .filter(|&i| !right_seen[i as usize])
+        .collect();
 
     Ok(Value::Table(Table {
         repr: super::super::value::TableRepr::JoinView(super::super::value::JoinViewState {
@@ -2676,6 +2695,7 @@ fn nested_join(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             right: std::sync::Arc::new(table2.clone()),
             new_column_name,
             matches,
+            unmatched_right,
             join_kind,
         }),
     }))
