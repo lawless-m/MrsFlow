@@ -10,9 +10,9 @@ use mrsflow_core::lexer::tokenize;
 use mrsflow_core::parser::{parse, Expr};
 use parquet::arrow::ArrowWriter;
 
-/// Errors that can happen while running the multi-query CLI mode. The CLI
-/// shell maps these to exit codes; the library exposes them so callers
-/// (tests, future shells) can inspect them.
+/// Errors that can happen while running the multi-query CLI mode. `pub`
+/// because the `mrsflow` binary in this same package (a separate compile
+/// target from the lib) matches on the variants for exit-code mapping.
 #[derive(Debug)]
 pub enum MultiQueryError {
     Io(String),
@@ -1345,14 +1345,9 @@ fn odbc_data_source_impl(connection_string: &str) -> Result<Value, IoError> {
     let mut rows: Vec<Vec<Value>> = Vec::with_capacity(by_catalog.len());
     for (catalog, tables) in by_catalog {
         let conn_string = connection_string.to_string();
-        let catalog_for_thunk = catalog.clone();
         let tables_for_thunk = tables.clone();
         let inner: Rc<dyn Fn() -> Result<Value, MError>> = Rc::new(move || {
-            Ok(build_table_nav(
-                &conn_string,
-                &catalog_for_thunk,
-                &tables_for_thunk,
-            ))
+            Ok(build_table_nav(&conn_string, &tables_for_thunk))
         });
         let data = Value::Thunk(Rc::new(RefCell::new(ThunkState::Native(inner))));
         rows.push(vec![
@@ -1365,7 +1360,7 @@ fn odbc_data_source_impl(connection_string: &str) -> Result<Value, IoError> {
 }
 
 #[cfg(feature = "odbc")]
-fn build_table_nav(connection: &str, catalog: &str, tables: &[(String, String)]) -> Value {
+fn build_table_nav(connection: &str, tables: &[(String, String)]) -> Value {
     use std::cell::RefCell;
     use std::rc::Rc;
 
@@ -1375,9 +1370,7 @@ fn build_table_nav(connection: &str, catalog: &str, tables: &[(String, String)])
     let mut rows: Vec<Vec<Value>> = Vec::with_capacity(tables.len());
     for (name, table_type) in tables {
         let conn_string = connection.to_string();
-        let catalog_name = catalog.to_string();
         let table_name = name.clone();
-        let _ = &catalog_name; // captured for future multi-catalog support
         let fetcher: Rc<dyn Fn() -> Result<Value, MError>> = Rc::new(move || {
             // Bare table name; DBISAM (the corpus driver) rejects
             // "catalog"."table" qualification, and the connection string

@@ -18,9 +18,8 @@ mod value;
 
 pub use env::{Env, EnvNode, EnvOps};
 pub use iohost::{IoError, IoHost, NoIoHost};
-pub use sexpr::{value_to_sexpr, write_value as write_sexpr};
+pub use sexpr::value_to_sexpr;
 pub use stdlib::root_env;
-pub use stdlib::table::cell_to_value;
 pub use summary::value_summary;
 pub use value::{
     BuiltinFn, Closure, FnBody, MError, Record, Table, TableRepr, ThunkState, TypeRep, Value,
