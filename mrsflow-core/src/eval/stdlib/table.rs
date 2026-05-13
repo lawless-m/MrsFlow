@@ -6,9 +6,10 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use arrow::array::{
-    Array, ArrayRef, BooleanArray, Date32Array, DurationMicrosecondArray, Float32Array,
-    Float64Array, Int16Array, Int32Array, Int64Array, Int8Array, NullArray, StringArray,
-    TimestampMicrosecondArray, UInt16Array, UInt32Array, UInt64Array, UInt8Array,
+    Array, ArrayRef, BooleanArray, Date32Array, Decimal128Array, Decimal256Array,
+    DurationMicrosecondArray, Float32Array, Float64Array, Int16Array, Int32Array,
+    Int64Array, Int8Array, NullArray, StringArray, TimestampMicrosecondArray,
+    UInt16Array, UInt32Array, UInt64Array, UInt8Array,
 };
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
@@ -1133,6 +1134,30 @@ pub fn cell_to_value(table: &Table, col: usize, row: usize) -> Result<Value, MEr
         DataType::UInt64 => Ok(Value::Number(
             array.as_any().downcast_ref::<UInt64Array>().expect("UInt64").value(row) as f64,
         )),
+        DataType::Decimal128(precision, scale) => {
+            let raw = array
+                .as_any()
+                .downcast_ref::<Decimal128Array>()
+                .expect("Decimal128")
+                .value(row);
+            Ok(Value::Decimal {
+                mantissa: arrow::datatypes::i256::from_i128(raw),
+                scale: *scale,
+                precision: *precision,
+            })
+        }
+        DataType::Decimal256(precision, scale) => {
+            let raw = array
+                .as_any()
+                .downcast_ref::<Decimal256Array>()
+                .expect("Decimal256")
+                .value(row);
+            Ok(Value::Decimal {
+                mantissa: raw,
+                scale: *scale,
+                precision: *precision,
+            })
+        }
         DataType::Utf8 => {
             let a = array.as_any().downcast_ref::<StringArray>().expect("Utf8");
             Ok(Value::Text(a.value(row).to_string()))
@@ -4548,6 +4573,7 @@ fn typename_of(v: &Value) -> &'static str {
         Value::Null => "Null.Type",
         Value::Logical(_) => "Logical.Type",
         Value::Number(_) => "Number.Type",
+        Value::Decimal { .. } => "Number.Type",
         Value::Text(_) => "Text.Type",
         Value::Date(_) => "Date.Type",
         Value::Datetime(_) => "DateTime.Type",

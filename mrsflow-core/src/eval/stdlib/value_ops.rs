@@ -162,6 +162,7 @@ fn typerep_of(v: &Value) -> TypeRep {
         Value::Null => TypeRep::Null,
         Value::Logical(_) => TypeRep::Logical,
         Value::Number(_) => TypeRep::Number,
+        Value::Decimal { .. } => TypeRep::Number,
         Value::Text(_) => TypeRep::Text,
         Value::Date(_) => TypeRep::Date,
         Value::Datetime(_) => TypeRep::Datetime,
@@ -305,6 +306,15 @@ fn remove_metadata(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> 
 pub(crate) fn value_add(a: &Value, b: &Value) -> Result<Value, MError> {
     match (a, b) {
         (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a + b)),
+        (
+            Value::Decimal { mantissa: ma, scale: sa, precision: pa },
+            Value::Decimal { mantissa: mb, scale: sb, precision: pb },
+        ) => decimal_add_sub(*ma, *sa, *pa, *mb, *sb, *pb, false),
+        (Value::Decimal { .. }, Value::Number(_)) | (Value::Number(_), Value::Decimal { .. }) => {
+            Ok(Value::Number(
+                a.as_f64_lossy().unwrap() + b.as_f64_lossy().unwrap(),
+            ))
+        }
         (Value::Text(a), Value::Text(b)) => Ok(Value::Text(format!("{a}{b}"))),
         (Value::Date(d), Value::Duration(dur)) | (Value::Duration(dur), Value::Date(d)) => {
             // Date + Duration: Power Query promotes to Datetime when the
@@ -345,6 +355,15 @@ pub(crate) fn value_add(a: &Value, b: &Value) -> Result<Value, MError> {
 pub(crate) fn value_subtract(a: &Value, b: &Value) -> Result<Value, MError> {
     match (a, b) {
         (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a - b)),
+        (
+            Value::Decimal { mantissa: ma, scale: sa, precision: pa },
+            Value::Decimal { mantissa: mb, scale: sb, precision: pb },
+        ) => decimal_add_sub(*ma, *sa, *pa, *mb, *sb, *pb, true),
+        (Value::Decimal { .. }, Value::Number(_)) | (Value::Number(_), Value::Decimal { .. }) => {
+            Ok(Value::Number(
+                a.as_f64_lossy().unwrap() - b.as_f64_lossy().unwrap(),
+            ))
+        }
         (Value::Date(a), Value::Date(b)) => {
             let dur = a.and_hms_opt(0, 0, 0).unwrap() - b.and_hms_opt(0, 0, 0).unwrap();
             Ok(Value::Duration(dur))
@@ -382,6 +401,15 @@ fn subtract(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 fn multiply(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     match (&args[0], &args[1]) {
         (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a * b)),
+        (
+            Value::Decimal { mantissa: ma, scale: sa, precision: pa },
+            Value::Decimal { mantissa: mb, scale: sb, precision: pb },
+        ) => decimal_multiply(*ma, *sa, *pa, *mb, *sb, *pb),
+        (Value::Decimal { .. }, Value::Number(_)) | (Value::Number(_), Value::Decimal { .. }) => {
+            Ok(Value::Number(
+                args[0].as_f64_lossy().unwrap() * args[1].as_f64_lossy().unwrap(),
+            ))
+        }
         (a, b) => Err(MError::Other(format!(
             "Value.Multiply: cannot multiply {} by {}",
             super::super::type_name(a),
@@ -393,12 +421,141 @@ fn multiply(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 fn divide(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     match (&args[0], &args[1]) {
         (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a / b)),
+        (
+            Value::Decimal { mantissa: ma, scale: sa, precision: pa },
+            Value::Decimal { mantissa: mb, scale: sb, precision: pb },
+        ) => decimal_divide(*ma, *sa, *pa, *mb, *sb, *pb),
+        (Value::Decimal { .. }, Value::Number(_)) | (Value::Number(_), Value::Decimal { .. }) => {
+            Ok(Value::Number(
+                args[0].as_f64_lossy().unwrap() / args[1].as_f64_lossy().unwrap(),
+            ))
+        }
         (a, b) => Err(MError::Other(format!(
             "Value.Divide: cannot divide {} by {}",
             super::super::type_name(a),
             super::super::type_name(b),
         ))),
     }
+}
+
+/// Shared add/subtract path for Decimal × Decimal. Aligns to
+/// `max(scale_a, scale_b)` by scaling the lower-scale mantissa up,
+/// then adds or subtracts. Result precision is `max(pa, pb) + 1` to
+/// reserve a digit for overflow into the next column (capped at 76 —
+/// the Arrow Decimal256 maximum).
+fn decimal_add_sub(
+    ma: arrow::datatypes::i256,
+    sa: i8,
+    pa: u8,
+    mb: arrow::datatypes::i256,
+    sb: i8,
+    pb: u8,
+    subtract: bool,
+) -> Result<Value, MError> {
+    let (ma, mb, scale) = align_scales(ma, sa, mb, sb)?;
+    let mantissa = if subtract {
+        ma.wrapping_sub(mb)
+    } else {
+        ma.wrapping_add(mb)
+    };
+    let precision = pa.max(pb).saturating_add(1).min(76);
+    Ok(Value::Decimal {
+        mantissa,
+        scale,
+        precision,
+    })
+}
+
+fn decimal_multiply(
+    ma: arrow::datatypes::i256,
+    sa: i8,
+    pa: u8,
+    mb: arrow::datatypes::i256,
+    sb: i8,
+    pb: u8,
+) -> Result<Value, MError> {
+    let mantissa = ma.wrapping_mul(mb);
+    let scale = sa.checked_add(sb).ok_or_else(|| {
+        MError::Other(format!(
+            "Value.Multiply: Decimal scale overflow ({sa} + {sb})"
+        ))
+    })?;
+    let precision = pa.saturating_add(pb).min(76);
+    Ok(Value::Decimal {
+        mantissa,
+        scale,
+        precision,
+    })
+}
+
+/// Integer Decimal divide: pick a target scale `s_target = max(sa, sb, 6)`
+/// and compute `ma * 10^(s_target + sb - sa) / mb`. Truncates toward zero
+/// (matches Rust's i256::wrapping_div semantics). Errors on division by
+/// zero — M's `/` on Number returns ±Infinity for divide-by-zero, but
+/// Decimal can't represent infinity so we error.
+fn decimal_divide(
+    ma: arrow::datatypes::i256,
+    sa: i8,
+    pa: u8,
+    mb: arrow::datatypes::i256,
+    sb: i8,
+    pb: u8,
+) -> Result<Value, MError> {
+    if mb == arrow::datatypes::i256::ZERO {
+        return Err(MError::Other(
+            "Value.Divide: Decimal division by zero".into(),
+        ));
+    }
+    let target_scale: i8 = sa.max(sb).max(6);
+    let scale_up: i8 = target_scale
+        .checked_add(sb)
+        .and_then(|x| x.checked_sub(sa))
+        .ok_or_else(|| MError::Other("Value.Divide: Decimal scale overflow".into()))?;
+    let scaled_ma = if scale_up >= 0 {
+        ma.wrapping_mul(pow10_i256(scale_up as u32))
+    } else {
+        ma.wrapping_div(pow10_i256((-scale_up) as u32))
+    };
+    let mantissa = scaled_ma.wrapping_div(mb);
+    let precision = pa.saturating_add(pb).saturating_add(6).min(76);
+    Ok(Value::Decimal {
+        mantissa,
+        scale: target_scale,
+        precision,
+    })
+}
+
+/// Bring two Decimal mantissas to a common scale = max(sa, sb).
+pub(crate) fn align_scales(
+    ma: arrow::datatypes::i256,
+    sa: i8,
+    mb: arrow::datatypes::i256,
+    sb: i8,
+) -> Result<(arrow::datatypes::i256, arrow::datatypes::i256, i8), MError> {
+    use std::cmp::Ordering::*;
+    match sa.cmp(&sb) {
+        Equal => Ok((ma, mb, sa)),
+        Less => {
+            let diff = (sb - sa) as u32;
+            Ok((ma.wrapping_mul(pow10_i256(diff)), mb, sb))
+        }
+        Greater => {
+            let diff = (sa - sb) as u32;
+            Ok((ma, mb.wrapping_mul(pow10_i256(diff)), sa))
+        }
+    }
+}
+
+/// 10^n as an i256. Caches small powers (n ≤ 38, the Decimal128 range)
+/// in a stack-local fast path; larger n falls through to a loop. n > 76
+/// will overflow i256 — caller's responsibility to cap.
+pub(crate) fn pow10_i256(n: u32) -> arrow::datatypes::i256 {
+    let mut acc = arrow::datatypes::i256::ONE;
+    let ten = arrow::datatypes::i256::from_i128(10);
+    for _ in 0..n {
+        acc = acc.wrapping_mul(ten);
+    }
+    acc
 }
 
 /// Deep structural equality. Lists / records compare element-wise (forcing
@@ -493,6 +650,19 @@ fn compare_values(a: &Value, b: &Value) -> Result<i32, MError> {
         (Value::Number(x), Value::Number(y)) => x
             .partial_cmp(y)
             .ok_or_else(|| MError::Other("Value.Compare: NaN".into()))?,
+        (
+            Value::Decimal { mantissa: ma, scale: sa, .. },
+            Value::Decimal { mantissa: mb, scale: sb, .. },
+        ) => {
+            let (ma, mb, _) = align_scales(*ma, *sa, *mb, *sb)?;
+            ma.cmp(&mb)
+        }
+        (Value::Decimal { .. }, Value::Number(_)) | (Value::Number(_), Value::Decimal { .. }) => {
+            a.as_f64_lossy()
+                .unwrap()
+                .partial_cmp(&b.as_f64_lossy().unwrap())
+                .ok_or_else(|| MError::Other("Value.Compare: NaN".into()))?
+        }
         (Value::Text(x), Value::Text(y)) => x.cmp(y),
         (Value::Logical(x), Value::Logical(y)) => x.cmp(y),
         (Value::Date(x), Value::Date(y)) => x.cmp(y),

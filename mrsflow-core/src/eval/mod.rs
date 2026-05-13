@@ -645,7 +645,7 @@ pub(crate) fn type_conforms(v: &Value, t: &TypeRep) -> bool {
         TypeRep::AnyNonNull => !matches!(v, Value::Null),
         TypeRep::Null => matches!(v, Value::Null),
         TypeRep::Logical => matches!(v, Value::Logical(_)),
-        TypeRep::Number => matches!(v, Value::Number(_)),
+        TypeRep::Number => matches!(v, Value::Number(_) | Value::Decimal { .. }),
         TypeRep::Text => matches!(v, Value::Text(_)),
         TypeRep::Date => matches!(v, Value::Date(_)),
         TypeRep::Datetime => matches!(v, Value::Datetime(_)),
@@ -1003,6 +1003,7 @@ pub(crate) fn type_name(v: &Value) -> &'static str {
         Value::Null => "null",
         Value::Logical(_) => "logical",
         Value::Number(_) => "number",
+        Value::Decimal { .. } => "number",
         Value::Text(_) => "text",
         Value::Date(_) => "date",
         Value::Datetime(_) => "datetime",
@@ -2365,6 +2366,7 @@ mod tests {
         "#;
         match eval_str(src).unwrap() {
             Value::Table(t) => {
+                let t = t.force().unwrap().into_owned();
                 assert_eq!(t.num_rows(), 2);
                 // Row 0 (id=1) has nested orders with 1 row.
                 let r0 = match super::stdlib::row_to_record(&t, 0).unwrap() {
@@ -2398,6 +2400,7 @@ mod tests {
         "#;
         match eval_str(src).unwrap() {
             Value::Table(t) => {
+                let t = t.force().unwrap().into_owned();
                 assert_eq!(t.num_rows(), 2);
                 let r0 = match super::stdlib::row_to_record(&t, 0).unwrap() {
                     Value::Record(r) => r,
@@ -2588,6 +2591,7 @@ mod tests {
                         let (_, rs) = super::stdlib::table_to_rows(&t).unwrap();
                         rs
                     }
+                    other => panic!("unexpected table backing for pivot result: {other:?}"),
                 };
                 match &rows[0][1] {
                     Value::Number(n) => assert_eq!(*n, 15.0),

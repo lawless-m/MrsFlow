@@ -23,6 +23,18 @@ pub enum Value {
     Null,
     Logical(bool),
     Number(f64),
+    /// Fixed-precision decimal. `mantissa` carries the unscaled integer
+    /// value; `scale` is the count of decimal digits to the right of the
+    /// point (so the represented number is `mantissa / 10^scale`).
+    /// `precision` is the source column's declared precision — preserved
+    /// so a parquet read→write round-trip emits the same Decimal(p, s)
+    /// type. Single variant covers both Arrow Decimal128 (mantissa fits
+    /// in the low 128 bits) and Decimal256.
+    Decimal {
+        mantissa: arrow::datatypes::i256,
+        scale: i8,
+        precision: u8,
+    },
     Text(String),
     Date(chrono::NaiveDate),
     /// Naive (timezone-less) datetime.
@@ -316,6 +328,43 @@ pub struct LazyParquetState {
     /// footer at construction. Lets `Table.RowCount` return without
     /// decoding any data.
     pub num_rows: usize,
+}
+
+impl Value {
+    /// Coerce a `Value::Decimal` (or `Number`) to f64, lossily. Used at
+    /// the Number↔Decimal boundary where preserving precision isn't
+    /// possible (Decimal × Number arithmetic, comparison vs Number,
+    /// `Number.From` on a Decimal). Returns `None` for other variants.
+    pub fn as_f64_lossy(&self) -> Option<f64> {
+        match self {
+            Value::Number(n) => Some(*n),
+            Value::Decimal { mantissa, scale, .. } => Some(decimal_to_f64(*mantissa, *scale)),
+            _ => None,
+        }
+    }
+}
+
+/// Convert a Decimal (mantissa, scale) to f64 — lossy for large
+/// mantissas. The intermediate i128 path covers Decimal128 exactly and
+/// truncates Decimal256 to its low 128 bits (with a `to_i128()` fallback
+/// for values that fit). For values too large to fit i128 we fall
+/// through to `i256::to_f64` if/when arrow exposes one; until then,
+/// large Decimal256 → f64 returns inf for overflow.
+pub(crate) fn decimal_to_f64(mantissa: arrow::datatypes::i256, scale: i8) -> f64 {
+    let m = mantissa.to_i128().map(|x| x as f64).unwrap_or_else(|| {
+        // Fallback for Decimal256 values that don't fit in i128:
+        // build f64 from the high/low halves. Lossy at this magnitude
+        // anyway (f64 has 53 bits of mantissa).
+        let (low, high) = mantissa.to_parts();
+        (high as f64) * (u128::MAX as f64 + 1.0) + (low as f64)
+    });
+    if scale == 0 {
+        m
+    } else if scale > 0 {
+        m / 10f64.powi(scale as i32)
+    } else {
+        m * 10f64.powi(-(scale as i32))
+    }
 }
 
 impl LazyParquetState {
@@ -858,6 +907,30 @@ fn arrow_cell_to_value(
         DataType::UInt64 => Ok(Value::Number(
             array.as_any().downcast_ref::<UInt64Array>().expect("UInt64").value(row) as f64,
         )),
+        DataType::Decimal128(precision, scale) => {
+            let raw = array
+                .as_any()
+                .downcast_ref::<Decimal128Array>()
+                .expect("Decimal128")
+                .value(row);
+            Ok(Value::Decimal {
+                mantissa: arrow::datatypes::i256::from_i128(raw),
+                scale: *scale,
+                precision: *precision,
+            })
+        }
+        DataType::Decimal256(precision, scale) => {
+            let raw = array
+                .as_any()
+                .downcast_ref::<Decimal256Array>()
+                .expect("Decimal256")
+                .value(row);
+            Ok(Value::Decimal {
+                mantissa: raw,
+                scale: *scale,
+                precision: *precision,
+            })
+        }
         DataType::Utf8 => Ok(Value::Text(
             array.as_any().downcast_ref::<StringArray>().expect("Utf8").value(row).to_string(),
         )),

@@ -185,6 +185,19 @@ pub(crate) fn values_equal_primitive(a: &Value, b: &Value) -> Result<bool, MErro
         (Value::Null, Value::Null) => Ok(true),
         (Value::Logical(x), Value::Logical(y)) => Ok(x == y),
         (Value::Number(x), Value::Number(y)) => Ok(x == y),
+        (
+            Value::Decimal { mantissa: ma, scale: sa, .. },
+            Value::Decimal { mantissa: mb, scale: sb, .. },
+        ) => {
+            // Align scales then compare mantissas — 1.50 == 1.5.
+            let (ma, mb, _) = super::value_ops::align_scales(*ma, *sa, *mb, *sb)?;
+            Ok(ma == mb)
+        }
+        (Value::Decimal { .. }, Value::Number(_)) | (Value::Number(_), Value::Decimal { .. }) => {
+            // Cross-type via f64 — lossy but matches M's Number-domain
+            // equality (`Decimal.From(1.5) = 1.5` is true).
+            Ok(a.as_f64_lossy().unwrap() == b.as_f64_lossy().unwrap())
+        }
         (Value::Text(x), Value::Text(y)) => Ok(x == y),
         (Value::Date(x), Value::Date(y)) => Ok(x == y),
         (Value::Datetime(x), Value::Datetime(y)) => Ok(x == y),
@@ -194,6 +207,7 @@ pub(crate) fn values_equal_primitive(a: &Value, b: &Value) -> Result<bool, MErro
             Value::Null
             | Value::Logical(_)
             | Value::Number(_)
+            | Value::Decimal { .. }
             | Value::Text(_)
             | Value::Date(_)
             | Value::Datetime(_)
@@ -201,6 +215,7 @@ pub(crate) fn values_equal_primitive(a: &Value, b: &Value) -> Result<bool, MErro
             Value::Null
             | Value::Logical(_)
             | Value::Number(_)
+            | Value::Decimal { .. }
             | Value::Text(_)
             | Value::Date(_)
             | Value::Datetime(_)

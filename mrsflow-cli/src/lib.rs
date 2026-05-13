@@ -144,6 +144,7 @@ fn value_kind(v: &Value) -> &'static str {
         Value::Null => "null",
         Value::Logical(_) => "logical",
         Value::Number(_) => "number",
+        Value::Decimal { .. } => "number",
         Value::Text(_) => "text",
         Value::Date(_) => "date",
         Value::Datetime(_) => "datetime",

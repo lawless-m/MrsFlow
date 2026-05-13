@@ -46,6 +46,13 @@ fn render_constant(v: &Value) -> String {
                 format!("{n}")
             }
         }
+        Value::Decimal { mantissa, scale, .. } => {
+            // Render as a literal decimal string: e.g. mantissa=12345
+            // scale=2 → "123.45". M's Expression.Constant doesn't have
+            // a Decimal sigil; the produced text round-trips through
+            // the lexer as a number literal.
+            format_decimal_literal(*mantissa, *scale)
+        }
         Value::Text(s) => format!("\"{}\"", s.replace('"', "\"\"")),
         Value::Date(d) => {
             use chrono::Datelike;
@@ -101,6 +108,32 @@ fn render_constant(v: &Value) -> String {
         Value::Type(_) => "type ...".to_string(),
         Value::Thunk(_) => "thunk ...".to_string(),
         Value::WithMetadata { inner, .. } => render_constant(inner),
+    }
+}
+
+/// Format a Decimal as a literal text e.g. (12345, 2) → "123.45",
+/// (-1, 0) → "-1", (5, -2) → "500".
+fn format_decimal_literal(mantissa: arrow::datatypes::i256, scale: i8) -> String {
+    let s = mantissa.to_string();
+    let (sign, digits) = if let Some(rest) = s.strip_prefix('-') {
+        ("-", rest.to_string())
+    } else {
+        ("", s)
+    };
+    if scale <= 0 {
+        // Trailing zeros: append (-scale) zeros after the digits.
+        let pad = (-(scale as i32)) as usize;
+        format!("{sign}{digits}{}", "0".repeat(pad))
+    } else {
+        let scale = scale as usize;
+        if digits.len() > scale {
+            let split = digits.len() - scale;
+            let (int_part, frac_part) = digits.split_at(split);
+            format!("{sign}{int_part}.{frac_part}")
+        } else {
+            let pad = scale - digits.len();
+            format!("{sign}0.{}{digits}", "0".repeat(pad))
+        }
     }
 }
 

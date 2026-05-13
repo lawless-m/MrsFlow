@@ -130,6 +130,9 @@ fn display_cell(v: &Value, max_chars: usize) -> String {
                 format!("{n}")
             }
         }
+        Value::Decimal { mantissa, scale, .. } => {
+            crate::eval::value::decimal_to_f64(*mantissa, *scale).to_string()
+        }
         Value::Text(s) => s.replace('\n', "\\n").replace('\t', "\\t"),
         Value::Date(d) => format!("{d}"),
         Value::Datetime(dt) => format!("{dt}"),

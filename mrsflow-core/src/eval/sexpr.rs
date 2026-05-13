@@ -27,6 +27,12 @@ pub fn write_value(out: &mut String, v: &Value) {
         // (e.g. `42.0`, not `42`) which matches scryer's `~w` for floats.
         // Differential parity hinges on this.
         Value::Number(n) => out.push_str(&format!("(num {n:?})")),
+        Value::Decimal { mantissa, scale, precision } => {
+            // Render as (decimal MANTISSA SCALE PRECISION) — distinct
+            // from (num ...) so differential parity against scryer
+            // doesn't conflate Decimal with f64.
+            out.push_str(&format!("(decimal {mantissa} {scale} {precision})"));
+        }
         Value::Text(s) => {
             out.push_str("(text ");
             write_quoted(out, s);
