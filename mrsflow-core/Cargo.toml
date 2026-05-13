@@ -27,6 +27,12 @@ bytes = "1"
 # Xml.Document / Xml.Tables. Default features off — we don't need encoding
 # detection or async; the corpus is UTF-8 XML coming via Web.Contents.
 quick-xml = { version = "0.36", default-features = false }
+# Html.Table — CSS-selector-driven HTML extraction. scraper wraps html5ever
+# for real-browser-compat HTML parsing plus the `selectors` crate for CSS
+# selector matching. Sizeable transitive tree but matches Json/Xml in
+# being unconditional (no feature flag) — corpus would otherwise have to
+# fall back to brittle regex.
+scraper = "0.20"
 
 # Enable the `js` feature on getrandom only when targeting the browser.
 # Both `rand` (direct) and `arrow`'s `ahash → const-random` chain pull

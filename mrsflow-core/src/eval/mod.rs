@@ -4763,6 +4763,66 @@ mod tests {
     }
 
     #[test]
+    fn html_table_with_row_selector() {
+        // MS doc example 1: rows defined by `.name`, columns pull
+        // text from `.name` (the row itself) and the following `span`.
+        let src = r#"
+            Html.Table(
+                "<div class=""name"">Jo</div><span>Manager</span>",
+                {{"Name", ".name"}, {"Title", "span"}},
+                [RowSelector=".name"]
+            )
+        "#;
+        match eval_str(src).unwrap() {
+            Value::Table(t) => {
+                let t = t.force().unwrap().into_owned();
+                assert_eq!(t.num_rows(), 1);
+                assert_eq!(t.column_names(), vec!["Name", "Title"]);
+                let r0 = match super::stdlib::table::row_to_record(&t, 0).unwrap() {
+                    Value::Record(r) => r,
+                    other => panic!("expected record, got {other:?}"),
+                };
+                match &r0.fields[0].1 {
+                    Value::Text(s) => assert_eq!(s, "Jo"),
+                    other => panic!("expected Name text, got {other:?}"),
+                }
+                match &r0.fields[1].1 {
+                    Value::Text(s) => assert_eq!(s, "Manager"),
+                    other => panic!("expected Title text, got {other:?}"),
+                }
+            }
+            other => panic!("expected table, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn html_table_with_attribute_transform() {
+        // MS doc example 2: column 3rd element is a transform lambda
+        // that pulls an attribute off the matched element's record.
+        let src = r#"
+            Html.Table(
+                "<a href=""/test.html"">Test</a>",
+                {{"Link", "a", each [Attributes][href]}}
+            )
+        "#;
+        match eval_str(src).unwrap() {
+            Value::Table(t) => {
+                let t = t.force().unwrap().into_owned();
+                assert_eq!(t.num_rows(), 1);
+                let r0 = match super::stdlib::table::row_to_record(&t, 0).unwrap() {
+                    Value::Record(r) => r,
+                    other => panic!("expected record, got {other:?}"),
+                };
+                match &r0.fields[0].1 {
+                    Value::Text(s) => assert_eq!(s, "/test.html"),
+                    other => panic!("expected Link text, got {other:?}"),
+                }
+            }
+            other => panic!("expected table, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn xml_document_simple_element() {
         // <root><a>hello</a><b>world</b></root>
         let src = "Xml.Document(\"<root><a>hello</a><b>world</b></root>\")";

@@ -51,6 +51,7 @@ mod variable;
 mod mysql;
 mod postgres;
 mod xml;
+mod html;
 
 
 /// Build the initial environment containing every stdlib intrinsic plus
@@ -223,6 +224,7 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         mysql::bindings(),
         postgres::bindings(),
         xml::bindings(),
+        html::bindings(),
     ] {
         all.extend(slice);
     }
