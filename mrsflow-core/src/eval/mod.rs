@@ -3230,6 +3230,42 @@ mod tests {
     }
 
     #[test]
+    fn table_last_n_caps_rows() {
+        let src = r#"
+            #table({"a"}, {{1}, {2}, {3}, {4}, {5}})
+        "#;
+        match eval_str(&format!("Table.LastN({src}, 2)")).unwrap() {
+            Value::Table(t) => {
+                let t = t.force().unwrap().into_owned();
+                assert_eq!(t.num_rows(), 2);
+                // Last two rows of 1..5 are 4 and 5.
+                let r0 = match super::stdlib::row_to_record(&t, 0).unwrap() {
+                    Value::Record(r) => r,
+                    other => panic!("expected record, got {other:?}"),
+                };
+                let a0 = &r0.fields.iter().find(|(n, _)| n == "a").unwrap().1;
+                match a0 {
+                    Value::Number(n) => assert_eq!(*n, 4.0),
+                    other => panic!("expected number, got {other:?}"),
+                }
+            }
+            other => panic!("expected table, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn table_last_n_more_than_rows() {
+        // Asking for more than exists returns the whole table.
+        let src = r#"
+            #table({"a"}, {{1}, {2}})
+        "#;
+        match eval_str(&format!("Table.LastN({src}, 10)")).unwrap() {
+            Value::Table(t) => assert_eq!(t.num_rows(), 2),
+            other => panic!("expected table, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn table_column_round_trip() {
         let src = r#"
             let t = #table({"a", "b"}, {{1, "x"}, {2, "y"}, {3, "z"}})

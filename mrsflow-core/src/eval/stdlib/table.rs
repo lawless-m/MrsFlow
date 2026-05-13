@@ -148,6 +148,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
             distinct,
         ),
         ("Table.FirstN", two("table", "countOrCondition"), first_n),
+        ("Table.LastN", two("table", "countOrCondition"), last_n),
         ("Table.FromRecords", one("records"), from_records),
         ("Table.ToRecords", one("table"), to_records),
         (
@@ -1441,6 +1442,31 @@ fn first_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     };
     let (names, rows) = table_to_rows(&table)?;
     let kept: Vec<Vec<Value>> = rows.into_iter().take(n).collect();
+    Ok(Value::Table(values_to_table(&names, &kept)?))
+}
+
+fn last_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    let n = match &args[1] {
+        Value::Number(n) => {
+            if !n.is_finite() || *n < 0.0 {
+                return Err(MError::Other(
+                    "Table.LastN: count must be a non-negative integer".into(),
+                ));
+            }
+            *n as usize
+        }
+        Value::Function(_) => {
+            return Err(MError::NotImplemented(
+                "Table.LastN: predicate (drop-while-from-start) form not yet supported",
+            ));
+        }
+        other => return Err(type_mismatch("number or function", other)),
+    };
+    let (names, rows) = table_to_rows(&table)?;
+    let total = rows.len();
+    let skip = total.saturating_sub(n);
+    let kept: Vec<Vec<Value>> = rows.into_iter().skip(skip).collect();
     Ok(Value::Table(values_to_table(&names, &kept)?))
 }
 
