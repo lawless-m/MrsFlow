@@ -41,6 +41,14 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
             vec![Param { name: "html".into(), optional: false, type_annotation: None }],
             page,
         ),
+        (
+            "Web.BrowserContents",
+            vec![
+                Param { name: "url".into(),     optional: false, type_annotation: None },
+                Param { name: "options".into(), optional: true,  type_annotation: None },
+            ],
+            browser_contents,
+        ),
     ]
 }
 
@@ -56,6 +64,17 @@ fn page(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Err(MError::NotImplemented(
         "Web.Page: HTML table extraction not implemented — \
          use Web.Contents + an external HTML→table tool for now",
+    ))
+}
+
+/// Web.BrowserContents drives a headless browser to render JS-heavy
+/// pages and return the final HTML. Out of scope for mrsflow — we'd
+/// need a Chromium / WebKit binding (chromiumoxide, headless_chrome).
+/// Static HTML works via Web.Contents.
+fn browser_contents(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    Err(MError::NotImplemented(
+        "Web.BrowserContents: headless-browser rendering not supported — \
+         use Web.Contents for static HTML",
     ))
 }
 
