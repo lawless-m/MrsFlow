@@ -1565,14 +1565,20 @@ fn mysql_query_value(conn: &MySqlConn, sql: &str) -> Result<Value, IoError> {
     use mysql::prelude::Queryable;
 
     let mut c = mysql_open(conn)?;
+    // Use a prepared statement (binary protocol) — `query_iter` would
+    // run the text protocol where every value comes back as ASCII
+    // Bytes, including DATETIME / DATE / INT. Binary protocol gives
+    // us typed values so the type mapper can produce M Date/Datetime
+    // cells directly instead of strings.
+    let stmt = c
+        .prep(sql)
+        .map_err(|e| IoError::Other(format!("MySQL prep: {e}")))?;
     let result = c
-        .query_iter(sql)
+        .exec_iter(&stmt, ())
         .map_err(|e| IoError::Other(format!("MySQL exec: {e}")))?;
 
-    // Capture column names + collected rows. Type mapping happens when
-    // we walk the cells — see mysql_value_to_m below.
-    let column_names: Vec<String> = result
-        .columns()
+    let cols_ref = result.columns();
+    let column_names: Vec<String> = cols_ref
         .as_ref()
         .iter()
         .map(|c| c.name_str().into_owned())
