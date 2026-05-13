@@ -2553,46 +2553,55 @@ fn join_key_from(v: &Value) -> Result<JoinKey, MError> {
     }
 }
 
+/// Parse a `Table.NestedJoin` key argument into a non-empty list of
+/// column names. Accepts bare text (single-key form) or a list of text
+/// (single- or multi-column composite keys — both forms are emitted by
+/// Power Query's GUI depending on the join shape).
+fn parse_join_key_columns(v: &Value, role: &str) -> Result<Vec<String>, MError> {
+    match v {
+        Value::Text(s) => Ok(vec![s.clone()]),
+        Value::List(items) => {
+            if items.is_empty() {
+                return Err(MError::Other(format!(
+                    "Table.NestedJoin: {role} key list is empty"
+                )));
+            }
+            let mut cols = Vec::with_capacity(items.len());
+            for item in items {
+                match item {
+                    Value::Text(s) => cols.push(s.clone()),
+                    other => {
+                        return Err(type_mismatch(
+                            "text (in key list)",
+                            other,
+                        ));
+                    }
+                }
+            }
+            Ok(cols)
+        }
+        other => Err(type_mismatch("text or text list", other)),
+    }
+}
+
 fn nested_join(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    // Both sides stay lazy where possible. Only the two key columns are
+    // Both sides stay lazy where possible. Only the key columns are
     // decoded — the left key (to enumerate left rows for match building)
     // and the right key (to build the hash bucket). Everything else
     // decodes later, on demand, when a downstream op forces.
     // See `mrsflow/09-lazy-tables.md` (Stage A.5).
     let table1 = expect_table_lazy_ok(&args[0])?;
-    let key1 = match &args[1] {
-        Value::Text(s) => s.clone(),
-        // Power Query's GUI emits `{"col"}` even for single-key joins, so
-        // a 1-element text list is just the bare-text form. True
-        // multi-column composite keys still aren't implemented — that
-        // needs tuple equality in the row-matching loop below.
-        Value::List(items) if items.len() == 1 => match &items[0] {
-            Value::Text(s) => s.clone(),
-            other => return Err(type_mismatch("text", other)),
-        },
-        Value::List(_) => {
-            return Err(MError::NotImplemented(
-                "Table.NestedJoin: composite keys (multi-column) not yet supported",
-            ));
-        }
-        other => return Err(type_mismatch("text or text list", other)),
-    };
-    // Right side kept lazy (where lazy) — `expect_table_lazy_ok` avoids the
-    // implicit force that `expect_table` does.
+    let key1_cols = parse_join_key_columns(&args[1], "key1")?;
     let table2 = expect_table_lazy_ok(&args[2])?;
-    let key2 = match &args[3] {
-        Value::Text(s) => s.clone(),
-        Value::List(items) if items.len() == 1 => match &items[0] {
-            Value::Text(s) => s.clone(),
-            other => return Err(type_mismatch("text", other)),
-        },
-        Value::List(_) => {
-            return Err(MError::NotImplemented(
-                "Table.NestedJoin: composite keys (multi-column) not yet supported",
-            ));
-        }
-        other => return Err(type_mismatch("text or text list", other)),
-    };
+    let key2_cols = parse_join_key_columns(&args[3], "key2")?;
+    if key1_cols.len() != key2_cols.len() {
+        return Err(MError::Other(format!(
+            "Table.NestedJoin: composite-key arity mismatch — key1 has {} \
+             columns, key2 has {}",
+            key1_cols.len(),
+            key2_cols.len()
+        )));
+    }
     let new_column_name = expect_text(&args[4])?.to_string();
     // joinKind: 0=Inner, 1=LeftOuter, 2=RightOuter, 3=FullOuter, 4=LeftAnti, 5=RightAnti
     let join_kind = match args.get(5) {
@@ -2607,38 +2616,55 @@ fn nested_join(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     }
 
     let left_names = table1.column_names();
-    let key1_idx = left_names.iter().position(|n| n == &key1).ok_or_else(|| {
-        MError::Other(format!(
-            "Table.NestedJoin: key1 column not found: {key1}"
-        ))
-    })?;
+    let key1_indices: Vec<usize> = key1_cols
+        .iter()
+        .map(|n| {
+            left_names.iter().position(|x| x == n).ok_or_else(|| {
+                MError::Other(format!(
+                    "Table.NestedJoin: key1 column not found: {n}"
+                ))
+            })
+        })
+        .collect::<Result<_, _>>()?;
     let right_names = table2.column_names();
-    let key2_idx = right_names.iter().position(|n| n == &key2).ok_or_else(|| {
-        MError::Other(format!(
-            "Table.NestedJoin: key2 column not found: {key2}"
-        ))
-    })?;
+    let key2_indices: Vec<usize> = key2_cols
+        .iter()
+        .map(|n| {
+            right_names.iter().position(|x| x == n).ok_or_else(|| {
+                MError::Other(format!(
+                    "Table.NestedJoin: key2 column not found: {n}"
+                ))
+            })
+        })
+        .collect::<Result<_, _>>()?;
 
-    // Decode only the two key columns. For LazyParquet either side, this
-    // reads one column from the parquet bytes; the rest stay undecoded
-    // for later force/expand to pull selectively. For Arrow/Rows, this
-    // is a single-column read; for JoinView/ExpandView, it falls through
-    // to force-then-read of that one cell column (the chained-join case
-    // — still narrows compared to materialising the whole table).
-    let left_keys: Vec<Value> = decode_key_column(table1, key1_idx)?;
-    let right_keys: Vec<Value> = decode_key_column(table2, key2_idx)?;
+    // Decode only the key columns. For LazyParquet sides, the projection
+    // mask narrows to just these N columns so the rest stay undecoded.
+    // For Arrow/Rows it's a multi-column read; for JoinView/ExpandView
+    // it falls through to force-then-read of just those columns.
+    let left_tuples = decode_key_columns(table1, &key1_indices)?;
+    let right_tuples = decode_key_columns(table2, &key2_indices)?;
 
-    let mut buckets: HashMap<JoinKey, Vec<usize>> = HashMap::with_capacity(right_keys.len());
-    for (i, k) in right_keys.iter().enumerate() {
-        buckets.entry(join_key_from(k)?).or_default().push(i);
+    // Hash bucket keyed on the tuple of JoinKeys (single-column joins
+    // produce 1-element vecs; the equality semantics are unchanged).
+    let mut buckets: HashMap<Vec<JoinKey>, Vec<usize>> =
+        HashMap::with_capacity(right_tuples.len());
+    for (i, tuple) in right_tuples.iter().enumerate() {
+        let key: Vec<JoinKey> = tuple
+            .iter()
+            .map(join_key_from)
+            .collect::<Result<_, _>>()?;
+        buckets.entry(key).or_default().push(i);
     }
 
-    // Build per-left-row matches.
-    let mut matches: Vec<Vec<u32>> = Vec::with_capacity(left_keys.len());
-    for lk in &left_keys {
-        let lkey = join_key_from(lk)?;
+    let mut matches: Vec<Vec<u32>> = Vec::with_capacity(left_tuples.len());
+    for tuple in &left_tuples {
+        let key: Vec<JoinKey> = tuple
+            .iter()
+            .map(join_key_from)
+            .collect::<Result<_, _>>()?;
         let ms: Vec<u32> = buckets
-            .get(&lkey)
+            .get(&key)
             .map(|idx| idx.iter().map(|&i| i as u32).collect())
             .unwrap_or_default();
         matches.push(ms);
@@ -2655,42 +2681,56 @@ fn nested_join(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     }))
 }
 
-/// Pull the values of column `col_idx` from `table`, decoding only that
-/// one column when `table` is a `LazyParquet`. Used by `nested_join` so
-/// hash-bucket build doesn't force the entire side it operates on. For
-/// non-LazyParquet inputs, falls through to a regular force + cell read.
-fn decode_key_column(
+/// Pull values from a set of columns at once, returning per-row tuples.
+/// For a `LazyParquet` source the projection mask narrows to just those
+/// columns; the rest stay on disk. Single-column callers pass a 1-element
+/// slice and get back a Vec of 1-element tuples.
+fn decode_key_columns(
     table: &Table,
-    col_idx: usize,
-) -> Result<Vec<Value>, MError> {
+    col_indices: &[usize],
+) -> Result<Vec<Vec<Value>>, MError> {
     use super::super::value::{LazyParquetState, TableRepr};
     match &table.repr {
         TableRepr::LazyParquet(state) => {
-            // Narrow to just the key column and force.
-            let key_schema_idx = state.projection[col_idx];
+            // Narrow projection to just these columns and force —
+            // the rest stay undecoded on disk.
+            let new_projection: Vec<usize> = col_indices
+                .iter()
+                .map(|&i| state.projection[i])
+                .collect();
             let key_only = Table {
                 repr: TableRepr::LazyParquet(LazyParquetState {
                     bytes: state.bytes.clone(),
                     schema: state.schema.clone(),
-                    projection: vec![key_schema_idx],
+                    projection: new_projection,
                     num_rows: state.num_rows,
                 }),
             };
             let forced = key_only.force()?;
-            let mut out = Vec::with_capacity(forced.num_rows());
-            for r in 0..forced.num_rows() {
-                out.push(cell_to_value(&forced, 0, r)?);
+            let n = forced.num_rows();
+            let mut out: Vec<Vec<Value>> = Vec::with_capacity(n);
+            for r in 0..n {
+                let mut tuple = Vec::with_capacity(col_indices.len());
+                for c in 0..col_indices.len() {
+                    tuple.push(cell_to_value(&forced, c, r)?);
+                }
+                out.push(tuple);
             }
             Ok(out)
         }
         _ => {
             // Eager path (or non-Parquet-lazy variants for now): force,
-            // read the column. A.5d will replace this branch with a
-            // cell-lookup that doesn't force chains of JoinView/ExpandView.
+            // read the columns. Chained-lazy decode of JoinView/ExpandView
+            // remains a future optimisation.
             let forced = table.force()?;
-            let mut out = Vec::with_capacity(forced.num_rows());
-            for r in 0..forced.num_rows() {
-                out.push(cell_to_value(&forced, col_idx, r)?);
+            let n = forced.num_rows();
+            let mut out: Vec<Vec<Value>> = Vec::with_capacity(n);
+            for r in 0..n {
+                let mut tuple = Vec::with_capacity(col_indices.len());
+                for &c in col_indices {
+                    tuple.push(cell_to_value(&forced, c, r)?);
+                }
+                out.push(tuple);
             }
             Ok(out)
         }
