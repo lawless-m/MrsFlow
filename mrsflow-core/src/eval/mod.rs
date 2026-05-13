@@ -375,6 +375,13 @@ pub fn evaluate(ast: &Expr, env: &Env, host: &dyn IoHost) -> Result<Value, MErro
                         // single row whose listed fields equal those values.
                         // Zero or >1 matches is an error unless `?` is used,
                         // in which case zero matches returns null.
+                        //
+                        // `cell_to_value` doesn't accept lazy repr (LazyOdbc /
+                        // LazyParquet / JoinView / ExpandView), so force the
+                        // table first. For already-materialised tables this is
+                        // a no-op `Cow::Borrowed`.
+                        let t = t.force()?;
+                        let t = t.as_ref();
                         let cols = t.column_names();
                         let n_rows = t.num_rows();
                         let mut matches: Vec<usize> = Vec::new();
@@ -385,7 +392,7 @@ pub fn evaluate(ast: &Expr, env: &Env, host: &dyn IoHost) -> Result<Value, MErro
                                     ok = false;
                                     break;
                                 };
-                                let cell = stdlib::table::cell_to_value(&t, col_idx, r)?;
+                                let cell = stdlib::table::cell_to_value(t, col_idx, r)?;
                                 let cell = force(cell, &mut |e, env| evaluate(e, env, host))?;
                                 let want = force(want.clone(), &mut |e, env| evaluate(e, env, host))?;
                                 if !values_equal(&cell, &want) {
@@ -401,7 +408,7 @@ pub fn evaluate(ast: &Expr, env: &Env, host: &dyn IoHost) -> Result<Value, MErro
                             }
                         }
                         match matches.len() {
-                            1 => stdlib::table::row_to_record(&t, matches[0]),
+                            1 => stdlib::table::row_to_record(t, matches[0]),
                             0 if *optional => Ok(Value::Null),
                             0 => Err(MError::Other(
                                 "table{predicate}: no row matched".into(),
@@ -419,6 +426,10 @@ pub fn evaluate(ast: &Expr, env: &Env, host: &dyn IoHost) -> Result<Value, MErro
                             )));
                         }
                         let idx = i as usize;
+                        // Force lazy reps for the same reason as the predicate
+                        // path above — row_to_record needs Arrow / Rows.
+                        let t = t.force()?;
+                        let t = t.as_ref();
                         let n_rows = t.num_rows();
                         if idx >= n_rows {
                             if *optional {
@@ -429,7 +440,7 @@ pub fn evaluate(ast: &Expr, env: &Env, host: &dyn IoHost) -> Result<Value, MErro
                                 )))
                             }
                         } else {
-                            stdlib::table::row_to_record(&t, idx)
+                            stdlib::table::row_to_record(t, idx)
                         }
                     }
                 },

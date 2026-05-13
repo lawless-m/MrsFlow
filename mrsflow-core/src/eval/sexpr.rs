@@ -107,6 +107,20 @@ pub fn write_value(out: &mut String, v: &Value) {
             out.push_str("))");
         }
         Value::Table(t) => {
+            // Force any lazy repr (LazyOdbc / LazyParquet / *View) before
+            // walking cells — `cell_to_value` only accepts Arrow / Rows.
+            // Errors during forcing render as `(table (force-error ...))`
+            // so the s-expression printer remains infallible.
+            let forced = match t.force() {
+                Ok(c) => c,
+                Err(e) => {
+                    out.push_str("(table (force-error ");
+                    write_quoted(out, &format!("{e:?}"));
+                    out.push_str("))");
+                    return;
+                }
+            };
+            let t = forced.as_ref();
             out.push_str("(table ((cols (");
             let names = t.column_names();
             for (i, name) in names.iter().enumerate() {
