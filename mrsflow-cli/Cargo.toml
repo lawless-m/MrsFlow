@@ -21,7 +21,7 @@ odbc = ["dep:odbc-api"]
 mysql = ["dep:mysql"]
 # Pulls in tokio-postgres + tokio-postgres-rustls for PostgreSQL.Database.
 # Pure-Rust TLS via rustls. Off by default to keep the dep graph light.
-postgresql = ["dep:tokio-postgres", "dep:tokio-postgres-rustls", "dep:tokio", "dep:rustls", "dep:webpki-roots", "dep:serde_json", "dep:uuid"]
+postgresql = ["dep:tokio-postgres", "dep:tokio-postgres-rustls", "dep:tokio", "dep:rustls", "dep:webpki-roots", "dep:serde_json", "dep:uuid", "dep:rust_decimal"]
 
 [dependencies]
 mrsflow-core = { path = "../mrsflow-core" }
@@ -58,6 +58,11 @@ tokio = { version = "1", default-features = false, features = ["rt", "macros"], 
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"], optional = true }
 webpki-roots = { version = "0.26", optional = true }
 uuid = { version = "1", optional = true }
+# rust_decimal: FromSql for Postgres NUMERIC → 128-bit mantissa + scale.
+# Together with mrsflow's Value::Decimal this gives a lossless round-trip
+# for the common NUMERIC(38,s) range. `db-tokio-postgres` provides the
+# FromSql/ToSql impls.
+rust_decimal = { version = "1", default-features = false, features = ["std", "db-tokio-postgres"], optional = true }
 
 [[bin]]
 name = "mrsflow"

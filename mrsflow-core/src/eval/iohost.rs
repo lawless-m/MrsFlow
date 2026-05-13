@@ -101,6 +101,19 @@ pub trait IoHost {
         let _ = (server, database, options);
         Err(IoError::NotSupported)
     }
+    /// Execute an arbitrary SQL string against PostgreSQL and return
+    /// the result as a Value::Table — backs `PostgreSQL.Query`. Same
+    /// shape as `Odbc.Query`. mrsflow extension (not in MS's M).
+    fn postgres_query(
+        &self,
+        server: &str,
+        database: &str,
+        sql: &str,
+        options: Option<&Value>,
+    ) -> Result<Value, IoError> {
+        let _ = (server, database, sql, options);
+        Err(IoError::NotSupported)
+    }
     /// Connect to MySQL and return a navigation table — backs `MySQL.Database`.
     /// `options` is the optional record passed as the third arg (UserName,
     /// Password, Port, SslMode, ConnectionTimeout, CommandTimeout, etc.).
@@ -115,6 +128,19 @@ pub trait IoHost {
         options: Option<&Value>,
     ) -> Result<Value, IoError> {
         let _ = (server, database, options);
+        Err(IoError::NotSupported)
+    }
+    /// Execute an arbitrary SQL string against MySQL — backs `MySQL.Query`.
+    /// Same shape as `Odbc.Query` / `postgres_query`. mrsflow extension
+    /// (not in MS's M).
+    fn mysql_query(
+        &self,
+        server: &str,
+        database: &str,
+        sql: &str,
+        options: Option<&Value>,
+    ) -> Result<Value, IoError> {
+        let _ = (server, database, sql, options);
         Err(IoError::NotSupported)
     }
     /// Caller-injected workbook parameters — backs `Excel.CurrentWorkbook`.

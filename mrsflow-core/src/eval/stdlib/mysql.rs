@@ -13,15 +13,27 @@ use super::super::value::{BuiltinFn, MError, Value};
 use super::common::expect_text;
 
 pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
-    vec![(
-        "MySQL.Database",
-        vec![
-            Param { name: "server".into(),   optional: false, type_annotation: None },
-            Param { name: "database".into(), optional: false, type_annotation: None },
-            Param { name: "options".into(),  optional: true,  type_annotation: None },
-        ],
-        database,
-    )]
+    vec![
+        (
+            "MySQL.Database",
+            vec![
+                Param { name: "server".into(),   optional: false, type_annotation: None },
+                Param { name: "database".into(), optional: false, type_annotation: None },
+                Param { name: "options".into(),  optional: true,  type_annotation: None },
+            ],
+            database,
+        ),
+        (
+            "MySQL.Query",
+            vec![
+                Param { name: "server".into(),   optional: false, type_annotation: None },
+                Param { name: "database".into(), optional: false, type_annotation: None },
+                Param { name: "sql".into(),      optional: false, type_annotation: None },
+                Param { name: "options".into(),  optional: true,  type_annotation: None },
+            ],
+            query,
+        ),
+    ]
 }
 
 fn database(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
@@ -36,4 +48,16 @@ fn database(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     };
     host.mysql_database(server, database_name, forced_opts.as_ref())
         .map_err(|e| MError::Other(format!("MySQL.Database: {e:?}")))
+}
+
+fn query(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+    let server = expect_text(&args[0])?;
+    let database_name = expect_text(&args[1])?;
+    let sql = expect_text(&args[2])?;
+    let forced_opts: Option<Value> = match args.get(3) {
+        None | Some(Value::Null) => None,
+        Some(v) => Some(super::super::deep_force(v.clone(), host)?),
+    };
+    host.mysql_query(server, database_name, sql, forced_opts.as_ref())
+        .map_err(|e| MError::Other(format!("MySQL.Query: {e:?}")))
 }

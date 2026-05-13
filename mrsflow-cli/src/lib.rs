@@ -296,6 +296,31 @@ impl IoHost for CliIoHost {
         mysql_database_impl(server, database, options)
     }
 
+    #[cfg(not(feature = "mysql"))]
+    fn mysql_query(
+        &self,
+        _server: &str,
+        _database: &str,
+        _sql: &str,
+        _options: Option<&Value>,
+    ) -> Result<Value, IoError> {
+        Err(IoError::Other(
+            "MySQL.Query: built without MySQL support — recompile mrsflow-cli with --features mysql".into(),
+        ))
+    }
+
+    #[cfg(feature = "mysql")]
+    fn mysql_query(
+        &self,
+        server: &str,
+        database: &str,
+        sql: &str,
+        options: Option<&Value>,
+    ) -> Result<Value, IoError> {
+        let conn = parse_mysql_conn(server, database, options)?;
+        mysql_query_value(&conn, sql)
+    }
+
     #[cfg(not(feature = "postgresql"))]
     fn postgres_database(
         &self,
@@ -316,6 +341,31 @@ impl IoHost for CliIoHost {
         options: Option<&Value>,
     ) -> Result<Value, IoError> {
         postgres_database_impl(server, database, options)
+    }
+
+    #[cfg(not(feature = "postgresql"))]
+    fn postgres_query(
+        &self,
+        _server: &str,
+        _database: &str,
+        _sql: &str,
+        _options: Option<&Value>,
+    ) -> Result<Value, IoError> {
+        Err(IoError::Other(
+            "PostgreSQL.Query: built without PostgreSQL support — recompile mrsflow-cli with --features postgresql".into(),
+        ))
+    }
+
+    #[cfg(feature = "postgresql")]
+    fn postgres_query(
+        &self,
+        server: &str,
+        database: &str,
+        sql: &str,
+        options: Option<&Value>,
+    ) -> Result<Value, IoError> {
+        let conn = parse_pg_conn(server, database, options)?;
+        pg_query_value(&conn, sql)
     }
 
     fn file_read(&self, path: &str) -> Result<Vec<u8>, IoError> {
@@ -2122,20 +2172,19 @@ fn pg_cell_to_value(row: &tokio_postgres::Row, col: usize, oid: u32) -> Value {
             Value::Datetimezone(dt)
         }
         NUMERIC => {
-            // tokio-postgres doesn't ship a built-in FromSql for NUMERIC
-            // (it'd need decimal-rs or rust_decimal). v1 reads it via
-            // the f64 path: tokio-postgres returns binary NUMERIC and
-            // we can't easily ask for text without rewriting the SELECT,
-            // so we fall back to the unknown-OID branch where try_get::<String>
-            // also fails. For now: try f64-via-text by issuing a one-off
-            // raw read; if that doesn't work, surface a clear message.
-            match row.try_get::<_, Option<&str>>(col) {
-                Ok(Some(s)) => match s.parse::<f64>() {
-                    Ok(n) => Value::Number(n),
-                    Err(_) => Value::Text(s.to_string()),
+            // rust_decimal supplies the FromSql for Postgres NUMERIC and
+            // gives us mantissa (i128) + scale (u32). Lossless within the
+            // 128-bit / scale-28 range that covers virtually all real PG
+            // NUMERIC use (typical money columns are NUMERIC(p,2)).
+            match row.try_get::<_, Option<rust_decimal::Decimal>>(col) {
+                Ok(Some(d)) => Value::Decimal {
+                    mantissa: arrow::datatypes::i256::from_i128(d.mantissa()),
+                    scale: d.scale() as i8,
+                    // rust_decimal caps precision at ~28 (96-bit mantissa).
+                    precision: 28,
                 },
                 Ok(None) => Value::Null,
-                Err(_) => Value::Text("<NUMERIC: decoder needs rust_decimal feature>".to_string()),
+                Err(e) => Value::Text(format!("<NUMERIC decode error: {e}>")),
             }
         }
         JSON | JSONB => {
@@ -2161,11 +2210,11 @@ fn pg_cell_to_value(row: &tokio_postgres::Row, col: usize, oid: u32) -> Value {
         }),
         UUID_ARR => pg_array_to_list::<uuid::Uuid>(row, col, |u| Value::Text(u.to_string())),
         JSONB_ARR => pg_array_to_list::<serde_json::Value>(row, col, json_value_to_m),
-        NUMERIC_ARR => {
-            // No FromSql for numeric without rust_decimal; surface as a
-            // clear placeholder rather than a silent error.
-            Value::Text("<NUMERIC[]: decoder needs rust_decimal feature>".to_string())
-        }
+        NUMERIC_ARR => pg_array_to_list::<rust_decimal::Decimal>(row, col, |d| Value::Decimal {
+            mantissa: arrow::datatypes::i256::from_i128(d.mantissa()),
+            scale: d.scale() as i8,
+            precision: 28,
+        }),
         _ => {
             // Unknown OID — fall back to PG's text representation.
             match row.try_get::<_, Option<String>>(col) {
