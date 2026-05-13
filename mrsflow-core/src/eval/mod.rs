@@ -4734,6 +4734,35 @@ mod tests {
     }
 
     #[test]
+    fn json_from_value_record_round_trip() {
+        let src = r#"
+            let
+                rec = [a = 1, b = "hello", c = true],
+                bin = Json.FromValue(rec),
+                txt = Text.FromBinary(bin)
+            in
+                txt
+        "#;
+        match eval_str(src).unwrap() {
+            Value::Text(s) => {
+                assert_eq!(s, r#"{"a":1,"b":"hello","c":true}"#);
+            }
+            other => panic!("expected text, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn json_from_value_list_of_numbers() {
+        let src = r#"
+            Text.FromBinary(Json.FromValue({1, 2, 3.5, null}))
+        "#;
+        match eval_str(src).unwrap() {
+            Value::Text(s) => assert_eq!(s, "[1,2,3.5,null]"),
+            other => panic!("expected text, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn list_split_basic() {
         match eval_str("List.Split({1, 2, 3, 4, 5}, 2)").unwrap() {
             Value::List(chunks) => {
