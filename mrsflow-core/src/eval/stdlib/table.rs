@@ -847,12 +847,31 @@ fn select_columns_by_index(
                 ),
             }))
         }
-        super::super::value::TableRepr::LazyOdbc(_) => {
-            // TODO(odbc-fold task #56): foldable fast path — narrow the
-            // projection in place without forcing. Until then, force
-            // and re-narrow on the materialised Arrow batch.
-            let forced = table.force()?;
-            return select_columns_by_index(&forced, keep_indices, ctx);
+        super::super::value::TableRepr::LazyOdbc(state) => {
+            // Foldable: narrow projection + output_names without
+            // touching the wire. Subsequent force will emit a SELECT
+            // listing only these columns.
+            let new_projection: Vec<usize> = keep_indices
+                .iter()
+                .map(|&i| state.projection[i])
+                .collect();
+            let new_output_names = state.output_names.as_ref().map(|onames| {
+                keep_indices.iter().map(|&i| onames[i].clone()).collect()
+            });
+            Ok(Value::Table(Table {
+                repr: super::super::value::TableRepr::LazyOdbc(
+                    super::super::value::LazyOdbcState {
+                        connection_string: state.connection_string.clone(),
+                        table_name: state.table_name.clone(),
+                        schema: state.schema.clone(),
+                        projection: new_projection,
+                        output_names: new_output_names,
+                        where_filters: state.where_filters.clone(),
+                        limit: state.limit,
+                        force_fn: state.force_fn.clone(),
+                    },
+                ),
+            }))
         }
         super::super::value::TableRepr::ExpandView(ev) => {
             // Projection-aware path on the post-expand result. Output
@@ -1308,23 +1327,45 @@ fn select_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     // (function calls, cross-column comparisons, if/then/else, etc.)
     // fall through to the eager filter below.
     if let Value::Table(t) = &args[0] {
-        if let super::super::value::TableRepr::LazyParquet(state) = &t.repr {
-            if let Value::Function(closure) = &args[1] {
-                if let Some(new_filters) = try_fold_predicate(state, closure) {
-                    let mut combined = state.row_filter.clone();
-                    combined.extend(new_filters);
-                    let new_state = super::super::value::LazyParquetState {
-                        bytes: state.bytes.clone(),
-                        schema: state.schema.clone(),
-                        projection: state.projection.clone(),
-                        output_names: state.output_names.clone(),
-                        num_rows: state.num_rows,
-                        row_filter: combined,
-                    };
-                    return Ok(Value::Table(Table {
-                        repr: super::super::value::TableRepr::LazyParquet(new_state),
-                    }));
+        if let Value::Function(closure) = &args[1] {
+            match &t.repr {
+                super::super::value::TableRepr::LazyParquet(state) => {
+                    if let Some(new_filters) = try_fold_predicate(state, closure) {
+                        let mut combined = state.row_filter.clone();
+                        combined.extend(new_filters);
+                        let new_state = super::super::value::LazyParquetState {
+                            bytes: state.bytes.clone(),
+                            schema: state.schema.clone(),
+                            projection: state.projection.clone(),
+                            output_names: state.output_names.clone(),
+                            num_rows: state.num_rows,
+                            row_filter: combined,
+                        };
+                        return Ok(Value::Table(Table {
+                            repr: super::super::value::TableRepr::LazyParquet(new_state),
+                        }));
+                    }
                 }
+                super::super::value::TableRepr::LazyOdbc(state) => {
+                    if let Some(new_filters) = try_fold_predicate_for_odbc(state, closure) {
+                        let mut combined = state.where_filters.clone();
+                        combined.extend(new_filters);
+                        let new_state = super::super::value::LazyOdbcState {
+                            connection_string: state.connection_string.clone(),
+                            table_name: state.table_name.clone(),
+                            schema: state.schema.clone(),
+                            projection: state.projection.clone(),
+                            output_names: state.output_names.clone(),
+                            where_filters: combined,
+                            limit: state.limit,
+                            force_fn: state.force_fn.clone(),
+                        };
+                        return Ok(Value::Table(Table {
+                            repr: super::super::value::TableRepr::LazyOdbc(new_state),
+                        }));
+                    }
+                }
+                _ => {}
             }
         }
     }
@@ -5237,6 +5278,32 @@ fn try_fold_predicate(
     state: &super::super::value::LazyParquetState,
     closure: &super::super::value::Closure,
 ) -> Option<Vec<super::super::value::RowFilter>> {
+    try_fold_predicate_generic(
+        &state.projection,
+        state.output_names.as_deref(),
+        state.schema.as_ref(),
+        closure,
+    )
+}
+
+fn try_fold_predicate_for_odbc(
+    state: &super::super::value::LazyOdbcState,
+    closure: &super::super::value::Closure,
+) -> Option<Vec<super::super::value::RowFilter>> {
+    try_fold_predicate_generic(
+        &state.projection,
+        state.output_names.as_deref(),
+        state.schema.as_ref(),
+        closure,
+    )
+}
+
+fn try_fold_predicate_generic(
+    projection: &[usize],
+    output_names: Option<&[Option<String>]>,
+    schema: &arrow::datatypes::Schema,
+    closure: &super::super::value::Closure,
+) -> Option<Vec<super::super::value::RowFilter>> {
     if closure.params.len() != 1 {
         return None;
     }
@@ -5246,7 +5313,7 @@ fn try_fold_predicate(
         super::super::value::FnBody::Builtin(_) => return None,
     };
     let mut out = Vec::new();
-    if extract_filters(body, param_name, state, &mut out) {
+    if extract_filters(body, param_name, projection, output_names, schema, &mut out) {
         Some(out)
     } else {
         None
@@ -5256,7 +5323,9 @@ fn try_fold_predicate(
 fn extract_filters(
     expr: &crate::parser::Expr,
     param_name: &str,
-    state: &super::super::value::LazyParquetState,
+    projection: &[usize],
+    output_names: Option<&[Option<String>]>,
+    schema: &arrow::datatypes::Schema,
     out: &mut Vec<super::super::value::RowFilter>,
 ) -> bool {
     use crate::parser::{BinaryOp, Expr};
@@ -5264,8 +5333,8 @@ fn extract_filters(
 
     match expr {
         Expr::Binary(BinaryOp::And, l, r) => {
-            extract_filters(l, param_name, state, out)
-                && extract_filters(r, param_name, state, out)
+            extract_filters(l, param_name, projection, output_names, schema, out)
+                && extract_filters(r, param_name, projection, output_names, schema, out)
         }
         Expr::Binary(op, l, r) => {
             // [col] op literal — or — literal op [col] (flip the op).
@@ -5299,7 +5368,7 @@ fn extract_filters(
                     FilterOp::Ne => FilterOp::IsNotNull,
                     _ => return false,
                 };
-                let col_idx = match resolve_field(state, col_field) {
+                let col_idx = match resolve_field_generic(projection, output_names, schema, col_field) {
                     Some(i) => i,
                     None => return false,
                 };
@@ -5314,7 +5383,7 @@ fn extract_filters(
                 Some(s) => s,
                 None => return false,
             };
-            let col_idx = match resolve_field(state, col_field) {
+            let col_idx = match resolve_field_generic(projection, output_names, schema, col_field) {
                 Some(i) => i,
                 None => return false,
             };
@@ -5355,15 +5424,23 @@ fn expr_to_scalar(expr: &crate::parser::Expr) -> Option<super::super::value::Fil
 }
 
 /// Resolve a user-facing field name (post-rename, post-projection) to
-/// the underlying parquet schema field index — the stable index used
-/// in RowFilter.source_col_idx.
-fn resolve_field(
-    state: &super::super::value::LazyParquetState,
+/// the underlying source schema field index — the stable index used
+/// in `RowFilter.source_col_idx`. Generic over projection state so
+/// both LazyParquet and LazyOdbc can share the foldable-predicate
+/// extractor.
+fn resolve_field_generic(
+    projection: &[usize],
+    output_names: Option<&[Option<String>]>,
+    schema: &arrow::datatypes::Schema,
     field_name: &str,
 ) -> Option<usize> {
-    for pos in 0..state.projection.len() {
-        if state.effective_name(pos) == field_name {
-            return Some(state.projection[pos]);
+    for pos in 0..projection.len() {
+        let effective = output_names
+            .and_then(|on| on.get(pos))
+            .and_then(|o| o.clone())
+            .unwrap_or_else(|| schema.field(projection[pos]).name().clone());
+        if effective == field_name {
+            return Some(projection[pos]);
         }
     }
     None
