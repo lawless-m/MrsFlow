@@ -20,7 +20,7 @@ use super::super::iohost::IoHost;
 use super::super::value::{BuiltinFn, Closure, FnBody, MError, Record, Table, Value};
 use super::common::{
     expect_function, expect_int, expect_list, expect_list_of_lists, expect_table,
-    expect_text, expect_text_list, int_n_arg, invoke_builtin_callback,
+    expect_table_lazy_ok, expect_text, expect_text_list, int_n_arg, invoke_builtin_callback,
     invoke_callback_with_host, one, three, two, type_mismatch, values_equal_primitive,
 };
 
@@ -643,7 +643,8 @@ fn constructor(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 
 
 fn column_names(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    let table = expect_table(&args[0])?;
+    // Schema-only: column names come from the cached schema, no decode needed.
+    let table = expect_table_lazy_ok(&args[0])?;
     let names: Vec<Value> = table
         .column_names()
         .into_iter()
@@ -716,12 +717,19 @@ fn rename_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         super::super::value::TableRepr::Rows { rows, .. } => {
             Ok(Value::Table(Table::from_rows(renamed, rows.clone())))
         }
+        super::super::value::TableRepr::LazyParquet(_) => {
+            unreachable!("expect_table forces upstream — lazy variant can't reach here")
+        }
+        super::super::value::TableRepr::JoinView(_) => {
+            unreachable!("expect_table forces upstream — JoinView can't reach here")
+        }
     }
 }
 
 
 fn remove_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    let table = expect_table(&args[0])?;
+    // Projection-aware: complement-of-SelectColumns, doesn't force.
+    let table = expect_table_lazy_ok(&args[0])?;
     let names = expect_text_list(&args[1], "Table.RemoveColumns: names")?;
     let existing = table.column_names();
     for n in &names {
@@ -769,6 +777,34 @@ fn select_columns_by_index(
                 .map(|row| keep_indices.iter().map(|&i| row[i].clone()).collect())
                 .collect();
             Ok(Value::Table(Table::from_rows(new_names, new_rows)))
+        }
+        super::super::value::TableRepr::JoinView(_) => {
+            // SelectColumns/RemoveColumns on a JoinView are uncommon in
+            // the corpus pattern (the demo applies them after expand,
+            // not before). Forcing first is correct and keeps the
+            // projection-narrowing code path simple.
+            let forced = table.force()?;
+            return select_columns_by_index(&forced, keep_indices, ctx);
+        }
+        super::super::value::TableRepr::LazyParquet(state) => {
+            // Projection-aware path: narrow the mask without decoding any
+            // column data. `keep_indices` are positions in the *current*
+            // projection list; translate them back to indices in the
+            // underlying parquet schema so subsequent ops compose correctly.
+            let new_projection: Vec<usize> = keep_indices
+                .iter()
+                .map(|&i| state.projection[i])
+                .collect();
+            Ok(Value::Table(Table {
+                repr: super::super::value::TableRepr::LazyParquet(
+                    super::super::value::LazyParquetState {
+                        bytes: state.bytes.clone(),
+                        schema: state.schema.clone(),
+                        projection: new_projection,
+                        num_rows: state.num_rows,
+                    },
+                ),
+            }))
         }
     }
 }
@@ -962,7 +998,7 @@ pub(crate) fn table_to_rows(table: &Table) -> Result<(Vec<String>, Vec<Vec<Value
     for r in 0..n_rows {
         let mut row = Vec::with_capacity(n_cols);
         for c in 0..n_cols {
-            row.push(cell_to_value(table, c, r)?);
+            row.push(cell_to_value(&table, c, r)?);
         }
         rows.push(row);
     }
@@ -977,6 +1013,10 @@ pub fn cell_to_value(table: &Table, col: usize, row: usize) -> Result<Value, MEr
         super::super::value::TableRepr::Arrow(b) => b,
         super::super::value::TableRepr::Rows { rows, .. } => {
             return Ok(rows[row][col].clone());
+        }
+        super::super::value::TableRepr::LazyParquet(_)
+        | super::super::value::TableRepr::JoinView(_) => {
+            unreachable!("cell_to_value expects forced table — caller should expect_table first")
         }
     };
     let array = batch.column(col);
@@ -1046,31 +1086,82 @@ pub fn cell_to_value(table: &Table, col: usize, row: usize) -> Result<Value, MEr
                 .ok_or_else(|| MError::Other(format!("Date32 out of range: {days} days")))?;
             Ok(Value::Date(d))
         }
-        DataType::Timestamp(arrow::datatypes::TimeUnit::Microsecond, None) => {
-            let a = array
-                .as_any()
-                .downcast_ref::<TimestampMicrosecondArray>()
-                .expect("TimestampMicrosecond");
-            let micros = a.value(row);
+        // All Timestamp variants → Value::Datetime (M has one datetime type;
+        // a timezone-bearing parquet column gets converted to its UTC-naive
+        // wall clock equivalent, matching Power Query's typical "show in UTC"
+        // default for unannotated parquet inputs).
+        DataType::Timestamp(unit, _tz) => {
+            use arrow::array::{
+                TimestampMillisecondArray, TimestampNanosecondArray, TimestampSecondArray,
+            };
+            use arrow::datatypes::TimeUnit;
+            let micros: i64 = match unit {
+                TimeUnit::Second => array
+                    .as_any()
+                    .downcast_ref::<TimestampSecondArray>()
+                    .expect("TimestampSecond")
+                    .value(row)
+                    .saturating_mul(1_000_000),
+                TimeUnit::Millisecond => array
+                    .as_any()
+                    .downcast_ref::<TimestampMillisecondArray>()
+                    .expect("TimestampMillisecond")
+                    .value(row)
+                    .saturating_mul(1_000),
+                TimeUnit::Microsecond => array
+                    .as_any()
+                    .downcast_ref::<TimestampMicrosecondArray>()
+                    .expect("TimestampMicrosecond")
+                    .value(row),
+                TimeUnit::Nanosecond => {
+                    array
+                        .as_any()
+                        .downcast_ref::<TimestampNanosecondArray>()
+                        .expect("TimestampNanosecond")
+                        .value(row)
+                        / 1_000
+                }
+            };
             let dt = chrono::DateTime::from_timestamp_micros(micros)
                 .ok_or_else(|| MError::Other(format!("Timestamp out of range: {micros} us")))?
                 .naive_utc();
             Ok(Value::Datetime(dt))
         }
-        DataType::Duration(arrow::datatypes::TimeUnit::Microsecond) => {
+        DataType::Date64 => {
             let a = array
                 .as_any()
-                .downcast_ref::<DurationMicrosecondArray>()
-                .expect("DurationMicrosecond");
-            let micros = a.value(row);
-            Ok(Value::Duration(chrono::Duration::microseconds(micros)))
+                .downcast_ref::<arrow::array::Date64Array>()
+                .expect("Date64");
+            let millis = a.value(row);
+            let dt = chrono::DateTime::from_timestamp_millis(millis)
+                .ok_or_else(|| MError::Other(format!("Date64 out of range: {millis} ms")))?
+                .date_naive();
+            Ok(Value::Date(dt))
         }
-        other => Err(MError::NotImplemented(match other {
-            DataType::Date64 | DataType::Timestamp(_, _) => {
-                "non-microsecond timestamp decode (deferred)"
-            }
-            _ => "unsupported cell type",
-        })),
+        // All Duration variants → Value::Duration (chrono::Duration is
+        // nanosecond-precision internally; we choose the constructor by unit).
+        DataType::Duration(unit) => {
+            use arrow::array::{
+                DurationMillisecondArray, DurationNanosecondArray, DurationSecondArray,
+            };
+            use arrow::datatypes::TimeUnit;
+            let d = match unit {
+                TimeUnit::Second => chrono::Duration::seconds(
+                    array.as_any().downcast_ref::<DurationSecondArray>().expect("DurationSecond").value(row),
+                ),
+                TimeUnit::Millisecond => chrono::Duration::milliseconds(
+                    array.as_any().downcast_ref::<DurationMillisecondArray>().expect("DurationMillisecond").value(row),
+                ),
+                TimeUnit::Microsecond => chrono::Duration::microseconds(
+                    array.as_any().downcast_ref::<DurationMicrosecondArray>().expect("DurationMicrosecond").value(row),
+                ),
+                TimeUnit::Nanosecond => chrono::Duration::nanoseconds(
+                    array.as_any().downcast_ref::<DurationNanosecondArray>().expect("DurationNanosecond").value(row),
+                ),
+            };
+            Ok(Value::Duration(d))
+        }
+        _other => Err(MError::NotImplemented("unsupported cell type")),
     }
 }
 
@@ -1081,7 +1172,9 @@ pub fn cell_to_value(table: &Table, col: usize, row: usize) -> Result<Value, MEr
 
 
 fn select_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    let table = expect_table(&args[0])?;
+    // Projection-aware: doesn't force a lazy table; `select_columns_by_index`
+    // narrows the LazyParquet mask directly. See mrsflow/09-lazy-tables.md.
+    let table = expect_table_lazy_ok(&args[0])?;
     let names = expect_text_list(&args[1], "Table.SelectColumns: names")?;
     let existing = table.column_names();
     let mut indices: Vec<usize> = Vec::with_capacity(names.len());
@@ -1105,7 +1198,7 @@ fn select_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let n_rows = table.num_rows();
     let mut keep: Vec<u32> = Vec::new();
     for row in 0..n_rows {
-        let record = row_to_record(table, row)?;
+        let record = row_to_record(&table, row)?;
         let result = invoke_callback_with_host(predicate, vec![record], host)?;
         match result {
             Value::Logical(true) => keep.push(row as u32),
@@ -1142,6 +1235,12 @@ fn select_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
             let new_rows: Vec<Vec<Value>> =
                 keep.into_iter().map(|i| rows[i as usize].clone()).collect();
             Ok(Value::Table(Table::from_rows(columns.clone(), new_rows)))
+        }
+        super::super::value::TableRepr::LazyParquet(_) => {
+            unreachable!("expect_table forces upstream — lazy variant can't reach here")
+        }
+        super::super::value::TableRepr::JoinView(_) => {
+            unreachable!("expect_table forces upstream — JoinView can't reach here")
         }
     }
 }
@@ -1187,7 +1286,7 @@ fn to_records(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let n = table.num_rows();
     let mut out: Vec<Value> = Vec::with_capacity(n);
     for row in 0..n {
-        out.push(row_to_record(table, row)?);
+        out.push(row_to_record(&table, row)?);
     }
     Ok(Value::List(out))
 }
@@ -1200,7 +1299,7 @@ fn distinct(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             "Table.Distinct: equationCriteria not yet supported",
         ));
     }
-    let (names, rows) = table_to_rows(table)?;
+    let (names, rows) = table_to_rows(&table)?;
     let mut kept: Vec<Vec<Value>> = Vec::new();
     for row in rows {
         let mut dup = false;
@@ -1243,7 +1342,7 @@ fn first_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         }
         other => return Err(type_mismatch("number or function", other)),
     };
-    let (names, rows) = table_to_rows(table)?;
+    let (names, rows) = table_to_rows(&table)?;
     let kept: Vec<Vec<Value>> = rows.into_iter().take(n).collect();
     Ok(Value::Table(values_to_table(&names, &kept)?))
 }
@@ -1260,14 +1359,15 @@ fn column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let n = table.num_rows();
     let mut out: Vec<Value> = Vec::with_capacity(n);
     for row in 0..n {
-        out.push(cell_to_value(table, col_idx, row)?);
+        out.push(cell_to_value(&table, col_idx, row)?);
     }
     Ok(Value::List(out))
 }
 
 
 fn is_empty(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    let table = expect_table(&args[0])?;
+    // Schema-only: row count comes from the parquet footer, no decode.
+    let table = expect_table_lazy_ok(&args[0])?;
     Ok(Value::Logical(table.num_rows() == 0))
 }
 
@@ -1285,7 +1385,7 @@ fn add_index_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError>
         Some(Value::Null) | None => 1.0,
         Some(other) => return Err(type_mismatch("number", other)),
     };
-    let (mut names, mut rows) = table_to_rows(table)?;
+    let (mut names, mut rows) = table_to_rows(&table)?;
     if names.iter().any(|n| n == &new_name) {
         return Err(MError::Other(format!(
             "Table.AddIndexColumn: column already exists: {new_name}"
@@ -1306,7 +1406,7 @@ fn add_column(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let n_rows = table.num_rows();
     let mut new_cells: Vec<Value> = Vec::with_capacity(n_rows);
     for row in 0..n_rows {
-        let record = row_to_record(table, row)?;
+        let record = row_to_record(&table, row)?;
         let v = invoke_callback_with_host(transform, vec![record], host)?;
         new_cells.push(v);
     }
@@ -1352,7 +1452,7 @@ fn add_column(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
 
     // Slow path: produce a Rows-backed result. Decode the input if needed,
     // then append the new column per row.
-    let (mut names, mut rows) = table_to_rows(table)?;
+    let (mut names, mut rows) = table_to_rows(&table)?;
     if rows.len() != new_cells.len() {
         return Err(MError::Other(
             "Table.AddColumn: row count mismatch (internal)".into(),
@@ -1428,7 +1528,7 @@ fn promote_headers(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     // Read row 0 as the new names.
     let mut new_names: Vec<String> = Vec::with_capacity(table.num_columns());
     for col in 0..table.num_columns() {
-        let cell = cell_to_value(table, col, 0)?;
+        let cell = cell_to_value(&table, col, 0)?;
         let name = match (&cell, promote_scalars) {
             (Value::Text(s), _) => s.clone(),
             // PromoteAllScalars=true: coerce numbers/logicals to text.
@@ -1471,6 +1571,12 @@ fn promote_headers(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
             let new_rows: Vec<Vec<Value>> = rows.iter().skip(1).cloned().collect();
             Ok(Value::Table(Table::from_rows(new_names, new_rows)))
         }
+        super::super::value::TableRepr::LazyParquet(_) => {
+            unreachable!("expect_table forces upstream — lazy variant can't reach here")
+        }
+        super::super::value::TableRepr::JoinView(_) => {
+            unreachable!("expect_table forces upstream — JoinView can't reach here")
+        }
     }
 }
 
@@ -1480,7 +1586,7 @@ pub(crate) fn row_to_record(table: &Table, row: usize) -> Result<Value, MError> 
     let names = table.column_names();
     let mut fields: Vec<(String, Value)> = Vec::with_capacity(names.len());
     for (col, name) in names.into_iter().enumerate() {
-        let value = cell_to_value(table, col, row)?;
+        let value = cell_to_value(&table, col, row)?;
         fields.push((name, value));
     }
     Ok(Value::Record(Record {
@@ -1568,6 +1674,12 @@ fn transform_column_types(args: &[Value], _host: &dyn IoHost) -> Result<Value, M
                 }
             }
             Ok(Value::Table(values_to_table(columns, &new_rows)?))
+        }
+        super::super::value::TableRepr::LazyParquet(_) => {
+            unreachable!("expect_table forces upstream — lazy variant can't reach here")
+        }
+        super::super::value::TableRepr::JoinView(_) => {
+            unreachable!("expect_table forces upstream — JoinView can't reach here")
         }
     }
 }
@@ -1682,7 +1794,7 @@ fn transform_columns(args: &[Value], host: &dyn IoHost) -> Result<Value, MError>
     // Each transform runs cell-by-cell; the result lands in values_to_table
     // which picks Arrow if the resulting columns are all uniform-typed, or
     // Rows if any column ends up heterogeneous after the transform.
-    let (names, mut rows) = table_to_rows(table)?;
+    let (names, mut rows) = table_to_rows(&table)?;
     let n_rows = rows.len();
 
     for (name, closure, type_opt) in &pairs {
@@ -1827,12 +1939,19 @@ fn skip(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             let new_rows: Vec<Vec<Value>> = rows.iter().skip(skip).cloned().collect();
             Ok(Value::Table(Table::from_rows(columns.clone(), new_rows)))
         }
+        super::super::value::TableRepr::LazyParquet(_) => {
+            unreachable!("expect_table forces upstream — lazy variant can't reach here")
+        }
+        super::super::value::TableRepr::JoinView(_) => {
+            unreachable!("expect_table forces upstream — JoinView can't reach here")
+        }
     }
 }
 
 
 fn reorder_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    let table = expect_table(&args[0])?;
+    // Projection-aware: reordering is just a permuted mask, no decode needed.
+    let table = expect_table_lazy_ok(&args[0])?;
     let order = expect_text_list(&args[1], "Table.ReorderColumns: columnOrder")?;
     let existing = table.column_names();
 
@@ -1876,7 +1995,7 @@ fn expand_record_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MEr
         )));
     }
 
-    let (existing, rows) = table_to_rows(table)?;
+    let (existing, rows) = table_to_rows(&table)?;
     let col_idx = existing.iter().position(|n| n == &column).ok_or_else(|| {
         MError::Other(format!(
             "Table.ExpandRecordColumn: column not found: {column}"
@@ -1928,7 +2047,7 @@ fn expand_record_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MEr
 fn expand_list_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let column = expect_text(&args[1])?.to_string();
-    let (names, rows) = table_to_rows(table)?;
+    let (names, rows) = table_to_rows(&table)?;
     let col_idx = names.iter().position(|n| n == &column).ok_or_else(|| {
         MError::Other(format!(
             "Table.ExpandListColumn: column not found: {column}"
@@ -1964,7 +2083,9 @@ fn expand_list_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MErro
 
 
 fn expand_table_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    let table = expect_table(&args[0])?;
+    // Use `expect_table_lazy_ok` so JoinView falls through to the fast
+    // path below without being materialised first.
+    let table = expect_table_lazy_ok(&args[0])?;
     let column = expect_text(&args[1])?.to_string();
     let column_names = expect_text_list(&args[2], "Table.ExpandTableColumn: columnNames")?;
     let new_column_names = match args.get(3) {
@@ -1979,6 +2100,21 @@ fn expand_table_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MErr
         )));
     }
 
+    // Fast path: expanding the JoinView's nested column. Pull only the
+    // requested columns from the lazy right side — for a LazyParquet
+    // right with 134 cols, this decodes 1–2 cols instead of all 134.
+    // RT-preserving: produces the byte-identical Rows-backed result the
+    // eager path would have, just without decoding columns no one asked
+    // for. See mrsflow/09-lazy-tables.md §4 (JoinView).
+    if let super::super::value::TableRepr::JoinView(jv) = &table.repr {
+        if jv.new_column_name == column {
+            return expand_join_view_lazily(jv, &column_names, &new_column_names);
+        }
+    }
+
+    // Slow path: force any laziness, then expand eagerly as before.
+    let forced = table.force()?;
+    let table: &Table = &forced;
     let (outer_names, outer_rows) = table_to_rows(table)?;
     let col_idx = outer_names.iter().position(|n| n == &column).ok_or_else(|| {
         MError::Other(format!(
@@ -2043,13 +2179,109 @@ fn expand_table_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MErr
     Ok(Value::Table(values_to_table(&out_names, &out_rows)?))
 }
 
+/// Fast-path expansion of a `JoinView`'s nested column. Reads only the
+/// requested columns from the right handle — for a `LazyParquet` right,
+/// the irrelevant columns are never decoded. RT-preserving: produces the
+/// same Rows-backed table the eager `materialise_join_view` +
+/// `expand_table_column` slow path would have, just without the
+/// throwaway full-row materialisation in between.
+fn expand_join_view_lazily(
+    jv: &super::super::value::JoinViewState,
+    column_names: &[String],
+    new_column_names: &[String],
+) -> Result<Value, MError> {
+    use super::super::value::TableRepr;
+
+    // 1. Resolve requested column indices in the right side's *current*
+    // column space (which may already be a narrowed projection).
+    let right_current_names = jv.right.column_names();
+    let mut right_keep: Vec<usize> = Vec::with_capacity(column_names.len());
+    for n in column_names {
+        let idx = right_current_names.iter().position(|r| r == n).ok_or_else(|| {
+            MError::Other(format!(
+                "Table.ExpandTableColumn: inner column not found: {n}"
+            ))
+        })?;
+        right_keep.push(idx);
+    }
+
+    // 2. Project right to just those columns. For LazyParquet, this
+    // narrows the mask without decoding anything yet. For Arrow/Rows,
+    // it's a regular column projection.
+    let projected_right = match &jv.right.repr {
+        TableRepr::LazyParquet(state) => {
+            let new_projection: Vec<usize> =
+                right_keep.iter().map(|&i| state.projection[i]).collect();
+            Table {
+                repr: TableRepr::LazyParquet(super::super::value::LazyParquetState {
+                    bytes: state.bytes.clone(),
+                    schema: state.schema.clone(),
+                    projection: new_projection,
+                    num_rows: state.num_rows,
+                }),
+            }
+        }
+        _ => {
+            // Eager right: build a Rows-backed projection of the kept columns.
+            let forced = jv.right.force()?;
+            let (_, all_rows) = table_to_rows(&forced)?;
+            let proj_rows: Vec<Vec<Value>> = all_rows
+                .iter()
+                .map(|r| right_keep.iter().map(|&i| r[i].clone()).collect())
+                .collect();
+            let proj_names: Vec<String> =
+                right_keep.iter().map(|&i| right_current_names[i].clone()).collect();
+            Table::from_rows(proj_names, proj_rows)
+        }
+    };
+
+    // 3. Now decode (LazyParquet → Arrow with narrowed projection) and
+    // read row-by-row. This is the moment the parquet bytes actually
+    // get read for the kept columns.
+    let projected_right_forced = projected_right.force()?;
+    let mut right_rows: Vec<Vec<Value>> = Vec::with_capacity(projected_right_forced.num_rows());
+    for r in 0..projected_right_forced.num_rows() {
+        let mut row = Vec::with_capacity(column_names.len());
+        for c in 0..column_names.len() {
+            row.push(cell_to_value(&projected_right_forced, c, r)?);
+        }
+        right_rows.push(row);
+    }
+
+    // 4. Force left and read rows.
+    let left_forced = jv.left.force()?;
+    let (left_names, left_rows) = table_to_rows(&left_forced)?;
+
+    // 5. Output column order: left columns then the new column names.
+    // (JoinView's nested column is always at the end of the join result,
+    // so the slot-replace logic of the eager path simplifies to a tail
+    // append here.)
+    let mut out_names: Vec<String> = left_names;
+    out_names.extend(new_column_names.iter().cloned());
+
+    let mut out_rows: Vec<Vec<Value>> = Vec::with_capacity(left_rows.len());
+    for (left_idx, left_row) in left_rows.iter().enumerate() {
+        let matches = &jv.matches[left_idx];
+        // Empty matches → drop the row (matches the eager path:
+        // empty inner Table in expand yields zero output rows).
+        for &right_idx in matches {
+            let mut new_row = Vec::with_capacity(out_names.len());
+            new_row.extend_from_slice(left_row);
+            new_row.extend_from_slice(&right_rows[right_idx as usize]);
+            out_rows.push(new_row);
+        }
+    }
+
+    Ok(Value::Table(values_to_table(&out_names, &out_rows)?))
+}
+
 
 fn unpivot(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let pivot_columns = expect_text_list(&args[1], "Table.Unpivot: pivotColumns")?;
     let attribute_column = expect_text(&args[2])?.to_string();
     let value_column = expect_text(&args[3])?.to_string();
-    do_unpivot(table, &pivot_columns, &attribute_column, &value_column, "Table.Unpivot")
+    do_unpivot(&table, &pivot_columns, &attribute_column, &value_column, "Table.Unpivot")
 }
 
 
@@ -2065,7 +2297,7 @@ fn unpivot_other_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, ME
         .filter(|n| !keep_columns.contains(n))
         .collect();
     do_unpivot(
-        table,
+        &table,
         &pivot_columns,
         &attribute_column,
         &value_column,
@@ -2082,7 +2314,7 @@ fn do_unpivot(
     value_column: &str,
     ctx: &str,
 ) -> Result<Value, MError> {
-    let (names, rows) = table_to_rows(table)?;
+    let (names, rows) = table_to_rows(&table)?;
     // Resolve pivot indices and validate.
     let pivot_indices: Vec<usize> = pivot_columns
         .iter()
@@ -2133,7 +2365,7 @@ fn pivot(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
         Some(other) => return Err(type_mismatch("function", other)),
     };
 
-    let (names, rows) = table_to_rows(table)?;
+    let (names, rows) = table_to_rows(&table)?;
     let attr_idx = names
         .iter()
         .position(|n| n == &attribute_column)
@@ -2256,8 +2488,8 @@ fn join(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         ));
     }
 
-    let (left_names, left_rows) = table_to_rows(table1)?;
-    let (right_names, right_rows) = table_to_rows(table2)?;
+    let (left_names, left_rows) = table_to_rows(&table1)?;
+    let (right_names, right_rows) = table_to_rows(&table2)?;
 
     let key1_idx = left_names.iter().position(|n| n == &key1).ok_or_else(|| {
         MError::Other(format!("Table.Join: key1 column not found: {key1}"))
@@ -2335,6 +2567,12 @@ fn join_key_from(v: &Value) -> Result<JoinKey, MError> {
 }
 
 fn nested_join(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    // Right side stays lazy where possible (only its key column is
+    // decoded to build hash buckets); left side is forced because we
+    // need to iterate left rows to build the matches vector. The
+    // resulting `JoinView` lets a downstream `Table.ExpandTableColumn`
+    // pull only the columns it actually uses from the right side.
+    // See `mrsflow/09-lazy-tables.md` §7.
     let table1 = expect_table(&args[0])?;
     let key1 = match &args[1] {
         Value::Text(s) => s.clone(),
@@ -2353,7 +2591,9 @@ fn nested_join(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         }
         other => return Err(type_mismatch("text or text list", other)),
     };
-    let table2 = expect_table(&args[2])?;
+    // Right side kept lazy (where lazy) — `expect_table_lazy_ok` avoids the
+    // implicit force that `expect_table` does.
+    let table2 = expect_table_lazy_ok(&args[2])?;
     let key2 = match &args[3] {
         Value::Text(s) => s.clone(),
         Value::List(items) if items.len() == 1 => match &items[0] {
@@ -2380,60 +2620,94 @@ fn nested_join(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         ));
     }
 
-    let (left_names, left_rows) = table_to_rows(table1)?;
-    let (right_names, right_rows) = table_to_rows(table2)?;
+    let (left_names, left_rows) = table_to_rows(&table1)?;
 
     let key1_idx = left_names.iter().position(|n| n == &key1).ok_or_else(|| {
         MError::Other(format!(
             "Table.NestedJoin: key1 column not found: {key1}"
         ))
     })?;
+    let right_names = table2.column_names();
     let key2_idx = right_names.iter().position(|n| n == &key2).ok_or_else(|| {
         MError::Other(format!(
             "Table.NestedJoin: key2 column not found: {key2}"
         ))
     })?;
 
-    // Hash join: O(n+m). Build a bucket map on the right side keyed by
-    // `key2_idx`, then probe with each left row's `key1_idx`. The corpus's
-    // dominant pattern is 100K+ left × 10K+ right; the previous O(n*m)
-    // scan was effectively useless at that scale.
-    let mut buckets: HashMap<JoinKey, Vec<usize>> = HashMap::with_capacity(right_rows.len());
-    for (i, right_row) in right_rows.iter().enumerate() {
-        let key = join_key_from(&right_row[key2_idx])?;
-        buckets.entry(key).or_default().push(i);
+    // Decode just the right key column to build hash buckets. For a
+    // LazyParquet right side, this reads only one column from the
+    // parquet — the rest stay on disk for later lazy expand to pull
+    // selectively. For Arrow/Rows, this is just a column projection.
+    let right_keys: Vec<Value> = decode_right_key_column(table2, key2_idx)?;
+
+    let mut buckets: HashMap<JoinKey, Vec<usize>> = HashMap::with_capacity(right_keys.len());
+    for (i, k) in right_keys.iter().enumerate() {
+        buckets.entry(join_key_from(k)?).or_default().push(i);
     }
 
-    let mut out_names: Vec<String> = left_names.clone();
-    out_names.push(new_column_name);
-    let mut out_rows: Vec<Vec<Value>> = Vec::with_capacity(left_rows.len());
-
+    // Build per-left-row matches.
+    let mut matches: Vec<Vec<u32>> = Vec::with_capacity(left_rows.len());
     for left_row in &left_rows {
         let lkey = join_key_from(&left_row[key1_idx])?;
-        let matched: Vec<Vec<Value>> = buckets
+        let ms: Vec<u32> = buckets
             .get(&lkey)
-            .map(|idx| idx.iter().map(|&i| right_rows[i].clone()).collect())
+            .map(|idx| idx.iter().map(|&i| i as u32).collect())
             .unwrap_or_default();
-        let inner_table = Table::from_rows(right_names.clone(), matched.clone());
-        match join_kind {
-            0 => {
-                if matched.is_empty() {
-                    continue;
-                }
-                let mut new_row = left_row.clone();
-                new_row.push(Value::Table(inner_table));
-                out_rows.push(new_row);
-            }
-            1 => {
-                let mut new_row = left_row.clone();
-                new_row.push(Value::Table(inner_table));
-                out_rows.push(new_row);
-            }
-            _ => unreachable!(),
-        }
+        matches.push(ms);
     }
 
-    Ok(Value::Table(values_to_table(&out_names, &out_rows)?))
+    // Build the left side as a Rows-backed table (preserves the iteration
+    // order that the matches vector is indexed against).
+    let left_table = Table::from_rows(left_names, left_rows);
+
+    Ok(Value::Table(Table {
+        repr: super::super::value::TableRepr::JoinView(super::super::value::JoinViewState {
+            left: Box::new(left_table),
+            right: std::sync::Arc::new(table2.clone()),
+            new_column_name,
+            matches,
+            join_kind,
+        }),
+    }))
+}
+
+/// Pull the values of column `col_idx` from `table`, decoding only that
+/// one column when `table` is a `LazyParquet`. Used by `nested_join` so
+/// hash-bucket build doesn't force the entire right side.
+fn decode_right_key_column(
+    table: &Table,
+    col_idx: usize,
+) -> Result<Vec<Value>, MError> {
+    use super::super::value::{LazyParquetState, TableRepr};
+    match &table.repr {
+        TableRepr::LazyParquet(state) => {
+            // Narrow to just the key column and force.
+            let key_schema_idx = state.projection[col_idx];
+            let key_only = Table {
+                repr: TableRepr::LazyParquet(LazyParquetState {
+                    bytes: state.bytes.clone(),
+                    schema: state.schema.clone(),
+                    projection: vec![key_schema_idx],
+                    num_rows: state.num_rows,
+                }),
+            };
+            let forced = key_only.force()?;
+            let mut out = Vec::with_capacity(forced.num_rows());
+            for r in 0..forced.num_rows() {
+                out.push(cell_to_value(&forced, 0, r)?);
+            }
+            Ok(out)
+        }
+        _ => {
+            // Eager path: force then read the column directly.
+            let forced = table.force()?;
+            let mut out = Vec::with_capacity(forced.num_rows());
+            for r in 0..forced.num_rows() {
+                out.push(cell_to_value(&forced, col_idx, r)?);
+            }
+            Ok(out)
+        }
+    }
 }
 
 
@@ -2501,7 +2775,7 @@ fn transform_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let n_rows = table.num_rows();
     let mut out: Vec<Value> = Vec::with_capacity(n_rows);
     for row in 0..n_rows {
-        let record = row_to_record(table, row)?;
+        let record = row_to_record(&table, row)?;
         out.push(invoke_callback_with_host(transform, vec![record], host)?);
     }
     Ok(Value::List(out))
@@ -2530,7 +2804,7 @@ fn insert_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     for row in 0..offset {
         let mut cells = Vec::with_capacity(names.len());
         for col in 0..names.len() {
-            cells.push(cell_to_value(table, col, row)?);
+            cells.push(cell_to_value(&table, col, row)?);
         }
         rows.push(cells);
     }
@@ -2557,7 +2831,7 @@ fn insert_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     for row in offset..n_existing {
         let mut cells = Vec::with_capacity(names.len());
         for col in 0..names.len() {
-            cells.push(cell_to_value(table, col, row)?);
+            cells.push(cell_to_value(&table, col, row)?);
         }
         rows.push(cells);
     }
@@ -2572,7 +2846,7 @@ fn first(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     if table.num_rows() == 0 {
         return Ok(args.get(1).cloned().unwrap_or(Value::Null));
     }
-    row_to_record(table, 0)
+    row_to_record(&table, 0)
 }
 
 fn last(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
@@ -2581,7 +2855,7 @@ fn last(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     if n == 0 {
         return Ok(args.get(1).cloned().unwrap_or(Value::Null));
     }
-    row_to_record(table, n - 1)
+    row_to_record(&table, n - 1)
 }
 
 fn first_value(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
@@ -2589,16 +2863,18 @@ fn first_value(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     if table.num_rows() == 0 || table.num_columns() == 0 {
         return Ok(args.get(1).cloned().unwrap_or(Value::Null));
     }
-    cell_to_value(table, 0, 0)
+    cell_to_value(&table, 0, 0)
 }
 
 fn row_count(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    let table = expect_table(&args[0])?;
+    // Schema-only: parquet footer carries row count, no column decode.
+    let table = expect_table_lazy_ok(&args[0])?;
     Ok(Value::Number(table.num_rows() as f64))
 }
 
 fn column_count(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    let table = expect_table(&args[0])?;
+    // Schema-only: column count comes from the current projection.
+    let table = expect_table_lazy_ok(&args[0])?;
     Ok(Value::Number(table.num_columns() as f64))
 }
 
@@ -2609,7 +2885,7 @@ fn range(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         return Err(MError::Other("Table.Range: offset must be non-negative".into()));
     }
     let offset = offset as usize;
-    let (names, rows) = table_to_rows(table)?;
+    let (names, rows) = table_to_rows(&table)?;
     let count = match args.get(2) {
         Some(Value::Null) | None => rows.len().saturating_sub(offset),
         Some(v) => {
@@ -2633,7 +2909,7 @@ fn row_matches_record(table: &Table, row: usize, needle: &Record) -> Result<bool
             Some(idx) => idx,
             None => return Ok(false),
         };
-        let cell = cell_to_value(table, col, row)?;
+        let cell = cell_to_value(&table, col, row)?;
         let expected = super::super::force(expected.clone(), &mut |e, env| {
             super::super::evaluate(e, env, &super::super::NoIoHost)
         })?;
@@ -2656,7 +2932,7 @@ fn contains(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         ));
     }
     for row in 0..table.num_rows() {
-        if row_matches_record(table, row, needle)? {
+        if row_matches_record(&table, row, needle)? {
             return Ok(Value::Logical(true));
         }
     }
@@ -2678,7 +2954,7 @@ fn contains_all(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         };
         let mut found = false;
         for row in 0..table.num_rows() {
-            if row_matches_record(table, row, needle)? {
+            if row_matches_record(&table, row, needle)? {
                 found = true;
                 break;
             }
@@ -2704,7 +2980,7 @@ fn contains_any(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             other => return Err(type_mismatch("record (in list)", other)),
         };
         for row in 0..table.num_rows() {
-            if row_matches_record(table, row, needle)? {
+            if row_matches_record(&table, row, needle)? {
                 return Ok(Value::Logical(true));
             }
         }
@@ -2719,7 +2995,7 @@ fn is_distinct(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             "Table.IsDistinct: comparisonCriteria not yet supported",
         ));
     }
-    let (_, rows) = table_to_rows(table)?;
+    let (_, rows) = table_to_rows(&table)?;
     for i in 0..rows.len() {
         for j in (i + 1)..rows.len() {
             let mut all_eq = true;
@@ -2738,7 +3014,8 @@ fn is_distinct(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 fn has_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    let table = expect_table(&args[0])?;
+    // Schema-only: just checks the column-name list against requested names.
+    let table = expect_table_lazy_ok(&args[0])?;
     let names = match &args[1] {
         Value::Text(s) => vec![s.clone()],
         Value::List(_) => expect_text_list(&args[1], "Table.HasColumns")?,
@@ -2753,7 +3030,7 @@ fn matches_all_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> 
     let table = expect_table(&args[0])?;
     let cond = expect_function(&args[1])?;
     for row in 0..table.num_rows() {
-        let rec = row_to_record(table, row)?;
+        let rec = row_to_record(&table, row)?;
         let result = invoke_callback_with_host(cond, vec![rec], host)?;
         match result {
             Value::Logical(true) => continue,
@@ -2768,7 +3045,7 @@ fn matches_any_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> 
     let table = expect_table(&args[0])?;
     let cond = expect_function(&args[1])?;
     for row in 0..table.num_rows() {
-        let rec = row_to_record(table, row)?;
+        let rec = row_to_record(&table, row)?;
         let result = invoke_callback_with_host(cond, vec![rec], host)?;
         match result {
             Value::Logical(true) => return Ok(Value::Logical(true)),
@@ -2782,7 +3059,7 @@ fn matches_any_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> 
 fn find_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let needle = expect_text(&args[1])?;
-    let (names, rows) = table_to_rows(table)?;
+    let (names, rows) = table_to_rows(&table)?;
     let kept: Vec<Vec<Value>> = rows
         .into_iter()
         .filter(|row| {
@@ -2812,7 +3089,7 @@ fn position_of(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         ));
     }
     for row in 0..table.num_rows() {
-        if row_matches_record(table, row, needle)? {
+        if row_matches_record(&table, row, needle)? {
             return Ok(Value::Number(row as f64));
         }
     }
@@ -2838,7 +3115,7 @@ fn position_of_any(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> 
                 Value::Record(r) => r,
                 other => return Err(type_mismatch("record (in list)", other)),
             };
-            if row_matches_record(table, row, needle)? {
+            if row_matches_record(&table, row, needle)? {
                 return Ok(Value::Number(row as f64));
             }
         }
@@ -2869,7 +3146,7 @@ fn columns_of_type(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> 
         // Empty columns (all null) — skip; we can't infer a type.
         let mut saw_non_null = false;
         for row in 0..table.num_rows() {
-            let cell = cell_to_value(table, col_idx, row)?;
+            let cell = cell_to_value(&table, col_idx, row)?;
             if matches!(cell, Value::Null) {
                 continue;
             }
@@ -2958,7 +3235,7 @@ fn sort(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             .ok_or_else(|| MError::Other(format!("Table.Sort: column not found: {col_name}")))?;
         keys.push((idx, desc));
     }
-    let (_, mut rows) = table_to_rows(table)?;
+    let (_, mut rows) = table_to_rows(&table)?;
     rows.sort_by(|a, b| {
         for &(col, desc) in &keys {
             let ord = compare_cells(&a[col], &b[col]);
@@ -2992,7 +3269,7 @@ fn parse_fill_columns(arg: &Value, names: &[String], ctx: &str) -> Result<Vec<us
 
 fn fill_down(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
-    let (names, mut rows) = table_to_rows(table)?;
+    let (names, mut rows) = table_to_rows(&table)?;
     let cols = parse_fill_columns(&args[1], &names, "Table.FillDown")?;
     for &col in &cols {
         let mut last: Option<Value> = None;
@@ -3011,7 +3288,7 @@ fn fill_down(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 
 fn fill_up(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
-    let (names, mut rows) = table_to_rows(table)?;
+    let (names, mut rows) = table_to_rows(&table)?;
     let cols = parse_fill_columns(&args[1], &names, "Table.FillUp")?;
     for &col in &cols {
         let mut last: Option<Value> = None;
@@ -3030,7 +3307,7 @@ fn fill_up(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 
 fn reverse_rows(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
-    let (names, mut rows) = table_to_rows(table)?;
+    let (names, mut rows) = table_to_rows(&table)?;
     rows.reverse();
     Ok(Value::Table(values_to_table(&names, &rows)?))
 }
@@ -3042,7 +3319,7 @@ fn split_at(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         return Err(MError::Other("Table.SplitAt: index must be non-negative".into()));
     }
     let split = (index as usize).min(table.num_rows());
-    let (names, rows) = table_to_rows(table)?;
+    let (names, rows) = table_to_rows(&table)?;
     let (head, tail) = rows.split_at(split);
     let head_tbl = values_to_table(&names, head)?;
     let tail_tbl = values_to_table(&names, tail)?;
@@ -3065,7 +3342,7 @@ fn alternate_rows(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let offset = offset as usize;
     let skip = skip as usize;
     let take = take as usize;
-    let (names, rows) = table_to_rows(table)?;
+    let (names, rows) = table_to_rows(&table)?;
     // After the initial offset, alternate `skip` rows dropped + `take` rows kept.
     let mut kept: Vec<Vec<Value>> = Vec::new();
     let mut i = offset;
@@ -3086,7 +3363,7 @@ fn repeat(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     if count < 0 {
         return Err(MError::Other("Table.Repeat: count must be non-negative".into()));
     }
-    let (names, rows) = table_to_rows(table)?;
+    let (names, rows) = table_to_rows(&table)?;
     let mut out: Vec<Vec<Value>> = Vec::with_capacity(rows.len() * count as usize);
     for _ in 0..count {
         for r in &rows {
@@ -3104,7 +3381,7 @@ fn single_row(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             table.num_rows()
         )));
     }
-    row_to_record(table, 0)
+    row_to_record(&table, 0)
 }
 
 // --- Slice #160: aggregations ---
@@ -3133,13 +3410,13 @@ fn min(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let col = parse_min_max_criteria(&args[1], &names, "Table.Min")?;
     let mut best: usize = 0;
     for row in 1..table.num_rows() {
-        let a = cell_to_value(table, col, best)?;
-        let b = cell_to_value(table, col, row)?;
+        let a = cell_to_value(&table, col, best)?;
+        let b = cell_to_value(&table, col, row)?;
         if compare_cells(&b, &a) == std::cmp::Ordering::Less {
             best = row;
         }
     }
-    row_to_record(table, best)
+    row_to_record(&table, best)
 }
 
 fn max(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
@@ -3151,13 +3428,13 @@ fn max(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let col = parse_min_max_criteria(&args[1], &names, "Table.Max")?;
     let mut best: usize = 0;
     for row in 1..table.num_rows() {
-        let a = cell_to_value(table, col, best)?;
-        let b = cell_to_value(table, col, row)?;
+        let a = cell_to_value(&table, col, best)?;
+        let b = cell_to_value(&table, col, row)?;
         if compare_cells(&b, &a) == std::cmp::Ordering::Greater {
             best = row;
         }
     }
-    row_to_record(table, best)
+    row_to_record(&table, best)
 }
 
 fn min_max_n_count(arg: &Value, ctx: &str) -> Result<usize, MError> {
@@ -3174,7 +3451,7 @@ fn min_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let n = min_max_n_count(&args[1], "Table.MinN")?;
     let names = table.column_names();
     let col = parse_min_max_criteria(&args[2], &names, "Table.MinN")?;
-    let (names_owned, mut rows) = table_to_rows(table)?;
+    let (names_owned, mut rows) = table_to_rows(&table)?;
     rows.sort_by(|a, b| compare_cells(&a[col], &b[col]));
     let kept: Vec<Vec<Value>> = rows.into_iter().take(n).collect();
     Ok(Value::Table(values_to_table(&names_owned, &kept)?))
@@ -3185,7 +3462,7 @@ fn max_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let n = min_max_n_count(&args[1], "Table.MaxN")?;
     let names = table.column_names();
     let col = parse_min_max_criteria(&args[2], &names, "Table.MaxN")?;
-    let (names_owned, mut rows) = table_to_rows(table)?;
+    let (names_owned, mut rows) = table_to_rows(&table)?;
     rows.sort_by(|a, b| compare_cells(&b[col], &a[col])); // descending
     let kept: Vec<Vec<Value>> = rows.into_iter().take(n).collect();
     Ok(Value::Table(values_to_table(&names_owned, &kept)?))
@@ -3241,7 +3518,7 @@ fn aggregate_table_column(args: &[Value], host: &dyn IoHost) -> Result<Value, ME
         }
     }
 
-    let (_, rows) = table_to_rows(table)?;
+    let (_, rows) = table_to_rows(&table)?;
     let mut new_rows: Vec<Vec<Value>> = Vec::with_capacity(rows.len());
     for row in &rows {
         let nested = match &row[target_idx] {
@@ -3309,7 +3586,7 @@ fn parse_optional_count(arg: Option<&Value>, default: usize, ctx: &str) -> Resul
 fn remove_first_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let n = parse_optional_count(args.get(1), 1, "Table.RemoveFirstN: count")?;
-    let (names, rows) = table_to_rows(table)?;
+    let (names, rows) = table_to_rows(&table)?;
     let kept: Vec<Vec<Value>> = rows.into_iter().skip(n).collect();
     Ok(Value::Table(values_to_table(&names, &kept)?))
 }
@@ -3317,7 +3594,7 @@ fn remove_first_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 fn remove_last_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let n = parse_optional_count(args.get(1), 1, "Table.RemoveLastN: count")?;
-    let (names, mut rows) = table_to_rows(table)?;
+    let (names, mut rows) = table_to_rows(&table)?;
     let n = n.min(rows.len());
     rows.truncate(rows.len() - n);
     Ok(Value::Table(values_to_table(&names, &rows)?))
@@ -3331,7 +3608,7 @@ fn remove_rows(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     }
     let count = parse_optional_count(args.get(2), 1, "Table.RemoveRows: count")?;
     let offset = offset as usize;
-    let (names, mut rows) = table_to_rows(table)?;
+    let (names, mut rows) = table_to_rows(&table)?;
     let off = offset.min(rows.len());
     let end = (off + count).min(rows.len());
     rows.drain(off..end);
@@ -3369,7 +3646,7 @@ fn remove_matching_rows(args: &[Value], _host: &dyn IoHost) -> Result<Value, MEr
             "Table.RemoveMatchingRows: equationCriteria not yet supported",
         ));
     }
-    let (names, rows) = table_to_rows(table)?;
+    let (names, rows) = table_to_rows(&table)?;
     let mut kept: Vec<Vec<Value>> = Vec::with_capacity(rows.len());
     'row: for row in rows {
         for n in needles {
@@ -3427,7 +3704,7 @@ fn replace_matching_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MEr
         };
         owned.push(Pair { old, new });
     }
-    let (names, rows) = table_to_rows(table)?;
+    let (names, rows) = table_to_rows(&table)?;
     let mut out: Vec<Vec<Value>> = Vec::with_capacity(rows.len());
     for row in rows {
         let mut replaced = false;
@@ -3469,7 +3746,7 @@ fn replace_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
         ));
     }
     let new_records = expect_list(&args[3])?;
-    let (names, mut rows) = table_to_rows(table)?;
+    let (names, mut rows) = table_to_rows(&table)?;
     let off = (offset as usize).min(rows.len());
     let cnt = (count as usize).min(rows.len() - off);
     let mut new_rows: Vec<Vec<Value>> = Vec::with_capacity(new_records.len());
@@ -3507,7 +3784,7 @@ fn replace_value(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
         Value::List(_) => expect_text_list(&args[4], "Table.ReplaceValue: columnsToSearch")?,
         other => return Err(type_mismatch("text or list of text", other)),
     };
-    let (names, mut rows) = table_to_rows(table)?;
+    let (names, mut rows) = table_to_rows(&table)?;
     let mut col_indices: Vec<usize> = Vec::with_capacity(cols_to_search.len());
     for n in &cols_to_search {
         let idx = names
@@ -3542,7 +3819,7 @@ fn combine_columns(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let sources = expect_text_list(&args[1], "Table.CombineColumns: sourceColumns")?;
     let combiner = expect_function(&args[2])?;
     let new_name = expect_text(&args[3])?.to_string();
-    let (names, rows) = table_to_rows(table)?;
+    let (names, rows) = table_to_rows(&table)?;
     let src_indices: Vec<usize> = sources
         .iter()
         .map(|n| {
@@ -3570,7 +3847,7 @@ fn combine_columns_to_record(args: &[Value], _host: &dyn IoHost) -> Result<Value
     let table = expect_table(&args[0])?;
     let new_name = expect_text(&args[1])?.to_string();
     let sources = expect_text_list(&args[2], "Table.CombineColumnsToRecord: sourceColumns")?;
-    let (names, rows) = table_to_rows(table)?;
+    let (names, rows) = table_to_rows(&table)?;
     let src_indices: Vec<usize> = sources
         .iter()
         .map(|n| {
@@ -3608,7 +3885,7 @@ fn demote_headers(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let new_names: Vec<String> = (1..=n_cols).map(|i| format!("Column{i}")).collect();
     // First row: original header names as text cells.
     let header_row: Vec<Value> = names.iter().cloned().map(Value::Text).collect();
-    let (_, mut rows) = table_to_rows(table)?;
+    let (_, mut rows) = table_to_rows(&table)?;
     rows.insert(0, header_row);
     Ok(Value::Table(values_to_table(&new_names, &rows)?))
 }
@@ -3617,7 +3894,7 @@ fn duplicate_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError>
     let table = expect_table(&args[0])?;
     let src = expect_text(&args[1])?.to_string();
     let new_name = expect_text(&args[2])?.to_string();
-    let (names, rows) = table_to_rows(table)?;
+    let (names, rows) = table_to_rows(&table)?;
     let idx = names
         .iter()
         .position(|n| n == &src)
@@ -3641,7 +3918,7 @@ fn duplicate_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError>
 fn prefix_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let prefix = expect_text(&args[1])?;
-    let (names, rows) = table_to_rows(table)?;
+    let (names, rows) = table_to_rows(&table)?;
     let new_names: Vec<String> = names.iter().map(|n| format!("{prefix}.{n}")).collect();
     Ok(Value::Table(values_to_table(&new_names, &rows)?))
 }
@@ -3672,7 +3949,7 @@ fn split_column(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
             "Table.SplitColumn: extraValues argument not yet supported",
         ));
     }
-    let (names, rows) = table_to_rows(table)?;
+    let (names, rows) = table_to_rows(&table)?;
     let src_idx = names
         .iter()
         .position(|n| n == &source)
@@ -3745,7 +4022,7 @@ fn transform_column_names(args: &[Value], host: &dyn IoHost) -> Result<Value, ME
             "Table.TransformColumnNames: options not yet supported",
         ));
     }
-    let (names, rows) = table_to_rows(table)?;
+    let (names, rows) = table_to_rows(&table)?;
     let mut new_names: Vec<String> = Vec::with_capacity(names.len());
     for n in &names {
         let result = invoke_callback_with_host(name_fn, vec![Value::Text(n.clone())], host)?;
@@ -3767,7 +4044,7 @@ fn transpose(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     for col in 0..n_cols {
         let mut row: Vec<Value> = Vec::with_capacity(n_rows);
         for r in 0..n_rows {
-            row.push(cell_to_value(table, col, r)?);
+            row.push(cell_to_value(&table, col, r)?);
         }
         new_rows.push(row);
     }
@@ -3780,8 +4057,8 @@ fn add_join_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> 
     let table2 = expect_table(&args[2])?;
     let key2 = expect_text(&args[3])?.to_string();
     let new_col = expect_text(&args[4])?.to_string();
-    let (names1, rows1) = table_to_rows(table1)?;
-    let (names2, rows2) = table_to_rows(table2)?;
+    let (names1, rows1) = table_to_rows(&table1)?;
+    let (names2, rows2) = table_to_rows(&table2)?;
     let k1_idx = names1
         .iter()
         .position(|n| n == &key1)
@@ -3940,7 +4217,7 @@ fn to_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     for c in 0..n_cols {
         let mut col: Vec<Value> = Vec::with_capacity(n_rows);
         for r in 0..n_rows {
-            col.push(cell_to_value(table, c, r)?);
+            col.push(cell_to_value(&table, c, r)?);
         }
         out.push(Value::List(col));
     }
@@ -3960,7 +4237,7 @@ fn to_list(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     for r in 0..n_rows {
         let mut cells: Vec<Value> = Vec::with_capacity(n_cols);
         for c in 0..n_cols {
-            cells.push(cell_to_value(table, c, r)?);
+            cells.push(cell_to_value(&table, c, r)?);
         }
         let joined = match combiner {
             Some(cb) => invoke_callback_with_host(cb, vec![Value::List(cells)], host)?,
@@ -3989,7 +4266,7 @@ fn to_list(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
 
 fn to_rows_value(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
-    let (_, rows) = table_to_rows(table)?;
+    let (_, rows) = table_to_rows(&table)?;
     let out: Vec<Value> = rows.into_iter().map(Value::List).collect();
     Ok(Value::List(out))
 }
@@ -4028,7 +4305,7 @@ fn schema(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         let mut col_type: Option<&'static str> = None;
         let mut mixed = false;
         for r in 0..n_rows {
-            let cell = cell_to_value(table, col_idx, r)?;
+            let cell = cell_to_value(&table, col_idx, r)?;
             if matches!(cell, Value::Null) {
                 continue;
             }
@@ -4072,7 +4349,7 @@ fn profile(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         let mut null_count = 0usize;
         let mut seen: Vec<Value> = Vec::new();
         for r in 0..n_rows {
-            let cell = cell_to_value(table, col_idx, r)?;
+            let cell = cell_to_value(&table, col_idx, r)?;
             if matches!(cell, Value::Null) {
                 null_count += 1;
                 continue;
@@ -4144,7 +4421,7 @@ fn group(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
         specs.push(AggSpec { new_col, agg });
     }
 
-    let (names, rows) = table_to_rows(table)?;
+    let (names, rows) = table_to_rows(&table)?;
     let key_indices: Vec<usize> = keys
         .iter()
         .map(|k| {
@@ -4228,7 +4505,7 @@ fn add_rank_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> 
         .position(|n| n == &col_name)
         .ok_or_else(|| MError::Other(format!("Table.AddRankColumn: column not found: {col_name}")))?;
 
-    let (names_owned, rows) = table_to_rows(table)?;
+    let (names_owned, rows) = table_to_rows(&table)?;
     // Sort row indices by the criterion column, preserving original index for tie order.
     let mut idx_with_val: Vec<(usize, Value)> = rows
         .iter()
@@ -4270,7 +4547,7 @@ fn split(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         return Err(MError::Other("Table.Split: pageSize must be positive".into()));
     }
     let page_size = page_size as usize;
-    let (names, rows) = table_to_rows(table)?;
+    let (names, rows) = table_to_rows(&table)?;
     let mut out: Vec<Value> = Vec::new();
     for chunk in rows.chunks(page_size) {
         out.push(Value::Table(values_to_table(&names, chunk)?));
@@ -4294,7 +4571,7 @@ fn partition(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     }
     let groups = groups as usize;
     let hash_fn = expect_function(&args[3])?;
-    let (names, rows) = table_to_rows(table)?;
+    let (names, rows) = table_to_rows(&table)?;
     let col_idx = names
         .iter()
         .position(|n| n == &col_name)
@@ -4383,7 +4660,7 @@ fn from_partitions(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> 
 fn select_rows_with_errors(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     // v1: cells don't carry per-cell error state — no rows are "errored".
     let table = expect_table(&args[0])?;
-    let (names, _rows) = table_to_rows(table)?;
+    let (names, _rows) = table_to_rows(&table)?;
     Ok(Value::Table(values_to_table(&names, &[])?))
 }
 

@@ -17,6 +17,13 @@ rand = "0.8"
 flate2 = "1"
 serde_json = { version = "1", default-features = false, features = ["std", "preserve_order"] }
 csv = "1"
+# Parquet here (not just in the shells) because Stage A's LazyParquet
+# table representation needs to construct readers with projection masks
+# on demand — the decode logic is shared between CLI and WASM, and
+# parquet is a pure decoder, no IO of its own. Minimal feature set
+# (no tokio/async) to keep the wasm32 build clean.
+parquet = { version = "53", default-features = false, features = ["arrow", "snap"] }
+bytes = "1"
 
 # Enable the `js` feature on getrandom only when targeting the browser.
 # Both `rand` (direct) and `arrow`'s `ahash → const-random` chain pull

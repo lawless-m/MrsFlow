@@ -96,7 +96,26 @@ pub(super) fn expect_function(v: &Value) -> Result<&Closure, MError> {
     }
 }
 
-pub(super) fn expect_table(v: &Value) -> Result<&Table, MError> {
+/// Extract a `Table` from a `Value` and force any lazy backing into
+/// `Arrow` / `Rows`. Returns `Cow::Borrowed` for already-eager tables
+/// (zero-copy) and `Cow::Owned` for lazy tables that just got decoded.
+///
+/// Most stdlib functions are row-bound and should use this so they
+/// never have to think about laziness. Projection-aware ops (the "P"
+/// set in `mrsflow/09-lazy-tables.md`) use `expect_table_lazy_ok`
+/// instead to keep the lazy variant intact.
+pub(crate) fn expect_table(v: &Value) -> Result<std::borrow::Cow<'_, Table>, MError> {
+    match v {
+        Value::Table(t) => t.force(),
+        other => Err(type_mismatch("table", other)),
+    }
+}
+
+/// Extract a `Table` reference *without* forcing — for the projection-
+/// aware and schema-only stdlib functions that can operate on a lazy
+/// table without decoding any column data. See
+/// `mrsflow/09-lazy-tables.md` §6.
+pub(crate) fn expect_table_lazy_ok(v: &Value) -> Result<&Table, MError> {
     match v {
         Value::Table(t) => Ok(t),
         other => Err(type_mismatch("table", other)),

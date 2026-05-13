@@ -7,9 +7,11 @@
 //! exhaustively from day one and so the type's shape doesn't change
 //! disruptively as later slices land.
 
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::fmt;
 use std::rc::{Rc, Weak};
+use std::sync::Arc;
 
 use crate::parser::{Expr, Param};
 
@@ -198,6 +200,68 @@ pub enum TableRepr {
         columns: Vec<String>,
         rows: Vec<Vec<Value>>,
     },
+    /// Parquet bytes + projection state, undecoded. Forced into `Arrow`
+    /// on any op that needs row data (see `Table::force`). Projection-
+    /// aware ops (`Table.SelectColumns`, etc.) narrow `projection`
+    /// without forcing, so columns the M source never touches are
+    /// never decoded. See `mrsflow/09-lazy-tables.md`.
+    LazyParquet(LazyParquetState),
+    /// Deferred result of `Table.NestedJoin`: left table + right handle +
+    /// per-left-row indices into right. The nested-column cell at each
+    /// row is conceptually a Table containing the matched right rows,
+    /// but those Tables aren't materialised until forced — letting
+    /// `Table.ExpandTableColumn` pull only the requested columns from
+    /// the right handle. RT-preserving by construction: forcing yields
+    /// the byte-identical Rows-backed result the eager path would have
+    /// produced. See `mrsflow/09-lazy-tables.md` §4.
+    JoinView(JoinViewState),
+}
+
+/// State for a `TableRepr::JoinView`. Constructed by `Table.NestedJoin`
+/// when the right side is a `LazyParquet` (or `Arrow`); preserves enough
+/// information for downstream `Table.ExpandTableColumn` to pull only
+/// the requested right-side columns. Forces into a Rows-backed table.
+#[derive(Debug, Clone)]
+pub struct JoinViewState {
+    /// Left table (without the nested column appended). All left columns
+    /// flow through unchanged into the join result.
+    pub left: Box<Table>,
+    /// The right-side table. May itself be `LazyParquet` (in which case
+    /// only the columns expand pulls are decoded) or an eager variant.
+    /// `Arc` so `left.clone()` cascades cheaply during forcing.
+    pub right: Arc<Table>,
+    /// The output column name for the nested column.
+    pub new_column_name: String,
+    /// For each row in `left`, the indices of matched rows in `right`.
+    /// Computed eagerly by `Table.NestedJoin`'s hash-join pass, since
+    /// computing matches requires decoding just the right key column.
+    pub matches: Vec<Vec<u32>>,
+    /// Join kind passed to NestedJoin (0 = Inner, 1 = LeftOuter; others
+    /// not yet supported per nested_join's existing check). Stored so
+    /// forcing can apply the Inner filter (drop unmatched left rows).
+    pub join_kind: i32,
+}
+
+/// State for a `TableRepr::LazyParquet`. Constructed by
+/// `Table::lazy_parquet`; mutated only by projection-aware ops via
+/// clone-and-replace.
+#[derive(Debug, Clone)]
+pub struct LazyParquetState {
+    /// Parquet file bytes. `Arc` so cloning a Table doesn't duplicate
+    /// up to 200MB of buffer.
+    pub bytes: Arc<bytes::Bytes>,
+    /// Schema as read from the parquet footer at construction time.
+    /// Indices into `schema.fields()` are stable identifiers used by
+    /// `projection`.
+    pub schema: arrow::datatypes::SchemaRef,
+    /// Column indices into `schema.fields()`, in output order.
+    /// Initially `(0..schema.fields().len()).collect()`. Narrowed by
+    /// `Table.SelectColumns` / `RemoveColumns` / `ReorderColumns`.
+    pub projection: Vec<usize>,
+    /// Total row count summed across row groups, cached from the
+    /// footer at construction. Lets `Table.RowCount` return without
+    /// decoding any data.
+    pub num_rows: usize,
 }
 
 /// Table value — wraps a [`TableRepr`]. Use the inherent helpers
@@ -217,10 +281,46 @@ impl Table {
         Self { repr: TableRepr::Rows { columns, rows } }
     }
 
+    /// Construct a lazy parquet-backed table. Reads only the footer to
+    /// obtain the schema and row count; row data stays in `bytes` until
+    /// a force call decodes it. See `mrsflow/09-lazy-tables.md` §3.
+    pub fn lazy_parquet(bytes: bytes::Bytes) -> Result<Self, MError> {
+        use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+        let builder = ParquetRecordBatchReaderBuilder::try_new(bytes.clone())
+            .map_err(|e| MError::Other(format!("LazyParquet: footer read failed: {e}")))?;
+        let schema = builder.schema().clone();
+        let num_rows: usize = builder
+            .metadata()
+            .row_groups()
+            .iter()
+            .map(|rg| rg.num_rows() as usize)
+            .sum();
+        let projection: Vec<usize> = (0..schema.fields().len()).collect();
+        Ok(Self {
+            repr: TableRepr::LazyParquet(LazyParquetState {
+                bytes: Arc::new(bytes),
+                schema,
+                projection,
+                num_rows,
+            }),
+        })
+    }
+
     pub fn column_names(&self) -> Vec<String> {
         match &self.repr {
             TableRepr::Arrow(b) => b.schema().fields().iter().map(|f| f.name().clone()).collect(),
             TableRepr::Rows { columns, .. } => columns.clone(),
+            TableRepr::LazyParquet(s) => s
+                .projection
+                .iter()
+                .map(|&i| s.schema.field(i).name().clone())
+                .collect(),
+            TableRepr::JoinView(jv) => {
+                // left columns + the new nested column at the end.
+                let mut names = jv.left.column_names();
+                names.push(jv.new_column_name.clone());
+                names
+            }
         }
     }
 
@@ -228,6 +328,15 @@ impl Table {
         match &self.repr {
             TableRepr::Arrow(b) => b.num_rows(),
             TableRepr::Rows { rows, .. } => rows.len(),
+            TableRepr::LazyParquet(s) => s.num_rows,
+            TableRepr::JoinView(jv) => {
+                // Inner: row count = left rows that have ≥1 match.
+                // LeftOuter: every left row is kept = jv.left.num_rows().
+                match jv.join_kind {
+                    0 => jv.matches.iter().filter(|m| !m.is_empty()).count(),
+                    _ => jv.left.num_rows(),
+                }
+            }
         }
     }
 
@@ -235,16 +344,23 @@ impl Table {
         match &self.repr {
             TableRepr::Arrow(b) => b.num_columns(),
             TableRepr::Rows { columns, .. } => columns.len(),
+            TableRepr::LazyParquet(s) => s.projection.len(),
+            TableRepr::JoinView(jv) => jv.left.num_columns() + 1,
         }
     }
 
     /// Borrow as a `RecordBatch`. Errors if this is a Rows-backed table.
-    /// Slice 1 always succeeds since Rows is not yet constructed.
+    /// For LazyParquet tables, callers should force first via `force()`;
+    /// this method only succeeds on already-Arrow tables.
     pub fn as_arrow(&self) -> Result<&arrow::record_batch::RecordBatch, MError> {
         match &self.repr {
             TableRepr::Arrow(b) => Ok(b),
             TableRepr::Rows { .. } => Err(MError::NotImplemented(
                 "operation requires Arrow-backed table (Rows-backed support pending)",
+            )),
+            TableRepr::LazyParquet(_) | TableRepr::JoinView(_) => Err(MError::Other(
+                "internal: as_arrow() called on lazy table without forcing first \
+                 — use Table::force() or expect_table()".into(),
             )),
         }
     }
@@ -252,7 +368,9 @@ impl Table {
     /// Owned `RecordBatch` (for sinks that take ownership, e.g. Parquet writer).
     /// Arrow variant: cheap Arc-based clone. Rows variant errors with a clear
     /// message — the Parquet writer (the main sink that calls this) can't
-    /// encode heterogeneous cells.
+    /// encode heterogeneous cells. LazyParquet forces with current projection
+    /// before returning. JoinView forces to Rows then fails (nested-Table
+    /// cells aren't Arrow-encodable, same as Rows variant).
     pub fn try_to_arrow(&self) -> Result<arrow::record_batch::RecordBatch, MError> {
         match &self.repr {
             TableRepr::Arrow(b) => Ok(b.clone()),
@@ -261,7 +379,235 @@ impl Table {
                  (coerce mixed cells with Text.From or Table.TransformColumnTypes first)"
                     .into(),
             )),
+            TableRepr::LazyParquet(s) => decode_lazy_parquet(s),
+            TableRepr::JoinView(_) => Err(MError::Other(
+                "Table.NestedJoin result contains nested Table-valued cells; \
+                 Arrow encoding requires uniform columns. Use \
+                 Table.ExpandTableColumn first to flatten."
+                    .into(),
+            )),
         }
+    }
+
+    /// Materialise a lazy table into its eager form. For already-Arrow or
+    /// Rows tables, returns the original by borrow (no copy). For
+    /// LazyParquet, decodes the projected columns. For JoinView, walks
+    /// `matches` against the right side and constructs the nested-Table
+    /// cells the eager NestedJoin would have produced. See
+    /// `mrsflow/09-lazy-tables.md` §5.
+    pub fn force(&self) -> Result<Cow<'_, Self>, MError> {
+        match &self.repr {
+            TableRepr::Arrow(_) | TableRepr::Rows { .. } => Ok(Cow::Borrowed(self)),
+            TableRepr::LazyParquet(s) => Ok(Cow::Owned(Self::from_arrow(decode_lazy_parquet(s)?))),
+            TableRepr::JoinView(jv) => Ok(Cow::Owned(materialise_join_view(jv)?)),
+        }
+    }
+}
+
+/// Materialise a `JoinView` into a `Rows`-backed Table — byte-identical
+/// to what the eager `Table.NestedJoin` path would have produced. Forces
+/// both sides, walks `matches`, builds nested Table-valued cells per
+/// row. Inner-join drops unmatched left rows; LeftOuter keeps them with
+/// empty nested tables.
+fn materialise_join_view(jv: &JoinViewState) -> Result<Table, MError> {
+    let left_forced = jv.left.force()?;
+    let right_forced = jv.right.force()?;
+    let left_table: &Table = &left_forced;
+    let right_table: &Table = &right_forced;
+
+    let left_names = left_table.column_names();
+    let right_names = right_table.column_names();
+
+    // Helper to read a row from an Arrow/Rows table into a Vec<Value>.
+    // We can't call stdlib::cell_to_value from here without a cycle, so
+    // duplicate the small dispatch inline. JoinView's left/right are
+    // always Arrow or Rows after force (LazyParquet decodes into Arrow).
+    let read_row = |t: &Table, row: usize| -> Result<Vec<Value>, MError> {
+        match &t.repr {
+            TableRepr::Rows { rows, .. } => Ok(rows[row].clone()),
+            TableRepr::Arrow(batch) => {
+                let mut out = Vec::with_capacity(batch.num_columns());
+                for col in 0..batch.num_columns() {
+                    out.push(arrow_cell_to_value(batch, col, row)?);
+                }
+                Ok(out)
+            }
+            _ => Err(MError::Other(
+                "materialise_join_view: unexpected non-eager variant after force".into(),
+            )),
+        }
+    };
+
+    let mut out_names: Vec<String> = left_names.clone();
+    out_names.push(jv.new_column_name.clone());
+
+    let mut out_rows: Vec<Vec<Value>> = Vec::with_capacity(jv.left.num_rows());
+    for (left_idx, match_indices) in jv.matches.iter().enumerate() {
+        let nested_rows: Vec<Vec<Value>> = match_indices
+            .iter()
+            .map(|&i| read_row(right_table, i as usize))
+            .collect::<Result<_, _>>()?;
+        let nested_table = Table::from_rows(right_names.clone(), nested_rows.clone());
+
+        match jv.join_kind {
+            0 => {
+                // Inner: drop unmatched left rows.
+                if match_indices.is_empty() {
+                    continue;
+                }
+                let mut row = read_row(left_table, left_idx)?;
+                row.push(Value::Table(nested_table));
+                out_rows.push(row);
+            }
+            _ => {
+                // LeftOuter (default): keep every left row, possibly with
+                // an empty nested table.
+                let mut row = read_row(left_table, left_idx)?;
+                row.push(Value::Table(nested_table));
+                out_rows.push(row);
+            }
+        }
+    }
+
+    Ok(Table::from_rows(out_names, out_rows))
+}
+
+/// Local minimal copy of stdlib's `cell_to_value` covering the types
+/// the NestedJoin / ExpandTableColumn path actually surfaces. Used by
+/// `materialise_join_view` to avoid an upward dep on the stdlib module.
+fn arrow_cell_to_value(
+    batch: &arrow::record_batch::RecordBatch,
+    col: usize,
+    row: usize,
+) -> Result<Value, MError> {
+    use arrow::array::*;
+    use arrow::datatypes::{DataType, TimeUnit};
+    let array = batch.column(col);
+    if array.is_null(row) {
+        return Ok(Value::Null);
+    }
+    match array.data_type() {
+        DataType::Float64 => Ok(Value::Number(
+            array.as_any().downcast_ref::<Float64Array>().expect("Float64").value(row),
+        )),
+        DataType::Float32 => Ok(Value::Number(
+            array.as_any().downcast_ref::<Float32Array>().expect("Float32").value(row) as f64,
+        )),
+        DataType::Int8 => Ok(Value::Number(
+            array.as_any().downcast_ref::<Int8Array>().expect("Int8").value(row) as f64,
+        )),
+        DataType::Int16 => Ok(Value::Number(
+            array.as_any().downcast_ref::<Int16Array>().expect("Int16").value(row) as f64,
+        )),
+        DataType::Int32 => Ok(Value::Number(
+            array.as_any().downcast_ref::<Int32Array>().expect("Int32").value(row) as f64,
+        )),
+        DataType::Int64 => Ok(Value::Number(
+            array.as_any().downcast_ref::<Int64Array>().expect("Int64").value(row) as f64,
+        )),
+        DataType::UInt8 => Ok(Value::Number(
+            array.as_any().downcast_ref::<UInt8Array>().expect("UInt8").value(row) as f64,
+        )),
+        DataType::UInt16 => Ok(Value::Number(
+            array.as_any().downcast_ref::<UInt16Array>().expect("UInt16").value(row) as f64,
+        )),
+        DataType::UInt32 => Ok(Value::Number(
+            array.as_any().downcast_ref::<UInt32Array>().expect("UInt32").value(row) as f64,
+        )),
+        DataType::UInt64 => Ok(Value::Number(
+            array.as_any().downcast_ref::<UInt64Array>().expect("UInt64").value(row) as f64,
+        )),
+        DataType::Utf8 => Ok(Value::Text(
+            array.as_any().downcast_ref::<StringArray>().expect("Utf8").value(row).to_string(),
+        )),
+        DataType::Boolean => Ok(Value::Logical(
+            array.as_any().downcast_ref::<BooleanArray>().expect("Boolean").value(row),
+        )),
+        DataType::Date32 => {
+            let days = array.as_any().downcast_ref::<Date32Array>().expect("Date32").value(row);
+            let epoch = chrono::NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
+            let d = epoch
+                .checked_add_signed(chrono::Duration::days(days as i64))
+                .ok_or_else(|| MError::Other(format!("Date32 out of range: {days} days")))?;
+            Ok(Value::Date(d))
+        }
+        // All Timestamp variants collapse to Value::Datetime; see the
+        // matching arm in `stdlib/table.rs` for rationale.
+        DataType::Timestamp(unit, _tz) => {
+            let micros: i64 = match unit {
+                TimeUnit::Second => array
+                    .as_any()
+                    .downcast_ref::<TimestampSecondArray>()
+                    .expect("TimestampSecond")
+                    .value(row)
+                    .saturating_mul(1_000_000),
+                TimeUnit::Millisecond => array
+                    .as_any()
+                    .downcast_ref::<TimestampMillisecondArray>()
+                    .expect("TimestampMillisecond")
+                    .value(row)
+                    .saturating_mul(1_000),
+                TimeUnit::Microsecond => array
+                    .as_any()
+                    .downcast_ref::<TimestampMicrosecondArray>()
+                    .expect("TimestampMicrosecond")
+                    .value(row),
+                TimeUnit::Nanosecond => array
+                    .as_any()
+                    .downcast_ref::<TimestampNanosecondArray>()
+                    .expect("TimestampNanosecond")
+                    .value(row)
+                    / 1_000,
+            };
+            let dt = chrono::DateTime::from_timestamp_micros(micros)
+                .ok_or_else(|| MError::Other(format!("Timestamp out of range: {micros} us")))?
+                .naive_utc();
+            Ok(Value::Datetime(dt))
+        }
+        DataType::Date64 => {
+            let millis = array
+                .as_any()
+                .downcast_ref::<Date64Array>()
+                .expect("Date64")
+                .value(row);
+            let dt = chrono::DateTime::from_timestamp_millis(millis)
+                .ok_or_else(|| MError::Other(format!("Date64 out of range: {millis} ms")))?
+                .date_naive();
+            Ok(Value::Date(dt))
+        }
+        DataType::Null => Ok(Value::Null),
+        _ => Err(MError::NotImplemented("unsupported cell type")),
+    }
+}
+
+/// Decode a `LazyParquetState` into a `RecordBatch`, reading only the
+/// columns named by `state.projection`.
+fn decode_lazy_parquet(
+    state: &LazyParquetState,
+) -> Result<arrow::record_batch::RecordBatch, MError> {
+    use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+    use parquet::arrow::ProjectionMask;
+    let builder =
+        ParquetRecordBatchReaderBuilder::try_new(state.bytes.as_ref().clone())
+            .map_err(|e| MError::Other(format!("LazyParquet decode: {e}")))?;
+    let mask = ProjectionMask::roots(
+        builder.parquet_schema(),
+        state.projection.iter().copied(),
+    );
+    let reader = builder
+        .with_projection(mask)
+        .build()
+        .map_err(|e| MError::Other(format!("LazyParquet decode: {e}")))?;
+    let batches: Vec<arrow::record_batch::RecordBatch> = reader
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| MError::Other(format!("LazyParquet decode: {e}")))?;
+    match batches.len() {
+        0 => Ok(arrow::record_batch::RecordBatch::new_empty(Arc::new(
+            arrow::datatypes::Schema::empty(),
+        ))),
+        1 => Ok(batches.into_iter().next().expect("len == 1")),
+        _ => arrow::compute::concat_batches(&batches[0].schema(), &batches)
+            .map_err(|e| MError::Other(format!("LazyParquet decode concat: {e}"))),
     }
 }
 

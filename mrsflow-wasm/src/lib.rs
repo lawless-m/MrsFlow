@@ -8,15 +8,13 @@
 
 use std::collections::HashMap;
 
-use arrow::record_batch::RecordBatch;
 use bytes::Bytes;
 use js_sys::{Array, Object, Uint8Array};
 use mrsflow_core::eval::{
-    deep_force, evaluate, root_env, value_to_sexpr, IoError, IoHost, Table, Value,
+    deep_force, evaluate, root_env, value_summary, IoError, IoHost, Table, Value,
 };
 use mrsflow_core::lexer::tokenize;
 use mrsflow_core::parser::parse;
-use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -37,25 +35,14 @@ impl IoHost for WasmIoHost {
             .get(path)
             .ok_or_else(|| IoError::Other(format!("no input named {path:?}")))?
             .clone();
-        let builder = ParquetRecordBatchReaderBuilder::try_new(buf)
-            .map_err(|e| IoError::Other(format!("parquet read {path}: {e}")))?;
-        let reader = builder
-            .build()
-            .map_err(|e| IoError::Other(format!("parquet read {path}: {e}")))?;
-        let mut batches: Vec<RecordBatch> = Vec::new();
-        for batch in reader {
-            let b = batch.map_err(|e| IoError::Other(format!("parquet read {path}: {e}")))?;
-            batches.push(b);
-        }
-        let combined = match batches.len() {
-            0 => RecordBatch::new_empty(std::sync::Arc::new(
-                arrow::datatypes::Schema::empty(),
-            )),
-            1 => batches.into_iter().next().expect("len == 1"),
-            _ => arrow::compute::concat_batches(&batches[0].schema(), &batches)
-                .map_err(|e| IoError::Other(format!("parquet read {path}: {e}")))?,
-        };
-        Ok(Value::Table(Table::from_arrow(combined)))
+        // Hand bytes to core's Table::lazy_parquet — core reads just the
+        // footer and defers per-column decode until an op forces. The big
+        // wins are reduced peak memory (no full-decode of 134-col customer
+        // / 163-col product tables) and reduced compute (columns the M
+        // source ignores never get decoded).
+        let table = Table::lazy_parquet(buf)
+            .map_err(|e| IoError::Other(format!("parquet read {path}: {e:?}")))?;
+        Ok(Value::Table(table))
     }
 
     fn parquet_write(&self, _: &str, _: &Value) -> Result<(), IoError> {
@@ -124,11 +111,10 @@ fn parse_inputs(js: &JsValue) -> Result<HashMap<String, Bytes>, JsValue> {
 /// Evaluate `source` against the supplied parquet bytes.
 ///
 /// `inputs` is a JS object of `{ name: Uint8Array }` — each name becomes
-/// available to M source via `Parquet.Document(name)`. Returns the result
-/// as a canonical S-expression string (the same format the CLI's
-/// differential harness emits). For a Table this can be large; callers
-/// who want a preview should narrow the M source itself (e.g. wrap in
-/// `Table.FirstN(_, 100)`).
+/// available to M source via `Parquet.Document(name)`. Returns a human-
+/// readable summary: for a Table, "N rows × M columns" header plus an
+/// aligned preview of the first 20 rows. Use `Table.RowCount(...)` or
+/// `Table.FirstN(..., k)` in the M source itself to see different shapes.
 #[wasm_bindgen]
 pub fn run(source: &str, inputs: JsValue) -> Result<String, JsValue> {
     let host = WasmIoHost {
@@ -143,5 +129,6 @@ pub fn run(source: &str, inputs: JsValue) -> Result<String, JsValue> {
         .map_err(|e| JsValue::from_str(&format!("eval error: {e:?}")))?;
     let value = deep_force(raw, &host)
         .map_err(|e| JsValue::from_str(&format!("eval error: {e:?}")))?;
-    Ok(value_to_sexpr(&value))
+    value_summary(&value, 20, &host)
+        .map_err(|e| JsValue::from_str(&format!("render error: {e:?}")))
 }

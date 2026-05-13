@@ -14,6 +14,7 @@ This zip contains the design notes from a conversation scoping out the project.
 6. **`06-resources.md`** — Links to the language spec, reference parser, relevant crates, prior art.
 7. **`07-evaluator-design.md`** — Load-bearing decisions for the evaluator (laziness, error model, environment, value/number representation), the Prolog evaluator companion as first-class differential, and the slicing plan.
 8. **`08-prolog-differential.md`** — How the parallel Prolog evaluator works as a differential oracle for the Rust implementation, and how the pattern transfers to other projects.
+9. **`09-lazy-tables.md`** — Stage A design proposal for lazy `Parquet.Document` handles and `JoinView` nested results, with a full stdlib audit classifying every `Table.*` binding as projection-aware / schema-only / row-bound. Empirically motivated by the WASM demo OOMing on the corpus join pattern; nothing implemented yet.
 
 ## Status
 

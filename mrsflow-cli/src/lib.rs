@@ -5,11 +5,9 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 
-use arrow::record_batch::RecordBatch;
 use mrsflow_core::eval::{deep_force, root_env, EnvOps, IoError, IoHost, Table, Value};
 use mrsflow_core::lexer::tokenize;
 use mrsflow_core::parser::{parse, Expr};
-use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use parquet::arrow::ArrowWriter;
 
 /// Errors that can happen while running the multi-query CLI mode. The CLI
@@ -189,22 +187,16 @@ impl Default for CliIoHost {
 
 impl IoHost for CliIoHost {
     fn parquet_read(&self, path: &str) -> Result<Value, IoError> {
-        let file = File::open(path)
+        // Read the bytes into a Bytes buffer and hand to Table::lazy_parquet —
+        // mrsflow-core decides when (and which columns) to actually decode.
+        // For Parquet files of ~200MB this is a single allocation + read; the
+        // big win is that the per-column decode happens later, only for the
+        // columns the M source actually references.
+        let bytes = std::fs::read(path)
             .map_err(|e| IoError::Other(format!("open {path}: {e}")))?;
-        let builder = ParquetRecordBatchReaderBuilder::try_new(file)
-            .map_err(|e| IoError::Other(format!("parquet read {path}: {e}")))?;
-        let mut reader = builder
-            .build()
-            .map_err(|e| IoError::Other(format!("parquet read {path}: {e}")))?;
-        let mut batches: Vec<RecordBatch> = Vec::new();
-        for batch in reader.by_ref() {
-            let b =
-                batch.map_err(|e| IoError::Other(format!("parquet read {path}: {e}")))?;
-            batches.push(b);
-        }
-        let combined = concatenate_batches(&batches)
-            .map_err(|e| IoError::Other(format!("parquet read {path}: {e}")))?;
-        Ok(Value::Table(Table::from_arrow(combined)))
+        let table = Table::lazy_parquet(bytes::Bytes::from(bytes))
+            .map_err(|e| IoError::Other(format!("parquet read {path}: {e:?}")))?;
+        Ok(Value::Table(table))
     }
 
     fn parquet_write(&self, path: &str, value: &Value) -> Result<(), IoError> {
@@ -718,23 +710,6 @@ fn cell_to_value(cell: &calamine::Data, delay_types: bool) -> Value {
     }
 }
 
-
-/// Concatenate multiple `RecordBatch`es with the same schema into one.
-/// Single-batch input is returned cloned. Empty input produces an empty
-/// batch — though in practice parquet always emits at least one batch.
-fn concatenate_batches(batches: &[RecordBatch]) -> Result<RecordBatch, arrow::error::ArrowError> {
-    match batches.len() {
-        0 => {
-            // No-batch case: build a default empty batch. Parquet readers
-            // typically don't produce this, but cover it defensively.
-            Ok(RecordBatch::new_empty(std::sync::Arc::new(
-                arrow::datatypes::Schema::empty(),
-            )))
-        }
-        1 => Ok(batches[0].clone()),
-        _ => arrow::compute::concat_batches(&batches[0].schema(), batches),
-    }
-}
 
 // --- ODBC implementation (feature-gated) ---
 //

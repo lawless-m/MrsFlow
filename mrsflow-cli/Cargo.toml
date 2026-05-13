@@ -26,6 +26,9 @@ parquet = { version = "53", default-features = false, features = ["arrow", "snap
 chrono = { version = "0.4", default-features = false, features = ["alloc", "clock"] }
 calamine = { version = "0.35", default-features = false, features = ["chrono"] }
 walkdir = "2"
+# `bytes::Bytes` wraps the parquet file contents handed to
+# `Table::lazy_parquet` — the core decides when to actually decode.
+bytes = "1"
 # rustls-tls so we don't need OpenSSL on the host. `blocking` to match
 # the synchronous IoHost call path (no tokio runtime to bootstrap).
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls"] }

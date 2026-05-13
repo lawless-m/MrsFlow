@@ -23,13 +23,14 @@ use std::path::PathBuf;
 use std::process;
 
 use mrsflow_cli::{run_multi_query, CliIoHost};
-use mrsflow_core::eval::{deep_force, evaluate, root_env, value_to_sexpr};
+use mrsflow_core::eval::{deep_force, evaluate, root_env, value_summary, value_to_sexpr};
 use mrsflow_core::lexer::tokenize;
 use mrsflow_core::parser::parse;
 
 fn usage_and_exit() -> ! {
     eprintln!(
         "usage: mrsflow <input.m> --sexpr\n\
+         usage: mrsflow <input.m> --summary [N]\n\
          usage: mrsflow <input.m> [<input.m> ...] --out <name> [--out <name> ...] --out-dir <dir>"
     );
     process::exit(64);
@@ -41,6 +42,11 @@ struct CliArgs {
     out_names: Vec<String>,
     out_dir: Option<String>,
     sexpr: bool,
+    /// `--summary` (default 10 rows) or `--summary N` for a different row cap.
+    /// Mutually exclusive with `--sexpr` and `--out`. Renders Tables as an
+    /// aligned text preview instead of the full canonical sexpr; for ad-hoc
+    /// query inspection. Differential harnesses keep using `--sexpr`.
+    summary: Option<usize>,
     params: Vec<(String, String)>,
 }
 
@@ -69,6 +75,20 @@ fn parse_args(raw: Vec<String>) -> CliArgs {
             }
             "--sexpr" => {
                 a.sexpr = true;
+            }
+            "--summary" => {
+                // Optional row count: `--summary 25` overrides the default 10.
+                // Treat the next arg as the count if it parses as a non-negative
+                // integer, otherwise leave it for the input-file slot.
+                let count = raw
+                    .get(i + 1)
+                    .and_then(|s| s.parse::<usize>().ok());
+                if let Some(n) = count {
+                    a.summary = Some(n);
+                    i += 1;
+                } else {
+                    a.summary = Some(10);
+                }
             }
             "--param" => {
                 i += 1;
@@ -100,13 +120,20 @@ fn main() {
     let cli = parse_args(env::args().skip(1).collect());
 
     let want_outputs = !cli.out_names.is_empty() || cli.out_dir.is_some();
+    let want_dump = cli.sexpr || cli.summary.is_some();
 
-    if want_outputs && cli.sexpr {
-        eprintln!("ERROR: --sexpr and --out/--out-dir are mutually exclusive");
+    if cli.sexpr && cli.summary.is_some() {
+        eprintln!("ERROR: --sexpr and --summary are mutually exclusive");
         process::exit(64);
     }
-    if !want_outputs && !cli.sexpr {
-        eprintln!("ERROR: specify either --sexpr or --out NAME --out-dir DIR");
+    if want_outputs && want_dump {
+        eprintln!("ERROR: --sexpr/--summary and --out/--out-dir are mutually exclusive");
+        process::exit(64);
+    }
+    if !want_outputs && !want_dump {
+        eprintln!(
+            "ERROR: specify one of --sexpr, --summary [N], or --out NAME --out-dir DIR"
+        );
         usage_and_exit();
     }
 
@@ -183,5 +210,15 @@ fn main() {
         }
     };
 
-    println!("{}", value_to_sexpr(&value));
+    if let Some(max_rows) = cli.summary {
+        match value_summary(&value, max_rows, &host) {
+            Ok(s) => print!("{s}"),
+            Err(e) => {
+                eprintln!("RENDER ERROR: {e:?}");
+                process::exit(4);
+            }
+        }
+    } else {
+        println!("{}", value_to_sexpr(&value));
+    }
 }
