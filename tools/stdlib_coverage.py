@@ -2,8 +2,8 @@
 """Report mrsflow stdlib coverage vs MicrosoftDocs reference.
 
 For each namespace in mrsflow/stdlib-reference/<NS>.json, list the
-functions we've bound in mrsflow-core/src/eval/stdlib.rs vs the ones
-Microsoft documents. Per-namespace breakdown plus a totals line.
+functions we've bound across mrsflow-core/src/eval/stdlib/*.rs vs the
+ones Microsoft documents. Per-namespace breakdown plus a totals line.
 
 Run from repo root: `python3 tools/stdlib_coverage.py`
 Optional: `python3 tools/stdlib_coverage.py Text Number` to filter.
@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
-STDLIB_RS = REPO / "mrsflow-core" / "src" / "eval" / "stdlib.rs"
+STDLIB_DIR = REPO / "mrsflow-core" / "src" / "eval" / "stdlib"
 REF_DIR = REPO / "mrsflow" / "stdlib-reference"
 
 # Match a stdlib binding tuple: ("Namespace.Name", ...
@@ -22,8 +22,10 @@ BINDING_RE = re.compile(r'\(\s*"([A-Z][A-Za-z0-9]*\.[A-Za-z0-9]+)"')
 
 
 def bound_names() -> set[str]:
-    src = STDLIB_RS.read_text(encoding="utf-8")
-    return set(BINDING_RE.findall(src))
+    names: set[str] = set()
+    for rs in sorted(STDLIB_DIR.glob("*.rs")):
+        names.update(BINDING_RE.findall(rs.read_text(encoding="utf-8")))
+    return names
 
 
 def ms_names_by_ns() -> dict[str, set[str]]:
