@@ -74,10 +74,9 @@ Excel.CurrentWorkbook()
 // q13: ODBC fold — column projection should push down to
 //      `SELECT RITerritoryCode, RITerritoryDesc FROM RIGeographic`.
 //      Semantics: 284 rows × 2 columns. Excel and mrsflow must match.
-//      `[HierarchicalNavigation=true]` is required for Excel — without
-//      it Excel returns a flat table list (no Database level) while
-//      mrsflow keeps the nested shape; that divergence is a separate
-//      follow-up (flat mode in mrsflow currently ignores the option).
+//      `[HierarchicalNavigation=true]` selects the nested
+//      Database → Table shape on both engines (default is flat, where
+//      `Source{[Name="RIGeographic",Kind="Table"]}` is the right key).
 //      Fold engagement is verified separately via the panicking
 //      force_fn tests in mrsflow-core.
 Table.SelectColumns(

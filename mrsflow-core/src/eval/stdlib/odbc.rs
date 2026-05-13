@@ -46,8 +46,16 @@ fn query(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
 
 fn data_source(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let conn = expect_text(&args[0])?;
-    let opts = args.get(1);
-    host.odbc_data_source(conn, opts)
+    // Deep-force the options record so the host can read its fields
+    // without wrestling with lazy thunks. Record-literal field values
+    // (`[HierarchicalNavigation=true]`) are stored as thunks; without
+    // forcing, the host's option-parser sees Thunk and falls through to
+    // the default.
+    let forced_opt = match args.get(1) {
+        Some(v) => Some(super::super::deep_force(v.clone(), host)?),
+        None => None,
+    };
+    host.odbc_data_source(conn, forced_opt.as_ref())
         .map_err(|e| MError::Other(format!("Odbc.DataSource: {e:?}")))
 }
 

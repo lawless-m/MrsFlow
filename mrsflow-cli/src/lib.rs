@@ -269,9 +269,26 @@ impl IoHost for CliIoHost {
     fn odbc_data_source(
         &self,
         connection_string: &str,
-        _options: Option<&Value>,
+        options: Option<&Value>,
     ) -> Result<Value, IoError> {
-        odbc_data_source_impl(connection_string)
+        // Power Query default is flat (no Database wrapper). Opt into
+        // nested with `[HierarchicalNavigation=true]`. mrsflow's previous
+        // behaviour was always-nested regardless of options — that's a
+        // semantic divergence the q13-q15 oracle round flagged.
+        let hierarchical = options
+            .and_then(|v| match v {
+                Value::Record(r) => Some(r),
+                _ => None,
+            })
+            .and_then(|r| {
+                r.fields
+                    .iter()
+                    .find(|(n, _)| n == "HierarchicalNavigation")
+                    .map(|(_, v)| v)
+            })
+            .map(|v| matches!(v, Value::Logical(true)))
+            .unwrap_or(false);
+        odbc_data_source_impl(connection_string, hierarchical)
     }
 
     #[cfg(not(feature = "mysql"))]
@@ -1284,7 +1301,10 @@ fn empty_table() -> Value {
 // lazy (the costly part).
 
 #[cfg(feature = "odbc")]
-fn odbc_data_source_impl(connection_string: &str) -> Result<Value, IoError> {
+fn odbc_data_source_impl(
+    connection_string: &str,
+    hierarchical: bool,
+) -> Result<Value, IoError> {
     use std::cell::RefCell;
     use std::collections::BTreeMap;
     use std::rc::Rc;
@@ -1344,22 +1364,35 @@ fn odbc_data_source_impl(connection_string: &str) -> Result<Value, IoError> {
     drop(tables_cursor);
     drop(conn);
 
-    let cols = vec!["Name".to_string(), "Data".to_string(), "Kind".to_string()];
-    let mut rows: Vec<Vec<Value>> = Vec::with_capacity(by_catalog.len());
-    for (catalog, tables) in by_catalog {
-        let conn_string = connection_string.to_string();
-        let tables_for_thunk = tables.clone();
-        let inner: Rc<dyn Fn() -> Result<Value, MError>> = Rc::new(move || {
-            Ok(build_table_nav(&conn_string, &tables_for_thunk))
-        });
-        let data = Value::Thunk(Rc::new(RefCell::new(ThunkState::Native(inner))));
-        rows.push(vec![
-            Value::Text(catalog),
-            data,
-            Value::Text("Database".to_string()),
-        ]);
+    if hierarchical {
+        // Nested: top-level rows are catalogs; each catalog's `[Data]`
+        // resolves to a sub-nav-table of that catalog's tables.
+        let cols = vec!["Name".to_string(), "Data".to_string(), "Kind".to_string()];
+        let mut rows: Vec<Vec<Value>> = Vec::with_capacity(by_catalog.len());
+        for (catalog, tables) in by_catalog {
+            let conn_string = connection_string.to_string();
+            let tables_for_thunk = tables.clone();
+            let inner: Rc<dyn Fn() -> Result<Value, MError>> = Rc::new(move || {
+                Ok(build_table_nav(&conn_string, &tables_for_thunk))
+            });
+            let data = Value::Thunk(Rc::new(RefCell::new(ThunkState::Native(inner))));
+            rows.push(vec![
+                Value::Text(catalog),
+                data,
+                Value::Text("Database".to_string()),
+            ]);
+        }
+        Ok(Value::Table(Table::from_rows(cols, rows)))
+    } else {
+        // Flat: skip the Database wrapper entirely; collect every table
+        // from every catalog into one navigation table. Matches Power
+        // Query's default behaviour (no HierarchicalNavigation option).
+        let mut all_tables: Vec<(String, String)> = Vec::new();
+        for tables in by_catalog.into_values() {
+            all_tables.extend(tables);
+        }
+        Ok(build_table_nav(connection_string, &all_tables))
     }
-    Ok(Value::Table(Table::from_rows(cols, rows)))
 }
 
 #[cfg(feature = "odbc")]
