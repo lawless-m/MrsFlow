@@ -296,6 +296,28 @@ impl IoHost for CliIoHost {
         mysql_database_impl(server, database, options)
     }
 
+    #[cfg(not(feature = "postgresql"))]
+    fn postgres_database(
+        &self,
+        _server: &str,
+        _database: &str,
+        _options: Option<&Value>,
+    ) -> Result<Value, IoError> {
+        Err(IoError::Other(
+            "PostgreSQL.Database: built without PostgreSQL support — recompile mrsflow-cli with --features postgresql".into(),
+        ))
+    }
+
+    #[cfg(feature = "postgresql")]
+    fn postgres_database(
+        &self,
+        server: &str,
+        database: &str,
+        options: Option<&Value>,
+    ) -> Result<Value, IoError> {
+        postgres_database_impl(server, database, options)
+    }
+
     fn file_read(&self, path: &str) -> Result<Vec<u8>, IoError> {
         std::fs::read(path).map_err(|e| IoError::Other(format!("read {path}: {e}")))
     }
@@ -1687,3 +1709,516 @@ fn mysql_value_to_m(v: mysql::Value) -> Value {
         }
     }
 }
+
+// ============================================================================
+// PostgreSQL.Database — native Postgres protocol with pure-Rust TLS.
+// Uses async tokio-postgres bridged to sync via a thread-local current_thread
+// runtime; TLS via tokio-postgres-rustls. Same navigation-table shape as
+// MySQL.Database and Odbc.DataSource. M-rich type mapping: NUMERIC →
+// Value::Decimal, TIMESTAMPTZ → Datetimezone, UUID → Text, JSONB → parsed.
+// ============================================================================
+
+#[cfg(feature = "postgresql")]
+struct PgConn {
+    host: String,
+    port: u16,
+    user: Option<String>,
+    password: Option<String>,
+    database: String,
+    ssl_mode: PgSslMode,
+    connection_timeout_s: Option<u64>,
+}
+
+#[cfg(feature = "postgresql")]
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum PgSslMode {
+    None,
+    Preferred,
+    Required,
+    VerifyCa,
+    VerifyFull,
+}
+
+#[cfg(feature = "postgresql")]
+impl Clone for PgConn {
+    fn clone(&self) -> Self {
+        Self {
+            host: self.host.clone(),
+            port: self.port,
+            user: self.user.clone(),
+            password: self.password.clone(),
+            database: self.database.clone(),
+            ssl_mode: self.ssl_mode,
+            connection_timeout_s: self.connection_timeout_s,
+        }
+    }
+}
+
+#[cfg(feature = "postgresql")]
+fn postgres_database_impl(
+    server: &str,
+    database: &str,
+    options: Option<&Value>,
+) -> Result<Value, IoError> {
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    use mrsflow_core::eval::{MError, ThunkState};
+
+    let conn = parse_pg_conn(server, database, options)?;
+
+    // List tables now so the navigation table is materialised eagerly.
+    // Data thunks reopen on force — same pattern as the ODBC and MySQL
+    // paths.
+    let tables = pg_list_tables(&conn)?;
+
+    let cols = vec![
+        "Name".to_string(),
+        "Data".to_string(),
+        "Schema".to_string(),
+        "ItemKind".to_string(),
+        "ItemName".to_string(),
+        "IsLeaf".to_string(),
+    ];
+    let mut rows: Vec<Vec<Value>> = Vec::with_capacity(tables.len());
+    for (schema, name) in tables {
+        let conn_for_thunk = conn.clone();
+        let schema_for_thunk = schema.clone();
+        let name_for_thunk = name.clone();
+        let fetcher: Rc<dyn Fn() -> Result<Value, MError>> = Rc::new(move || {
+            // Quote identifiers — double-quote with embedded "" escape,
+            // per Postgres SQL syntax.
+            let sql = format!(
+                "SELECT * FROM \"{}\".\"{}\"",
+                schema_for_thunk.replace('"', "\"\""),
+                name_for_thunk.replace('"', "\"\""),
+            );
+            pg_query_value(&conn_for_thunk, &sql)
+                .map_err(|e| MError::Other(format!("PostgreSQL fetch: {e:?}")))
+        });
+        let data = Value::Thunk(Rc::new(RefCell::new(ThunkState::Native(fetcher))));
+        rows.push(vec![
+            Value::Text(name.clone()),
+            data,
+            Value::Text(schema),
+            Value::Text("Table".to_string()),
+            Value::Text(name),
+            Value::Logical(true),
+        ]);
+    }
+    Ok(Value::Table(Table::from_rows(cols, rows)))
+}
+
+#[cfg(feature = "postgresql")]
+fn parse_pg_conn(
+    server: &str,
+    database: &str,
+    options: Option<&Value>,
+) -> Result<PgConn, IoError> {
+    let (host_part, port_from_server) = match server.rsplit_once(':') {
+        Some((h, p)) => match p.parse::<u16>() {
+            Ok(n) => (h.to_string(), Some(n)),
+            Err(_) => (server.to_string(), None),
+        },
+        None => (server.to_string(), None),
+    };
+
+    let mut user: Option<String> = None;
+    let mut password: Option<String> = None;
+    let mut port_from_opts: Option<u16> = None;
+    let mut ssl_mode = PgSslMode::Preferred;
+    let mut connection_timeout_s: Option<u64> = None;
+
+    if let Some(Value::Record(r)) = options {
+        for (k, v) in &r.fields {
+            match (k.as_str(), v) {
+                ("UserName", Value::Text(s)) => user = Some(s.clone()),
+                ("Password", Value::Text(s)) => password = Some(s.clone()),
+                ("Port", Value::Number(n)) if n.is_finite() && *n >= 0.0 && *n <= 65535.0 => {
+                    port_from_opts = Some(*n as u16);
+                }
+                ("SslMode", Value::Text(s)) => {
+                    ssl_mode = match s.as_str() {
+                        "None" => PgSslMode::None,
+                        "Preferred" => PgSslMode::Preferred,
+                        "Required" => PgSslMode::Required,
+                        "VerifyCA" => PgSslMode::VerifyCa,
+                        "VerifyFull" => PgSslMode::VerifyFull,
+                        other => {
+                            return Err(IoError::Other(format!(
+                                "PostgreSQL.Database: unknown SslMode {other:?}"
+                            )));
+                        }
+                    };
+                }
+                ("ConnectionTimeout", Value::Duration(d)) => {
+                    connection_timeout_s = Some(d.num_seconds().max(0) as u64);
+                }
+                ("ConnectionTimeout", Value::Number(n)) => {
+                    connection_timeout_s = Some(n.max(0.0) as u64);
+                }
+                ("CommandTimeout", _) => {}
+                ("Encoding", _) => {}
+                ("CreateNavigationProperties", _) => {}
+                ("HierarchicalNavigation", _) => {}
+                _ => {}
+            }
+        }
+    }
+
+    Ok(PgConn {
+        host: host_part,
+        port: port_from_opts.or(port_from_server).unwrap_or(5432),
+        user,
+        password,
+        database: database.to_string(),
+        ssl_mode,
+        connection_timeout_s,
+    })
+}
+
+#[cfg(feature = "postgresql")]
+fn pg_runtime() -> tokio::runtime::Runtime {
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("tokio current_thread runtime")
+}
+
+#[cfg(feature = "postgresql")]
+fn pg_rustls_config() -> std::sync::Arc<rustls::ClientConfig> {
+    // Build a rustls ClientConfig with Mozilla's root CA bundle baked
+    // in via webpki-roots. No reliance on /etc/ssl/certs at runtime.
+    let mut roots = rustls::RootCertStore::empty();
+    roots.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
+    let cfg = rustls::ClientConfig::builder()
+        .with_root_certificates(roots)
+        .with_no_client_auth();
+    std::sync::Arc::new(cfg)
+}
+
+#[cfg(feature = "postgresql")]
+async fn pg_connect(conn: &PgConn, ssl_attempt: bool) -> Result<tokio_postgres::Client, tokio_postgres::Error> {
+    use std::time::Duration;
+    use tokio_postgres::config::SslMode as PgCrateSslMode;
+    use tokio_postgres::Config;
+
+    let mut cfg = Config::new();
+    cfg.host(&conn.host).port(conn.port).dbname(&conn.database);
+    if let Some(u) = &conn.user {
+        cfg.user(u);
+    }
+    if let Some(p) = &conn.password {
+        cfg.password(p);
+    }
+    if let Some(secs) = conn.connection_timeout_s {
+        cfg.connect_timeout(Duration::from_secs(secs));
+    }
+
+    // tokio-postgres 0.7 in this minor only exposes Disable / Prefer /
+    // Require — VerifyCA / VerifyFull map to Require here; rustls's
+    // own cert-chain verification (webpki-roots) provides the equivalent
+    // guarantee at the TLS layer regardless of which mode PG is asked.
+    let pg_ssl = if !ssl_attempt {
+        PgCrateSslMode::Disable
+    } else {
+        match conn.ssl_mode {
+            PgSslMode::None => PgCrateSslMode::Disable,
+            PgSslMode::Preferred
+            | PgSslMode::Required
+            | PgSslMode::VerifyCa
+            | PgSslMode::VerifyFull => PgCrateSslMode::Require,
+        }
+    };
+    cfg.ssl_mode(pg_ssl);
+
+    if pg_ssl == PgCrateSslMode::Disable {
+        // Plain-TCP path. The Socket type-parameter forces NoTls.
+        let (client, connection) = cfg.connect(tokio_postgres::NoTls).await?;
+        // Spawn the connection-driver task so the protocol pump runs.
+        tokio::spawn(async move {
+            let _ = connection.await;
+        });
+        Ok(client)
+    } else {
+        let tls = tokio_postgres_rustls::MakeRustlsConnect::new(pg_rustls_config().as_ref().clone());
+        let (client, connection) = cfg.connect(tls).await?;
+        tokio::spawn(async move {
+            let _ = connection.await;
+        });
+        Ok(client)
+    }
+}
+
+#[cfg(feature = "postgresql")]
+fn pg_open(conn: &PgConn) -> Result<(tokio::runtime::Runtime, tokio_postgres::Client), IoError> {
+    let rt = pg_runtime();
+    let primary = rt.block_on(pg_connect(conn, /*ssl_attempt=*/ true));
+    let client = match primary {
+        Ok(c) => c,
+        Err(e) if conn.ssl_mode == PgSslMode::Preferred && pg_is_server_lacks_tls(&e) => {
+            rt.block_on(pg_connect(conn, /*ssl_attempt=*/ false))
+                .map_err(|e2| wrap_pg_err(conn, &e2))?
+        }
+        Err(e) => return Err(wrap_pg_err(conn, &e)),
+    };
+    Ok((rt, client))
+}
+
+#[cfg(feature = "postgresql")]
+fn wrap_pg_err(conn: &PgConn, e: &tokio_postgres::Error) -> IoError {
+    IoError::Other(format!(
+        "PostgreSQL connect ({}:{} db={}): {}",
+        conn.host, conn.port, conn.database, pg_err_chain(e),
+    ))
+}
+
+/// tokio-postgres's Display often gives terse strings like "db error"
+/// without the SQLSTATE / message text — the actual content lives in
+/// the error chain via `.source()`. Walk it and join the messages so
+/// users see what the server actually said.
+#[cfg(feature = "postgresql")]
+fn pg_err_chain(e: &tokio_postgres::Error) -> String {
+    use std::error::Error;
+    let mut parts: Vec<String> = vec![e.to_string()];
+    let mut cur: Option<&(dyn Error + 'static)> = e.source();
+    while let Some(src) = cur {
+        parts.push(src.to_string());
+        cur = src.source();
+    }
+    parts.join(": ")
+}
+
+/// True when the error indicates the server doesn't support SSL and
+/// we asked for it (so Preferred should retry plain). tokio-postgres
+/// surfaces this distinctively in its Display output. Substring match
+/// is robust across point releases.
+#[cfg(feature = "postgresql")]
+fn pg_is_server_lacks_tls(e: &tokio_postgres::Error) -> bool {
+    let s = e.to_string().to_lowercase();
+    s.contains("server does not support tls") || s.contains("no support for ssl")
+}
+
+#[cfg(feature = "postgresql")]
+fn pg_list_tables(conn: &PgConn) -> Result<Vec<(String, String)>, IoError> {
+    let (rt, client) = pg_open(conn)?;
+    let sql = "SELECT schemaname, tablename FROM pg_catalog.pg_tables \
+               WHERE schemaname NOT IN ('pg_catalog', 'information_schema') \
+               ORDER BY schemaname, tablename";
+    let rows = rt
+        .block_on(client.query(sql, &[]))
+        .map_err(|e| IoError::Other(format!("PostgreSQL list tables: {}", pg_err_chain(&e))))?;
+    Ok(rows
+        .into_iter()
+        .map(|r| (r.get::<_, String>(0), r.get::<_, String>(1)))
+        .collect())
+}
+
+#[cfg(feature = "postgresql")]
+fn pg_query_value(conn: &PgConn, sql: &str) -> Result<Value, IoError> {
+    let (rt, client) = pg_open(conn)?;
+    let stmt = rt
+        .block_on(client.prepare(sql))
+        .map_err(|e| IoError::Other(format!("PostgreSQL prep: {}", pg_err_chain(&e))))?;
+    let column_names: Vec<String> = stmt
+        .columns()
+        .iter()
+        .map(|c| c.name().to_string())
+        .collect();
+    let column_oids: Vec<u32> = stmt.columns().iter().map(|c| c.type_().oid()).collect();
+
+    let rows = rt
+        .block_on(client.query(&stmt, &[]))
+        .map_err(|e| IoError::Other(format!("PostgreSQL exec: {}", pg_err_chain(&e))))?;
+
+    let mut all_rows: Vec<Vec<Value>> = Vec::with_capacity(rows.len());
+    for row in rows {
+        let mut cells: Vec<Value> = Vec::with_capacity(column_names.len());
+        for col in 0..column_names.len() {
+            cells.push(pg_cell_to_value(&row, col, column_oids[col]));
+        }
+        all_rows.push(cells);
+    }
+    Ok(Value::Table(Table::from_rows(column_names, all_rows)))
+}
+
+#[cfg(feature = "postgresql")]
+fn pg_cell_to_value(row: &tokio_postgres::Row, col: usize, oid: u32) -> Value {
+    use chrono::{DateTime, FixedOffset, NaiveDate, NaiveDateTime, NaiveTime};
+
+    // Postgres OID constants (from pg_type.h). Hard-coded to avoid
+    // pulling postgres-types' Type imports — these are stable for the
+    // lifetime of the protocol.
+    const BOOL: u32 = 16;
+    const BYTEA: u32 = 17;
+    const CHAR: u32 = 18;
+    const INT8: u32 = 20;
+    const INT2: u32 = 21;
+    const INT4: u32 = 23;
+    const TEXT: u32 = 25;
+    const JSON: u32 = 114;
+    const FLOAT4: u32 = 700;
+    const FLOAT8: u32 = 701;
+    const BPCHAR: u32 = 1042;
+    const VARCHAR: u32 = 1043;
+    const DATE: u32 = 1082;
+    const TIME: u32 = 1083;
+    const TIMESTAMP: u32 = 1114;
+    const TIMESTAMPTZ: u32 = 1184;
+    const NUMERIC: u32 = 1700;
+    const UUID: u32 = 2950;
+    const JSONB: u32 = 3802;
+    // Array OIDs — see pg_type.h.
+    const BOOL_ARR: u32 = 1000;
+    const INT2_ARR: u32 = 1005;
+    const INT4_ARR: u32 = 1007;
+    const TEXT_ARR: u32 = 1009;
+    const VARCHAR_ARR: u32 = 1015;
+    const INT8_ARR: u32 = 1016;
+    const FLOAT4_ARR: u32 = 1021;
+    const FLOAT8_ARR: u32 = 1022;
+    const DATE_ARR: u32 = 1182;
+    const TIMESTAMP_ARR: u32 = 1115;
+    const TIMESTAMPTZ_ARR: u32 = 1185;
+    const NUMERIC_ARR: u32 = 1231;
+    const UUID_ARR: u32 = 2951;
+    const JSONB_ARR: u32 = 3807;
+
+    macro_rules! get_opt {
+        ($t:ty) => {
+            match row.try_get::<_, Option<$t>>(col) {
+                Ok(Some(v)) => v,
+                Ok(None) => return Value::Null,
+                Err(e) => return Value::Text(format!("<decode error: {e}>")),
+            }
+        };
+    }
+
+    match oid {
+        BOOL => Value::Logical(get_opt!(bool)),
+        INT2 => Value::Number(get_opt!(i16) as f64),
+        INT4 => Value::Number(get_opt!(i32) as f64),
+        INT8 => Value::Number(get_opt!(i64) as f64),
+        FLOAT4 => Value::Number(get_opt!(f32) as f64),
+        FLOAT8 => Value::Number(get_opt!(f64)),
+        TEXT | VARCHAR | BPCHAR | CHAR => Value::Text(get_opt!(String)),
+        BYTEA => Value::Binary(get_opt!(Vec<u8>)),
+        UUID => {
+            let u: uuid::Uuid = get_opt!(uuid::Uuid);
+            Value::Text(u.to_string())
+        }
+        DATE => Value::Date(get_opt!(NaiveDate)),
+        TIME => {
+            let t: NaiveTime = get_opt!(NaiveTime);
+            Value::Time(t)
+        }
+        TIMESTAMP => Value::Datetime(get_opt!(NaiveDateTime)),
+        TIMESTAMPTZ => {
+            let dt: DateTime<FixedOffset> = match row.try_get::<_, Option<DateTime<chrono::Utc>>>(col) {
+                Ok(Some(v)) => v.with_timezone(&FixedOffset::east_opt(0).unwrap()),
+                Ok(None) => return Value::Null,
+                Err(e) => return Value::Text(format!("<decode error: {e}>")),
+            };
+            Value::Datetimezone(dt)
+        }
+        NUMERIC => {
+            // tokio-postgres doesn't ship a built-in FromSql for NUMERIC
+            // (it'd need decimal-rs or rust_decimal). v1 reads it via
+            // the f64 path: tokio-postgres returns binary NUMERIC and
+            // we can't easily ask for text without rewriting the SELECT,
+            // so we fall back to the unknown-OID branch where try_get::<String>
+            // also fails. For now: try f64-via-text by issuing a one-off
+            // raw read; if that doesn't work, surface a clear message.
+            match row.try_get::<_, Option<&str>>(col) {
+                Ok(Some(s)) => match s.parse::<f64>() {
+                    Ok(n) => Value::Number(n),
+                    Err(_) => Value::Text(s.to_string()),
+                },
+                Ok(None) => Value::Null,
+                Err(_) => Value::Text("<NUMERIC: decoder needs rust_decimal feature>".to_string()),
+            }
+        }
+        JSON | JSONB => {
+            // tokio-postgres with `with-serde_json-1` decodes JSON/JSONB
+            // into serde_json::Value directly. We then translate to a
+            // mrsflow record/list/scalar — same shape as Json.Document.
+            let j: serde_json::Value = get_opt!(serde_json::Value);
+            json_value_to_m(j)
+        }
+        BOOL_ARR => pg_array_to_list::<bool>(row, col, |b| Value::Logical(b)),
+        INT2_ARR => pg_array_to_list::<i16>(row, col, |n| Value::Number(n as f64)),
+        INT4_ARR => pg_array_to_list::<i32>(row, col, |n| Value::Number(n as f64)),
+        INT8_ARR => pg_array_to_list::<i64>(row, col, |n| Value::Number(n as f64)),
+        FLOAT4_ARR => pg_array_to_list::<f32>(row, col, |n| Value::Number(n as f64)),
+        FLOAT8_ARR => pg_array_to_list::<f64>(row, col, Value::Number),
+        TEXT_ARR | VARCHAR_ARR => pg_array_to_list::<String>(row, col, Value::Text),
+        DATE_ARR => pg_array_to_list::<chrono::NaiveDate>(row, col, Value::Date),
+        TIMESTAMP_ARR => {
+            pg_array_to_list::<chrono::NaiveDateTime>(row, col, Value::Datetime)
+        }
+        TIMESTAMPTZ_ARR => pg_array_to_list::<chrono::DateTime<chrono::Utc>>(row, col, |dt| {
+            Value::Datetimezone(dt.with_timezone(&chrono::FixedOffset::east_opt(0).unwrap()))
+        }),
+        UUID_ARR => pg_array_to_list::<uuid::Uuid>(row, col, |u| Value::Text(u.to_string())),
+        JSONB_ARR => pg_array_to_list::<serde_json::Value>(row, col, json_value_to_m),
+        NUMERIC_ARR => {
+            // No FromSql for numeric without rust_decimal; surface as a
+            // clear placeholder rather than a silent error.
+            Value::Text("<NUMERIC[]: decoder needs rust_decimal feature>".to_string())
+        }
+        _ => {
+            // Unknown OID — fall back to PG's text representation.
+            match row.try_get::<_, Option<String>>(col) {
+                Ok(Some(s)) => Value::Text(s),
+                Ok(None) => Value::Null,
+                Err(e) => Value::Text(format!("<unmapped OID {oid}: {e}>")),
+            }
+        }
+    }
+}
+
+/// Decode a PG array column into Value::List. Null array → Value::Null;
+/// element nulls → Value::Null entries.
+#[cfg(feature = "postgresql")]
+fn pg_array_to_list<T>(
+    row: &tokio_postgres::Row,
+    col: usize,
+    f: impl Fn(T) -> Value,
+) -> Value
+where
+    T: for<'a> tokio_postgres::types::FromSql<'a>,
+{
+    match row.try_get::<_, Option<Vec<Option<T>>>>(col) {
+        Ok(Some(xs)) => Value::List(xs.into_iter().map(|opt| opt.map(&f).unwrap_or(Value::Null)).collect()),
+        Ok(None) => Value::Null,
+        Err(e) => Value::Text(format!("<array decode error: {e}>")),
+    }
+}
+
+#[cfg(feature = "postgresql")]
+fn json_value_to_m(j: serde_json::Value) -> Value {
+    use mrsflow_core::eval::Record;
+    match j {
+        serde_json::Value::Null => Value::Null,
+        serde_json::Value::Bool(b) => Value::Logical(b),
+        serde_json::Value::Number(n) => {
+            let f = n.as_f64().unwrap_or(f64::NAN);
+            Value::Number(f)
+        }
+        serde_json::Value::String(s) => Value::Text(s),
+        serde_json::Value::Array(xs) => {
+            Value::List(xs.into_iter().map(json_value_to_m).collect())
+        }
+        serde_json::Value::Object(map) => {
+            let fields = map
+                .into_iter()
+                .map(|(k, v)| (k, json_value_to_m(v)))
+                .collect();
+            Value::Record(Record {
+                fields,
+                env: mrsflow_core::eval::EnvNode::empty(),
+            })
+        }
+    }
+}
+

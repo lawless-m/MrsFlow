@@ -87,6 +87,20 @@ pub trait IoHost {
     /// `folder_contents` but folders are descended-into and not emitted
     /// as rows.
     fn folder_files(&self, path: &str) -> Result<Value, IoError>;
+    /// Connect to PostgreSQL and return a navigation table — backs
+    /// `PostgreSQL.Database`. Same shape as `mysql_database` /
+    /// `Odbc.DataSource`. Default impl returns `IoError::NotSupported`
+    /// so non-CLI shells (and CLI builds without `--features postgresql`)
+    /// surface a clear error.
+    fn postgres_database(
+        &self,
+        server: &str,
+        database: &str,
+        options: Option<&Value>,
+    ) -> Result<Value, IoError> {
+        let _ = (server, database, options);
+        Err(IoError::NotSupported)
+    }
     /// Connect to MySQL and return a navigation table — backs `MySQL.Database`.
     /// `options` is the optional record passed as the third arg (UserName,
     /// Password, Port, SslMode, ConnectionTimeout, CommandTimeout, etc.).
