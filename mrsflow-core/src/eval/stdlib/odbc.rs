@@ -33,6 +33,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
             ],
             data_source,
         ),
+        ("Odbc.InferOptions", one("connection"), infer_options),
     ]
 }
 
@@ -48,4 +49,33 @@ fn data_source(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let opts = args.get(1);
     host.odbc_data_source(conn, opts)
         .map_err(|e| MError::Other(format!("Odbc.DataSource: {e:?}")))
+}
+
+/// Stub returning an empty SqlCapabilities record. The real
+/// Odbc.InferOptions introspects the driver via `SQLGetInfo` /
+/// `SQLGetTypeInfo` and produces a record describing aggregates,
+/// supported literals, identifier quoting, etc. — used by Power BI's
+/// query-folding engine. mrsflow doesn't fold, so the returned record
+/// is empty; downstream code that reads `SqlCapabilities.X` will get
+/// null (M's missing-field default), which folding logic treats as
+/// "feature unsupported" — the conservative answer.
+fn infer_options(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let _ = expect_text(&args[0])?;
+    Ok(Value::Record(Record {
+        fields: vec![
+            (
+                "SqlCapabilities".to_string(),
+                Value::Record(Record { fields: vec![], env: EnvNode::empty() }),
+            ),
+            (
+                "SQLGetInfo".to_string(),
+                Value::Record(Record { fields: vec![], env: EnvNode::empty() }),
+            ),
+            (
+                "SQLGetTypeInfo".to_string(),
+                Value::Record(Record { fields: vec![], env: EnvNode::empty() }),
+            ),
+        ],
+        env: EnvNode::empty(),
+    }))
 }
