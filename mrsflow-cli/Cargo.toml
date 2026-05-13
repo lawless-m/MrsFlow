@@ -15,6 +15,10 @@ default = []
 # on Debian) at build and runtime. Off by default so the workspace builds
 # cleanly without an ODBC driver manager present.
 odbc = ["dep:odbc-api"]
+# Pulls in the `mysql` crate for MySQL.Database. Pure-Rust TLS via rustls,
+# no system OpenSSL required. Off by default so the workspace stays light
+# for users who don't query MySQL.
+mysql = ["dep:mysql"]
 
 [dependencies]
 mrsflow-core = { path = "../mrsflow-core" }
@@ -33,6 +37,11 @@ bytes = "1"
 # the synchronous IoHost call path (no tokio runtime to bootstrap).
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls"] }
 odbc-api = { version = "13", optional = true }
+# Native MySQL protocol client. `default-features = false` strips the bundled
+# OpenSSL backend; `minimal-rust` selects the minimum sync feature set;
+# `rustls-tls-ring` gives us pure-Rust TLS (rustls + ring crypto provider)
+# matching reqwest's TLS choice above.
+mysql = { version = "26", default-features = false, features = ["minimal-rust", "rustls-tls-ring"], optional = true }
 
 [[bin]]
 name = "mrsflow"

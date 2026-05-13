@@ -48,6 +48,7 @@ mod csv;
 mod folder;
 mod diagnostics;
 mod variable;
+mod mysql;
 
 // External callers of the old `stdlib::*` API expect these names at this path.
 // `table_to_rows` is only reached from #[cfg(test)] code in eval::mod, hence
@@ -223,6 +224,7 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         folder::bindings(),
         diagnostics::bindings(),
         variable::bindings(),
+        mysql::bindings(),
     ] {
         all.extend(slice);
     }

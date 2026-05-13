@@ -87,6 +87,22 @@ pub trait IoHost {
     /// `folder_contents` but folders are descended-into and not emitted
     /// as rows.
     fn folder_files(&self, path: &str) -> Result<Value, IoError>;
+    /// Connect to MySQL and return a navigation table — backs `MySQL.Database`.
+    /// `options` is the optional record passed as the third arg (UserName,
+    /// Password, Port, SslMode, ConnectionTimeout, CommandTimeout, etc.).
+    /// Returns a navigation table with columns `Name, Data, ItemKind,
+    /// ItemName, IsLeaf` — same shape as `Odbc.DataSource` produces.
+    /// Hosts with no MySQL support (WASM, default builds) return
+    /// `IoError::NotSupported`.
+    fn mysql_database(
+        &self,
+        server: &str,
+        database: &str,
+        options: Option<&Value>,
+    ) -> Result<Value, IoError> {
+        let _ = (server, database, options);
+        Err(IoError::NotSupported)
+    }
     /// Caller-injected workbook parameters — backs `Excel.CurrentWorkbook`.
     /// Returns a Table with columns `Name, Content` where each Content
     /// cell is a 1-row Table `[Value=…]`. The shell (`mrsflow-cli`) builds

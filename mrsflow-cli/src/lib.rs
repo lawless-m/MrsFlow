@@ -274,6 +274,28 @@ impl IoHost for CliIoHost {
         odbc_data_source_impl(connection_string)
     }
 
+    #[cfg(not(feature = "mysql"))]
+    fn mysql_database(
+        &self,
+        _server: &str,
+        _database: &str,
+        _options: Option<&Value>,
+    ) -> Result<Value, IoError> {
+        Err(IoError::Other(
+            "MySQL.Database: built without MySQL support — recompile mrsflow-cli with --features mysql".into(),
+        ))
+    }
+
+    #[cfg(feature = "mysql")]
+    fn mysql_database(
+        &self,
+        server: &str,
+        database: &str,
+        options: Option<&Value>,
+    ) -> Result<Value, IoError> {
+        mysql_database_impl(server, database, options)
+    }
+
     fn file_read(&self, path: &str) -> Result<Vec<u8>, IoError> {
         std::fs::read(path).map_err(|e| IoError::Other(format!("read {path}: {e}")))
     }
@@ -1312,4 +1334,317 @@ fn build_table_nav(connection: &str, catalog: &str, tables: &[(String, String)])
         ]);
     }
     Value::Table(Table::from_rows(cols, rows))
+}
+
+// ============================================================================
+// MySQL.Database — native MySQL protocol client with rustls TLS.
+// Connection options come in via the M record passed to MySQL.Database
+// (already deep-forced in the stdlib binding, so we just pattern-match
+// here without forcing). The shape of the returned navigation table
+// mirrors what Odbc.DataSource produces: a table with columns
+// (Name, Data, ItemKind, ItemName, IsLeaf) where each Data is a lazy
+// thunk that runs `SELECT * FROM \`db\`.\`table\`` on force.
+// ============================================================================
+
+#[cfg(feature = "mysql")]
+struct MySqlConn {
+    host: String,
+    port: u16,
+    user: Option<String>,
+    password: Option<String>,
+    database: String,
+    ssl_mode: SslMode,
+    connection_timeout_s: Option<u64>,
+}
+
+#[cfg(feature = "mysql")]
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SslMode {
+    None,
+    Preferred,
+    Required,
+    VerifyCa,
+    VerifyFull,
+}
+
+#[cfg(feature = "mysql")]
+fn mysql_database_impl(
+    server: &str,
+    database: &str,
+    options: Option<&Value>,
+) -> Result<Value, IoError> {
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    use mrsflow_core::eval::{MError, ThunkState};
+
+    let conn = parse_mysql_conn(server, database, options)?;
+
+    // Connect once to enumerate tables. The Data thunks reopen on force —
+    // simpler than sharing a connection across thunk firings, and the
+    // navigation table itself can outlive any single connection.
+    let table_names = mysql_list_tables(&conn)?;
+
+    let cols = vec![
+        "Name".to_string(),
+        "Data".to_string(),
+        "ItemKind".to_string(),
+        "ItemName".to_string(),
+        "IsLeaf".to_string(),
+    ];
+    let mut rows: Vec<Vec<Value>> = Vec::with_capacity(table_names.len());
+    for name in table_names {
+        let conn_for_thunk = conn.clone();
+        let table_for_thunk = name.clone();
+        let fetcher: Rc<dyn Fn() -> Result<Value, MError>> = Rc::new(move || {
+            let sql = format!(
+                "SELECT * FROM `{}`.`{}`",
+                conn_for_thunk.database.replace('`', "``"),
+                table_for_thunk.replace('`', "``"),
+            );
+            mysql_query_value(&conn_for_thunk, &sql)
+                .map_err(|e| MError::Other(format!("MySQL fetch: {e:?}")))
+        });
+        let data = Value::Thunk(Rc::new(RefCell::new(ThunkState::Native(fetcher))));
+        rows.push(vec![
+            Value::Text(name.clone()),
+            data,
+            Value::Text("Table".to_string()),
+            Value::Text(name),
+            Value::Logical(true),
+        ]);
+    }
+    Ok(Value::Table(Table::from_rows(cols, rows)))
+}
+
+#[cfg(feature = "mysql")]
+impl Clone for MySqlConn {
+    fn clone(&self) -> Self {
+        Self {
+            host: self.host.clone(),
+            port: self.port,
+            user: self.user.clone(),
+            password: self.password.clone(),
+            database: self.database.clone(),
+            ssl_mode: self.ssl_mode,
+            connection_timeout_s: self.connection_timeout_s,
+        }
+    }
+}
+
+#[cfg(feature = "mysql")]
+fn parse_mysql_conn(
+    server: &str,
+    database: &str,
+    options: Option<&Value>,
+) -> Result<MySqlConn, IoError> {
+    // server is "host" or "host:port". Options may override Port.
+    let (host_part, port_from_server) = match server.rsplit_once(':') {
+        Some((h, p)) => match p.parse::<u16>() {
+            Ok(n) => (h.to_string(), Some(n)),
+            Err(_) => (server.to_string(), None),
+        },
+        None => (server.to_string(), None),
+    };
+
+    let mut user: Option<String> = None;
+    let mut password: Option<String> = None;
+    let mut port_from_opts: Option<u16> = None;
+    let mut ssl_mode = SslMode::Preferred;
+    let mut connection_timeout_s: Option<u64> = None;
+
+    if let Some(Value::Record(r)) = options {
+        for (k, v) in &r.fields {
+            match (k.as_str(), v) {
+                ("UserName", Value::Text(s)) => user = Some(s.clone()),
+                ("UserName", Value::Null) | ("UserName", _) if matches!(v, Value::Null) => {}
+                ("Password", Value::Text(s)) => password = Some(s.clone()),
+                ("Password", Value::Null) => {}
+                ("Port", Value::Number(n)) if n.is_finite() && *n >= 0.0 && *n <= 65535.0 => {
+                    port_from_opts = Some(*n as u16);
+                }
+                ("Port", Value::Null) => {}
+                ("SslMode", Value::Text(s)) => {
+                    ssl_mode = match s.as_str() {
+                        "None" => SslMode::None,
+                        "Preferred" => SslMode::Preferred,
+                        "Required" => SslMode::Required,
+                        "VerifyCA" => SslMode::VerifyCa,
+                        "VerifyFull" => SslMode::VerifyFull,
+                        other => {
+                            return Err(IoError::Other(format!(
+                                "MySQL.Database: unknown SslMode {other:?}"
+                            )));
+                        }
+                    };
+                }
+                ("SslMode", Value::Null) => {}
+                ("ConnectionTimeout", Value::Duration(d)) => {
+                    connection_timeout_s = Some(d.num_seconds().max(0) as u64);
+                }
+                ("ConnectionTimeout", Value::Number(n)) => {
+                    connection_timeout_s = Some(n.max(0.0) as u64);
+                }
+                ("ConnectionTimeout", Value::Null) => {}
+                ("CommandTimeout", _) => {} // accepted, not forwarded
+                ("Encoding", _) => {} // accepted, ignored (mysql crate is UTF-8)
+                ("CreateNavigationProperties", _) => {} // ignored
+                ("HierarchicalNavigation", _) => {} // ignored
+                ("ReturnSingleDatabase", _) => {} // ignored
+                _ => {} // unknown fields silently ignored, matching PQ tolerance
+            }
+        }
+    }
+
+    Ok(MySqlConn {
+        host: host_part,
+        port: port_from_opts.or(port_from_server).unwrap_or(3306),
+        user,
+        password,
+        database: database.to_string(),
+        ssl_mode,
+        connection_timeout_s,
+    })
+}
+
+#[cfg(feature = "mysql")]
+fn mysql_open(conn: &MySqlConn) -> Result<mysql::Conn, IoError> {
+    use mysql::{Conn, OptsBuilder, SslOpts};
+    use std::time::Duration;
+
+    let mut builder = OptsBuilder::new()
+        .ip_or_hostname(Some(conn.host.as_str()))
+        .tcp_port(conn.port)
+        .db_name(Some(conn.database.as_str()))
+        .user(conn.user.as_deref())
+        .pass(conn.password.as_deref());
+
+    if let Some(secs) = conn.connection_timeout_s {
+        builder = builder.tcp_connect_timeout(Some(Duration::from_secs(secs)));
+    }
+
+    let ssl_opts = match conn.ssl_mode {
+        SslMode::None => None,
+        SslMode::Preferred | SslMode::Required => Some(SslOpts::default()),
+        SslMode::VerifyCa => Some(SslOpts::default().with_danger_accept_invalid_certs(false)),
+        SslMode::VerifyFull => {
+            Some(SslOpts::default()
+                .with_danger_skip_domain_validation(false)
+                .with_danger_accept_invalid_certs(false))
+        }
+    };
+    if let Some(opts) = ssl_opts {
+        builder = builder.ssl_opts(opts);
+    }
+
+    Conn::new(builder).map_err(|e| {
+        IoError::Other(format!(
+            "MySQL connect ({}:{} db={}): {e}",
+            conn.host, conn.port, conn.database
+        ))
+    })
+}
+
+#[cfg(feature = "mysql")]
+fn mysql_list_tables(conn: &MySqlConn) -> Result<Vec<String>, IoError> {
+    use mysql::prelude::Queryable;
+
+    let mut c = mysql_open(conn)?;
+    let rows: Vec<String> = c
+        .query(
+            "SELECT table_name FROM information_schema.tables \
+             WHERE table_schema = DATABASE() \
+             ORDER BY table_name",
+        )
+        .map_err(|e| IoError::Other(format!("MySQL list tables: {e}")))?;
+    Ok(rows)
+}
+
+#[cfg(feature = "mysql")]
+fn mysql_query_value(conn: &MySqlConn, sql: &str) -> Result<Value, IoError> {
+    use mysql::prelude::Queryable;
+
+    let mut c = mysql_open(conn)?;
+    let result = c
+        .query_iter(sql)
+        .map_err(|e| IoError::Other(format!("MySQL exec: {e}")))?;
+
+    // Capture column names + collected rows. Type mapping happens when
+    // we walk the cells — see mysql_value_to_m below.
+    let column_names: Vec<String> = result
+        .columns()
+        .as_ref()
+        .iter()
+        .map(|c| c.name_str().into_owned())
+        .collect();
+
+    let mut all_rows: Vec<Vec<Value>> = Vec::new();
+    for row_res in result {
+        let row = row_res.map_err(|e| IoError::Other(format!("MySQL fetch: {e}")))?;
+        let mut cells: Vec<Value> = Vec::with_capacity(column_names.len());
+        for col in 0..column_names.len() {
+            let v: mysql::Value = row.as_ref(col).cloned().unwrap_or(mysql::Value::NULL);
+            cells.push(mysql_value_to_m(v));
+        }
+        all_rows.push(cells);
+    }
+    Ok(Value::Table(Table::from_rows(column_names, all_rows)))
+}
+
+#[cfg(feature = "mysql")]
+fn mysql_value_to_m(v: mysql::Value) -> Value {
+    use chrono::{NaiveDate, NaiveDateTime, NaiveTime, Duration as ChronoDuration};
+    use mysql::Value as MV;
+    match v {
+        MV::NULL => Value::Null,
+        MV::Int(n) => Value::Number(n as f64),
+        MV::UInt(n) => Value::Number(n as f64),
+        MV::Float(n) => Value::Number(n as f64),
+        MV::Double(n) => Value::Number(n),
+        MV::Bytes(b) => match String::from_utf8(b) {
+            // Most VARCHAR/TEXT cells come through as Bytes. Treat
+            // valid UTF-8 as Text; only fall back to Binary for
+            // genuinely non-textual blobs.
+            Ok(s) => {
+                // DECIMAL also lands as Bytes (always-ASCII numeric
+                // string) — attempt to parse so DECIMAL(p,s) round-trips
+                // as a Number. mrsflow has Value::Decimal too, but
+                // without precision/scale metadata at the row level
+                // we'd need to wire ColumnType information through;
+                // f64 parse is the v1 compromise.
+                if let Ok(n) = s.parse::<f64>() {
+                    Value::Number(n)
+                } else {
+                    Value::Text(s)
+                }
+            }
+            Err(e) => Value::Binary(e.into_bytes()),
+        },
+        MV::Date(year, month, day, hour, minute, second, micros) => {
+            let date = NaiveDate::from_ymd_opt(year as i32, month as u32, day as u32);
+            let time = NaiveTime::from_hms_micro_opt(
+                hour as u32, minute as u32, second as u32, micros,
+            );
+            match (date, time) {
+                (Some(d), Some(t)) => {
+                    if hour == 0 && minute == 0 && second == 0 && micros == 0 {
+                        Value::Date(d)
+                    } else {
+                        Value::Datetime(NaiveDateTime::new(d, t))
+                    }
+                }
+                _ => Value::Null,
+            }
+        }
+        MV::Time(negative, days, hours, minutes, seconds, micros) => {
+            let total_secs = (days as i64) * 86400
+                + (hours as i64) * 3600
+                + (minutes as i64) * 60
+                + (seconds as i64);
+            let micros_part = micros as i64;
+            let total_micros = total_secs * 1_000_000 + micros_part;
+            let signed = if negative { -total_micros } else { total_micros };
+            Value::Duration(ChronoDuration::microseconds(signed))
+        }
+    }
 }
