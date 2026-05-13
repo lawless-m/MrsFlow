@@ -4763,6 +4763,101 @@ mod tests {
     }
 
     #[test]
+    fn xml_document_simple_element() {
+        // <root><a>hello</a><b>world</b></root>
+        let src = "Xml.Document(\"<root><a>hello</a><b>world</b></root>\")";
+        match eval_str(src).unwrap() {
+            Value::Table(t) => {
+                let t = t.force().unwrap().into_owned();
+                // Top-level is a 1-row navtable; that row's Value is the
+                // child Table.
+                assert_eq!(t.num_rows(), 1);
+                let r0 = match super::stdlib::row_to_record(&t, 0).unwrap() {
+                    Value::Record(r) => r,
+                    other => panic!("expected record, got {other:?}"),
+                };
+                assert_eq!(r0.fields[0].0, "Name");
+                match &r0.fields[0].1 {
+                    Value::Text(s) => assert_eq!(s, "root"),
+                    other => panic!("expected text, got {other:?}"),
+                }
+                let value_cell = &r0.fields.iter().find(|(n, _)| n == "Value").unwrap().1;
+                match value_cell {
+                    Value::Table(inner) => {
+                        let inner = inner.force().unwrap().into_owned();
+                        assert_eq!(inner.num_rows(), 2);
+                    }
+                    other => panic!("expected nested table, got {other:?}"),
+                }
+            }
+            other => panic!("expected table, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn xml_document_attributes_and_leaf_text() {
+        // <e attr="42">hi</e>
+        let src = "Xml.Document(\"<e attr=\"\"42\"\">hi</e>\")";
+        match eval_str(src).unwrap() {
+            Value::Table(t) => {
+                let t = t.force().unwrap().into_owned();
+                let r0 = match super::stdlib::row_to_record(&t, 0).unwrap() {
+                    Value::Record(r) => r,
+                    other => panic!("expected record, got {other:?}"),
+                };
+                // Leaf element: Value is text "hi"
+                let v = &r0.fields.iter().find(|(n, _)| n == "Value").unwrap().1;
+                match v {
+                    Value::Text(s) => assert_eq!(s, "hi"),
+                    other => panic!("expected text, got {other:?}"),
+                }
+                // Attributes is a Record with attr = "42"
+                let attrs = &r0.fields.iter().find(|(n, _)| n == "Attributes").unwrap().1;
+                match attrs {
+                    Value::Record(r) => {
+                        assert_eq!(r.fields.len(), 1);
+                        assert_eq!(r.fields[0].0, "attr");
+                        match &r.fields[0].1 {
+                            Value::Text(s) => assert_eq!(s, "42"),
+                            other => panic!("expected text attr, got {other:?}"),
+                        }
+                    }
+                    other => panic!("expected record attrs, got {other:?}"),
+                }
+            }
+            other => panic!("expected table, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn xml_document_cdata_and_namespace() {
+        // <ns:root xmlns:ns="urn:test"><![CDATA[<raw>]]></ns:root>
+        let src = "Xml.Document(\"<ns:root xmlns:ns=\"\"urn:test\"\"><![CDATA[<raw>]]></ns:root>\")";
+        match eval_str(src).unwrap() {
+            Value::Table(t) => {
+                let t = t.force().unwrap().into_owned();
+                let r0 = match super::stdlib::row_to_record(&t, 0).unwrap() {
+                    Value::Record(r) => r,
+                    other => panic!("expected record, got {other:?}"),
+                };
+                // Namespace URI is resolved.
+                let ns = &r0.fields.iter().find(|(n, _)| n == "Namespace").unwrap().1;
+                match ns {
+                    Value::Text(s) => assert_eq!(s, "urn:test"),
+                    other => panic!("expected namespace text, got {other:?}"),
+                }
+                // CDATA content survives as-is — angle brackets preserved.
+                let v = &r0.fields.iter().find(|(n, _)| n == "Value").unwrap().1;
+                match v {
+                    Value::Text(s) => assert_eq!(s, "<raw>"),
+                    other => panic!("expected text, got {other:?}"),
+                }
+            }
+            other => panic!("expected table, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn list_split_basic() {
         match eval_str("List.Split({1, 2, 3, 4, 5}, 2)").unwrap() {
             Value::List(chunks) => {

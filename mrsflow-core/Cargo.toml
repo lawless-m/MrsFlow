@@ -24,6 +24,9 @@ csv = "1"
 # (no tokio/async) to keep the wasm32 build clean.
 parquet = { version = "53", default-features = false, features = ["arrow", "snap"] }
 bytes = "1"
+# Xml.Document / Xml.Tables. Default features off — we don't need encoding
+# detection or async; the corpus is UTF-8 XML coming via Web.Contents.
+quick-xml = { version = "0.36", default-features = false }
 
 # Enable the `js` feature on getrandom only when targeting the browser.
 # Both `rand` (direct) and `arrow`'s `ahash → const-random` chain pull
