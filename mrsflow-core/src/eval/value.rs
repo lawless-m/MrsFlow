@@ -215,6 +215,45 @@ pub enum TableRepr {
     /// the byte-identical Rows-backed result the eager path would have
     /// produced. See `mrsflow/09-lazy-tables.md` §4.
     JoinView(JoinViewState),
+    /// Deferred result of `Table.ExpandTableColumn` over a `JoinView`.
+    /// Holds (lazy) left + projections of left and right + per-outer-row
+    /// match indices. Column count, row count and column names are
+    /// available without forcing; cell access forces the same way as
+    /// the eager `expand_table_column` would have produced. The big win:
+    /// `Table.RowCount` / chained `SelectColumns` / `RemoveColumns` /
+    /// `Table.NestedJoin` can operate on this view without materialising
+    /// either side's bulk columns. See `mrsflow/09-lazy-tables.md`
+    /// (Stage A.5).
+    ExpandView(ExpandViewState),
+}
+
+/// State for a `TableRepr::ExpandView`. Constructed by
+/// `Table.ExpandTableColumn` over a `JoinView`; preserves enough
+/// information for `SelectColumns`/`RemoveColumns`/`NestedJoin` chains
+/// to keep operating lazily, deferring left- and right-side decode
+/// until something genuinely needs a cell.
+#[derive(Debug, Clone)]
+pub struct ExpandViewState {
+    /// Source left table — possibly lazy. Cell access for a left
+    /// column at outer row `i` reads `left` at row `i`.
+    pub left: Arc<Table>,
+    /// Indices of left columns to include in the output, in output
+    /// order. Positions in `left.column_names()` (which may itself be
+    /// a projection if `left` is a `LazyParquet` with a narrowed mask).
+    pub left_projection: Vec<usize>,
+    /// Source right table — possibly lazy.
+    pub right: Arc<Table>,
+    /// Indices of right columns to include in the output, in the
+    /// order in which the expand's `column_names` arg listed them.
+    pub right_projection: Vec<usize>,
+    /// Output names for the right columns — parallel to
+    /// `right_projection`, lets `Table.ExpandTableColumn` rename
+    /// the expanded columns at view-construction time.
+    pub right_output_names: Vec<String>,
+    /// For each row of `left`, indices of matched rows in `right`.
+    /// Empty matches drop the outer row from the output (matches the
+    /// eager expand semantics: empty inner table → 0 output rows).
+    pub matches: Vec<Vec<u32>>,
 }
 
 /// State for a `TableRepr::JoinView`. Constructed by `Table.NestedJoin`
@@ -223,18 +262,21 @@ pub enum TableRepr {
 /// the requested right-side columns. Forces into a Rows-backed table.
 #[derive(Debug, Clone)]
 pub struct JoinViewState {
-    /// Left table (without the nested column appended). All left columns
-    /// flow through unchanged into the join result.
-    pub left: Box<Table>,
+    /// Left table — stays lazy where lazy. NestedJoin decodes only the
+    /// left key column to build matches; the full left side decodes
+    /// later only when something forces (e.g. a force-on-entry stdlib
+    /// function, or `materialise_join_view`). `Arc` to share with
+    /// downstream lazy nodes (ExpandView) cheaply.
+    pub left: Arc<Table>,
     /// The right-side table. May itself be `LazyParquet` (in which case
     /// only the columns expand pulls are decoded) or an eager variant.
-    /// `Arc` so `left.clone()` cascades cheaply during forcing.
     pub right: Arc<Table>,
     /// The output column name for the nested column.
     pub new_column_name: String,
     /// For each row in `left`, the indices of matched rows in `right`.
     /// Computed eagerly by `Table.NestedJoin`'s hash-join pass, since
-    /// computing matches requires decoding just the right key column.
+    /// computing matches requires decoding just the key columns of
+    /// each side.
     pub matches: Vec<Vec<u32>>,
     /// Join kind passed to NestedJoin (0 = Inner, 1 = LeftOuter; others
     /// not yet supported per nested_join's existing check). Stored so
@@ -321,6 +363,16 @@ impl Table {
                 names.push(jv.new_column_name.clone());
                 names
             }
+            TableRepr::ExpandView(ev) => {
+                let left_names = ev.left.column_names();
+                let mut names: Vec<String> = ev
+                    .left_projection
+                    .iter()
+                    .map(|&i| left_names[i].clone())
+                    .collect();
+                names.extend(ev.right_output_names.iter().cloned());
+                names
+            }
         }
     }
 
@@ -337,6 +389,11 @@ impl Table {
                     _ => jv.left.num_rows(),
                 }
             }
+            TableRepr::ExpandView(ev) => {
+                // Expanded rows = sum over matches[i].len(). Empty
+                // matches drop their outer row, matching eager expand.
+                ev.matches.iter().map(|m| m.len()).sum()
+            }
         }
     }
 
@@ -346,6 +403,9 @@ impl Table {
             TableRepr::Rows { columns, .. } => columns.len(),
             TableRepr::LazyParquet(s) => s.projection.len(),
             TableRepr::JoinView(jv) => jv.left.num_columns() + 1,
+            TableRepr::ExpandView(ev) => {
+                ev.left_projection.len() + ev.right_output_names.len()
+            }
         }
     }
 
@@ -358,7 +418,9 @@ impl Table {
             TableRepr::Rows { .. } => Err(MError::NotImplemented(
                 "operation requires Arrow-backed table (Rows-backed support pending)",
             )),
-            TableRepr::LazyParquet(_) | TableRepr::JoinView(_) => Err(MError::Other(
+            TableRepr::LazyParquet(_)
+            | TableRepr::JoinView(_)
+            | TableRepr::ExpandView(_) => Err(MError::Other(
                 "internal: as_arrow() called on lazy table without forcing first \
                  — use Table::force() or expect_table()".into(),
             )),
@@ -386,6 +448,15 @@ impl Table {
                  Table.ExpandTableColumn first to flatten."
                     .into(),
             )),
+            TableRepr::ExpandView(_) => {
+                // Force into a Rows-backed Table first, then try the
+                // Rows→Arrow path. Most ExpandView results have mixed
+                // typed columns and will fail at the Rows branch above
+                // with a clear message; that's the same outcome as the
+                // eager `expand_table_column` would have produced.
+                let forced = self.force()?;
+                forced.try_to_arrow()
+            }
         }
     }
 
@@ -400,8 +471,125 @@ impl Table {
             TableRepr::Arrow(_) | TableRepr::Rows { .. } => Ok(Cow::Borrowed(self)),
             TableRepr::LazyParquet(s) => Ok(Cow::Owned(Self::from_arrow(decode_lazy_parquet(s)?))),
             TableRepr::JoinView(jv) => Ok(Cow::Owned(materialise_join_view(jv)?)),
+            TableRepr::ExpandView(ev) => Ok(Cow::Owned(materialise_expand_view(ev)?)),
         }
     }
+}
+
+/// Narrow `t` to just the columns at positions `cols` (in output order),
+/// without forcing if the input is `LazyParquet` (rewrites the mask),
+/// `Arrow` (Arc-cheap column select), or `Rows` (per-row index pick).
+/// For `JoinView`/`ExpandView` the input is forced first and then
+/// narrowed — recursive narrowing through chained-lazy sources is a
+/// future improvement. The common corpus path
+/// (LazyParquet → JoinView → ExpandView → narrowed) only ever hits the
+/// LazyParquet branch when materialising.
+fn narrow_for_force(t: &Table, cols: &[usize]) -> Result<Table, MError> {
+    let names = t.column_names();
+    let new_names: Vec<String> = cols.iter().map(|&i| names[i].clone()).collect();
+    match &t.repr {
+        TableRepr::LazyParquet(state) => {
+            let new_projection: Vec<usize> =
+                cols.iter().map(|&i| state.projection[i]).collect();
+            Ok(Table {
+                repr: TableRepr::LazyParquet(LazyParquetState {
+                    bytes: state.bytes.clone(),
+                    schema: state.schema.clone(),
+                    projection: new_projection,
+                    num_rows: state.num_rows,
+                }),
+            })
+        }
+        TableRepr::Arrow(batch) => {
+            let schema = batch.schema();
+            let new_fields: Vec<arrow::datatypes::Field> = cols
+                .iter()
+                .map(|&i| schema.field(i).clone())
+                .collect();
+            let new_schema = Arc::new(arrow::datatypes::Schema::new(new_fields));
+            let new_columns: Vec<arrow::array::ArrayRef> =
+                cols.iter().map(|&i| batch.column(i).clone()).collect();
+            let new_batch = arrow::record_batch::RecordBatch::try_new(new_schema, new_columns)
+                .map_err(|e| MError::Other(format!("narrow_for_force: {e}")))?;
+            Ok(Table::from_arrow(new_batch))
+        }
+        TableRepr::Rows { rows, .. } => {
+            let new_rows: Vec<Vec<Value>> = rows
+                .iter()
+                .map(|row| cols.iter().map(|&i| row[i].clone()).collect())
+                .collect();
+            Ok(Table::from_rows(new_names, new_rows))
+        }
+        TableRepr::JoinView(_) | TableRepr::ExpandView(_) => {
+            // Force then narrow. Sub-optimal for nested lazies but
+            // correct; the chained-lazy decode is the deeper
+            // optimisation that isn't done here.
+            let forced = t.force()?;
+            narrow_for_force(&forced, cols)
+        }
+    }
+}
+
+/// Materialise an `ExpandView` into a `Rows`-backed Table — byte-
+/// identical to what the eager `Table.NestedJoin` + `Table.ExpandTableColumn`
+/// path would have produced. Narrows left/right to just the projected
+/// columns BEFORE forcing, so that `LazyParquet` sources decode only
+/// the columns this ExpandView actually exposes (rather than their full
+/// current projection).
+fn materialise_expand_view(ev: &ExpandViewState) -> Result<Table, MError> {
+    // Narrow each side to just its projection before forcing — the
+    // critical optimisation. For a 40-col LazyParquet left where this
+    // ExpandView only exposes 10 columns, we decode 10 not 40.
+    let left_narrowed = narrow_for_force(&ev.left, &ev.left_projection)?;
+    let right_narrowed = narrow_for_force(&ev.right, &ev.right_projection)?;
+    let left_forced = left_narrowed.force()?;
+    let right_forced = right_narrowed.force()?;
+    let left_table: &Table = &left_forced;
+    let right_table: &Table = &right_forced;
+
+    // After narrowing, left has columns 0..ev.left_projection.len() and
+    // right has columns 0..ev.right_projection.len() — no longer indexed
+    // by the original projection.
+    let n_left = ev.left_projection.len();
+    let n_right = ev.right_projection.len();
+
+    let read_row = |t: &Table, row: usize, n: usize| -> Result<Vec<Value>, MError> {
+        match &t.repr {
+            TableRepr::Rows { rows, .. } => Ok(rows[row].clone()),
+            TableRepr::Arrow(batch) => {
+                let mut out = Vec::with_capacity(n);
+                for c in 0..n {
+                    out.push(arrow_cell_to_value(batch, c, row)?);
+                }
+                Ok(out)
+            }
+            _ => Err(MError::Other(
+                "materialise_expand_view: unexpected non-eager variant after force".into(),
+            )),
+        }
+    };
+
+    let left_names = left_table.column_names();
+    let mut out_names: Vec<String> = left_names;
+    out_names.extend(ev.right_output_names.iter().cloned());
+
+    let total: usize = ev.matches.iter().map(|m| m.len()).sum();
+    let mut out_rows: Vec<Vec<Value>> = Vec::with_capacity(total);
+
+    for (outer_idx, match_indices) in ev.matches.iter().enumerate() {
+        if match_indices.is_empty() {
+            continue;
+        }
+        let left_cells = read_row(left_table, outer_idx, n_left)?;
+        for &right_idx in match_indices {
+            let mut row = left_cells.clone();
+            let right_cells = read_row(right_table, right_idx as usize, n_right)?;
+            row.extend(right_cells);
+            out_rows.push(row);
+        }
+    }
+
+    Ok(Table::from_rows(out_names, out_rows))
 }
 
 /// Materialise a `JoinView` into a `Rows`-backed Table — byte-identical

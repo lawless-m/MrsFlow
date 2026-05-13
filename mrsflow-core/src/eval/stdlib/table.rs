@@ -720,8 +720,9 @@ fn rename_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         super::super::value::TableRepr::LazyParquet(_) => {
             unreachable!("expect_table forces upstream — lazy variant can't reach here")
         }
-        super::super::value::TableRepr::JoinView(_) => {
-            unreachable!("expect_table forces upstream — JoinView can't reach here")
+        super::super::value::TableRepr::JoinView(_)
+        | super::super::value::TableRepr::ExpandView(_) => {
+            unreachable!("expect_table forces upstream — JoinView/ExpandView can't reach here")
         }
     }
 }
@@ -802,6 +803,40 @@ fn select_columns_by_index(
                         schema: state.schema.clone(),
                         projection: new_projection,
                         num_rows: state.num_rows,
+                    },
+                ),
+            }))
+        }
+        super::super::value::TableRepr::ExpandView(ev) => {
+            // Projection-aware path on the post-expand result. Output
+            // columns split between "from left" (positions 0..n_left)
+            // and "from right_output_names" (positions n_left..total).
+            // For each kept index, route to the corresponding source
+            // projection. Right entries dropped from output also drop
+            // their `right_projection` entry (no point decoding columns
+            // we won't expose).
+            let n_left = ev.left_projection.len();
+            let mut new_left_projection: Vec<usize> = Vec::new();
+            let mut new_right_projection: Vec<usize> = Vec::new();
+            let mut new_right_output_names: Vec<String> = Vec::new();
+            for &out_idx in keep_indices {
+                if out_idx < n_left {
+                    new_left_projection.push(ev.left_projection[out_idx]);
+                } else {
+                    let right_slot = out_idx - n_left;
+                    new_right_projection.push(ev.right_projection[right_slot]);
+                    new_right_output_names.push(ev.right_output_names[right_slot].clone());
+                }
+            }
+            Ok(Value::Table(Table {
+                repr: super::super::value::TableRepr::ExpandView(
+                    super::super::value::ExpandViewState {
+                        left: ev.left.clone(),
+                        left_projection: new_left_projection,
+                        right: ev.right.clone(),
+                        right_projection: new_right_projection,
+                        right_output_names: new_right_output_names,
+                        matches: ev.matches.clone(),
                     },
                 ),
             }))
@@ -1015,7 +1050,8 @@ pub fn cell_to_value(table: &Table, col: usize, row: usize) -> Result<Value, MEr
             return Ok(rows[row][col].clone());
         }
         super::super::value::TableRepr::LazyParquet(_)
-        | super::super::value::TableRepr::JoinView(_) => {
+        | super::super::value::TableRepr::JoinView(_)
+        | super::super::value::TableRepr::ExpandView(_) => {
             unreachable!("cell_to_value expects forced table — caller should expect_table first")
         }
     };
@@ -1239,8 +1275,9 @@ fn select_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
         super::super::value::TableRepr::LazyParquet(_) => {
             unreachable!("expect_table forces upstream — lazy variant can't reach here")
         }
-        super::super::value::TableRepr::JoinView(_) => {
-            unreachable!("expect_table forces upstream — JoinView can't reach here")
+        super::super::value::TableRepr::JoinView(_)
+        | super::super::value::TableRepr::ExpandView(_) => {
+            unreachable!("expect_table forces upstream — JoinView/ExpandView can't reach here")
         }
     }
 }
@@ -1574,8 +1611,9 @@ fn promote_headers(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
         super::super::value::TableRepr::LazyParquet(_) => {
             unreachable!("expect_table forces upstream — lazy variant can't reach here")
         }
-        super::super::value::TableRepr::JoinView(_) => {
-            unreachable!("expect_table forces upstream — JoinView can't reach here")
+        super::super::value::TableRepr::JoinView(_)
+        | super::super::value::TableRepr::ExpandView(_) => {
+            unreachable!("expect_table forces upstream — JoinView/ExpandView can't reach here")
         }
     }
 }
@@ -1678,8 +1716,9 @@ fn transform_column_types(args: &[Value], _host: &dyn IoHost) -> Result<Value, M
         super::super::value::TableRepr::LazyParquet(_) => {
             unreachable!("expect_table forces upstream — lazy variant can't reach here")
         }
-        super::super::value::TableRepr::JoinView(_) => {
-            unreachable!("expect_table forces upstream — JoinView can't reach here")
+        super::super::value::TableRepr::JoinView(_)
+        | super::super::value::TableRepr::ExpandView(_) => {
+            unreachable!("expect_table forces upstream — JoinView/ExpandView can't reach here")
         }
     }
 }
@@ -1942,8 +1981,9 @@ fn skip(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         super::super::value::TableRepr::LazyParquet(_) => {
             unreachable!("expect_table forces upstream — lazy variant can't reach here")
         }
-        super::super::value::TableRepr::JoinView(_) => {
-            unreachable!("expect_table forces upstream — JoinView can't reach here")
+        super::super::value::TableRepr::JoinView(_)
+        | super::super::value::TableRepr::ExpandView(_) => {
+            unreachable!("expect_table forces upstream — JoinView/ExpandView can't reach here")
         }
     }
 }
@@ -2179,100 +2219,47 @@ fn expand_table_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MErr
     Ok(Value::Table(values_to_table(&out_names, &out_rows)?))
 }
 
-/// Fast-path expansion of a `JoinView`'s nested column. Reads only the
-/// requested columns from the right handle — for a `LazyParquet` right,
-/// the irrelevant columns are never decoded. RT-preserving: produces the
-/// same Rows-backed table the eager `materialise_join_view` +
-/// `expand_table_column` slow path would have, just without the
-/// throwaway full-row materialisation in between.
+/// Fast-path expansion of a `JoinView`'s nested column. Returns an
+/// `ExpandView` — a lazy result that doesn't materialise either side
+/// until something downstream forces it. Lets the corpus chain
+/// (`expand → RemoveColumns → NestedJoin → expand → RowCount`) avoid
+/// decoding either side's bulk columns at all.
 fn expand_join_view_lazily(
     jv: &super::super::value::JoinViewState,
     column_names: &[String],
     new_column_names: &[String],
 ) -> Result<Value, MError> {
-    use super::super::value::TableRepr;
-
-    // 1. Resolve requested column indices in the right side's *current*
-    // column space (which may already be a narrowed projection).
+    // Resolve requested right columns into their current-projection
+    // indices on jv.right. These are positions in `jv.right.column_names()`
+    // (which may itself already be a narrowed projection).
     let right_current_names = jv.right.column_names();
-    let mut right_keep: Vec<usize> = Vec::with_capacity(column_names.len());
+    let mut right_projection: Vec<usize> = Vec::with_capacity(column_names.len());
     for n in column_names {
         let idx = right_current_names.iter().position(|r| r == n).ok_or_else(|| {
             MError::Other(format!(
                 "Table.ExpandTableColumn: inner column not found: {n}"
             ))
         })?;
-        right_keep.push(idx);
+        right_projection.push(idx);
     }
 
-    // 2. Project right to just those columns. For LazyParquet, this
-    // narrows the mask without decoding anything yet. For Arrow/Rows,
-    // it's a regular column projection.
-    let projected_right = match &jv.right.repr {
-        TableRepr::LazyParquet(state) => {
-            let new_projection: Vec<usize> =
-                right_keep.iter().map(|&i| state.projection[i]).collect();
-            Table {
-                repr: TableRepr::LazyParquet(super::super::value::LazyParquetState {
-                    bytes: state.bytes.clone(),
-                    schema: state.schema.clone(),
-                    projection: new_projection,
-                    num_rows: state.num_rows,
-                }),
-            }
-        }
-        _ => {
-            // Eager right: build a Rows-backed projection of the kept columns.
-            let forced = jv.right.force()?;
-            let (_, all_rows) = table_to_rows(&forced)?;
-            let proj_rows: Vec<Vec<Value>> = all_rows
-                .iter()
-                .map(|r| right_keep.iter().map(|&i| r[i].clone()).collect())
-                .collect();
-            let proj_names: Vec<String> =
-                right_keep.iter().map(|&i| right_current_names[i].clone()).collect();
-            Table::from_rows(proj_names, proj_rows)
-        }
-    };
+    // Left projection: all columns of jv.left, in order. (The JoinView
+    // exposes left columns + the nested column; expanding the nested
+    // column means we keep every left column unchanged.)
+    let left_projection: Vec<usize> = (0..jv.left.num_columns()).collect();
 
-    // 3. Now decode (LazyParquet → Arrow with narrowed projection) and
-    // read row-by-row. This is the moment the parquet bytes actually
-    // get read for the kept columns.
-    let projected_right_forced = projected_right.force()?;
-    let mut right_rows: Vec<Vec<Value>> = Vec::with_capacity(projected_right_forced.num_rows());
-    for r in 0..projected_right_forced.num_rows() {
-        let mut row = Vec::with_capacity(column_names.len());
-        for c in 0..column_names.len() {
-            row.push(cell_to_value(&projected_right_forced, c, r)?);
-        }
-        right_rows.push(row);
-    }
-
-    // 4. Force left and read rows.
-    let left_forced = jv.left.force()?;
-    let (left_names, left_rows) = table_to_rows(&left_forced)?;
-
-    // 5. Output column order: left columns then the new column names.
-    // (JoinView's nested column is always at the end of the join result,
-    // so the slot-replace logic of the eager path simplifies to a tail
-    // append here.)
-    let mut out_names: Vec<String> = left_names;
-    out_names.extend(new_column_names.iter().cloned());
-
-    let mut out_rows: Vec<Vec<Value>> = Vec::with_capacity(left_rows.len());
-    for (left_idx, left_row) in left_rows.iter().enumerate() {
-        let matches = &jv.matches[left_idx];
-        // Empty matches → drop the row (matches the eager path:
-        // empty inner Table in expand yields zero output rows).
-        for &right_idx in matches {
-            let mut new_row = Vec::with_capacity(out_names.len());
-            new_row.extend_from_slice(left_row);
-            new_row.extend_from_slice(&right_rows[right_idx as usize]);
-            out_rows.push(new_row);
-        }
-    }
-
-    Ok(Value::Table(values_to_table(&out_names, &out_rows)?))
+    Ok(Value::Table(Table {
+        repr: super::super::value::TableRepr::ExpandView(
+            super::super::value::ExpandViewState {
+                left: jv.left.clone(),
+                left_projection,
+                right: jv.right.clone(),
+                right_projection,
+                right_output_names: new_column_names.to_vec(),
+                matches: jv.matches.clone(),
+            },
+        ),
+    }))
 }
 
 
@@ -2567,13 +2554,12 @@ fn join_key_from(v: &Value) -> Result<JoinKey, MError> {
 }
 
 fn nested_join(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    // Right side stays lazy where possible (only its key column is
-    // decoded to build hash buckets); left side is forced because we
-    // need to iterate left rows to build the matches vector. The
-    // resulting `JoinView` lets a downstream `Table.ExpandTableColumn`
-    // pull only the columns it actually uses from the right side.
-    // See `mrsflow/09-lazy-tables.md` §7.
-    let table1 = expect_table(&args[0])?;
+    // Both sides stay lazy where possible. Only the two key columns are
+    // decoded — the left key (to enumerate left rows for match building)
+    // and the right key (to build the hash bucket). Everything else
+    // decodes later, on demand, when a downstream op forces.
+    // See `mrsflow/09-lazy-tables.md` (Stage A.5).
+    let table1 = expect_table_lazy_ok(&args[0])?;
     let key1 = match &args[1] {
         Value::Text(s) => s.clone(),
         // Power Query's GUI emits `{"col"}` even for single-key joins, so
@@ -2620,8 +2606,7 @@ fn nested_join(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         ));
     }
 
-    let (left_names, left_rows) = table_to_rows(&table1)?;
-
+    let left_names = table1.column_names();
     let key1_idx = left_names.iter().position(|n| n == &key1).ok_or_else(|| {
         MError::Other(format!(
             "Table.NestedJoin: key1 column not found: {key1}"
@@ -2634,11 +2619,14 @@ fn nested_join(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         ))
     })?;
 
-    // Decode just the right key column to build hash buckets. For a
-    // LazyParquet right side, this reads only one column from the
-    // parquet — the rest stay on disk for later lazy expand to pull
-    // selectively. For Arrow/Rows, this is just a column projection.
-    let right_keys: Vec<Value> = decode_right_key_column(table2, key2_idx)?;
+    // Decode only the two key columns. For LazyParquet either side, this
+    // reads one column from the parquet bytes; the rest stay undecoded
+    // for later force/expand to pull selectively. For Arrow/Rows, this
+    // is a single-column read; for JoinView/ExpandView, it falls through
+    // to force-then-read of that one cell column (the chained-join case
+    // — still narrows compared to materialising the whole table).
+    let left_keys: Vec<Value> = decode_key_column(table1, key1_idx)?;
+    let right_keys: Vec<Value> = decode_key_column(table2, key2_idx)?;
 
     let mut buckets: HashMap<JoinKey, Vec<usize>> = HashMap::with_capacity(right_keys.len());
     for (i, k) in right_keys.iter().enumerate() {
@@ -2646,9 +2634,9 @@ fn nested_join(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     }
 
     // Build per-left-row matches.
-    let mut matches: Vec<Vec<u32>> = Vec::with_capacity(left_rows.len());
-    for left_row in &left_rows {
-        let lkey = join_key_from(&left_row[key1_idx])?;
+    let mut matches: Vec<Vec<u32>> = Vec::with_capacity(left_keys.len());
+    for lk in &left_keys {
+        let lkey = join_key_from(lk)?;
         let ms: Vec<u32> = buckets
             .get(&lkey)
             .map(|idx| idx.iter().map(|&i| i as u32).collect())
@@ -2656,13 +2644,9 @@ fn nested_join(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         matches.push(ms);
     }
 
-    // Build the left side as a Rows-backed table (preserves the iteration
-    // order that the matches vector is indexed against).
-    let left_table = Table::from_rows(left_names, left_rows);
-
     Ok(Value::Table(Table {
         repr: super::super::value::TableRepr::JoinView(super::super::value::JoinViewState {
-            left: Box::new(left_table),
+            left: std::sync::Arc::new(table1.clone()),
             right: std::sync::Arc::new(table2.clone()),
             new_column_name,
             matches,
@@ -2673,8 +2657,9 @@ fn nested_join(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 
 /// Pull the values of column `col_idx` from `table`, decoding only that
 /// one column when `table` is a `LazyParquet`. Used by `nested_join` so
-/// hash-bucket build doesn't force the entire right side.
-fn decode_right_key_column(
+/// hash-bucket build doesn't force the entire side it operates on. For
+/// non-LazyParquet inputs, falls through to a regular force + cell read.
+fn decode_key_column(
     table: &Table,
     col_idx: usize,
 ) -> Result<Vec<Value>, MError> {
@@ -2699,7 +2684,9 @@ fn decode_right_key_column(
             Ok(out)
         }
         _ => {
-            // Eager path: force then read the column directly.
+            // Eager path (or non-Parquet-lazy variants for now): force,
+            // read the column. A.5d will replace this branch with a
+            // cell-lookup that doesn't force chains of JoinView/ExpandView.
             let forced = table.force()?;
             let mut out = Vec::with_capacity(forced.num_rows());
             for r in 0..forced.num_rows() {
