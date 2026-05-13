@@ -502,6 +502,97 @@ impl LazyOdbcState {
         }
         self.schema.field(self.projection[i]).name().clone()
     }
+
+    /// Render the deferred plan into a portable-ish SQL SELECT statement.
+    /// Dialect choices:
+    /// - `"col"` for column quoting (works for most drivers)
+    /// - Bare table name (no catalog/schema qualification — DBISAM
+    ///   rejects "catalog"."table" syntax)
+    /// - 0/1 for booleans (universal across drivers)
+    /// - Single-quoted text literals with '' escape
+    /// Limitations: no LIMIT (dialect-specific), no date/datetime
+    /// literals yet (would need #'YYYY-MM-DD'# / ISO strings per dialect).
+    pub fn render_sql(&self) -> String {
+        use std::fmt::Write;
+        let mut sql = String::with_capacity(64);
+        sql.push_str("SELECT ");
+        if self.projection.is_empty() {
+            // No columns selected — emit COUNT(*) so the driver still
+            // returns a usable row count. Shouldn't happen via fast
+            // paths; here as a safety valve.
+            sql.push_str("COUNT(*)");
+        } else {
+            for (i, &src_idx) in self.projection.iter().enumerate() {
+                if i > 0 {
+                    sql.push_str(", ");
+                }
+                // Source-schema name; renames are applied client-side
+                // after the result lands (see materialise_lazy_odbc).
+                let _ = write!(sql, "\"{}\"", self.schema.field(src_idx).name());
+            }
+        }
+        let _ = write!(sql, " FROM \"{}\"", self.table_name);
+        if !self.where_filters.is_empty() {
+            sql.push_str(" WHERE ");
+            for (i, f) in self.where_filters.iter().enumerate() {
+                if i > 0 {
+                    sql.push_str(" AND ");
+                }
+                render_filter(&mut sql, f, self.schema.as_ref());
+            }
+        }
+        sql
+    }
+}
+
+fn render_filter(out: &mut String, f: &RowFilter, schema: &arrow::datatypes::Schema) {
+    use std::fmt::Write;
+    let col_name = schema.field(f.source_col_idx).name();
+    match f.op {
+        FilterOp::IsNull => {
+            let _ = write!(out, "\"{col_name}\" IS NULL");
+            return;
+        }
+        FilterOp::IsNotNull => {
+            let _ = write!(out, "\"{col_name}\" IS NOT NULL");
+            return;
+        }
+        _ => {}
+    }
+    let op = match f.op {
+        FilterOp::Eq => "=",
+        FilterOp::Ne => "<>",
+        FilterOp::Lt => "<",
+        FilterOp::Le => "<=",
+        FilterOp::Gt => ">",
+        FilterOp::Ge => ">=",
+        FilterOp::IsNull | FilterOp::IsNotNull => unreachable!(),
+    };
+    let _ = write!(out, "\"{col_name}\" {op} ");
+    match &f.scalar {
+        FilterScalar::Number(n) => {
+            if n.fract() == 0.0 && n.is_finite() {
+                let _ = write!(out, "{}", *n as i64);
+            } else {
+                let _ = write!(out, "{n}");
+            }
+        }
+        FilterScalar::Text(s) => {
+            out.push('\'');
+            out.push_str(&s.replace('\'', "''"));
+            out.push('\'');
+        }
+        FilterScalar::Logical(b) => out.push(if *b { '1' } else { '0' }),
+        FilterScalar::Date(d) => {
+            // ANSI: DATE 'YYYY-MM-DD'. Drivers that lack DATE-literal
+            // syntax (DBISAM uses '#YYYY-MM-DD#') will need a dialect
+            // override later; v1 emits ANSI.
+            let _ = write!(out, "DATE '{}'", d);
+        }
+        FilterScalar::Datetime(dt) => {
+            let _ = write!(out, "TIMESTAMP '{}'", dt);
+        }
+    }
 }
 
 /// Table value — wraps a [`TableRepr`]. Use the inherent helpers
@@ -1585,4 +1676,107 @@ pub enum MError {
     /// Generic catch-all replaced by more specific variants as slices surface
     /// real categories.
     Other(String),
+}
+
+#[cfg(test)]
+mod odbc_sql_tests {
+    use super::*;
+
+    fn dummy_state(filters: Vec<RowFilter>) -> LazyOdbcState {
+        use arrow::datatypes::{DataType, Field, Schema};
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("id", DataType::Int64, false),
+            Field::new("name", DataType::Utf8, false),
+            Field::new("price", DataType::Float64, true),
+        ]));
+        LazyOdbcState {
+            connection_string: "DSN=test".into(),
+            table_name: "customers".into(),
+            schema,
+            projection: vec![0, 1, 2],
+            output_names: None,
+            where_filters: filters,
+            limit: None,
+            force_fn: std::rc::Rc::new(|_| {
+                panic!("force_fn must not be called in render-only tests")
+            }),
+        }
+    }
+
+    #[test]
+    fn render_select_star_equivalent() {
+        let sql = dummy_state(vec![]).render_sql();
+        assert_eq!(sql, r#"SELECT "id", "name", "price" FROM "customers""#);
+    }
+
+    #[test]
+    fn render_with_int_filter() {
+        let f = RowFilter {
+            source_col_idx: 0,
+            op: FilterOp::Gt,
+            scalar: FilterScalar::Number(100.0),
+        };
+        let sql = dummy_state(vec![f]).render_sql();
+        assert_eq!(
+            sql,
+            r#"SELECT "id", "name", "price" FROM "customers" WHERE "id" > 100"#
+        );
+    }
+
+    #[test]
+    fn render_with_text_filter_escapes_quotes() {
+        let f = RowFilter {
+            source_col_idx: 1,
+            op: FilterOp::Eq,
+            scalar: FilterScalar::Text("O'Brien".into()),
+        };
+        let sql = dummy_state(vec![f]).render_sql();
+        assert_eq!(
+            sql,
+            r#"SELECT "id", "name", "price" FROM "customers" WHERE "name" = 'O''Brien'"#
+        );
+    }
+
+    #[test]
+    fn render_with_null_filter() {
+        let f = RowFilter {
+            source_col_idx: 2,
+            op: FilterOp::IsNull,
+            scalar: FilterScalar::Logical(false),
+        };
+        let sql = dummy_state(vec![f]).render_sql();
+        assert_eq!(
+            sql,
+            r#"SELECT "id", "name", "price" FROM "customers" WHERE "price" IS NULL"#
+        );
+    }
+
+    #[test]
+    fn render_with_two_filters_anded() {
+        let filters = vec![
+            RowFilter {
+                source_col_idx: 0,
+                op: FilterOp::Ge,
+                scalar: FilterScalar::Number(10.0),
+            },
+            RowFilter {
+                source_col_idx: 2,
+                op: FilterOp::Le,
+                scalar: FilterScalar::Number(99.95),
+            },
+        ];
+        let sql = dummy_state(filters).render_sql();
+        assert_eq!(
+            sql,
+            r#"SELECT "id", "name", "price" FROM "customers" WHERE "id" >= 10 AND "price" <= 99.95"#
+        );
+    }
+
+    #[test]
+    fn render_with_narrowed_projection() {
+        let mut state = dummy_state(vec![]);
+        state.projection = vec![1]; // just "name"
+        let sql = state.render_sql();
+        assert_eq!(sql, r#"SELECT "name" FROM "customers""#);
+    }
 }
