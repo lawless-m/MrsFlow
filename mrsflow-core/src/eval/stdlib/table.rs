@@ -2776,23 +2776,161 @@ fn decode_key_columns(
             }
             Ok(out)
         }
-        _ => {
-            // Eager path (or non-Parquet-lazy variants for now): force,
-            // read the columns. Chained-lazy decode of JoinView/ExpandView
-            // remains a future optimisation.
-            let forced = table.force()?;
-            let n = forced.num_rows();
-            let mut out: Vec<Vec<Value>> = Vec::with_capacity(n);
-            for r in 0..n {
-                let mut tuple = Vec::with_capacity(col_indices.len());
-                for &c in col_indices {
-                    tuple.push(cell_to_value(&forced, c, r)?);
+        TableRepr::JoinView(jv) => {
+            // The JoinView's columns are left's columns + the nested
+            // column at position left.num_columns(). The nested column
+            // is Table-valued and can't be a join key.
+            let n_left = jv.left.num_columns();
+            for &c in col_indices {
+                if c == n_left {
+                    return Err(MError::Other(format!(
+                        "Table.NestedJoin: cannot use nested column '{}' as a join key",
+                        jv.new_column_name
+                    )));
                 }
-                out.push(tuple);
+                if c > n_left {
+                    return Err(MError::Other(format!(
+                        "decode_key_columns: column index {c} out of range for JoinView (has {} cols)",
+                        n_left + 1
+                    )));
+                }
+            }
+            // Inner / LeftOuter / LeftAnti all iterate left rows in
+            // order (possibly filtered by match-emptiness). Recurse to
+            // left for just the needed columns, then filter rows per
+            // join_kind. The other kinds (RightOuter / FullOuter /
+            // RightAnti) interleave null-left rows with right-derived
+            // rows — fall back to force for those.
+            match jv.join_kind {
+                0 => {
+                    let left_values = decode_key_columns(&jv.left, col_indices)?;
+                    let n = jv.matches.iter().filter(|m| !m.is_empty()).count();
+                    let mut out = Vec::with_capacity(n);
+                    for (i, m) in jv.matches.iter().enumerate() {
+                        if !m.is_empty() {
+                            out.push(left_values[i].clone());
+                        }
+                    }
+                    Ok(out)
+                }
+                1 => decode_key_columns(&jv.left, col_indices),
+                4 => {
+                    let left_values = decode_key_columns(&jv.left, col_indices)?;
+                    let n = jv.matches.iter().filter(|m| m.is_empty()).count();
+                    let mut out = Vec::with_capacity(n);
+                    for (i, m) in jv.matches.iter().enumerate() {
+                        if m.is_empty() {
+                            out.push(left_values[i].clone());
+                        }
+                    }
+                    Ok(out)
+                }
+                _ => force_and_read(table, col_indices),
+            }
+        }
+        TableRepr::ExpandView(ev) => {
+            // Output columns split between left (0..n_left) and right
+            // (n_left..). For each requested output position, partition
+            // into the underlying source's column index. Recurse to
+            // each source for just its needed columns — so a LazyParquet
+            // left with 40 cols decodes only the columns this read asks
+            // for, not the ExpandView's full left_projection.
+            //
+            // This is the corpus-scale WASM saver: the second NestedJoin
+            // in `expand → RemoveColumns → NestedJoin` was previously
+            // forcing the entire first-expand result here.
+            let n_left = ev.left_projection.len();
+            let mut left_needed: Vec<usize> = Vec::new();
+            let mut right_needed: Vec<usize> = Vec::new();
+            // (is_right, local_idx) for each requested output column.
+            let mut routing: Vec<(bool, usize)> = Vec::with_capacity(col_indices.len());
+            for &col_idx in col_indices {
+                if col_idx < n_left {
+                    let underlying = ev.left_projection[col_idx];
+                    let pos = match left_needed.iter().position(|&u| u == underlying) {
+                        Some(p) => p,
+                        None => {
+                            left_needed.push(underlying);
+                            left_needed.len() - 1
+                        }
+                    };
+                    routing.push((false, pos));
+                } else {
+                    let right_slot = col_idx - n_left;
+                    if right_slot >= ev.right_projection.len() {
+                        return Err(MError::Other(format!(
+                            "decode_key_columns: column index {col_idx} out of range for ExpandView"
+                        )));
+                    }
+                    let underlying = ev.right_projection[right_slot];
+                    let pos = match right_needed.iter().position(|&u| u == underlying) {
+                        Some(p) => p,
+                        None => {
+                            right_needed.push(underlying);
+                            right_needed.len() - 1
+                        }
+                    };
+                    routing.push((true, pos));
+                }
+            }
+            // Recursive decode — handles nested lazies. Empty `needed`
+            // lists are an artefact of decoding only one side; skip the
+            // call rather than dispatch on an empty slice.
+            let left_values = if !left_needed.is_empty() {
+                decode_key_columns(&ev.left, &left_needed)?
+            } else {
+                Vec::new()
+            };
+            let right_values = if !right_needed.is_empty() {
+                decode_key_columns(&ev.right, &right_needed)?
+            } else {
+                Vec::new()
+            };
+            // Walk matches to emit one output row per (left, right) pair.
+            // Empty matches drop the outer row, matching the eager
+            // expand semantics.
+            let total: usize = ev.matches.iter().map(|m| m.len()).sum();
+            let mut out: Vec<Vec<Value>> = Vec::with_capacity(total);
+            for (outer_i, match_list) in ev.matches.iter().enumerate() {
+                if match_list.is_empty() {
+                    continue;
+                }
+                for &m in match_list {
+                    let mut tuple = Vec::with_capacity(col_indices.len());
+                    for &(is_right, local_idx) in &routing {
+                        if is_right {
+                            tuple.push(right_values[m as usize][local_idx].clone());
+                        } else {
+                            tuple.push(left_values[outer_i][local_idx].clone());
+                        }
+                    }
+                    out.push(tuple);
+                }
             }
             Ok(out)
         }
+        _ => force_and_read(table, col_indices),
     }
+}
+
+/// Fallback: force the table and read the requested columns row by row.
+/// Used for variants we don't have a smart path for (Arrow / Rows /
+/// JoinView with right-side join kinds).
+fn force_and_read(
+    table: &Table,
+    col_indices: &[usize],
+) -> Result<Vec<Vec<Value>>, MError> {
+    let forced = table.force()?;
+    let n = forced.num_rows();
+    let mut out: Vec<Vec<Value>> = Vec::with_capacity(n);
+    for r in 0..n {
+        let mut tuple = Vec::with_capacity(col_indices.len());
+        for &c in col_indices {
+            tuple.push(cell_to_value(&forced, c, r)?);
+        }
+        out.push(tuple);
+    }
+    Ok(out)
 }
 
 
