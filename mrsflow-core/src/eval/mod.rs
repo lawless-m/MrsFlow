@@ -22,7 +22,7 @@ pub use sexpr::value_to_sexpr;
 pub use stdlib::root_env;
 pub use summary::value_summary;
 pub use value::{
-    BuiltinFn, Closure, FnBody, MError, Record, Table, TableRepr, ThunkState, TypeRep, Value,
+    BuiltinFn, Closure, FnBody, LazyOdbcState, MError, Record, Table, TableRepr, ThunkState, TypeRep, Value,
 };
 
 use std::rc::Rc;

@@ -1371,16 +1371,15 @@ fn build_table_nav(connection: &str, tables: &[(String, String)]) -> Value {
     for (name, table_type) in tables {
         let conn_string = connection.to_string();
         let table_name = name.clone();
+        // Data cell is a Native thunk that, when fired (on `[Data]`
+        // field access), discovers the table's schema via a
+        // zero-row probe and returns a `LazyOdbc` Table carrying the
+        // deferred plan. Subsequent Table.SelectColumns / SelectRows /
+        // FirstN / RowCount ops can then fold into the plan instead
+        // of pulling rows. Force runs the rendered SQL via the
+        // captured force_fn.
         let fetcher: Rc<dyn Fn() -> Result<Value, MError>> = Rc::new(move || {
-            // Bare table name; DBISAM (the corpus driver) rejects
-            // "catalog"."table" qualification, and the connection string
-            // already pins the database for single-catalog DSNs. For
-            // multi-catalog drivers (MSSQL, etc.) we'd need to issue `USE`
-            // or append `DATABASE=<catalog>` to the connection string;
-            // expand here when the corpus hits that case.
-            let sql = format!("SELECT * FROM \"{}\"", table_name);
-            odbc_query_impl(&conn_string, &sql)
-                .map_err(|e| MError::Other(format!("Odbc.DataSource fetch: {e:?}")))
+            build_lazy_odbc_table(&conn_string, &table_name)
         });
         let data = Value::Thunk(Rc::new(RefCell::new(ThunkState::Native(fetcher))));
         // PQ uses title-case Kind values: "Table", "View", etc.
@@ -2264,3 +2263,65 @@ fn json_value_to_m(j: serde_json::Value) -> Value {
     }
 }
 
+
+// ============================================================================
+// Odbc.DataSource folding bridge — builds a `LazyOdbc` Table whose
+// `force_fn` re-runs odbc_query_impl with the rendered SQL. Schema is
+// discovered via a zero-row probe (`SELECT * FROM "t" WHERE 1=0`) so
+// foldable Table.* fast paths can refer to columns by name.
+// ============================================================================
+
+#[cfg(feature = "odbc")]
+fn build_lazy_odbc_table(connection_string: &str, table_name: &str) -> Result<Value, mrsflow_core::eval::MError> {
+    use mrsflow_core::eval::{LazyOdbcState, MError, TableRepr};
+    use std::rc::Rc;
+
+    let probe_sql = format!("SELECT * FROM \"{}\" WHERE 1=0", table_name);
+    let probe = odbc_query_impl(connection_string, &probe_sql)
+        .map_err(|e| MError::Other(format!("Odbc.DataSource probe: {e:?}")))?;
+    let probe_table = match probe {
+        Value::Table(t) => t,
+        _ => {
+            return Err(MError::Other(
+                "Odbc.DataSource probe: expected table".into(),
+            ));
+        }
+    };
+    let schema = probe_table
+        .try_to_arrow()
+        .map_err(|e| MError::Other(format!("Odbc.DataSource probe schema: {e:?}")))?
+        .schema();
+
+    let conn_for_force = connection_string.to_string();
+    let force_fn: Rc<dyn Fn(&LazyOdbcState) -> Result<arrow::record_batch::RecordBatch, MError>> =
+        Rc::new(move |state| {
+            let sql = state.render_sql();
+            let v = odbc_query_impl(&conn_for_force, &sql)
+                .map_err(|e| MError::Other(format!("Odbc fold force: {e:?}")))?;
+            match v {
+                Value::Table(t) => t.try_to_arrow(),
+                _ => Err(MError::Other("Odbc fold force: expected table".into())),
+            }
+        });
+
+    let projection: Vec<usize> = (0..schema.fields().len()).collect();
+    let state = LazyOdbcState {
+        connection_string: connection_string.to_string(),
+        table_name: table_name.to_string(),
+        schema,
+        projection,
+        output_names: None,
+        where_filters: vec![],
+        limit: None,
+        force_fn,
+    };
+    Ok(Value::Table(Table { repr: TableRepr::LazyOdbc(state) }))
+}
+
+#[cfg(not(feature = "odbc"))]
+#[allow(dead_code)]
+fn build_lazy_odbc_table(_: &str, _: &str) -> Result<Value, mrsflow_core::eval::MError> {
+    Err(mrsflow_core::eval::MError::Other(
+        "Odbc.DataSource: built without ODBC support".into(),
+    ))
+}
