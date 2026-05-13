@@ -655,7 +655,9 @@ fn column_names(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 
 
 fn rename_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    let table = expect_table(&args[0])?;
+    // Projection-aware: rename can update the LazyParquet output_names
+    // vector without forcing. Other variants force on entry.
+    let table = expect_table_lazy_ok(&args[0])?;
     let renames = expect_list(&args[1])?;
     let mut pairs: Vec<(String, String)> = Vec::new();
     for r in renames {
@@ -699,6 +701,34 @@ fn rename_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             name
         })
         .collect();
+    // Lazy fast path: update output_names on a LazyParquet without
+    // decoding anything. Setting entry i to Some(renamed[i]) overrides
+    // whatever the underlying schema would have called that column.
+    if let super::super::value::TableRepr::LazyParquet(state) = &table.repr {
+        let new_output_names: Vec<Option<String>> = renamed
+            .iter()
+            .enumerate()
+            .map(|(i, n)| {
+                if n == &state.effective_name(i) { None } else { Some(n.clone()) }
+            })
+            .collect();
+        return Ok(Value::Table(Table {
+            repr: super::super::value::TableRepr::LazyParquet(
+                super::super::value::LazyParquetState {
+                    bytes: state.bytes.clone(),
+                    schema: state.schema.clone(),
+                    projection: state.projection.clone(),
+                    output_names: Some(new_output_names),
+                    num_rows: state.num_rows,
+                },
+            ),
+        }));
+    }
+    // Other variants: force then rename (the Arrow / Rows arms below
+    // assume already-forced input; the LazyParquet arm below is dead
+    // after the early-return but kept for exhaustiveness).
+    let table_owned = table.force()?;
+    let table: &Table = &table_owned;
     match &table.repr {
         super::super::value::TableRepr::Arrow(batch) => {
             let schema = batch.schema();
@@ -796,12 +826,17 @@ fn select_columns_by_index(
                 .iter()
                 .map(|&i| state.projection[i])
                 .collect();
+            // Carry over per-column rename overrides positionally.
+            let new_output_names = state.output_names.as_ref().map(|onames| {
+                keep_indices.iter().map(|&i| onames[i].clone()).collect()
+            });
             Ok(Value::Table(Table {
                 repr: super::super::value::TableRepr::LazyParquet(
                     super::super::value::LazyParquetState {
                         bytes: state.bytes.clone(),
                         schema: state.schema.clone(),
                         projection: new_projection,
+                        output_names: new_output_names,
                         num_rows: state.num_rows,
                     },
                 ),
@@ -2718,11 +2753,14 @@ fn decode_key_columns(
                 .iter()
                 .map(|&i| state.projection[i])
                 .collect();
+            // No need to carry output_names — decode_key_columns
+            // doesn't expose names, just cell values.
             let key_only = Table {
                 repr: TableRepr::LazyParquet(LazyParquetState {
                     bytes: state.bytes.clone(),
                     schema: state.schema.clone(),
                     projection: new_projection,
+                    output_names: None,
                     num_rows: state.num_rows,
                 }),
             };
@@ -3938,19 +3976,47 @@ fn demote_headers(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 fn duplicate_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    let table = expect_table(&args[0])?;
+    // Projection-aware: a duplicate is a new projection entry pointing
+    // at the same source column with a different output name.
+    let table = expect_table_lazy_ok(&args[0])?;
     let src = expect_text(&args[1])?.to_string();
     let new_name = expect_text(&args[2])?.to_string();
-    let (names, rows) = table_to_rows(&table)?;
-    let idx = names
+    let existing = table.column_names();
+    let idx = existing
         .iter()
         .position(|n| n == &src)
         .ok_or_else(|| MError::Other(format!("Table.DuplicateColumn: column not found: {src}")))?;
-    if names.iter().any(|n| n == &new_name) {
+    if existing.iter().any(|n| n == &new_name) {
         return Err(MError::Other(format!(
             "Table.DuplicateColumn: new column name already exists: {new_name}"
         )));
     }
+    // Lazy fast path: clone the projection entry, set its output name.
+    if let super::super::value::TableRepr::LazyParquet(state) = &table.repr {
+        let mut new_projection = state.projection.clone();
+        new_projection.push(state.projection[idx]);
+        // Output names must exist now since we're forcing at least one
+        // override. Initialise as None-for-each, then set the new slot.
+        let mut new_output_names: Vec<Option<String>> = state
+            .output_names
+            .clone()
+            .unwrap_or_else(|| vec![None; state.projection.len()]);
+        new_output_names.push(Some(new_name));
+        return Ok(Value::Table(Table {
+            repr: super::super::value::TableRepr::LazyParquet(
+                super::super::value::LazyParquetState {
+                    bytes: state.bytes.clone(),
+                    schema: state.schema.clone(),
+                    projection: new_projection,
+                    output_names: Some(new_output_names),
+                    num_rows: state.num_rows,
+                },
+            ),
+        }));
+    }
+    // Force-then-rebuild for other variants.
+    let table_owned = table.force()?;
+    let (names, rows) = table_to_rows(&table_owned)?;
     let mut out_names = names.clone();
     out_names.push(new_name);
     let mut out_rows: Vec<Vec<Value>> = Vec::with_capacity(rows.len());
@@ -3963,10 +4029,29 @@ fn duplicate_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError>
 }
 
 fn prefix_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    let table = expect_table(&args[0])?;
+    // Projection-aware: prepend `prefix.` to every output name. For
+    // LazyParquet this updates `output_names` without forcing.
+    let table = expect_table_lazy_ok(&args[0])?;
     let prefix = expect_text(&args[1])?;
-    let (names, rows) = table_to_rows(&table)?;
-    let new_names: Vec<String> = names.iter().map(|n| format!("{prefix}.{n}")).collect();
+    let existing = table.column_names();
+    let new_names: Vec<String> = existing.iter().map(|n| format!("{prefix}.{n}")).collect();
+    if let super::super::value::TableRepr::LazyParquet(state) = &table.repr {
+        let new_output_names: Vec<Option<String>> =
+            new_names.iter().map(|n| Some(n.clone())).collect();
+        return Ok(Value::Table(Table {
+            repr: super::super::value::TableRepr::LazyParquet(
+                super::super::value::LazyParquetState {
+                    bytes: state.bytes.clone(),
+                    schema: state.schema.clone(),
+                    projection: state.projection.clone(),
+                    output_names: Some(new_output_names),
+                    num_rows: state.num_rows,
+                },
+            ),
+        }));
+    }
+    let table_owned = table.force()?;
+    let (_, rows) = table_to_rows(&table_owned)?;
     Ok(Value::Table(values_to_table(&new_names, &rows)?))
 }
 

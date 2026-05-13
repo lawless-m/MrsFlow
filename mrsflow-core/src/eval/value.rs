@@ -304,10 +304,32 @@ pub struct LazyParquetState {
     /// Initially `(0..schema.fields().len()).collect()`. Narrowed by
     /// `Table.SelectColumns` / `RemoveColumns` / `ReorderColumns`.
     pub projection: Vec<usize>,
+    /// Per-output-column name override, parallel to `projection`. `None`
+    /// at the outer level means "no renames anywhere — use schema field
+    /// names as-is" (the common case, zero overhead). When `Some`, each
+    /// inner `None` means "use schema field name", each `Some(s)` means
+    /// "rename the column to `s` at force-time". Lets
+    /// `Table.RenameColumns` / `PrefixColumns` / `DuplicateColumn`
+    /// stay lazy by mutating only this list.
+    pub output_names: Option<Vec<Option<String>>>,
     /// Total row count summed across row groups, cached from the
     /// footer at construction. Lets `Table.RowCount` return without
     /// decoding any data.
     pub num_rows: usize,
+}
+
+impl LazyParquetState {
+    /// Effective output name for the column at position `i` in
+    /// `projection` — applies any `output_names[i]` override or falls
+    /// back to the source schema field name.
+    pub fn effective_name(&self, i: usize) -> String {
+        if let Some(ov) = self.output_names.as_ref().and_then(|v| v.get(i)) {
+            if let Some(s) = ov {
+                return s.clone();
+            }
+        }
+        self.schema.field(self.projection[i]).name().clone()
+    }
 }
 
 /// Table value — wraps a [`TableRepr`]. Use the inherent helpers
@@ -347,6 +369,7 @@ impl Table {
                 bytes: Arc::new(bytes),
                 schema,
                 projection,
+                output_names: None,
                 num_rows,
             }),
         })
@@ -356,11 +379,9 @@ impl Table {
         match &self.repr {
             TableRepr::Arrow(b) => b.schema().fields().iter().map(|f| f.name().clone()).collect(),
             TableRepr::Rows { columns, .. } => columns.clone(),
-            TableRepr::LazyParquet(s) => s
-                .projection
-                .iter()
-                .map(|&i| s.schema.field(i).name().clone())
-                .collect(),
+            TableRepr::LazyParquet(s) => {
+                (0..s.projection.len()).map(|i| s.effective_name(i)).collect()
+            }
             TableRepr::JoinView(jv) => {
                 // left columns + the new nested column at the end.
                 let mut names = jv.left.column_names();
@@ -510,11 +531,17 @@ fn narrow_for_force(t: &Table, cols: &[usize]) -> Result<Table, MError> {
         TableRepr::LazyParquet(state) => {
             let new_projection: Vec<usize> =
                 cols.iter().map(|&i| state.projection[i]).collect();
+            // Preserve per-column renames: pick the matching slots
+            // from the existing output_names by position.
+            let new_output_names = state.output_names.as_ref().map(|onames| {
+                cols.iter().map(|&i| onames[i].clone()).collect()
+            });
             Ok(Table {
                 repr: TableRepr::LazyParquet(LazyParquetState {
                     bytes: state.bytes.clone(),
                     schema: state.schema.clone(),
                     projection: new_projection,
+                    output_names: new_output_names,
                     num_rows: state.num_rows,
                 }),
             })
@@ -915,14 +942,40 @@ fn decode_lazy_parquet(
     let batches: Vec<arrow::record_batch::RecordBatch> = reader
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| MError::Other(format!("LazyParquet decode: {e}")))?;
-    match batches.len() {
-        0 => Ok(arrow::record_batch::RecordBatch::new_empty(Arc::new(
+    let combined = match batches.len() {
+        0 => arrow::record_batch::RecordBatch::new_empty(Arc::new(
             arrow::datatypes::Schema::empty(),
-        ))),
-        1 => Ok(batches.into_iter().next().expect("len == 1")),
+        )),
+        1 => batches.into_iter().next().expect("len == 1"),
         _ => arrow::compute::concat_batches(&batches[0].schema(), &batches)
-            .map_err(|e| MError::Other(format!("LazyParquet decode concat: {e}"))),
+            .map_err(|e| MError::Other(format!("LazyParquet decode concat: {e}")))?,
+    };
+    // Apply per-column renames if any are set. Schema is Arc-shared so
+    // we only rebuild it when output_names actually overrides something.
+    if let Some(onames) = state.output_names.as_ref() {
+        if onames.iter().any(Option::is_some) {
+            let schema = combined.schema();
+            let new_fields: Vec<arrow::datatypes::Field> = schema
+                .fields()
+                .iter()
+                .enumerate()
+                .map(|(i, f)| {
+                    let name = onames
+                        .get(i)
+                        .and_then(|o| o.clone())
+                        .unwrap_or_else(|| f.name().clone());
+                    arrow::datatypes::Field::new(name, f.data_type().clone(), f.is_nullable())
+                })
+                .collect();
+            let new_schema = Arc::new(arrow::datatypes::Schema::new(new_fields));
+            return arrow::record_batch::RecordBatch::try_new(
+                new_schema,
+                combined.columns().to_vec(),
+            )
+            .map_err(|e| MError::Other(format!("LazyParquet decode rename: {e}")));
+        }
     }
+    Ok(combined)
 }
 
 /// Errors raised during evaluation. Per design doc §07 §2, errors propagate
