@@ -217,6 +217,14 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ),
         ("List.Repeat", two("list", "count"), repeat),
         ("List.Times", two("value", "count"), times),
+        (
+            "List.ConformToPageReader",
+            vec![
+                Param { name: "list".into(),    optional: false, type_annotation: None },
+                Param { name: "options".into(), optional: true,  type_annotation: None },
+            ],
+            conform_to_page_reader,
+        ),
         ("List.Alternate", four_with_opts("list", "count", "repeatInterval", "offset"), alternate),
         ("List.Split", two("list", "pageSize"), split),
         ("List.Buffer", one("list"), buffer),
@@ -1076,6 +1084,16 @@ fn times(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         other => return Err(type_mismatch("non-negative integer (count)", other)),
     };
     Ok(Value::List(vec![value.clone(); count]))
+}
+
+/// Power BI engine hook for paged data sources — "intended for internal
+/// use only" per MS docs. MS's signature returns a table; mrsflow has
+/// no paging engine, so we return the list unchanged. Real user code
+/// won't call this; the binding exists so name lookup doesn't fail if
+/// someone copy-pastes a Power BI export.
+fn conform_to_page_reader(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let _ = expect_list(&args[0])?;
+    Ok(args[0].clone())
 }
 
 fn alternate(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {

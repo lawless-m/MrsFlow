@@ -4726,6 +4726,14 @@ mod tests {
     }
 
     #[test]
+    fn list_conform_to_page_reader_passes_through() {
+        match eval_str("List.ConformToPageReader({1, 2, 3})").unwrap() {
+            Value::List(xs) => assert_eq!(xs.len(), 3),
+            other => panic!("expected list, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn list_split_basic() {
         match eval_str("List.Split({1, 2, 3, 4, 5}, 2)").unwrap() {
             Value::List(chunks) => {
