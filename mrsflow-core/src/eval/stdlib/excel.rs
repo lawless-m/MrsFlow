@@ -19,12 +19,37 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
             workbook,
         ),
         ("Excel.CurrentWorkbook", vec![], current_workbook),
+        (
+            "Excel.ShapeTable",
+            vec![
+                Param { name: "table".into(),   optional: false, type_annotation: None },
+                Param { name: "options".into(), optional: true,  type_annotation: None },
+            ],
+            shape_table,
+        ),
     ]
 }
 
 fn current_workbook(_args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     host.current_workbook()
         .map_err(|e| MError::Other(format!("Excel.CurrentWorkbook: {e:?}")))
+}
+
+/// MS docs flag this as "intended for internal use only" — a Power BI
+/// connector-synthesis helper that applies a transform spec record to
+/// a base table. The options record's shape is undocumented; without
+/// a contract we can't translate it to Table.* primitives correctly.
+/// When `options` is null or absent, the function is a no-op — return
+/// the input table unchanged so trivial pass-through uses don't break.
+/// Any non-null options record errors with NotImplemented.
+fn shape_table(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    match args.get(1) {
+        None | Some(Value::Null) => Ok(args[0].clone()),
+        Some(_) => Err(MError::NotImplemented(
+            "Excel.ShapeTable: options record handling not implemented \
+             (MS-documented as internal use only; spec is opaque)",
+        )),
+    }
 }
 
 fn workbook(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
