@@ -4822,6 +4822,133 @@ mod tests {
         }
     }
 
+    // ============================================================
+    // Odbc.DataSource folding — verify Table.* ops fold into the
+    // LazyOdbc plan rather than forcing. Tests inject a dummy
+    // LazyOdbc with a panicking force_fn so any accidental decode
+    // makes the test loud instead of silently regressing to
+    // pre-fold behaviour. The SQL emitter is exercised separately
+    // in value.rs's `odbc_sql_tests` module.
+    // ============================================================
+    fn dummy_lazy_odbc_table() -> Value {
+        use std::sync::Arc;
+        use arrow::datatypes::{DataType, Field, Schema};
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("id", DataType::Int64, false),
+            Field::new("name", DataType::Utf8, false),
+            Field::new("price", DataType::Float64, true),
+        ]));
+        let state = super::value::LazyOdbcState {
+            connection_string: "DSN=test".into(),
+            table_name: "customers".into(),
+            schema,
+            projection: vec![0, 1, 2],
+            output_names: None,
+            where_filters: vec![],
+            limit: None,
+            force_fn: std::rc::Rc::new(|_| {
+                panic!("force_fn fired — test expected fold, got force")
+            }),
+        };
+        Value::Table(super::Table {
+            repr: super::value::TableRepr::LazyOdbc(state),
+        })
+    }
+
+    fn eval_with_src(m: &str, src_table: Value) -> Value {
+        let toks = tokenize(m).expect("lex");
+        let ast = parse(&toks).expect("parse");
+        let env = super::env::EnvOps::extend(&super::root_env(), "src".into(), src_table);
+        let host = super::NoIoHost;
+        super::evaluate(&ast, &env, &host).expect("eval")
+    }
+
+    fn unwrap_lazy_odbc(v: &Value) -> &super::value::LazyOdbcState {
+        match v {
+            Value::Table(t) => match &t.repr {
+                super::value::TableRepr::LazyOdbc(s) => s,
+                other => panic!("expected LazyOdbc, got {other:?}"),
+            },
+            other => panic!("expected Table, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn odbc_select_columns_folds_projection() {
+        let result = eval_with_src(
+            r#"Table.SelectColumns(src, {"id", "price"})"#,
+            dummy_lazy_odbc_table(),
+        );
+        let state = unwrap_lazy_odbc(&result);
+        assert_eq!(state.projection, vec![0, 2]);
+        assert_eq!(
+            state.render_sql(),
+            r#"SELECT "id", "price" FROM "customers""#
+        );
+    }
+
+    #[test]
+    fn odbc_select_rows_folds_int_predicate() {
+        let result = eval_with_src(
+            r#"Table.SelectRows(src, each [id] > 100)"#,
+            dummy_lazy_odbc_table(),
+        );
+        let state = unwrap_lazy_odbc(&result);
+        assert_eq!(state.where_filters.len(), 1);
+        assert_eq!(
+            state.render_sql(),
+            r#"SELECT "id", "name", "price" FROM "customers" WHERE "id" > 100"#
+        );
+    }
+
+    #[test]
+    fn odbc_chained_selectrows_then_selectcolumns_folds_both() {
+        let result = eval_with_src(
+            r#"
+            let
+                filtered = Table.SelectRows(src, each [name] = "Acme"),
+                narrowed = Table.SelectColumns(filtered, {"id", "name"})
+            in
+                narrowed
+            "#,
+            dummy_lazy_odbc_table(),
+        );
+        let state = unwrap_lazy_odbc(&result);
+        assert_eq!(state.projection, vec![0, 1]);
+        assert_eq!(state.where_filters.len(), 1);
+        assert_eq!(
+            state.render_sql(),
+            r#"SELECT "id", "name" FROM "customers" WHERE "name" = 'Acme'"#
+        );
+    }
+
+    #[test]
+    fn odbc_two_filters_anded_fold_both() {
+        let result = eval_with_src(
+            r#"Table.SelectRows(src, each [id] >= 10 and [price] < 99.95)"#,
+            dummy_lazy_odbc_table(),
+        );
+        let state = unwrap_lazy_odbc(&result);
+        assert_eq!(state.where_filters.len(), 2);
+        assert_eq!(
+            state.render_sql(),
+            r#"SELECT "id", "name", "price" FROM "customers" WHERE "id" >= 10 AND "price" < 99.95"#
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "force_fn fired")]
+    fn odbc_non_foldable_predicate_does_force() {
+        // Text.Length isn't in the foldable subset — falls through to
+        // eager filter, which forces the table → our panicking
+        // force_fn fires → #[should_panic] catches it. This is the
+        // negative test that proves the fold engages selectively.
+        let _ = eval_with_src(
+            r#"Table.SelectRows(src, each Text.Length([name]) > 3)"#,
+            dummy_lazy_odbc_table(),
+        );
+    }
+
     #[test]
     fn xml_document_simple_element() {
         // <root><a>hello</a><b>world</b></root>
