@@ -216,6 +216,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
             replace_value,
         ),
         ("List.Repeat", two("list", "count"), repeat),
+        ("List.Times", two("value", "count"), times),
         ("List.Alternate", four_with_opts("list", "count", "repeatInterval", "offset"), alternate),
         ("List.Split", two("list", "pageSize"), split),
         ("List.Buffer", one("list"), buffer),
@@ -1066,6 +1067,15 @@ fn repeat(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         out.extend_from_slice(list);
     }
     Ok(Value::List(out))
+}
+
+fn times(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let value = &args[0];
+    let count = match &args[1] {
+        Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
+        other => return Err(type_mismatch("non-negative integer (count)", other)),
+    };
+    Ok(Value::List(vec![value.clone(); count]))
 }
 
 fn alternate(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {

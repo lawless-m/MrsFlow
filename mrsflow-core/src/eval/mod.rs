@@ -4705,6 +4705,27 @@ mod tests {
     }
 
     #[test]
+    fn list_times_basic() {
+        match eval_str("List.Times(\"x\", 3)").unwrap() {
+            Value::List(xs) => {
+                let strs: Vec<&str> = xs.iter().map(|v| match v {
+                    Value::Text(s) => s.as_str(), _ => panic!(),
+                }).collect();
+                assert_eq!(strs, vec!["x", "x", "x"]);
+            }
+            other => panic!("expected list, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn list_times_zero() {
+        match eval_str("List.Times(42, 0)").unwrap() {
+            Value::List(xs) => assert_eq!(xs.len(), 0),
+            other => panic!("expected list, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn list_split_basic() {
         match eval_str("List.Split({1, 2, 3, 4, 5}, 2)").unwrap() {
             Value::List(chunks) => {
