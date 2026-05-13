@@ -36,7 +36,27 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
             ],
             headers,
         ),
+        (
+            "Web.Page",
+            vec![Param { name: "html".into(), optional: false, type_annotation: None }],
+            page,
+        ),
     ]
+}
+
+/// Web.Page(html) parses an HTML document into a navigation table of
+/// detected HTML tables. mrsflow has no HTML parser dependency; the
+/// canonical Power Query usage is `Web.Page(Web.Contents(url))` to
+/// scrape tabular pages. Implementing this would mean pulling in
+/// `scraper` or `html5ever` plus the heuristics MS uses to find
+/// "interesting" tables — significant scope and the corpus doesn't
+/// reference it. Bound as NotImplemented for now; the binding exists
+/// so name lookup errors with a clear message instead of NameNotInScope.
+fn page(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    Err(MError::NotImplemented(
+        "Web.Page: HTML table extraction not implemented — \
+         use Web.Contents + an external HTML→table tool for now",
+    ))
 }
 
 fn headers(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
