@@ -326,8 +326,58 @@ pub struct LazyParquetState {
     pub output_names: Option<Vec<Option<String>>>,
     /// Total row count summed across row groups, cached from the
     /// footer at construction. Lets `Table.RowCount` return without
-    /// decoding any data.
+    /// decoding any data. Stays raw (pre-filter) even when
+    /// `row_filter` is non-empty — RowCount on a filtered handle has
+    /// to force the decode to be exact.
     pub num_rows: usize,
+    /// Predicate filters to apply at decode time. Empty by default.
+    /// `Table.SelectRows` on a LazyParquet input tries to translate
+    /// foldable predicates into entries here; non-foldable predicates
+    /// force the handle and filter eagerly in M-land. Indices in
+    /// `RowFilter.source_col_idx` are into `schema.fields()` (i.e.
+    /// the underlying parquet schema, NOT the projection), so they
+    /// stay stable across column-narrowing operations.
+    pub row_filter: Vec<RowFilter>,
+}
+
+/// A single predicate that can be evaluated against Parquet column
+/// statistics (for row-group elimination) and against decoded Arrow
+/// arrays (for per-row filtering). AND-combined with siblings in
+/// `LazyParquetState.row_filter`. OR is currently expressed as a
+/// non-foldable predicate that falls back to in-memory filtering.
+#[derive(Debug, Clone)]
+pub struct RowFilter {
+    /// Index into the LazyParquet's underlying schema fields. Stays
+    /// valid across SelectColumns / RemoveColumns even when the
+    /// projection moves around it.
+    pub source_col_idx: usize,
+    pub op: FilterOp,
+    pub scalar: FilterScalar,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FilterOp {
+    Eq,
+    Ne,
+    Lt,
+    Le,
+    Gt,
+    Ge,
+    /// `scalar` is ignored.
+    IsNull,
+    /// `scalar` is ignored.
+    IsNotNull,
+}
+
+/// The constant side of a foldable predicate. Restricted to the
+/// types we can compare against Parquet statistics without ambiguity.
+#[derive(Debug, Clone)]
+pub enum FilterScalar {
+    Number(f64),
+    Text(String),
+    Logical(bool),
+    Date(chrono::NaiveDate),
+    Datetime(chrono::NaiveDateTime),
 }
 
 impl Value {
@@ -420,6 +470,7 @@ impl Table {
                 projection,
                 output_names: None,
                 num_rows,
+                row_filter: Vec::new(),
             }),
         })
     }
@@ -592,6 +643,7 @@ fn narrow_for_force(t: &Table, cols: &[usize]) -> Result<Table, MError> {
                     projection: new_projection,
                     output_names: new_output_names,
                     num_rows: state.num_rows,
+                    row_filter: state.row_filter.clone(),
                 }),
             })
         }
@@ -1001,33 +1053,115 @@ fn decode_lazy_parquet(
 ) -> Result<arrow::record_batch::RecordBatch, MError> {
     use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
     use parquet::arrow::ProjectionMask;
-    let builder =
+
+    // When row_filter is non-empty we need to (a) decode the columns
+    // referenced by any filter so we can evaluate them, even if the
+    // user's projection has narrowed past them; (b) survey row-group
+    // statistics to drop groups that can't possibly match; (c) apply
+    // filters per row after decode; (d) trim back to the user's
+    // projection. Empty filter → original fast path.
+    let extended_projection: Vec<usize> = if state.row_filter.is_empty() {
+        state.projection.clone()
+    } else {
+        let mut ext = state.projection.clone();
+        for f in &state.row_filter {
+            if !ext.contains(&f.source_col_idx) {
+                ext.push(f.source_col_idx);
+            }
+        }
+        ext
+    };
+
+    let mut builder =
         ParquetRecordBatchReaderBuilder::try_new(state.bytes.as_ref().clone())
             .map_err(|e| MError::Other(format!("LazyParquet decode: {e}")))?;
+
+    // Row-group elimination via column statistics.
+    if !state.row_filter.is_empty() {
+        let surviving = surviving_row_groups(builder.metadata(), &state.row_filter);
+        if let Some(groups) = surviving {
+            builder = builder.with_row_groups(groups);
+        }
+    }
+
     let mask = ProjectionMask::roots(
         builder.parquet_schema(),
-        state.projection.iter().copied(),
+        extended_projection.iter().copied(),
     );
+    // Capture the builder's resolved schema before consuming it —
+    // needed for empty-result handling when every row group is
+    // eliminated (`reader.collect()` returns an empty Vec).
+    let builder = builder.with_projection(mask);
+    let reader_schema = builder.schema().clone();
     let reader = builder
-        .with_projection(mask)
         .build()
         .map_err(|e| MError::Other(format!("LazyParquet decode: {e}")))?;
     let batches: Vec<arrow::record_batch::RecordBatch> = reader
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| MError::Other(format!("LazyParquet decode: {e}")))?;
     let combined = match batches.len() {
-        0 => arrow::record_batch::RecordBatch::new_empty(Arc::new(
-            arrow::datatypes::Schema::empty(),
-        )),
+        0 => arrow::record_batch::RecordBatch::new_empty(reader_schema),
         1 => batches.into_iter().next().expect("len == 1"),
         _ => arrow::compute::concat_batches(&batches[0].schema(), &batches)
             .map_err(|e| MError::Other(format!("LazyParquet decode concat: {e}")))?,
     };
-    // Apply per-column renames if any are set. Schema is Arc-shared so
-    // we only rebuild it when output_names actually overrides something.
+
+    // ProjectionMask::roots returns batch columns in SCHEMA ORDER, not
+    // the order we listed. Build a lookup from source_col_idx → batch
+    // column position via the sorted/deduplicated extended projection.
+    let mut sorted_ext: Vec<usize> = extended_projection.clone();
+    sorted_ext.sort_unstable();
+    sorted_ext.dedup();
+    let batch_pos_of = |src: usize| -> usize {
+        sorted_ext
+            .iter()
+            .position(|s| *s == src)
+            .expect("source col was in extended projection")
+    };
+
+    // Per-row filter application.
+    let filtered_batch = if state.row_filter.is_empty() {
+        combined
+    } else {
+        apply_row_filters_at(&combined, &state.row_filter, &batch_pos_of)?
+    };
+
+    // Permute / trim to the user's projection order, dropping columns
+    // that were only decoded for filter evaluation.
+    let needs_reorder = state.projection.len() != filtered_batch.num_columns()
+        || state
+            .projection
+            .iter()
+            .enumerate()
+            .any(|(out_pos, src)| batch_pos_of(*src) != out_pos);
+    let trimmed = if !needs_reorder {
+        filtered_batch
+    } else {
+        let keep_positions: Vec<usize> = state
+            .projection
+            .iter()
+            .map(|src| batch_pos_of(*src))
+            .collect();
+        let schema = filtered_batch.schema();
+        let new_fields: Vec<arrow::datatypes::Field> = keep_positions
+            .iter()
+            .map(|&p| (*schema.field(p)).clone())
+            .collect();
+        let new_cols: Vec<arrow::array::ArrayRef> = keep_positions
+            .iter()
+            .map(|&p| filtered_batch.column(p).clone())
+            .collect();
+        arrow::record_batch::RecordBatch::try_new(
+            Arc::new(arrow::datatypes::Schema::new(new_fields)),
+            new_cols,
+        )
+        .map_err(|e| MError::Other(format!("LazyParquet trim: {e}")))?
+    };
+
+    // Apply per-column renames if any are set.
     if let Some(onames) = state.output_names.as_ref() {
         if onames.iter().any(Option::is_some) {
-            let schema = combined.schema();
+            let schema = trimmed.schema();
             let new_fields: Vec<arrow::datatypes::Field> = schema
                 .fields()
                 .iter()
@@ -1043,12 +1177,275 @@ fn decode_lazy_parquet(
             let new_schema = Arc::new(arrow::datatypes::Schema::new(new_fields));
             return arrow::record_batch::RecordBatch::try_new(
                 new_schema,
-                combined.columns().to_vec(),
+                trimmed.columns().to_vec(),
             )
             .map_err(|e| MError::Other(format!("LazyParquet decode rename: {e}")));
         }
     }
-    Ok(combined)
+    Ok(trimmed)
+}
+
+/// Walk row-group metadata, returning the indices of groups whose
+/// (min, max, null_count) statistics could still satisfy every
+/// RowFilter. Returns None if statistics are unavailable for any
+/// filter column (then we skip group-level elimination and rely on
+/// per-row filtering). Returns Some(vec) — possibly empty — when we
+/// can answer definitively.
+fn surviving_row_groups(
+    metadata: &parquet::file::metadata::ParquetMetaData,
+    filters: &[RowFilter],
+) -> Option<Vec<usize>> {
+    use parquet::file::statistics::Statistics;
+
+    let n_groups = metadata.num_row_groups();
+    let mut out: Vec<usize> = Vec::with_capacity(n_groups);
+    for g in 0..n_groups {
+        let rg = metadata.row_group(g);
+        let mut keep = true;
+        for f in filters {
+            let col_meta = rg.column(f.source_col_idx);
+            let stats = match col_meta.statistics() {
+                Some(s) => s,
+                None => continue, // no stats — assume could match
+            };
+            if !stats_can_match(stats, &f.op, &f.scalar) {
+                keep = false;
+                break;
+            }
+            let _ = stats; // silence unused if Statistics: clippy::let_unit later
+            let _: &Statistics = stats;
+        }
+        if keep {
+            out.push(g);
+        }
+    }
+    Some(out)
+}
+
+/// Best-effort min/max/null comparison: returns `true` when the row
+/// group *might* contain a matching row. Returns `true` (conservative)
+/// for any statistics shape we don't know how to evaluate.
+fn stats_can_match(
+    stats: &parquet::file::statistics::Statistics,
+    op: &FilterOp,
+    scalar: &FilterScalar,
+) -> bool {
+    use parquet::file::statistics::Statistics as S;
+    // Handle null-only filters first — they only need null_count
+    // information, which works across all stat types.
+    if matches!(op, FilterOp::IsNull) {
+        return stats.null_count_opt().unwrap_or(1) > 0;
+    }
+    if matches!(op, FilterOp::IsNotNull) {
+        // Group has a non-null row when row-count > null-count.
+        let null_count = stats.null_count_opt().unwrap_or(0);
+        let row_count = match stats {
+            S::Boolean(_) | S::Int32(_) | S::Int64(_) | S::Int96(_)
+            | S::Float(_) | S::Double(_) | S::ByteArray(_) | S::FixedLenByteArray(_) => {
+                // Statistics doesn't expose row-count directly; assume not all null.
+                u64::MAX
+            }
+        };
+        return row_count > null_count;
+    }
+    // Min/max comparisons for the common numeric/text cases.
+    match (stats, scalar) {
+        (S::Int32(s), FilterScalar::Number(n)) => {
+            let v = *n;
+            let lo = s.min_opt().copied().map(|x| x as f64);
+            let hi = s.max_opt().copied().map(|x| x as f64);
+            range_can_match(lo, hi, *op, v)
+        }
+        (S::Int64(s), FilterScalar::Number(n)) => {
+            let v = *n;
+            let lo = s.min_opt().copied().map(|x| x as f64);
+            let hi = s.max_opt().copied().map(|x| x as f64);
+            range_can_match(lo, hi, *op, v)
+        }
+        (S::Float(s), FilterScalar::Number(n)) => {
+            let v = *n;
+            let lo = s.min_opt().copied().map(|x| x as f64);
+            let hi = s.max_opt().copied().map(|x| x as f64);
+            range_can_match(lo, hi, *op, v)
+        }
+        (S::Double(s), FilterScalar::Number(n)) => {
+            let v = *n;
+            let lo = s.min_opt().copied();
+            let hi = s.max_opt().copied();
+            range_can_match(lo, hi, *op, v)
+        }
+        // ByteArray comparisons for text — only handle Eq/Ne/Lt/Gt as
+        // lexicographic. The min/max bytes are UTF-8 in practice.
+        (S::ByteArray(s), FilterScalar::Text(t)) => {
+            let v = t.as_bytes();
+            let lo = s.min_opt().map(|b| b.data());
+            let hi = s.max_opt().map(|b| b.data());
+            text_range_can_match(lo, hi, *op, v)
+        }
+        // Unknown stat × scalar combos: conservatively say yes.
+        _ => true,
+    }
+}
+
+fn range_can_match(lo: Option<f64>, hi: Option<f64>, op: FilterOp, v: f64) -> bool {
+    match op {
+        FilterOp::Eq => {
+            // [v in [lo..=hi]]
+            !(lo.is_some_and(|l| v < l) || hi.is_some_and(|h| v > h))
+        }
+        FilterOp::Ne => {
+            // [lo..=hi] != {v} iff range has more than one value or != v
+            !(lo == Some(v) && hi == Some(v))
+        }
+        FilterOp::Lt => lo.is_none_or(|l| l < v),
+        FilterOp::Le => lo.is_none_or(|l| l <= v),
+        FilterOp::Gt => hi.is_none_or(|h| h > v),
+        FilterOp::Ge => hi.is_none_or(|h| h >= v),
+        FilterOp::IsNull | FilterOp::IsNotNull => true,
+    }
+}
+
+fn text_range_can_match(lo: Option<&[u8]>, hi: Option<&[u8]>, op: FilterOp, v: &[u8]) -> bool {
+    match op {
+        FilterOp::Eq => !(lo.is_some_and(|l| v < l) || hi.is_some_and(|h| v > h)),
+        FilterOp::Ne => !(lo == Some(v) && hi == Some(v)),
+        FilterOp::Lt => lo.is_none_or(|l| l < v),
+        FilterOp::Le => lo.is_none_or(|l| l <= v),
+        FilterOp::Gt => hi.is_none_or(|h| h > v),
+        FilterOp::Ge => hi.is_none_or(|h| h >= v),
+        FilterOp::IsNull | FilterOp::IsNotNull => true,
+    }
+}
+
+/// Per-row filter application after decode. Returns a new RecordBatch
+/// with only the rows matching every filter (AND semantics).
+/// `batch_pos_of` maps a source_col_idx to its position in the batch
+/// (the parquet reader returns columns in schema order, not in the
+/// order we listed them in the projection mask).
+fn apply_row_filters_at(
+    batch: &arrow::record_batch::RecordBatch,
+    filters: &[RowFilter],
+    batch_pos_of: &dyn Fn(usize) -> usize,
+) -> Result<arrow::record_batch::RecordBatch, MError> {
+    use arrow::array::BooleanArray;
+    use arrow::compute::filter_record_batch;
+
+    let n_rows = batch.num_rows();
+    let mut mask: Vec<bool> = vec![true; n_rows];
+    for f in filters {
+        let pos = batch_pos_of(f.source_col_idx);
+        let column = batch.column(pos);
+        for row in 0..n_rows {
+            if !mask[row] {
+                continue;
+            }
+            mask[row] = cell_matches_filter(column.as_ref(), row, &f.op, &f.scalar);
+        }
+    }
+    let bool_mask = BooleanArray::from(mask);
+    filter_record_batch(batch, &bool_mask)
+        .map_err(|e| MError::Other(format!("LazyParquet filter: {e}")))
+}
+
+fn cell_matches_filter(
+    column: &dyn arrow::array::Array,
+    row: usize,
+    op: &FilterOp,
+    scalar: &FilterScalar,
+) -> bool {
+    use arrow::array::*;
+    use arrow::datatypes::DataType;
+
+    let is_null = column.is_null(row);
+    match op {
+        FilterOp::IsNull => return is_null,
+        FilterOp::IsNotNull => return !is_null,
+        _ => {}
+    }
+    if is_null {
+        // Comparisons against null: M's 3-valued logic — null
+        // comparison result is null, treated as "not matched".
+        return false;
+    }
+    match (column.data_type(), scalar) {
+        (DataType::Boolean, FilterScalar::Logical(b)) => {
+            let v = column
+                .as_any()
+                .downcast_ref::<BooleanArray>()
+                .unwrap()
+                .value(row);
+            cmp_partial(v.cmp(b), *op)
+        }
+        (DataType::Int8, FilterScalar::Number(n)) => {
+            let v = column.as_any().downcast_ref::<Int8Array>().unwrap().value(row) as f64;
+            cmp_f64(v, *n, *op)
+        }
+        (DataType::Int16, FilterScalar::Number(n)) => {
+            let v = column.as_any().downcast_ref::<Int16Array>().unwrap().value(row) as f64;
+            cmp_f64(v, *n, *op)
+        }
+        (DataType::Int32, FilterScalar::Number(n)) => {
+            let v = column.as_any().downcast_ref::<Int32Array>().unwrap().value(row) as f64;
+            cmp_f64(v, *n, *op)
+        }
+        (DataType::Int64, FilterScalar::Number(n)) => {
+            let v = column.as_any().downcast_ref::<Int64Array>().unwrap().value(row) as f64;
+            cmp_f64(v, *n, *op)
+        }
+        (DataType::UInt8, FilterScalar::Number(n)) => {
+            let v = column.as_any().downcast_ref::<UInt8Array>().unwrap().value(row) as f64;
+            cmp_f64(v, *n, *op)
+        }
+        (DataType::UInt16, FilterScalar::Number(n)) => {
+            let v = column.as_any().downcast_ref::<UInt16Array>().unwrap().value(row) as f64;
+            cmp_f64(v, *n, *op)
+        }
+        (DataType::UInt32, FilterScalar::Number(n)) => {
+            let v = column.as_any().downcast_ref::<UInt32Array>().unwrap().value(row) as f64;
+            cmp_f64(v, *n, *op)
+        }
+        (DataType::UInt64, FilterScalar::Number(n)) => {
+            let v = column.as_any().downcast_ref::<UInt64Array>().unwrap().value(row) as f64;
+            cmp_f64(v, *n, *op)
+        }
+        (DataType::Float32, FilterScalar::Number(n)) => {
+            let v = column.as_any().downcast_ref::<Float32Array>().unwrap().value(row) as f64;
+            cmp_f64(v, *n, *op)
+        }
+        (DataType::Float64, FilterScalar::Number(n)) => {
+            let v = column.as_any().downcast_ref::<Float64Array>().unwrap().value(row);
+            cmp_f64(v, *n, *op)
+        }
+        (DataType::Utf8, FilterScalar::Text(t)) => {
+            let v = column.as_any().downcast_ref::<StringArray>().unwrap().value(row);
+            cmp_partial(v.cmp(t.as_str()), *op)
+        }
+        // Type mismatch (Text scalar vs Int column etc) — never matches.
+        _ => false,
+    }
+}
+
+fn cmp_f64(v: f64, scalar: f64, op: FilterOp) -> bool {
+    match op {
+        FilterOp::Eq => v == scalar,
+        FilterOp::Ne => v != scalar,
+        FilterOp::Lt => v < scalar,
+        FilterOp::Le => v <= scalar,
+        FilterOp::Gt => v > scalar,
+        FilterOp::Ge => v >= scalar,
+        FilterOp::IsNull | FilterOp::IsNotNull => unreachable!(),
+    }
+}
+
+fn cmp_partial(ord: std::cmp::Ordering, op: FilterOp) -> bool {
+    use std::cmp::Ordering;
+    match (ord, op) {
+        (Ordering::Equal, FilterOp::Eq) => true,
+        (Ordering::Equal, FilterOp::Le | FilterOp::Ge) => true,
+        (Ordering::Less, FilterOp::Lt | FilterOp::Le | FilterOp::Ne) => true,
+        (Ordering::Greater, FilterOp::Gt | FilterOp::Ge | FilterOp::Ne) => true,
+        _ => false,
+    }
 }
 
 /// Errors raised during evaluation. Per design doc §07 §2, errors propagate

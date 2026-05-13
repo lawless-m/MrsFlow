@@ -722,6 +722,7 @@ fn rename_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
                     projection: state.projection.clone(),
                     output_names: Some(new_output_names),
                     num_rows: state.num_rows,
+                    row_filter: state.row_filter.clone(),
                 },
             ),
         }));
@@ -840,6 +841,7 @@ fn select_columns_by_index(
                         projection: new_projection,
                         output_names: new_output_names,
                         num_rows: state.num_rows,
+                        row_filter: state.row_filter.clone(),
                     },
                 ),
             }))
@@ -1290,6 +1292,34 @@ fn select_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 
 
 fn select_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+    // Fast path: if the input is a LazyParquet handle and the
+    // predicate translates to a foldable subset (literal-RHS
+    // comparisons AND'd together), push the filter into the handle
+    // and return without decoding any data. Non-foldable predicates
+    // (function calls, cross-column comparisons, if/then/else, etc.)
+    // fall through to the eager filter below.
+    if let Value::Table(t) = &args[0] {
+        if let super::super::value::TableRepr::LazyParquet(state) = &t.repr {
+            if let Value::Function(closure) = &args[1] {
+                if let Some(new_filters) = try_fold_predicate(state, closure) {
+                    let mut combined = state.row_filter.clone();
+                    combined.extend(new_filters);
+                    let new_state = super::super::value::LazyParquetState {
+                        bytes: state.bytes.clone(),
+                        schema: state.schema.clone(),
+                        projection: state.projection.clone(),
+                        output_names: state.output_names.clone(),
+                        num_rows: state.num_rows,
+                        row_filter: combined,
+                    };
+                    return Ok(Value::Table(Table {
+                        repr: super::super::value::TableRepr::LazyParquet(new_state),
+                    }));
+                }
+            }
+        }
+    }
+
     let table = expect_table(&args[0])?;
     let predicate = expect_function(&args[1])?;
     let n_rows = table.num_rows();
@@ -2813,6 +2843,7 @@ fn decode_key_columns(
                     projection: new_projection,
                     output_names: None,
                     num_rows: state.num_rows,
+                    row_filter: state.row_filter.clone(),
                 }),
             };
             let forced = key_only.force()?;
@@ -3141,8 +3172,18 @@ fn first_value(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 fn row_count(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    // Schema-only: parquet footer carries row count, no column decode.
+    // Normally schema-only — parquet footer carries the row count and
+    // we return it without any column decode. The exception is a
+    // filtered LazyParquet: the cached count is pre-filter, so we
+    // have to force the decode (which applies the filter) and use
+    // the post-filter row count.
     let table = expect_table_lazy_ok(&args[0])?;
+    if let super::super::value::TableRepr::LazyParquet(s) = &table.repr {
+        if !s.row_filter.is_empty() {
+            let forced = table.force()?;
+            return Ok(Value::Number(forced.num_rows() as f64));
+        }
+    }
     Ok(Value::Number(table.num_rows() as f64))
 }
 
@@ -4199,6 +4240,7 @@ fn duplicate_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError>
                     projection: new_projection,
                     output_names: Some(new_output_names),
                     num_rows: state.num_rows,
+                    row_filter: state.row_filter.clone(),
                 },
             ),
         }));
@@ -4235,6 +4277,7 @@ fn prefix_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
                     projection: state.projection.clone(),
                     output_names: Some(new_output_names),
                     num_rows: state.num_rows,
+                    row_filter: state.row_filter.clone(),
                 },
             ),
         }));
@@ -5167,5 +5210,149 @@ fn parse_text_to_number(
         out.push(Some(n));
     }
     Ok(Arc::new(Float64Array::from(out)))
+}
+
+
+// ============================================================================
+// Predicate folding for LazyParquet: walk a one-arg lambda's body and
+// translate the foldable subset (literal-RHS comparisons AND'd together,
+// IsNull / IsNotNull) into RowFilters. Anything outside that subset
+// returns None — caller falls back to eager filtering.
+// ============================================================================
+
+fn try_fold_predicate(
+    state: &super::super::value::LazyParquetState,
+    closure: &super::super::value::Closure,
+) -> Option<Vec<super::super::value::RowFilter>> {
+    if closure.params.len() != 1 {
+        return None;
+    }
+    let param_name = closure.params[0].name.as_str();
+    let body = match &closure.body {
+        super::super::value::FnBody::M(expr) => expr.as_ref(),
+        super::super::value::FnBody::Builtin(_) => return None,
+    };
+    let mut out = Vec::new();
+    if extract_filters(body, param_name, state, &mut out) {
+        Some(out)
+    } else {
+        None
+    }
+}
+
+fn extract_filters(
+    expr: &crate::parser::Expr,
+    param_name: &str,
+    state: &super::super::value::LazyParquetState,
+    out: &mut Vec<super::super::value::RowFilter>,
+) -> bool {
+    use crate::parser::{BinaryOp, Expr};
+    use super::super::value::{FilterOp, FilterScalar, RowFilter};
+
+    match expr {
+        Expr::Binary(BinaryOp::And, l, r) => {
+            extract_filters(l, param_name, state, out)
+                && extract_filters(r, param_name, state, out)
+        }
+        Expr::Binary(op, l, r) => {
+            // [col] op literal — or — literal op [col] (flip the op).
+            let (col_field, scalar_expr, flipped) =
+                if let Some(field) = field_access_on_param(l, param_name) {
+                    (field, r.as_ref(), false)
+                } else if let Some(field) = field_access_on_param(r, param_name) {
+                    (field, l.as_ref(), true)
+                } else {
+                    return false;
+                };
+            let fop = match (op, flipped) {
+                (BinaryOp::Equal, _) => FilterOp::Eq,
+                (BinaryOp::NotEqual, _) => FilterOp::Ne,
+                (BinaryOp::LessThan, false) | (BinaryOp::GreaterThan, true) => FilterOp::Lt,
+                (BinaryOp::LessEquals, false) | (BinaryOp::GreaterEquals, true) => {
+                    FilterOp::Le
+                }
+                (BinaryOp::GreaterThan, false) | (BinaryOp::LessThan, true) => FilterOp::Gt,
+                (BinaryOp::GreaterEquals, false) | (BinaryOp::LessEquals, true) => {
+                    FilterOp::Ge
+                }
+                _ => return false,
+            };
+            // `[col] = null` / `<> null` → IsNull / IsNotNull (drop the
+            // scalar from the filter — Eq/Ne against null is M's 3-valued
+            // null check, distinct from a real value comparison).
+            if matches!(scalar_expr, Expr::NullLit) {
+                let null_op = match fop {
+                    FilterOp::Eq => FilterOp::IsNull,
+                    FilterOp::Ne => FilterOp::IsNotNull,
+                    _ => return false,
+                };
+                let col_idx = match resolve_field(state, col_field) {
+                    Some(i) => i,
+                    None => return false,
+                };
+                out.push(RowFilter {
+                    source_col_idx: col_idx,
+                    op: null_op,
+                    scalar: FilterScalar::Logical(false),
+                });
+                return true;
+            }
+            let scalar = match expr_to_scalar(scalar_expr) {
+                Some(s) => s,
+                None => return false,
+            };
+            let col_idx = match resolve_field(state, col_field) {
+                Some(i) => i,
+                None => return false,
+            };
+            out.push(RowFilter {
+                source_col_idx: col_idx,
+                op: fop,
+                scalar,
+            });
+            true
+        }
+        _ => false,
+    }
+}
+
+/// If `expr` is `[field]` against the lambda parameter `param_name`,
+/// return the field name. The parser desugars `[col]` inside an
+/// `each` body to `FieldAccess { target: Identifier("_"), field: "col" }`.
+fn field_access_on_param<'e>(expr: &'e crate::parser::Expr, param_name: &str) -> Option<&'e str> {
+    use crate::parser::Expr;
+    match expr {
+        Expr::FieldAccess { target, field, optional: false } => match target.as_ref() {
+            Expr::Identifier(n) if n == param_name => Some(field.as_str()),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+fn expr_to_scalar(expr: &crate::parser::Expr) -> Option<super::super::value::FilterScalar> {
+    use crate::parser::Expr;
+    use super::super::value::FilterScalar;
+    match expr {
+        Expr::NumberLit(s) => s.parse::<f64>().ok().map(FilterScalar::Number),
+        Expr::TextLit(s) => Some(FilterScalar::Text(s.clone())),
+        Expr::LogicalLit(b) => Some(FilterScalar::Logical(*b)),
+        _ => None,
+    }
+}
+
+/// Resolve a user-facing field name (post-rename, post-projection) to
+/// the underlying parquet schema field index — the stable index used
+/// in RowFilter.source_col_idx.
+fn resolve_field(
+    state: &super::super::value::LazyParquetState,
+    field_name: &str,
+) -> Option<usize> {
+    for pos in 0..state.projection.len() {
+        if state.effective_name(pos) == field_name {
+            return Some(state.projection[pos]);
+        }
+    }
+    None
 }
 
