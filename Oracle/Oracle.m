@@ -70,3 +70,39 @@ Folder.Contents("C:\Windows\System32"){0}[Attributes]
 //      mrsflow CLI w/o --param: empty Name/Content table.
 //      In Excel: should include every named cell + ListObject.
 Excel.CurrentWorkbook()
+
+// q13: ODBC fold — column projection should push down to
+//      `SELECT RITerritoryCode, RITerritoryDesc FROM RIGeographic`.
+//      Semantics: 284 rows × 2 columns. Excel and mrsflow must match.
+//      `[HierarchicalNavigation=true]` is required for Excel — without
+//      it Excel returns a flat table list (no Database level) while
+//      mrsflow keeps the nested shape; that divergence is a separate
+//      follow-up (flat mode in mrsflow currently ignores the option).
+//      Fold engagement is verified separately via the panicking
+//      force_fn tests in mrsflow-core.
+Table.SelectColumns(
+    Odbc.DataSource("dsn=Exportmaster", [HierarchicalNavigation=true])
+        {[Name="NISAINT_CS",Kind="Database"]}[Data]
+        {[Name="RIGeographic",Kind="Table"]}[Data],
+    {"RITerritoryCode", "RITerritoryDesc"})
+
+// q14: ODBC fold — row predicate should push down to
+//      `SELECT * FROM RIGeographic WHERE RITerritoryCode = 'GB'`.
+//      Semantics: GB territory subset only.
+Table.SelectRows(
+    Odbc.DataSource("dsn=Exportmaster", [HierarchicalNavigation=true])
+        {[Name="NISAINT_CS",Kind="Database"]}[Data]
+        {[Name="RIGeographic",Kind="Table"]}[Data],
+    each [RITerritoryCode] = "GB")
+
+// q15: ODBC fold — combined projection + predicate.
+//      Should push down to
+//      `SELECT RITerritoryDesc FROM RIGeographic
+//          WHERE RITerritoryCode = 'GB'`.
+Table.SelectColumns(
+    Table.SelectRows(
+        Odbc.DataSource("dsn=Exportmaster", [HierarchicalNavigation=true])
+            {[Name="NISAINT_CS",Kind="Database"]}[Data]
+            {[Name="RIGeographic",Kind="Table"]}[Data],
+        each [RITerritoryCode] = "GB"),
+    {"RITerritoryDesc"})
