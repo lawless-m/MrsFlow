@@ -750,7 +750,8 @@ fn rename_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         super::super::value::TableRepr::Rows { rows, .. } => {
             Ok(Value::Table(Table::from_rows(renamed, rows.clone())))
         }
-        super::super::value::TableRepr::LazyParquet(_) => {
+        super::super::value::TableRepr::LazyParquet(_)
+        | super::super::value::TableRepr::LazyOdbc(_) => {
             unreachable!("expect_table forces upstream — lazy variant can't reach here")
         }
         super::super::value::TableRepr::JoinView(_)
@@ -845,6 +846,13 @@ fn select_columns_by_index(
                     },
                 ),
             }))
+        }
+        super::super::value::TableRepr::LazyOdbc(_) => {
+            // TODO(odbc-fold task #56): foldable fast path — narrow the
+            // projection in place without forcing. Until then, force
+            // and re-narrow on the materialised Arrow batch.
+            let forced = table.force()?;
+            return select_columns_by_index(&forced, keep_indices, ctx);
         }
         super::super::value::TableRepr::ExpandView(ev) => {
             // Projection-aware path on the post-expand result. Output
@@ -1089,6 +1097,7 @@ pub fn cell_to_value(table: &Table, col: usize, row: usize) -> Result<Value, MEr
             return Ok(rows[row][col].clone());
         }
         super::super::value::TableRepr::LazyParquet(_)
+        | super::super::value::TableRepr::LazyOdbc(_)
         | super::super::value::TableRepr::JoinView(_)
         | super::super::value::TableRepr::ExpandView(_) => {
             unreachable!("cell_to_value expects forced table — caller should expect_table first")
@@ -1363,7 +1372,8 @@ fn select_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
                 keep.into_iter().map(|i| rows[i as usize].clone()).collect();
             Ok(Value::Table(Table::from_rows(columns.clone(), new_rows)))
         }
-        super::super::value::TableRepr::LazyParquet(_) => {
+        super::super::value::TableRepr::LazyParquet(_)
+        | super::super::value::TableRepr::LazyOdbc(_) => {
             unreachable!("expect_table forces upstream — lazy variant can't reach here")
         }
         super::super::value::TableRepr::JoinView(_)
@@ -1724,7 +1734,8 @@ fn promote_headers(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
             let new_rows: Vec<Vec<Value>> = rows.iter().skip(1).cloned().collect();
             Ok(Value::Table(Table::from_rows(new_names, new_rows)))
         }
-        super::super::value::TableRepr::LazyParquet(_) => {
+        super::super::value::TableRepr::LazyParquet(_)
+        | super::super::value::TableRepr::LazyOdbc(_) => {
             unreachable!("expect_table forces upstream — lazy variant can't reach here")
         }
         super::super::value::TableRepr::JoinView(_)
@@ -1829,7 +1840,8 @@ fn transform_column_types(args: &[Value], _host: &dyn IoHost) -> Result<Value, M
             }
             Ok(Value::Table(values_to_table(columns, &new_rows)?))
         }
-        super::super::value::TableRepr::LazyParquet(_) => {
+        super::super::value::TableRepr::LazyParquet(_)
+        | super::super::value::TableRepr::LazyOdbc(_) => {
             unreachable!("expect_table forces upstream — lazy variant can't reach here")
         }
         super::super::value::TableRepr::JoinView(_)
@@ -2094,7 +2106,8 @@ fn skip(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             let new_rows: Vec<Vec<Value>> = rows.iter().skip(skip).cloned().collect();
             Ok(Value::Table(Table::from_rows(columns.clone(), new_rows)))
         }
-        super::super::value::TableRepr::LazyParquet(_) => {
+        super::super::value::TableRepr::LazyParquet(_)
+        | super::super::value::TableRepr::LazyOdbc(_) => {
             unreachable!("expect_table forces upstream — lazy variant can't reach here")
         }
         super::super::value::TableRepr::JoinView(_)

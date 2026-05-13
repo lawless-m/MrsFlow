@@ -218,6 +218,15 @@ pub enum TableRepr {
     /// without forcing, so columns the M source never touches are
     /// never decoded. See `mrsflow/09-lazy-tables.md`.
     LazyParquet(LazyParquetState),
+    /// Deferred ODBC query plan. Constructed by `Odbc.DataSource`
+    /// returning a navigation table where each row's `Data` cell is a
+    /// `LazyOdbc` — the plan is fleshed out by foldable Table.* ops
+    /// (SelectColumns, SelectRows, FirstN, ReorderColumns) without
+    /// touching the wire. When forced, the SQL emitter renders the
+    /// accumulated plan into a single SELECT statement which the
+    /// connector's `force_fn` runs against the driver. Non-foldable
+    /// downstream ops trigger a force boundary and proceed eagerly.
+    LazyOdbc(LazyOdbcState),
     /// Deferred result of `Table.NestedJoin`: left table + right handle +
     /// per-left-row indices into right. The nested-column cell at each
     /// row is conceptually a Table containing the matched right rows,
@@ -431,6 +440,70 @@ impl LazyParquetState {
     }
 }
 
+/// State for a `TableRepr::LazyOdbc` — a deferred ODBC query plan.
+/// Each row of `Odbc.DataSource`'s navigation table holds one of
+/// these as its `Data` cell. Foldable Table.* operations narrow the
+/// plan in place (clone-and-replace); non-foldable ops force the plan
+/// into an Arrow result at the call site.
+#[derive(Clone)]
+pub struct LazyOdbcState {
+    /// Connection string passed to the driver. Owned because the
+    /// `force_fn` closure captures it.
+    pub connection_string: String,
+    /// Bare table name. Drivers vary on whether `"catalog"."table"`
+    /// qualification is accepted (DBISAM rejects it); the SQL emitter
+    /// renders just `"table_name"` for portability.
+    pub table_name: String,
+    /// Column schema as discovered by the connector at navigation-table
+    /// construction time (typically via `SELECT * ... WHERE 1=0` or
+    /// `SQLDescribeCol`). Indices in `projection` are into this.
+    pub schema: arrow::datatypes::SchemaRef,
+    /// Column indices into `schema.fields()`, in output order. Initially
+    /// `(0..schema.fields().len()).collect()`; narrowed by
+    /// `Table.SelectColumns` / `RemoveColumns` / `ReorderColumns`.
+    pub projection: Vec<usize>,
+    /// Per-output-column rename overrides. Same shape as
+    /// `LazyParquetState.output_names` — `None` means no renames; an
+    /// inner `None` means "use the schema name at this position".
+    pub output_names: Option<Vec<Option<String>>>,
+    /// AND-conjoined predicate filters. Reuses the same `RowFilter`
+    /// shape we use for parquet pushdown so the foldable-predicate
+    /// extractor in stdlib can target both backends with one helper.
+    pub where_filters: Vec<RowFilter>,
+    /// Set by `Table.FirstN(_, n)`. Translates to `LIMIT n` (or `TOP n`
+    /// for dialects that don't speak LIMIT — see the SQL emitter).
+    pub limit: Option<usize>,
+    /// Driver-side execution. The CLI shell builds this closure with
+    /// `odbc_query_impl` captured; the WASM shell and `NoIoHost`
+    /// never construct LazyOdbc values so they never need one. The
+    /// closure receives the (potentially narrowed) state and returns
+    /// the rendered Arrow batch.
+    pub force_fn: std::rc::Rc<dyn Fn(&LazyOdbcState) -> Result<arrow::record_batch::RecordBatch, MError>>,
+}
+
+impl std::fmt::Debug for LazyOdbcState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LazyOdbcState")
+            .field("connection_string", &"<elided>") // may contain secrets
+            .field("table_name", &self.table_name)
+            .field("projection_len", &self.projection.len())
+            .field("where_filters_len", &self.where_filters.len())
+            .field("limit", &self.limit)
+            .finish()
+    }
+}
+
+impl LazyOdbcState {
+    pub fn effective_name(&self, i: usize) -> String {
+        if let Some(ov) = self.output_names.as_ref().and_then(|v| v.get(i)) {
+            if let Some(s) = ov {
+                return s.clone();
+            }
+        }
+        self.schema.field(self.projection[i]).name().clone()
+    }
+}
+
 /// Table value — wraps a [`TableRepr`]. Use the inherent helpers
 /// (`column_names`, `num_rows`, `as_arrow`, `try_to_arrow`) instead of
 /// reaching into the variant directly.
@@ -482,6 +555,9 @@ impl Table {
             TableRepr::LazyParquet(s) => {
                 (0..s.projection.len()).map(|i| s.effective_name(i)).collect()
             }
+            TableRepr::LazyOdbc(s) => {
+                (0..s.projection.len()).map(|i| s.effective_name(i)).collect()
+            }
             TableRepr::JoinView(jv) => {
                 // left columns + the new nested column at the end.
                 let mut names = jv.left.column_names();
@@ -506,6 +582,13 @@ impl Table {
             TableRepr::Arrow(b) => b.num_rows(),
             TableRepr::Rows { rows, .. } => rows.len(),
             TableRepr::LazyParquet(s) => s.num_rows,
+            // LazyOdbc has no cheap row count — the navtable carries
+            // schema-only info, not row counts. Callers that need a
+            // precise count should go through `Table.RowCount` which
+            // emits `SELECT COUNT(*)` rather than `SELECT *`. Returning
+            // 0 here would lie; usize::MAX is the conservative answer
+            // that signals "must force to know".
+            TableRepr::LazyOdbc(_) => usize::MAX,
             TableRepr::JoinView(jv) => {
                 // Row count per join kind:
                 //   Inner       = left rows with ≥1 match
@@ -542,6 +625,7 @@ impl Table {
             TableRepr::Arrow(b) => b.num_columns(),
             TableRepr::Rows { columns, .. } => columns.len(),
             TableRepr::LazyParquet(s) => s.projection.len(),
+            TableRepr::LazyOdbc(s) => s.projection.len(),
             TableRepr::JoinView(jv) => jv.left.num_columns() + 1,
             TableRepr::ExpandView(ev) => {
                 ev.left_projection.len() + ev.right_output_names.len()
@@ -559,6 +643,7 @@ impl Table {
                 "operation requires Arrow-backed table (Rows-backed support pending)",
             )),
             TableRepr::LazyParquet(_)
+            | TableRepr::LazyOdbc(_)
             | TableRepr::JoinView(_)
             | TableRepr::ExpandView(_) => Err(MError::Other(
                 "internal: as_arrow() called on lazy table without forcing first \
@@ -582,6 +667,7 @@ impl Table {
                     .into(),
             )),
             TableRepr::LazyParquet(s) => decode_lazy_parquet(s),
+            TableRepr::LazyOdbc(s) => materialise_lazy_odbc(s),
             TableRepr::JoinView(_) => Err(MError::Other(
                 "Table.NestedJoin result contains nested Table-valued cells; \
                  Arrow encoding requires uniform columns. Use \
@@ -610,10 +696,44 @@ impl Table {
         match &self.repr {
             TableRepr::Arrow(_) | TableRepr::Rows { .. } => Ok(Cow::Borrowed(self)),
             TableRepr::LazyParquet(s) => Ok(Cow::Owned(Self::from_arrow(decode_lazy_parquet(s)?))),
+            TableRepr::LazyOdbc(s) => Ok(Cow::Owned(Self::from_arrow(materialise_lazy_odbc(s)?))),
             TableRepr::JoinView(jv) => Ok(Cow::Owned(materialise_join_view(jv)?)),
             TableRepr::ExpandView(ev) => Ok(Cow::Owned(materialise_expand_view(ev)?)),
         }
     }
+}
+
+/// Run a `LazyOdbc`'s plan through its `force_fn` and apply per-column
+/// renames. Returns an Arrow RecordBatch — the same shape any other
+/// successful Table.* operation would yield.
+fn materialise_lazy_odbc(
+    state: &LazyOdbcState,
+) -> Result<arrow::record_batch::RecordBatch, MError> {
+    let batch = (state.force_fn)(state)?;
+    if let Some(onames) = state.output_names.as_ref() {
+        if onames.iter().any(Option::is_some) {
+            let schema = batch.schema();
+            let new_fields: Vec<arrow::datatypes::Field> = schema
+                .fields()
+                .iter()
+                .enumerate()
+                .map(|(i, f)| {
+                    let name = onames
+                        .get(i)
+                        .and_then(|o| o.clone())
+                        .unwrap_or_else(|| f.name().clone());
+                    arrow::datatypes::Field::new(name, f.data_type().clone(), f.is_nullable())
+                })
+                .collect();
+            let new_schema = Arc::new(arrow::datatypes::Schema::new(new_fields));
+            return arrow::record_batch::RecordBatch::try_new(
+                new_schema,
+                batch.columns().to_vec(),
+            )
+            .map_err(|e| MError::Other(format!("LazyOdbc rename: {e}")));
+        }
+    }
+    Ok(batch)
 }
 
 /// Narrow `t` to just the columns at positions `cols` (in output order),
@@ -667,10 +787,10 @@ fn narrow_for_force(t: &Table, cols: &[usize]) -> Result<Table, MError> {
                 .collect();
             Ok(Table::from_rows(new_names, new_rows))
         }
-        TableRepr::JoinView(_) | TableRepr::ExpandView(_) => {
-            // Force then narrow. Sub-optimal for nested lazies but
-            // correct; the chained-lazy decode is the deeper
-            // optimisation that isn't done here.
+        TableRepr::JoinView(_) | TableRepr::ExpandView(_) | TableRepr::LazyOdbc(_) => {
+            // Force then narrow. For LazyOdbc this is the wrong shape
+            // anyway — narrowing as a fold should happen in the stdlib
+            // Table.SelectColumns fast path before reaching here.
             let forced = t.force()?;
             narrow_for_force(&forced, cols)
         }
