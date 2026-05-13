@@ -1126,7 +1126,10 @@ fn odbc_query_row_at_a_time(connection_string: &str, sql: &str) -> Result<Value,
                     let cell = if !has_data {
                         None
                     } else {
-                        Some(String::from_utf8_lossy(&buf).into_owned())
+                        // Trim trailing whitespace — DBISAM (and other
+                        // fixed-width-CHAR drivers) pad to column width.
+                        // Excel/PQ trims the same way before exposing.
+                        Some(String::from_utf8_lossy(&buf).trim_end().to_string())
                     };
                     acc_str[col_idx].push(cell);
                 }

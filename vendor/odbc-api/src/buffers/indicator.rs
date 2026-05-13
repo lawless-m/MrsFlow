@@ -16,15 +16,25 @@ impl Indicator {
     /// Creates an indicator from an `isize` indicator value returned by ODBC. Users of this crate
     /// have likely no need to call this method.
     pub fn from_isize(indicator: isize) -> Self {
-        // PATCHED for MrsFlow: upstream panics on unrecognised negatives,
-        // which DBISAM produces (32-bit SQLLEN mis-sign-extended into 64-bit).
-        // Treat any negative non-standard value as `Null` so a misbehaving
-        // driver doesn't bring the process down. See vendor/README.md.
+        // PATCHED for MrsFlow: keep the upstream panic for unrecognised
+        // negatives. Earlier attempts to swallow them as `Null` silently
+        // lost rows on DBISAM (the 32-bit-SQLLEN driver bug applies to
+        // *valid* row data, not just null sentinels). The panic now
+        // surfaces the driver issue cleanly; mrsflow-cli's columnar
+        // dispatcher catches it via `catch_unwind` and falls back to
+        // row-at-a-time, which uses SQLGetData and decodes correctly.
+        // See vendor/README.md.
         match indicator {
             NULL_DATA => Indicator::Null,
             NO_TOTAL => Indicator::NoTotal,
-            n if n < 0 => Indicator::Null,
-            other => Indicator::Length(other as usize),
+            other => Indicator::Length(other.try_into().expect(
+                "Length indicator must be non-negative. This is not necessarily a programming \
+                error, in the application. If you are on a 64Bit platfrom and the isize value has \
+                been returned by the driver there may be a better exlpanation for what went wrong: \
+                In the past some driver managers and drivers assumed SQLLEN to be 32Bits even on \
+                64Bit platforms. Please ask your vendor for a version of the driver which is \
+                correctly build using 64Bits for SQLLEN.",
+            )),
         }
     }
 
