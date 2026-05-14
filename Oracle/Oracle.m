@@ -1369,7 +1369,53 @@ let
             List.Sort({2,1,2,1,2})),
 
         SafeSerialize("q260", () =>
-            List.Sort({"B","a","A","b"}, Comparer.OrdinalIgnoreCase))
+            List.Sort({"B","a","A","b"}, Comparer.OrdinalIgnoreCase)),
+
+        // q261-q265: Table.Pivot / Table.Unpivot.
+
+        SafeSerialize("q261", () =>
+            let r = try Table.Unpivot(
+                #table({"id","jan","feb","mar"}, {{"a",1,2,3}}),
+                {"jan","feb","mar"}, "month", "value") in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q262", () =>
+            let r = try Table.UnpivotOtherColumns(
+                #table({"id","jan","feb"}, {{"a",1,2}, {"b",3,4}}),
+                {"id"}, "month", "value") in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q263", () =>
+            let r = try Table.Pivot(
+                #table({"id","month","value"},
+                    {{"a","jan",1},{"a","feb",2},{"a","mar",3}}),
+                {"jan","feb","mar"}, "month", "value") in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q264", () =>
+            let r = try Table.Pivot(
+                #table({"id","month","value"},
+                    {{"a","jan",1},{"a","jan",10},{"a","feb",2}}),
+                {"jan","feb"}, "month", "value", List.Sum) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q265", () =>
+            let
+                orig = #table({"id","jan","feb"}, {{"a",1,2}, {"b",3,4}}),
+                unp = Table.UnpivotOtherColumns(orig, {"id"}, "month", "value"),
+                r = try Table.Pivot(unp, {"jan","feb"}, "month", "value")
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]])
     },
 
     Catalog = Table.FromRecords(cases)
