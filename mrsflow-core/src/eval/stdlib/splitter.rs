@@ -285,13 +285,16 @@ fn split_text_by_lengths(args: &[Value], _host: &dyn IoHost) -> Result<Value, ME
     for v in xs {
         let _ = expect_int(v, "Splitter.SplitTextByLengths")?;
     }
-    if matches!(args.get(1), Some(Value::Logical(true))) {
-        return Err(MError::NotImplemented(
-            "Splitter.SplitTextByLengths: startAtEnd=true not yet supported",
-        ));
-    }
+    let start_at_end = match args.get(1) {
+        None | Some(Value::Null) => false,
+        Some(Value::Logical(b)) => *b,
+        Some(other) => return Err(type_mismatch("logical (startAtEnd)", other)),
+    };
     Ok(make_splitter(
-        vec![("__lengths".into(), args[0].clone())],
+        vec![
+            ("__lengths".into(), args[0].clone()),
+            ("__rev".into(), Value::Logical(start_at_end)),
+        ],
         split_text_by_lengths_impl,
     ))
 }
@@ -575,6 +578,7 @@ fn split_text_by_each_delimiter_impl(args: &[Value], _host: &dyn IoHost) -> Resu
 fn split_text_by_lengths_impl(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     let lengths_v = expect_list(&args[1])?;
+    let reverse = matches!(&args[2], Value::Logical(true));
     let mut lengths: Vec<usize> = Vec::with_capacity(lengths_v.len());
     for v in lengths_v {
         let n = expect_int(v, "Splitter.SplitTextByLengths")?;
@@ -586,20 +590,41 @@ fn split_text_by_lengths_impl(args: &[Value], _host: &dyn IoHost) -> Result<Valu
         lengths.push(n as usize);
     }
     let chars: Vec<char> = text.chars().collect();
-    let mut parts: Vec<Value> = Vec::with_capacity(lengths.len());
-    let mut idx = 0usize;
-    for n in lengths {
-        if idx + n > chars.len() {
+    if !reverse {
+        let mut parts: Vec<Value> = Vec::with_capacity(lengths.len());
+        let mut idx = 0usize;
+        for n in lengths {
+            if idx + n > chars.len() {
+                return Err(MError::Other(format!(
+                    "Splitter.SplitTextByLengths: text too short for length sequence (need {}, have {} remaining)",
+                    n,
+                    chars.len() - idx
+                )));
+            }
+            let chunk: String = chars[idx..idx + n].iter().collect();
+            parts.push(Value::Text(chunk));
+            idx += n;
+        }
+        return Ok(Value::List(parts));
+    }
+    // Reverse: walk lengths right-to-left, taking chunks from the end of text.
+    let mut tail_parts: Vec<String> = Vec::with_capacity(lengths.len());
+    let mut end = chars.len();
+    for n in lengths.iter().rev() {
+        if *n > end {
             return Err(MError::Other(format!(
                 "Splitter.SplitTextByLengths: text too short for length sequence (need {}, have {} remaining)",
-                n,
-                chars.len() - idx
+                n, end
             )));
         }
-        let chunk: String = chars[idx..idx + n].iter().collect();
-        parts.push(Value::Text(chunk));
-        idx += n;
+        let start = end - n;
+        let chunk: String = chars[start..end].iter().collect();
+        tail_parts.push(chunk);
+        end = start;
     }
+    // tail_parts is in right-to-left order; reverse to match original
+    // lengths-array order in the output list.
+    let parts: Vec<Value> = tail_parts.into_iter().rev().map(Value::Text).collect();
     Ok(Value::List(parts))
 }
 

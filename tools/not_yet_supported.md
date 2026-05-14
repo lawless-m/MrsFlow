@@ -60,7 +60,7 @@ the scan direction.
 - ✅ `Splitter.SplitTextByDelimiter`
 - ✅ `Splitter.SplitTextByAnyDelimiter`
 - ✅ `Splitter.SplitTextByEachDelimiter` (both flags)
-- `Splitter.SplitTextByLengths`
+- ✅ `Splitter.SplitTextByLengths`
 - `Splitter.SplitTextByPositions`
 - `Splitter.SplitTextByRanges`
 - `Splitter.SplitTextByWhitespace`
