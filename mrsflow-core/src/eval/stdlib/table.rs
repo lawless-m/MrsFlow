@@ -4502,16 +4502,22 @@ fn split_column(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
         }
         Some(other) => return Err(type_mismatch("list of text or number", other)),
     };
-    if !matches!(args.get(4), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented(
-            "Table.SplitColumn: default argument not yet supported",
-        ));
-    }
-    if !matches!(args.get(5), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented(
-            "Table.SplitColumn: extraValues argument not yet supported",
-        ));
-    }
+    let default: Value = match args.get(4) {
+        None | Some(Value::Null) => Value::Null,
+        Some(v) => v.clone(),
+    };
+    // ExtraValues: List = 0 (default), Ignore = 1, Error = 2 (same enum
+    // as Table.FromList). Only consulted when a split overflows `width`.
+    let extra_values: u8 = match args.get(5) {
+        None | Some(Value::Null) => 0,
+        Some(Value::Number(n)) if *n == 0.0 || *n == 1.0 || *n == 2.0 => *n as u8,
+        Some(other) => {
+            return Err(MError::Other(format!(
+                "Table.SplitColumn: extraValues must be ExtraValues.List/Ignore/Error, got {}",
+                super::super::type_name(other),
+            )));
+        }
+    };
     let (names, rows) = table_to_rows(&table)?;
     let src_idx = names
         .iter()
@@ -4565,8 +4571,32 @@ fn split_column(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
         for (i, cell) in row.into_iter().enumerate() {
             if i == src_idx {
                 let parts = &split_results[row_i];
-                for j in 0..width {
-                    new_row.push(parts.get(j).cloned().unwrap_or(Value::Null));
+                // Pad short with `default`; treat overflow per extraValues.
+                let mut split_row: Vec<Value> = parts.clone();
+                while split_row.len() < width {
+                    split_row.push(default.clone());
+                }
+                if split_row.len() > width {
+                    match extra_values {
+                        2 => {
+                            return Err(MError::Other(format!(
+                                "Table.SplitColumn: split produced {} values but {} columns \
+                                 (ExtraValues.Error)",
+                                split_row.len(),
+                                width,
+                            )));
+                        }
+                        1 => {
+                            split_row.truncate(width);
+                        }
+                        _ => {
+                            let tail = split_row.split_off(width - 1);
+                            split_row.push(Value::List(tail));
+                        }
+                    }
+                }
+                for v in split_row {
+                    new_row.push(v);
                 }
             } else {
                 new_row.push(cell);

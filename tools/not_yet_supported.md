@@ -97,7 +97,7 @@ Smaller per-function options, lower aggregate impact.
 - ✅ `Table.FromValue` (options.Name)
 - `Table.Join` (composite keys)
 - `Table.Profile` (additionalAggregates)
-- `Table.SplitColumn` (default + extraValues)
+- ✅ `Table.SplitColumn` (default + extraValues)
 - ✅ `Table.TransformColumnNames` (options accepted-and-ignored)
 - ✅ `Value.FromText` (culture — accepted-and-ignored)
 - `List.Percentile` (options)
