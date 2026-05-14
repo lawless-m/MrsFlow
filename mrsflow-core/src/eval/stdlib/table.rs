@@ -3297,19 +3297,59 @@ fn row_matches_record(table: &Table, row: usize, needle: &Record) -> Result<bool
     Ok(true)
 }
 
+/// Extract the optional equationCriteria function arg from a Table.*
+/// call. Mirrors `equation_criteria_fn` in stdlib/list.rs but lives here
+/// to avoid a cross-module dep. Null/missing → None (caller uses the
+/// default row-equality path); Function → Some(_); other shapes are not
+/// yet supported.
+fn table_equation_criteria_fn<'a>(
+    args: &'a [Value],
+    idx: usize,
+    fn_name: &str,
+) -> Result<Option<&'a Closure>, MError> {
+    match args.get(idx) {
+        Some(Value::Null) | None => Ok(None),
+        Some(Value::Function(c)) => Ok(Some(c)),
+        Some(other) => Err(MError::Other(format!(
+            "{fn_name}: equationCriteria as {} not yet supported (function only)",
+            super::super::type_name(other),
+        ))),
+    }
+}
+
+/// Compare a table row against a needle Record. With no criteria, uses
+/// `row_matches_record` (default per-field primitive equality). With a
+/// function criteria, materialises the row as a record and invokes
+/// `f(row, needle)` for a logical result.
+fn row_matches_with_criteria(
+    table: &Table,
+    row: usize,
+    needle: &Record,
+    criteria: Option<&Closure>,
+) -> Result<bool, MError> {
+    match criteria {
+        None => row_matches_record(table, row, needle),
+        Some(f) => {
+            let row_rec = row_to_record(table, row)?;
+            let needle_v = Value::Record(needle.clone());
+            let r = invoke_builtin_callback(f, vec![row_rec, needle_v])?;
+            match r {
+                Value::Logical(b) => Ok(b),
+                other => Err(type_mismatch("logical (from equationCriteria)", &other)),
+            }
+        }
+    }
+}
+
 fn contains(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let needle = match &args[1] {
         Value::Record(r) => r,
         other => return Err(type_mismatch("record", other)),
     };
-    if !matches!(args.get(2), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented(
-            "Table.Contains: equationCriteria not yet supported",
-        ));
-    }
+    let criteria = table_equation_criteria_fn(args, 2, "Table.Contains")?;
     for row in 0..table.num_rows() {
-        if row_matches_record(&table, row, needle)? {
+        if row_matches_with_criteria(&table, row, needle, criteria)? {
             return Ok(Value::Logical(true));
         }
     }
@@ -3319,11 +3359,7 @@ fn contains(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 fn contains_all(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let needles = expect_list(&args[1])?;
-    if !matches!(args.get(2), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented(
-            "Table.ContainsAll: equationCriteria not yet supported",
-        ));
-    }
+    let criteria = table_equation_criteria_fn(args, 2, "Table.ContainsAll")?;
     for n in needles {
         let needle = match n {
             Value::Record(r) => r,
@@ -3331,7 +3367,7 @@ fn contains_all(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         };
         let mut found = false;
         for row in 0..table.num_rows() {
-            if row_matches_record(&table, row, needle)? {
+            if row_matches_with_criteria(&table, row, needle, criteria)? {
                 found = true;
                 break;
             }
@@ -3346,18 +3382,14 @@ fn contains_all(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 fn contains_any(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let needles = expect_list(&args[1])?;
-    if !matches!(args.get(2), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented(
-            "Table.ContainsAny: equationCriteria not yet supported",
-        ));
-    }
+    let criteria = table_equation_criteria_fn(args, 2, "Table.ContainsAny")?;
     for n in needles {
         let needle = match n {
             Value::Record(r) => r,
             other => return Err(type_mismatch("record (in list)", other)),
         };
         for row in 0..table.num_rows() {
-            if row_matches_record(&table, row, needle)? {
+            if row_matches_with_criteria(&table, row, needle, criteria)? {
                 return Ok(Value::Logical(true));
             }
         }
