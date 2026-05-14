@@ -1415,6 +1415,46 @@ let
             in
                 if r[HasError]
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        // q266-q270: Json.FromValue handling of function-typed values.
+
+        SafeSerialize("q266", () =>
+            let r = try Text.FromBinary(Json.FromValue([a=1, b=2]), TextEncoding.Utf8) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q267", () =>
+            let r = try Text.FromBinary(
+                Json.FromValue([a=1, f=(x) => x+1]),
+                TextEncoding.Utf8) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q268", () =>
+            let r = try Text.FromBinary(
+                Json.FromValue({1, (x) => x*2, 3}),
+                TextEncoding.Utf8) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q269", () =>
+            let r = try Text.FromBinary(
+                Json.FromValue((x) => x),
+                TextEncoding.Utf8) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q270", () =>
+            let r = try Text.FromBinary(
+                Json.FromValue([Name="x", Compute=(n) => n+1]),
+                TextEncoding.Utf8) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                     else [HasError=false, Value=r[Value]])
     },
 
