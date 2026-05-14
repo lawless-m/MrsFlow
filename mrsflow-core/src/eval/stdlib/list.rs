@@ -605,10 +605,57 @@ fn last(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 
 fn sort(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
-    if !matches!(args.get(1), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented(
-            "List.Sort: comparisonCriteria not yet supported",
-        ));
+    // comparisonCriteria (arg 1): function `(x, y) => number` where
+    // negative=less, 0=equal, positive=greater. PQ also supports a
+    // field-selector form for records and a numeric direction shorthand;
+    // those land separately when the corpus needs them.
+    if let Some(v) = args.get(1) {
+        match v {
+            Value::Null => {}
+            Value::Function(f) => {
+                // Use an error slot so the fallible callback can propagate
+                // out of the infallible sort_by closure.
+                let mut out: Vec<Value> = list.clone();
+                let mut sort_err: Option<MError> = None;
+                out.sort_by(|a, b| {
+                    if sort_err.is_some() {
+                        return std::cmp::Ordering::Equal;
+                    }
+                    match invoke_builtin_callback(f, vec![a.clone(), b.clone()]) {
+                        Ok(Value::Number(n)) => {
+                            if n < 0.0 {
+                                std::cmp::Ordering::Less
+                            } else if n > 0.0 {
+                                std::cmp::Ordering::Greater
+                            } else {
+                                std::cmp::Ordering::Equal
+                            }
+                        }
+                        Ok(other) => {
+                            sort_err = Some(MError::Other(format!(
+                                "List.Sort: comparisonCriteria must return a number, got {}",
+                                super::super::type_name(&other),
+                            )));
+                            std::cmp::Ordering::Equal
+                        }
+                        Err(e) => {
+                            sort_err = Some(e);
+                            std::cmp::Ordering::Equal
+                        }
+                    }
+                });
+                if let Some(e) = sort_err {
+                    return Err(e);
+                }
+                return Ok(Value::List(out));
+            }
+            other => {
+                return Err(MError::Other(format!(
+                    "List.Sort: comparisonCriteria as {} not yet supported (function only)",
+                    super::super::type_name(other),
+                )));
+            }
+        }
     }
     enum Kind { Empty, Num, Text }
     let mut kind = Kind::Empty;
