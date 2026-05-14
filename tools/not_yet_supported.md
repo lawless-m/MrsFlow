@@ -43,7 +43,7 @@ equality / natural ordering. Implementing requires a callback path.
 - ✅ `Table.RemoveMatchingRows` / `ReplaceMatchingRows`
 - ✅ `Value.Equals`
 
-## Predicate-form arguments (8)
+## Predicate-form arguments — DONE
 
 The Nth-item form (`(table, 5)`) works; the predicate form
 (`(table, each [x] > 10)` — take-while or skip-while) is unimplemented.
