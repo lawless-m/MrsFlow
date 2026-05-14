@@ -780,7 +780,110 @@ let
             in
                 if r[HasError]
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
-                    else [HasError=false, Value=r[Value]])
+                    else [HasError=false, Value=r[Value]]),
+
+        // q154-q175: focused-coverage probes across uncharted territory.
+
+        // --- Number.ToText format strings (q154-q159) ---
+
+        SafeSerialize("q154", () => Number.ToText(3.14159, "F2")),
+        SafeSerialize("q155", () => Number.ToText(1234567, "N0")),
+        SafeSerialize("q156", () => Number.ToText(0.123, "P1")),
+        SafeSerialize("q157", () => Number.ToText(1234.5, "E2")),
+        SafeSerialize("q158", () => Number.ToText(42, "D5")),
+        SafeSerialize("q159", () =>
+            let r = try Number.ToText(99.5, "C") in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        // --- DateTime/Time.ToText format strings (q160-q162) ---
+
+        SafeSerialize("q160", () =>
+            DateTime.ToText(#datetime(2026,6,15,14,30,45), "yyyy-MM-ddTHH:mm:ss")),
+
+        SafeSerialize("q161", () =>
+            let r = try DateTime.ToText(#datetime(2026,6,15,14,30,45), "g") in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q162", () =>
+            let r = try Time.ToText(#time(14,30,0), "hh:mm tt") in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        // --- List.Accumulate (q163-q165) ---
+
+        SafeSerialize("q163", () =>
+            List.Accumulate({1,2,3,4,5}, 0, (state, current) => state + current)),
+
+        SafeSerialize("q164", () =>
+            List.Accumulate({"a","b","c"}, {}, (state, current) => state & {current})),
+
+        SafeSerialize("q165", () =>
+            List.Accumulate({}, 42, (state, current) => state + current)),
+
+        // --- Table.ReplaceValue (q166-q168) ---
+
+        SafeSerialize("q166", () =>
+            Table.ReplaceValue(
+                #table({"v"}, {{1},{2},{1}}),
+                1,
+                99,
+                Replacer.ReplaceValue,
+                {"v"})),
+
+        SafeSerialize("q167", () =>
+            Table.ReplaceValue(
+                #table({"s"}, {{"foo bar"},{"baz foo"}}),
+                "foo",
+                "FOO",
+                Replacer.ReplaceText,
+                {"s"})),
+
+        SafeSerialize("q168", () =>
+            Table.ReplaceValue(
+                #table({"v"}, {{1},{2}}),
+                99,
+                "NEVER",
+                Replacer.ReplaceValue,
+                {"v"})),
+
+        // --- Operator type coercion (q169-q173) ---
+
+        SafeSerialize("q169", () =>
+            let r = try 1 + "2" in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q170", () =>
+            let r = try null + 1 in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q171", () =>
+            #date(2026,12,31) - #date(2026,1,1)),
+
+        SafeSerialize("q172", () => "hello" & " " & "world"),
+
+        SafeSerialize("q173", () =>
+            let r = try "n=" & 42 in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        // --- Exotic splitters (q174-q175) ---
+
+        SafeSerialize("q174", () =>
+            Splitter.SplitTextByCharacterTransition(
+                {"a".."z"}, {"0".."9"})("abc123def456")),
+
+        SafeSerialize("q175", () =>
+            Splitter.SplitTextByRepeatedLengths(2)("abcdefgh"))
     },
 
     Catalog = Table.FromRecords(cases)
