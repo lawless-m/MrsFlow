@@ -1,0 +1,1 @@
+(table ((cols ("k" "x" "y")) (rows (((num 1.0) (text "hello") (text "world"))))))

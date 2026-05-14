@@ -127,7 +127,84 @@ let
                         {[Name="NISAINT_CS",Kind="Database"]}[Data]
                         {[Name="RIGeographic",Kind="Table"]}[Data],
                     each [RITerritoryCode] = "GB"),
-                {"RITerritoryDesc"}))
+                {"RITerritoryDesc"})),
+
+        // q16-q29: top-13 unexercised stdlib functions by corpus call
+        // frequency. Each case is the smallest one-liner that
+        // exercises the function's documented happy-path.
+
+        // q16: Table.RenameColumns — bulk rename.
+        SafeSerialize("q16", () =>
+            Table.RenameColumns(
+                #table({"A","B"}, {{1,2}}),
+                {{"A","X"},{"B","Y"}})),
+
+        // q17: Table.RemoveColumns — drop one.
+        SafeSerialize("q17", () =>
+            Table.RemoveColumns(
+                #table({"A","B","C"}, {{1,2,3}}),
+                {"B"})),
+
+        // q18: Table.TransformColumnTypes — coerce text to Int64.
+        SafeSerialize("q18", () =>
+            Table.TransformColumnTypes(
+                #table({"N"}, {{"42"}}),
+                {{"N", Int64.Type}})),
+
+        // q19: Table.AddColumn — derived column via `each`.
+        SafeSerialize("q19", () =>
+            Table.AddColumn(
+                #table({"A"}, {{10}}),
+                "B",
+                each [A] * 2)),
+
+        // q20: Text.Replace — substring substitution.
+        SafeSerialize("q20", () =>
+            Text.Replace("hello world", "world", "there")),
+
+        // q21: List.Transform — map a function over a list.
+        SafeSerialize("q21", () =>
+            List.Transform({1,2,3}, each _ * 10)),
+
+        // q22: Table.ColumnNames — returns a list of text.
+        SafeSerialize("q22", () =>
+            Table.ColumnNames(#table({"A","B","C"}, {{1,2,3}}))),
+
+        // q23: Json.Document — parse a JSON array literal.
+        SafeSerialize("q23", () =>
+            Json.Document("[1,2,3]")),
+
+        // q24: Table.FromRows — rows + column names → table.
+        SafeSerialize("q24", () =>
+            Table.FromRows({{1,2},{3,4}}, {"A","B"})),
+
+        // q25: Text.Contains — substring presence test.
+        SafeSerialize("q25", () =>
+            Text.Contains("hello world", "world")),
+
+        // q26: Table.TransformColumns — per-column transform with type.
+        SafeSerialize("q26", () =>
+            Table.TransformColumns(
+                #table({"A"}, {{5}}),
+                {{"A", each _ + 1, Int64.Type}})),
+
+        // q27: Text.From — convert a number to its text rendering.
+        SafeSerialize("q27", () => Text.From(42)),
+
+        // q28: Table.ExpandTableColumn — flatten a NestedJoin result.
+        SafeSerialize("q28", () =>
+            let
+                a = #table({"k","x"}, {{1,"hello"}}),
+                b = #table({"k","y"}, {{1,"world"}}),
+                j = Table.NestedJoin(a, {"k"}, b, {"k"}, "right", JoinKind.LeftOuter)
+            in
+                Table.ExpandTableColumn(j, "right", {"y"})),
+
+        // q29: Table.Combine — vertical concat of same-schema tables.
+        SafeSerialize("q29", () =>
+            Table.Combine({
+                #table({"A"}, {{1}}),
+                #table({"A"}, {{2}})}))
     },
 
     Catalog = Table.FromRecords(cases)
