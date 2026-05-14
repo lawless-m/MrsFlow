@@ -188,10 +188,12 @@ fn replace_type(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 
 fn from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let s = expect_text(&args[0])?.trim();
-    if !matches!(args.get(1), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented(
-            "Value.FromText: culture argument not yet supported",
-        ));
+    // Culture is accepted-and-ignored: mrsflow's number/literal parsing
+    // is en-US-ish (dot decimal, no thousands sep) regardless. Only a
+    // text culture is accepted; anything else errors.
+    match args.get(1) {
+        None | Some(Value::Null) | Some(Value::Text(_)) => {}
+        Some(other) => return Err(type_mismatch("text (culture) or null", other)),
     }
     if s.eq_ignore_ascii_case("null") {
         return Ok(Value::Null);

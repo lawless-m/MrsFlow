@@ -99,7 +99,7 @@ Smaller per-function options, lower aggregate impact.
 - `Table.Profile` (additionalAggregates)
 - `Table.SplitColumn` (default + extraValues)
 - `Table.TransformColumnNames` (options)
-- `Value.FromText` (culture)
+- ✅ `Value.FromText` (culture — accepted-and-ignored)
 - `List.Percentile` (options)
 - `List.Random` (seed)
 - `unsupported cell type` (internal — Arrow encode path)
