@@ -315,6 +315,30 @@ pub fn evaluate(ast: &Expr, env: &Env, host: &dyn IoHost) -> Result<Value, MErro
         } => {
             let t = evaluate(target, env, host)?;
             let t = force(t, &mut |e, env| evaluate(e, env, host))?;
+            // Table column-as-list access: `t[col]` returns the column's
+            // values as a list. Matches PQ's `table[col]` shorthand and
+            // is the idiom Table.Group aggregators use (each List.Sum([v])).
+            if let Value::Table(table) = &t {
+                let names = table.column_names();
+                let col_idx = names.iter().position(|n| n == field);
+                return match col_idx {
+                    Some(i) => {
+                        let n_rows = table.num_rows();
+                        let mut out: Vec<Value> = Vec::with_capacity(n_rows);
+                        for r in 0..n_rows {
+                            out.push(stdlib::table::cell_to_value(table, i, r)?);
+                        }
+                        Ok(Value::List(out))
+                    }
+                    None => {
+                        if *optional {
+                            Ok(Value::Null)
+                        } else {
+                            Err(MError::Other(format!("column not found: {field}")))
+                        }
+                    }
+                };
+            }
             let record = match t {
                 Value::Record(r) => r,
                 other => {

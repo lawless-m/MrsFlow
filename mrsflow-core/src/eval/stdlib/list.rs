@@ -96,7 +96,14 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
             last_n,
         ),
         ("List.Skip", two("list", "countOrCondition"), skip),
-        ("List.Distinct", one("list"), distinct),
+        (
+            "List.Distinct",
+            vec![
+                Param { name: "list".into(),             optional: false, type_annotation: None },
+                Param { name: "equationCriteria".into(), optional: true,  type_annotation: None },
+            ],
+            distinct,
+        ),
         (
             "List.Sort",
             vec![
@@ -825,11 +832,12 @@ fn remove_matching_items(args: &[Value], _host: &dyn IoHost) -> Result<Value, ME
 
 fn distinct(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
+    let criteria = equation_criteria_fn(args, 1, "List.Distinct")?;
     let mut out: Vec<Value> = Vec::with_capacity(list.len());
     for v in list {
         let mut seen = false;
         for kept in &out {
-            if values_equal_primitive(kept, v)? {
+            if eq_via_criteria(kept, v, criteria)? {
                 seen = true;
                 break;
             }
