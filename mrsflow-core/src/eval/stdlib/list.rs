@@ -802,27 +802,64 @@ fn accumulate(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
 fn contains(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     let target = &args[1];
-    if !matches!(args.get(2), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented("List.Contains: equationCriteria not yet supported"));
-    }
+    // equationCriteria (arg 2): null/missing → default primitive equality.
+    // Function `(x, y) => logical` → call per pair and use its boolean.
+    // Other shapes (records, numbers for case-folding text comparison)
+    // aren't supported yet.
+    let criteria = equation_criteria_fn(args, 2, "List.Contains")?;
     for v in list {
-        if values_equal_primitive(v, target)? {
+        if eq_via_criteria(v, target, criteria)? {
             return Ok(Value::Logical(true));
         }
     }
     Ok(Value::Logical(false))
 }
 
+/// Extract an optional equationCriteria function arg. `Null`/missing →
+/// `None` (caller falls back to primitive equality). `Function` → `Some(_)`.
+/// Other shapes are not yet supported.
+fn equation_criteria_fn<'a>(
+    args: &'a [Value],
+    idx: usize,
+    fn_name: &str,
+) -> Result<Option<&'a Closure>, MError> {
+    match args.get(idx) {
+        Some(Value::Null) | None => Ok(None),
+        Some(Value::Function(c)) => Ok(Some(c)),
+        Some(other) => Err(MError::Other(format!(
+            "{fn_name}: equationCriteria as {} not yet supported (function only)",
+            super::super::type_name(other),
+        ))),
+    }
+}
+
+/// Compare two values via the optional equationCriteria function — fall
+/// back to primitive equality when `criteria` is `None`.
+fn eq_via_criteria(
+    a: &Value,
+    b: &Value,
+    criteria: Option<&Closure>,
+) -> Result<bool, MError> {
+    match criteria {
+        None => values_equal_primitive(a, b),
+        Some(f) => {
+            let r = invoke_builtin_callback(f, vec![a.clone(), b.clone()])?;
+            match r {
+                Value::Logical(b) => Ok(b),
+                other => Err(type_mismatch("logical (from equationCriteria)", &other)),
+            }
+        }
+    }
+}
+
 fn contains_all(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     let values = expect_list(&args[1])?;
-    if !matches!(args.get(2), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented("List.ContainsAll: equationCriteria not yet supported"));
-    }
+    let criteria = equation_criteria_fn(args, 2, "List.ContainsAll")?;
     for v in values {
         let mut found = false;
         for x in list {
-            if values_equal_primitive(x, v)? { found = true; break; }
+            if eq_via_criteria(x, v, criteria)? { found = true; break; }
         }
         if !found { return Ok(Value::Logical(false)); }
     }
@@ -832,12 +869,10 @@ fn contains_all(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 fn contains_any(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     let values = expect_list(&args[1])?;
-    if !matches!(args.get(2), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented("List.ContainsAny: equationCriteria not yet supported"));
-    }
+    let criteria = equation_criteria_fn(args, 2, "List.ContainsAny")?;
     for v in values {
         for x in list {
-            if values_equal_primitive(x, v)? { return Ok(Value::Logical(true)); }
+            if eq_via_criteria(x, v, criteria)? { return Ok(Value::Logical(true)); }
         }
     }
     Ok(Value::Logical(false))
