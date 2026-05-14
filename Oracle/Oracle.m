@@ -1471,7 +1471,35 @@ let
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                     else [HasError=false, Value=r[Value]]),
 
-        SafeSerialize("q275", () => Text.From(123456789012345))
+        SafeSerialize("q275", () => Text.From(123456789012345)),
+
+        // q276-q280: Number arithmetic — Decimal vs Number.
+
+        SafeSerialize("q276", () => 0.1 + 0.2),
+
+        SafeSerialize("q277", () =>
+            let r = try Decimal.From(0.1) + Decimal.From(0.2) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q278", () =>
+            let r = try Number.IsNaN(Number.NaN) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q279", () =>
+            let r = try Number.IsOdd(7) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q280", () =>
+            let r = try Decimal.From("0.1") * 3 in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]])
     },
 
     Catalog = Table.FromRecords(cases)
