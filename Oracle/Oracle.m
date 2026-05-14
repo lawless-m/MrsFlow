@@ -1499,7 +1499,28 @@ let
             let r = try Decimal.From("0.1") * 3 in
                 if r[HasError]
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
-                    else [HasError=false, Value=r[Value]])
+                    else [HasError=false, Value=r[Value]]),
+
+        // q281-q285: List.Generate loop semantics.
+
+        SafeSerialize("q281", () =>
+            List.Generate(() => 1, each _ <= 5, each _ + 1)),
+
+        SafeSerialize("q282", () =>
+            List.Generate(() => 0, each _ < 0, each _ + 1)),
+
+        SafeSerialize("q283", () =>
+            List.Generate(() => 1, each _ <= 3, each _ + 1, each _ * 10)),
+
+        SafeSerialize("q284", () =>
+            List.Generate(
+                () => [i=0, total=0],
+                each [i] < 4,
+                each [i=[i]+1, total=[total]+[i]+1],
+                each [total])),
+
+        SafeSerialize("q285", () =>
+            List.Generate(() => 5, each _ = 5, each _ + 1))
     },
 
     Catalog = Table.FromRecords(cases)
