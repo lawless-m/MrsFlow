@@ -947,7 +947,10 @@ fn materialise_expand_view(ev: &ExpandViewState) -> Result<Table, MError> {
         }
     }
 
-    Ok(Table::from_rows(out_names, out_rows))
+    // Prefer Arrow encoding when every column is uniformly typed —
+    // expand results often *are*, and Rows-backed tables can't be written
+    // to Parquet. Genuinely mixed columns fall back to Rows naturally.
+    super::stdlib::table::values_to_table(&out_names, &out_rows)
 }
 
 /// Materialise a `JoinView` into a `Rows`-backed Table — byte-identical
