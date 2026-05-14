@@ -51,11 +51,15 @@ The Nth-item form (`(table, 5)`) works; the predicate form
 - ✅ `List.FirstN` / `LastN` / `Skip` / `RemoveFirstN` / `RemoveLastN`
 - ✅ `Table.FirstN` / `LastN` / `Skip`
 
-## quoteStyle / startAtEnd flags (9)
+## quoteStyle / startAtEnd flags — 2 left (positions/ranges-from-end)
 
 Splitter / Combiner options. `quoteStyle` is the same enum
 `Csv.Document` already honours (None / Csv); `startAtEnd` reverses
 the scan direction.
+
+The two unticked entries below need empirical PQ testing to confirm
+positions-from-end semantics — left for a later slice with Oracle
+support.
 
 - ✅ `Splitter.SplitTextByDelimiter`
 - ✅ `Splitter.SplitTextByAnyDelimiter`
@@ -64,7 +68,7 @@ the scan direction.
 - `Splitter.SplitTextByPositions`
 - `Splitter.SplitTextByRanges`
 - ✅ `Splitter.SplitTextByWhitespace`
-- `Combiner.CombineTextByDelimiter`
+- ✅ `Combiner.CombineTextByDelimiter`
 
 ## missingField option (5)
 

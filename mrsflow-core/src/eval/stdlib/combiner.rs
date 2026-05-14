@@ -104,13 +104,24 @@ fn combine_text_by_delimiter(args: &[Value], _host: &dyn IoHost) -> Result<Value
     if !matches!(&args[0], Value::Text(_)) {
         return Err(type_mismatch("text", &args[0]));
     }
-    if !matches!(args.get(1), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented(
-            "Combiner.CombineTextByDelimiter: quoteStyle not yet supported",
-        ));
-    }
+    let qs_n: i64 = match args.get(1) {
+        None | Some(Value::Null) => 0,
+        Some(Value::Number(n)) => {
+            let k = *n as i64;
+            if k != 0 && k != 1 {
+                return Err(MError::Other(format!(
+                    "Combiner.CombineTextByDelimiter: quoteStyle must be QuoteStyle.None (0) or QuoteStyle.Csv (1), got {k}"
+                )));
+            }
+            k
+        }
+        Some(other) => return Err(type_mismatch("number (QuoteStyle.*)", other)),
+    };
     Ok(make_combiner(
-        vec![("__delim".into(), args[0].clone())],
+        vec![
+            ("__delim".into(), args[0].clone()),
+            ("__qs".into(), Value::Number(qs_n as f64)),
+        ],
         combine_text_by_delimiter_impl,
     ))
 }
@@ -190,7 +201,39 @@ fn combine_text_by_ranges(args: &[Value], _host: &dyn IoHost) -> Result<Value, M
 fn combine_text_by_delimiter_impl(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let items = expect_text_list(&args[0], "Combiner.CombineTextByDelimiter")?;
     let delim = expect_text(&args[1])?;
-    Ok(Value::Text(items.join(delim)))
+    let qs_n = match &args[2] {
+        Value::Number(n) => *n as i64,
+        _ => 0,
+    };
+    if qs_n != 1 {
+        return Ok(Value::Text(items.join(delim)));
+    }
+    // Csv quoting: wrap a field in "..." if it contains the delimiter,
+    // a `"`, CR, or LF; double any embedded `"`.
+    let mut quoted: Vec<String> = Vec::with_capacity(items.len());
+    for item in &items {
+        let needs_quoting = (!delim.is_empty() && item.contains(delim))
+            || item.contains('"')
+            || item.contains('\n')
+            || item.contains('\r');
+        if needs_quoting {
+            let mut s = String::with_capacity(item.len() + 2);
+            s.push('"');
+            for c in item.chars() {
+                if c == '"' {
+                    s.push('"');
+                    s.push('"');
+                } else {
+                    s.push(c);
+                }
+            }
+            s.push('"');
+            quoted.push(s);
+        } else {
+            quoted.push(item.clone());
+        }
+    }
+    Ok(Value::Text(quoted.join(delim)))
 }
 
 fn combine_text_by_each_delimiter_impl(
