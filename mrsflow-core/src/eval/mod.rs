@@ -723,6 +723,35 @@ pub(crate) fn type_conforms(v: &Value, t: &TypeRep) -> bool {
     }
 }
 
+/// Type-subtype test: is type `a` a subtype of type `b`?
+///
+/// Used by `Type.Is` when the first argument is itself a type-value, the
+/// idiom PQ relies on for predicates like `each Type.Is(_, type number)`
+/// where `_` is bound to a column's type. v1 rules: equal types match,
+/// Any/AnyNonNull supertype the obvious things, and `T <: Nullable(T)`.
+/// Compound types (ListOf/RecordOf/etc.) use structural-equality fallback.
+pub(crate) fn type_is_subtype(a: &TypeRep, b: &TypeRep) -> bool {
+    // Anything is a subtype of Any.
+    if matches!(b, TypeRep::Any) {
+        return true;
+    }
+    // Identical types match (covers all primitive/compound cases via
+    // PartialEq).
+    if a == b {
+        return true;
+    }
+    // Non-null primitives are subtypes of AnyNonNull.
+    if matches!(b, TypeRep::AnyNonNull) {
+        return !matches!(a, TypeRep::Null | TypeRep::Any | TypeRep::Nullable(_));
+    }
+    // T <: Nullable(T) and T <: Nullable(U) when T <: U.
+    if let TypeRep::Nullable(inner) = b {
+        return type_is_subtype(a, inner);
+    }
+    // Otherwise no implicit subtyping.
+    false
+}
+
 /// Human-readable name of a TypeRep, used in error messages.
 pub(crate) fn type_rep_name(t: &TypeRep) -> String {
     match t {
@@ -1003,6 +1032,10 @@ fn values_equal(a: &Value, b: &Value) -> bool {
         // matches that exactly.
         (Value::Number(x), Value::Number(y)) => x == y,
         (Value::Text(x), Value::Text(y)) => x == y,
+        // Two type-values are equal when their TypeReps are structurally
+        // equal. (TypeRep derives PartialEq.) Lets `(type number) = (type
+        // number)` answer true, which `each _ = type number` idioms rely on.
+        (Value::Type(x), Value::Type(y)) => x == y,
         // Mismatched kinds are never equal in slice 1. Per spec there are
         // some allowed coercions; they land if/when the corpus needs them.
         _ => false,

@@ -69,7 +69,14 @@ fn expect_type(v: &Value) -> Result<&TypeRep, MError> {
 
 fn is(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let t = expect_type(&args[1])?;
-    Ok(Value::Logical(super::super::type_conforms(&args[0], t)))
+    // PQ idiom: when the value is itself a type-value, Type.Is performs
+    // a type-subtype check (e.g. `each Type.Is(_, type number)` where `_`
+    // is a column's type). Otherwise it's a value-vs-type conformance test.
+    let result = match &args[0] {
+        Value::Type(a) => super::super::type_is_subtype(a, t),
+        v => super::super::type_conforms(v, t),
+    };
+    Ok(Value::Logical(result))
 }
 
 fn is_nullable(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
