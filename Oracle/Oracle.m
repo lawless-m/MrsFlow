@@ -1171,7 +1171,30 @@ let
                 "next", each Date.AddDays([d], 1), type date)),
 
         SafeSerialize("q230", () =>
-            Table.AddColumn(#table({"A"}, {{10}}), "B", each [A] * 2))
+            Table.AddColumn(#table({"A"}, {{10}}), "B", each [A] * 2)),
+
+        // q231-q235: Record.AddField delayed flag.
+
+        SafeSerialize("q231", () =>
+            Record.AddField([a=1], "b", 99)),
+
+        SafeSerialize("q232", () =>
+            Record.AddField([a=1], "b", () => 99, true)),
+
+        SafeSerialize("q233", () =>
+            Record.AddField([a=1], "b", () => 99, true)[b]),
+
+        SafeSerialize("q234", () =>
+            let r = try Record.AddField([a=1], "bad", () => error "x", true) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q235", () =>
+            let r = try Record.AddField([a=1], "bad", () => error "x", true)[bad] in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]])
     },
 
     Catalog = Table.FromRecords(cases)
