@@ -501,18 +501,18 @@ fn remove_items(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 fn position_of(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     let target = &args[1];
-    if !matches!(args.get(2), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented(
-            "List.PositionOf: occurrence arg not yet supported",
-        ));
-    }
+    let mode = parse_occurrence(args.get(2), "List.PositionOf")?;
     let criteria = equation_criteria_fn(args, 3, "List.PositionOf")?;
+    let mut matches: Vec<usize> = Vec::new();
     for (i, v) in list.iter().enumerate() {
         if eq_via_criteria(v, target, criteria)? {
-            return Ok(Value::Number(i as f64));
+            matches.push(i);
+            if mode == Occurrence::First {
+                break;
+            }
         }
     }
-    Ok(Value::Number(-1.0))
+    Ok(occurrence_result(mode, &matches))
 }
 
 
@@ -923,6 +923,39 @@ fn equation_criteria_fn<'a>(
     }
 }
 
+/// Occurrence mode: First (default), Last, All. Used by PositionOf-family.
+#[derive(Copy, Clone, PartialEq)]
+enum Occurrence {
+    First,
+    Last,
+    All,
+}
+
+fn parse_occurrence(arg: Option<&Value>, fn_name: &str) -> Result<Occurrence, MError> {
+    match arg {
+        None | Some(Value::Null) => Ok(Occurrence::First),
+        Some(Value::Number(n)) => match *n as i64 {
+            0 => Ok(Occurrence::First),
+            1 => Ok(Occurrence::Last),
+            2 => Ok(Occurrence::All),
+            k => Err(MError::Other(format!(
+                "{fn_name}: occurrence must be Occurrence.First/Last/All (0/1/2), got {k}"
+            ))),
+        },
+        Some(other) => Err(type_mismatch("number (Occurrence.*)", other)),
+    }
+}
+
+/// Build the return value of a PositionOf-family scan according to the
+/// occurrence mode and the matches list (in encounter order).
+fn occurrence_result(mode: Occurrence, matches: &[usize]) -> Value {
+    match mode {
+        Occurrence::First => Value::Number(matches.first().copied().map(|i| i as f64).unwrap_or(-1.0)),
+        Occurrence::Last => Value::Number(matches.last().copied().map(|i| i as f64).unwrap_or(-1.0)),
+        Occurrence::All => Value::List(matches.iter().map(|&i| Value::Number(i as f64)).collect()),
+    }
+}
+
 /// Compare two values via the optional equationCriteria function — fall
 /// back to primitive equality when `criteria` is `None`.
 fn eq_via_criteria(
@@ -1025,18 +1058,21 @@ fn find_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 fn position_of_any(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     let values = expect_list(&args[1])?;
-    if !matches!(args.get(2), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented("List.PositionOfAny: occurrence not yet supported"));
-    }
+    let mode = parse_occurrence(args.get(2), "List.PositionOfAny")?;
     let criteria = equation_criteria_fn(args, 3, "List.PositionOfAny")?;
-    for (i, v) in list.iter().enumerate() {
+    let mut matches: Vec<usize> = Vec::new();
+    'outer: for (i, v) in list.iter().enumerate() {
         for t in values {
             if eq_via_criteria(v, t, criteria)? {
-                return Ok(Value::Number(i as f64));
+                matches.push(i);
+                if mode == Occurrence::First {
+                    break 'outer;
+                }
+                break;
             }
         }
     }
-    Ok(Value::Number(-1.0))
+    Ok(occurrence_result(mode, &matches))
 }
 
 fn positions(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
