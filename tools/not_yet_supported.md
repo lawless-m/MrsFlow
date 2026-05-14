@@ -39,7 +39,7 @@ equality / natural ordering. Implementing requires a callback path.
 - ✅ `Table.Contains` / `ContainsAll` / `ContainsAny`
 - ✅ `Table.Distinct` / `IsDistinct`
 - ✅ `Table.Group` (comparisonCriteria + groupKind)
-- `Table.PositionOf` / `PositionOfAny`
+- ✅ `Table.PositionOf` / `PositionOfAny` (equationCriteria only — occurrence still pending)
 - `Table.RemoveMatchingRows` / `ReplaceMatchingRows`
 - `Value.Equals`
 

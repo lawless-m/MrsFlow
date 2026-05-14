@@ -3508,13 +3508,9 @@ fn position_of(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             "Table.PositionOf: occurrence not yet supported",
         ));
     }
-    if !matches!(args.get(3), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented(
-            "Table.PositionOf: equationCriteria not yet supported",
-        ));
-    }
+    let criteria = table_equation_criteria_fn(args, 3, "Table.PositionOf")?;
     for row in 0..table.num_rows() {
-        if row_matches_record(&table, row, needle)? {
+        if row_matches_with_criteria(&table, row, needle, criteria)? {
             return Ok(Value::Number(row as f64));
         }
     }
@@ -3529,18 +3525,14 @@ fn position_of_any(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> 
             "Table.PositionOfAny: occurrence not yet supported",
         ));
     }
-    if !matches!(args.get(3), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented(
-            "Table.PositionOfAny: equationCriteria not yet supported",
-        ));
-    }
+    let criteria = table_equation_criteria_fn(args, 3, "Table.PositionOfAny")?;
     for row in 0..table.num_rows() {
         for n in needles_v {
             let needle = match n {
                 Value::Record(r) => r,
                 other => return Err(type_mismatch("record (in list)", other)),
             };
-            if row_matches_record(&table, row, needle)? {
+            if row_matches_with_criteria(&table, row, needle, criteria)? {
                 return Ok(Value::Number(row as f64));
             }
         }
