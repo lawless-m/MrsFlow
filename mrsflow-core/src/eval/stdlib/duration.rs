@@ -233,9 +233,21 @@ fn to_record(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 fn to_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     if matches!(args[0], Value::Null) { return Ok(Value::Null); }
     let d = extract_duration(&args[0], "Duration.ToText")?;
-    if !matches!(args.get(1), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented("Duration.ToText: format string not yet supported"));
+    let general = match args.get(1) {
+        None | Some(Value::Null) => true,
+        Some(Value::Text(fmt)) => {
+            let trimmed = fmt.trim();
+            matches!(trimmed, "G" | "g") || trimmed.is_empty()
+        }
+        Some(other) => return Err(type_mismatch("text (format)", other)),
+    };
+    if !general {
+        let Some(Value::Text(fmt)) = args.get(1) else { unreachable!() };
+        return Err(MError::Other(format!(
+            "Duration.ToText: format string {fmt:?} not yet supported (only G / no-format)"
+        )));
     }
+    let _ = args.get(2);
     let total_secs = d.num_seconds();
     let sign_str = if total_secs < 0 { "-" } else { "" };
     let abs = total_secs.abs();

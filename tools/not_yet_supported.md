@@ -21,7 +21,7 @@ error on others with the actual format string in the message.
 
 - ✅ `DateTime.ToText`
 - ✅ `DateTimeZone.ToText`
-- `Duration.ToText`
+- ✅ `Duration.ToText`
 - `Time.ToText`
 
 ## equationCriteria / comparisonCriteria (24)
