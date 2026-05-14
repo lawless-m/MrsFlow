@@ -1145,7 +1145,15 @@ let
             Duration.TotalSeconds(#duration(0,1,30,0))),
 
         SafeSerialize("q220", () =>
-            #duration(1,2,3,4))
+            #duration(1,2,3,4)),
+
+        // q221-q225: Date arithmetic edge cases.
+
+        SafeSerialize("q221", () => Date.AddMonths(#date(2026,1,31), 1)),
+        SafeSerialize("q222", () => Date.AddYears(#date(2024,2,29), 1)),
+        SafeSerialize("q223", () => Date.AddYears(#date(2024,2,29), 4)),
+        SafeSerialize("q224", () => Date.AddDays(#date(2026,1,1), -1)),
+        SafeSerialize("q225", () => Date.AddQuarters(#date(2026,1,15), 3))
     },
 
     Catalog = Table.FromRecords(cases)
