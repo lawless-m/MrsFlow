@@ -6053,18 +6053,19 @@ mod tests {
 
     #[test]
     fn comparer_ordinal_compares_text() {
+        // Comparer.Ordinal is itself a 2-arg comparer (matches PQ shape).
         // "a" < "b" → -1, "b" > "a" → 1, "a" == "a" → 0
-        assert_eq!(eval_number(r#"Comparer.Ordinal()("a", "b")"#), -1.0);
-        assert_eq!(eval_number(r#"Comparer.Ordinal()("b", "a")"#), 1.0);
-        assert_eq!(eval_number(r#"Comparer.Ordinal()("a", "a")"#), 0.0);
+        assert_eq!(eval_number(r#"Comparer.Ordinal("a", "b")"#), -1.0);
+        assert_eq!(eval_number(r#"Comparer.Ordinal("b", "a")"#), 1.0);
+        assert_eq!(eval_number(r#"Comparer.Ordinal("a", "a")"#), 0.0);
     }
 
     #[test]
     fn comparer_ordinal_ignore_case_folds() {
         // Case-insensitive: "ABC" == "abc"; with strict Ordinal they'd differ.
-        assert_eq!(eval_number(r#"Comparer.OrdinalIgnoreCase()("ABC", "abc")"#), 0.0);
+        assert_eq!(eval_number(r#"Comparer.OrdinalIgnoreCase("ABC", "abc")"#), 0.0);
         // Sanity-check that strict Ordinal disagrees.
-        assert_ne!(eval_number(r#"Comparer.Ordinal()("ABC", "abc")"#), 0.0);
+        assert_ne!(eval_number(r#"Comparer.Ordinal("ABC", "abc")"#), 0.0);
     }
 
     #[test]
@@ -7428,8 +7429,9 @@ mod tests {
     #[test]
     fn comparer_equals_wraps_comparer() {
         // Comparer.Equals returns true iff comparer(x,y) == 0.
-        assert!(eval_bool(r#"Comparer.Equals(Comparer.OrdinalIgnoreCase(), "ABC", "abc")"#));
-        assert!(!eval_bool(r#"Comparer.Equals(Comparer.Ordinal(), "ABC", "abc")"#));
+        // Comparer.* are passed bare (no parens) — matches PQ shape.
+        assert!(eval_bool(r#"Comparer.Equals(Comparer.OrdinalIgnoreCase, "ABC", "abc")"#));
+        assert!(!eval_bool(r#"Comparer.Equals(Comparer.Ordinal, "ABC", "abc")"#));
     }
 
     #[test]

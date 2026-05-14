@@ -3380,7 +3380,11 @@ fn row_matches_with_criteria(
             let r = invoke_builtin_callback(f, vec![row_rec, needle_v])?;
             match r {
                 Value::Logical(b) => Ok(b),
-                other => Err(type_mismatch("logical (from equationCriteria)", &other)),
+                Value::Number(n) => Ok(n == 0.0),
+                other => Err(type_mismatch(
+                    "logical or number (from equationCriteria)",
+                    &other,
+                )),
             }
         }
     }
@@ -3418,7 +3422,11 @@ fn rows_equal_with_criteria(
             let r = invoke_builtin_callback(f, vec![mk(a), mk(b)])?;
             match r {
                 Value::Logical(b) => Ok(b),
-                other => Err(type_mismatch("logical (from equationCriteria)", &other)),
+                Value::Number(n) => Ok(n == 0.0),
+                other => Err(type_mismatch(
+                    "logical or number (from equationCriteria)",
+                    &other,
+                )),
             }
         }
     }
@@ -4168,7 +4176,11 @@ fn materialised_row_matches_with_criteria(
             let r = invoke_builtin_callback(f, vec![row_rec, needle_v])?;
             match r {
                 Value::Logical(b) => Ok(b),
-                other => Err(type_mismatch("logical (from equationCriteria)", &other)),
+                Value::Number(n) => Ok(n == 0.0),
+                other => Err(type_mismatch(
+                    "logical or number (from equationCriteria)",
+                    &other,
+                )),
             }
         }
     }

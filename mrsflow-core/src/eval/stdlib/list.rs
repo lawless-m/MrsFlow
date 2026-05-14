@@ -975,9 +975,16 @@ fn eq_via_criteria(
         None => values_equal_primitive(a, b),
         Some(f) => {
             let r = invoke_builtin_callback(f, vec![a.clone(), b.clone()])?;
+            // Accept both shapes:
+            //   - logical (mrsflow's extension — user lambdas (a,b) => bool)
+            //   - number  (PQ's Comparer.* shape — -1|0|1, equal iff 0)
             match r {
                 Value::Logical(b) => Ok(b),
-                other => Err(type_mismatch("logical (from equationCriteria)", &other)),
+                Value::Number(n) => Ok(n == 0.0),
+                other => Err(type_mismatch(
+                    "logical or number (from equationCriteria)",
+                    &other,
+                )),
             }
         }
     }

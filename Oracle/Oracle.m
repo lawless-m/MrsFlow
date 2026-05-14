@@ -514,7 +514,42 @@ let
         SafeSerialize("q120", () =>
             Table.Profile(
                 #table({"n","s"}, {{1,"a"},{2,"b"},{3,"c"}}),
-                {{"Sum", each Type.Is(_, type number), each List.Sum(_)}}))
+                {{"Sum", each Type.Is(_, type number), each List.Sum(_)}})),
+
+        // q121-q127: PQ-canonical Comparer.* idioms. Real PQ accepts
+        // built-in comparers as the equationCriteria slot (passed bare,
+        // no parens — `Comparer.X` is itself a 2-arg comparer in PQ).
+        // Mrsflow now matches this shape and still also accepts our
+        // existing custom-lambda extension (verified by q80/q81/q83/etc).
+
+        // q121: List.Distinct with Comparer.OrdinalIgnoreCase.
+        SafeSerialize("q121", () =>
+            List.Distinct({"a","A","b","B","c"}, Comparer.OrdinalIgnoreCase)),
+
+        // q122: List.Contains with Comparer.OrdinalIgnoreCase.
+        SafeSerialize("q122", () =>
+            List.Contains({"Hello","World"}, "HELLO", Comparer.OrdinalIgnoreCase)),
+
+        // q123: List.PositionOf with Comparer.OrdinalIgnoreCase.
+        SafeSerialize("q123", () =>
+            List.PositionOf({"X","Y","z"}, "Z", Occurrence.First,
+                Comparer.OrdinalIgnoreCase)),
+
+        // q124: Comparer.Ordinal direct call returns -1 / 0 / 1.
+        SafeSerialize("q124", () =>
+            Comparer.Ordinal("abc", "abd")),
+
+        // q125: Comparer.OrdinalIgnoreCase direct call: case-fold to equal.
+        SafeSerialize("q125", () =>
+            Comparer.OrdinalIgnoreCase("ABC", "abc")),
+
+        // q126: Comparer.Equals helper folds the -1/0/1 result to logical.
+        SafeSerialize("q126", () =>
+            Comparer.Equals(Comparer.OrdinalIgnoreCase, "ABC", "abc")),
+
+        // q127: Comparer.FromCulture(_, true) is case-insensitive.
+        SafeSerialize("q127", () =>
+            List.Distinct({"a","A","b"}, Comparer.FromCulture("en-US", true)))
     },
 
     Catalog = Table.FromRecords(cases)

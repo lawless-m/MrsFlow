@@ -1,7 +1,16 @@
-//! `Comparer.*` factory + helper stdlib bindings.
+//! `Comparer.*` stdlib bindings.
 //!
-//! Factories return a 2-arg closure `(a, b) => -1 | 0 | 1`. `Comparer.Equals`
-//! is a 3-arg helper that wraps an existing comparer.
+//! Matches Power Query's shape: each `Comparer.*` IS a 2-arg comparer
+//! `(a, b) => -1 | 0 | 1`, not a 0-arg factory that returns one. Real
+//! PQ usage:
+//!
+//!   List.Distinct(xs, Comparer.OrdinalIgnoreCase)
+//!
+//! passes the function directly as the equationCriteria slot.
+//! `Comparer.FromCulture` is the one factory — it takes a culture and
+//! returns a comparer (since the resulting comparer is locale-derived).
+//! `Comparer.Equals` is a 3-arg helper that calls a comparer and tests
+//! the result against 0.
 
 #![allow(unused_imports)]
 
@@ -16,8 +25,24 @@ use super::common::{
 
 pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
     vec![
-        ("Comparer.Ordinal", vec![], ordinal),
-        ("Comparer.OrdinalIgnoreCase", vec![], ordinal_ignore_case),
+        // Comparer.* are themselves 2-arg comparers — apply directly
+        // with two values to get -1 | 0 | 1.
+        (
+            "Comparer.Ordinal",
+            vec![
+                Param { name: "a".into(), optional: false, type_annotation: None },
+                Param { name: "b".into(), optional: false, type_annotation: None },
+            ],
+            ordinal_impl,
+        ),
+        (
+            "Comparer.OrdinalIgnoreCase",
+            vec![
+                Param { name: "a".into(), optional: false, type_annotation: None },
+                Param { name: "b".into(), optional: false, type_annotation: None },
+            ],
+            ordinal_ignore_case_impl,
+        ),
         (
             "Comparer.FromCulture",
             vec![
@@ -38,41 +63,29 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
     ]
 }
 
-// --- Factories ---
-
-fn ordinal(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    Ok(make_comparer(ordinal_impl))
-}
-
-fn ordinal_ignore_case(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    Ok(make_comparer(ordinal_ignore_case_impl))
-}
+// --- Comparer.FromCulture — the one factory ---
 
 fn from_culture(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    // Culture arg is accepted (must be text) but ignored in v1.
+    // Culture arg is accepted (must be text) but ignored in v1 — we
+    // don't have locale tables. Falls back to Ordinal /
+    // OrdinalIgnoreCase depending on the ignoreCase flag.
     if !matches!(&args[0], Value::Text(_) | Value::Null) {
         return Err(type_mismatch("text (culture name)", &args[0]));
     }
     let ignore = matches!(args.get(1), Some(Value::Logical(true)));
-    if ignore {
-        Ok(make_comparer(ordinal_ignore_case_impl))
-    } else {
-        Ok(make_comparer(ordinal_impl))
-    }
-}
-
-fn make_comparer(impl_fn: BuiltinFn) -> Value {
-    Value::Function(Closure {
+    let impl_fn: BuiltinFn = if ignore { ordinal_ignore_case_impl } else { ordinal_impl };
+    Ok(Value::Function(Closure {
         params: vec![
             Param { name: "a".into(), optional: false, type_annotation: None },
             Param { name: "b".into(), optional: false, type_annotation: None },
         ],
         body: FnBody::Builtin(impl_fn),
         env: EnvNode::empty(),
-    })
+    }))
 }
 
-// --- Comparer impls ---
+// --- Comparer impls (called directly when Comparer.Ordinal /
+// Comparer.OrdinalIgnoreCase is invoked with two values) ---
 
 fn ordinal_impl(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let cmp = compare_ordinal(&args[0], &args[1])?;

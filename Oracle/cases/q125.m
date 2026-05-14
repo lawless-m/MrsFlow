@@ -1,0 +1,1 @@
+Comparer.OrdinalIgnoreCase("ABC", "abc")
