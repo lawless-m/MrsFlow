@@ -1455,7 +1455,23 @@ let
                 TextEncoding.Utf8) in
                 if r[HasError]
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
-                    else [HasError=false, Value=r[Value]])
+                    else [HasError=false, Value=r[Value]]),
+
+        // q271-q275: Text.From scalar coercion.
+
+        SafeSerialize("q271", () => Text.From(null)),
+
+        SafeSerialize("q272", () => Text.From(true)),
+
+        SafeSerialize("q273", () => Text.From(#date(2026,6,15))),
+
+        SafeSerialize("q274", () =>
+            let r = try Text.From({1,2,3}) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q275", () => Text.From(123456789012345))
     },
 
     Catalog = Table.FromRecords(cases)
