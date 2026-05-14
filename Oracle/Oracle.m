@@ -1210,7 +1210,38 @@ let
             in
                 if r[HasError]
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
-                    else [HasError=false, Value=r[Value]])
+                    else [HasError=false, Value=r[Value]]),
+
+        // q236-q240: Csv.Document encoding edge cases.
+
+        SafeSerialize("q236", () =>
+            Csv.Document(Text.ToBinary("a,b#(lf)1,2"))),
+
+        SafeSerialize("q237", () =>
+            let r = try Csv.Document(
+                Text.ToBinary("a,b#(lf)1,2"),
+                [Encoding=65001]) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q238", () =>
+            let r = try Csv.Document(
+                Text.ToBinary("a,b#(lf)1,2"),
+                [Encoding=1252]) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q239", () =>
+            let r = try Csv.Document(
+                Binary.Combine({#binary({0xEF,0xBB,0xBF}), Text.ToBinary("a,b#(lf)1,2")})) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q240", () =>
+            Csv.Document(Text.ToBinary("")))
     },
 
     Catalog = Table.FromRecords(cases)
