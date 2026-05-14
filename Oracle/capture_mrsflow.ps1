@@ -9,7 +9,10 @@ $casesDir = Join-Path $root 'cases'
 $oracleFile = Join-Path $root 'Oracle.m'
 $mrsflow = Join-Path (Split-Path $root) 'target\release\mrsflow.exe'
 
-$output = & $mrsflow $oracleFile --sexpr 2>&1 | Out-String
+# Only capture stdout; mrsflow writes diagnostic noise (e.g. the
+# Odbc.Query columnar-fallback notice) to stderr, which would break
+# the s-expression parser below if interleaved.
+$output = & $mrsflow $oracleFile --sexpr 2>$null | Out-String
 
 # Rows look like: ((text "qN") (text "<escaped-json>"))
 # Match the two (text ...) groups; the second's body is the Result.
