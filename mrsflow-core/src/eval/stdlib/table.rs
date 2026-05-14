@@ -5371,10 +5371,13 @@ fn filter_with_data_table(args: &[Value], _host: &dyn IoHost) -> Result<Value, M
 
 fn from_partitions(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let parts = expect_list(&args[0])?;
-    if !matches!(args.get(1), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented(
-            "Table.FromPartitions: columnInfo not yet supported",
-        ));
+    // columnInfo is accepted-and-ignored: mrsflow doesn't apply schema
+    // type annotations to row data (types are inferred at Arrow-encode
+    // time). A list of {Name, Type} records is the documented shape;
+    // we just validate it's a list (or null) and move on.
+    match args.get(1) {
+        None | Some(Value::Null) | Some(Value::List(_)) => {}
+        Some(other) => return Err(type_mismatch("list (columnInfo) or null", other)),
     }
     if parts.is_empty() {
         // No partitions → no rows, but we need column names. Return an
