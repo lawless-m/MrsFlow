@@ -927,7 +927,27 @@ fn odbc_query_impl(connection_string: &str, sql: &str) -> Result<Value, IoError>
         }));
         std::panic::set_hook(original_hook);
         match attempt {
-            Ok(result) => return result,
+            Ok(Ok(value)) => return Ok(value),
+            // Bind/setup errors (e.g. DuckDB's ODBC driver rejecting
+            // SQLSetStmtAttr; missing feature support in older drivers).
+            // The same blocklist + row-at-a-time fallback applies — these
+            // are driver-class incompatibilities, not transient errors.
+            Ok(Err(IoError::Other(msg)))
+                if msg.contains("Odbc.Query bind")
+                    || msg.contains("Odbc.Query cols")
+                    || msg.contains("SQLSetStmtAttr") =>
+            {
+                if let Ok(mut set) = columnar_blocklist().lock() {
+                    set.insert(connection_string.to_string());
+                }
+                eprintln!(
+                    "Odbc.Query: columnar setup failed for `{connection_string}`; \
+                     falling back to row-at-a-time. error: {msg}"
+                );
+            }
+            // Any other clean error (network down, SQL syntax, etc.) —
+            // pass through unchanged; row-at-a-time would error the same way.
+            Ok(Err(e)) => return Err(e),
             Err(panic_payload) => {
                 if let Ok(mut set) = columnar_blocklist().lock() {
                     set.insert(connection_string.to_string());
@@ -1233,7 +1253,17 @@ fn describe_columns<C: odbc_api::Cursor + odbc_api::ResultSetMetadata>(
         cursor
             .describe_col(col_idx as u16, &mut desc)
             .map_err(|e| IoError::Other(format!("Odbc.Query describe col {}: {}", col_idx, e)))?;
-        let name = desc.name_to_string().unwrap_or_else(|_| format!("col{col_idx}"));
+        // Some drivers (DuckDB at least) under-report name length via
+        // SQLDescribeCol — "sasource" comes back as "sas". Pull the name
+        // separately via SQLColAttribute(SQL_DESC_NAME), which has its
+        // own buffer and reads the full string. Falls back to the
+        // describe_col name if that errors.
+        let name = cursor
+            .col_name(col_idx as u16)
+            .ok()
+            .filter(|s| !s.is_empty())
+            .or_else(|| desc.name_to_string().ok())
+            .unwrap_or_else(|| format!("col{col_idx}"));
         let (arrow_dtype, buf_desc) = match desc.data_type {
             odbc_api::DataType::Integer | odbc_api::DataType::SmallInt
             | odbc_api::DataType::TinyInt | odbc_api::DataType::BigInt
