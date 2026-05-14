@@ -25,26 +25,85 @@ all primitive types (number/text/logical/date/datetime/duration/null/
 binary), arithmetic and comparison operators, the cycle detector, and
 identifier-named functions imported from input bindings.
 
-**Standard library** (~40 modules):
+**Standard library** — ~36 namespaces, ~600 callable functions.
+Numbers are bindings actually registered in `mrsflow-core/src/eval/stdlib/`.
 
-| Domain         | Functions (sample)                                                |
-| -------------- | ----------------------------------------------------------------- |
-| `Table.*`      | `SelectRows`, `SelectColumns`, `Sort`, `Group`, `NestedJoin`, `ExpandTableColumn`, `Pivot`, `RowCount`, `PromoteHeaders`, `FromRecords`, `ToRecords` |
-| `List.*`       | `Sum`, `Average`, `Count`, `Distinct`, `Contains`, `Transform`, `Select` |
-| `Record.*`     | `Field`, `FieldNames`, `AddField`, `RemoveFields`, `RenameFields` |
-| `Text.*`       | `From`, `Upper`/`Lower`, `Trim`, `Replace`, `Contains`, `Length`, `Split`, `ToBinary` |
-| `Number.*`     | `From`, `Round`, `Abs`, `ToText`                                  |
-| `Date.*`       | `From`, `Year`, `Month`, `AddDays`, `ToText` (custom + locale)    |
-| `Csv.*`        | `Document` with `Delimiter`/`QuoteStyle`                          |
-| `Json.*`       | `Document`, `FromValue`                                           |
-| `Binary.*`     | `ToText`/`FromText` with `BinaryEncoding.Base64`                  |
-| `Parquet.*`    | `Document` — lazy with predicate pushdown                         |
-| `Odbc.*`       | `DataSource` (flat + nested nav), `Query` — both fold-aware       |
-| `MySQL.*`      | `Database`, `Query` — native protocol, rustls TLS                 |
-| `PostgreSQL.*` | `Database`, `Query` — native protocol, rustls TLS, lossless NUMERIC |
-| `Xml.*`        | `Document`, `Tables`                                              |
-| `Html.*`       | `Table` — CSS-selector extraction                                 |
-| `Folder.*`     | `Contents`, `Files`                                               |
+*Tabular data:*
+
+| Namespace      | Fns | Examples                                                       |
+| -------------- | ---:| -------------------------------------------------------------- |
+| `Table.*`      | 114 | `SelectRows`, `SelectColumns`, `Sort`, `Group`, `NestedJoin`, `ExpandTableColumn`, `Pivot`, `RowCount`, `AddColumn`, `PromoteHeaders`, `FromRecords`, `ToRecords` |
+| `List.*`       |  72 | `Sum`, `Average`, `Count`, `Distinct`, `Transform`, `Select`, `Accumulate`, `Contains` |
+| `Record.*`     |  18 | `Field`, `FieldNames`, `AddField`, `RemoveFields`, `RenameFields`, `Combine` |
+
+*Scalars:*
+
+| Namespace      | Fns | Examples                                                       |
+| -------------- | ---:| -------------------------------------------------------------- |
+| `Text.*`       |  42 | `From`, `Upper`/`Lower`, `Trim`, `Replace`, `Contains`, `Length`, `Split`, `BeforeDelimiter`, `BetweenDelimiters` |
+| `Number.*`     |  41 | `From`, `Round`, `Abs`, `ToText`, full trig (`Sin`/`Cos`/`Atan`/…) |
+| `Binary.*`     |  18 | `ToText`/`FromText` with `BinaryEncoding`, `Compress`, `Buffer`, `Combine` |
+| `Logical.*`    |   4 | `From`, `FromText`, `ToText`, `Type`                           |
+
+*Temporal:*
+
+| Namespace          | Fns | Examples                                              |
+| ------------------ | ---:| ----------------------------------------------------- |
+| `Date.*`           |  58 | `AddDays`, `AddMonths`, `Year`, `ToText`, custom-format |
+| `DateTime.*`       |  26 | `From`, `FixedLocalNow`, `AddZone`, `ToText`           |
+| `DateTimeZone.*`   |  16 | `From`, `FixedUtcNow`, `FromFileTime`                  |
+| `Duration.*`       |  13 | `Days`, `Hours`, `FromText`, `ToText`                  |
+| `Time.*`           |  10 | `From`, `Hour`, `EndOfHour`, `ToText`                  |
+
+*Type system:*
+
+| Namespace      | Fns | Examples                                                       |
+| -------------- | ---:| -------------------------------------------------------------- |
+| `Value.*`      |  26 | `Compare`, `Equals`, `As`, `Type`, `FromText`                  |
+| `Type.*`       |  25 | `ForFunction`, `ClosedRecord`, `IsNullable`, `Facets`          |
+
+*Document parsing & serialisation:*
+
+| Namespace      | Fns | Notes                                                                  |
+| -------------- | ---:| ---------------------------------------------------------------------- |
+| `Json.*`       |   2 | `Document`, `FromValue`                                                |
+| `Csv.*`        |   1 | `Document` with `Delimiter`/`QuoteStyle`                               |
+| `Xml.*`        |   2 | `Document`, `Tables`                                                   |
+| `Html.*`       |   1 | `Table` — CSS-selector extraction                                      |
+| `Lines.*`      |   4 | `FromBinary`/`ToBinary`, `FromText`/`ToText`                           |
+
+*IO and database connectors:*
+
+| Namespace      | Fns | Notes                                                                  |
+| -------------- | ---:| ---------------------------------------------------------------------- |
+| `Parquet.*`    |   1 | `Document` — lazy, predicate pushdown                                  |
+| `Odbc.*`       |   3 | `DataSource` (flat + nested nav), `Query`, `InferOptions` — fold-aware |
+| `MySQL.*`      |   2 | `Database`, `Query` — native protocol, rustls TLS                      |
+| `PostgreSQL.*` |   2 | `Database`, `Query` — native protocol, rustls TLS, lossless NUMERIC    |
+| `Excel.*`      |   3 | `Workbook` (.xlsx parse), `CurrentWorkbook`, `ShapeTable`              |
+| `Web.*`        |   4 | `Contents`, `Headers`, `Page`, `BrowserContents`                       |
+| `File.*`       |   1 | `Contents`                                                             |
+| `Folder.*`     |   — | `Contents`, `Files`                                                    |
+
+*Combinators and meta:*
+
+| Namespace      | Fns | Examples                                                       |
+| -------------- | ---:| -------------------------------------------------------------- |
+| `Splitter.*`   |  10 | `SplitTextByDelimiter`, `SplitTextByCharacterTransition`       |
+| `Function.*`   |   7 | `Invoke`, `InvokeAfter`, `From`                                |
+| `Combiner.*`   |   5 | `CombineTextByDelimiter`, `CombineTextByLengths`               |
+| `Comparer.*`   |   4 | `Equals`, `Ordinal`, `OrdinalIgnoreCase`, `FromCulture`        |
+| `Uri.*`        |   4 | `Parts`, `BuildQueryString`, `EscapeDataString`, `Combine`     |
+| `Expression.*` |   3 | `Evaluate`, `Constant`, `Identifier`                           |
+| `Diagnostics.*`|   3 | `Trace`, `ActivityId`, `CorrelationId`                         |
+| `Replacer.*`   |   2 | `ReplaceText`, `ReplaceValue`                                  |
+| `Variable.*`   |   2 | `Value`, `ValueOrDefault`                                      |
+| `Error.*`      |   — | error-record helpers                                           |
+
+Enum-style tokens are also registered: `BinaryEncoding`, `TextEncoding`,
+`JoinKind`, `Order`, `QuoteStyle`, `TraceLevel`, `ExtraValues`,
+`Compression`, `Day`, plus type tokens (`Int64.Type`, `Decimal.Type`,
+`Currency.Type`, …).
 
 For the full surface, see
 [`mrsflow/stdlib-reference/`](mrsflow/stdlib-reference/) or run
@@ -195,16 +254,17 @@ against the real Excel oracle.
 ## What's deliberately out of scope
 
 - **No async in the evaluator.** All concurrency lives in the shell.
-- **No native CSV/JSON/Web.Contents.** Use ODBC against DuckDB if you
-  need CSV; use `Json.Document` for JSON parsing where unavoidable.
+  The evaluator is synchronous and pure; this keeps the WASM build
+  trivial and the test harness deterministic.
 - **No SQL injection guards on `*.Query` connectors.** `Odbc.Query`,
   `MySQL.Query`, `PostgreSQL.Query` take raw SQL strings — the M
-  layer trusts its caller.
+  layer trusts its caller. Escaping is the user's responsibility.
 - **No 100% M compatibility.** The goal is "the queries we actually
-  write, run correctly."
-- **No type-coercion machinery beyond what's required.** Parquet has
-  typed schemas, M operates on already-typed data, ODBC mapping is
-  handled directly.
+  write, run correctly." Microsoft-specific connectors
+  (`Salesforce.*`, `SharePoint.*`, etc.) and the corners of the M
+  spec that nobody uses in practice are skipped.
+- **No backwards-compatibility shims.** Pre-v1; renames and removals
+  are free. Don't depend on internal APIs.
 
 ## Design docs
 
