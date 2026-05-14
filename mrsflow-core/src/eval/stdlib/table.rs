@@ -2657,25 +2657,18 @@ fn pivot(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
 /// right-side key column is dropped.
 fn join(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table1 = expect_table(&args[0])?;
-    let key1 = match &args[1] {
-        Value::Text(s) => s.clone(),
-        Value::List(_) => {
-            return Err(MError::NotImplemented(
-                "Table.Join: composite keys (text-list form) not yet supported",
-            ));
-        }
-        other => return Err(type_mismatch("text", other)),
-    };
+    // key1/key2 can each be a single text or a list of texts (composite).
+    // Both forms route through parse_join_key_columns; counts must match.
+    let key1_cols = parse_join_key_columns(&args[1], "key1")?;
     let table2 = expect_table(&args[2])?;
-    let key2 = match &args[3] {
-        Value::Text(s) => s.clone(),
-        Value::List(_) => {
-            return Err(MError::NotImplemented(
-                "Table.Join: composite keys (text-list form) not yet supported",
-            ));
-        }
-        other => return Err(type_mismatch("text", other)),
-    };
+    let key2_cols = parse_join_key_columns(&args[3], "key2")?;
+    if key1_cols.len() != key2_cols.len() {
+        return Err(MError::Other(format!(
+            "Table.Join: key column counts differ — key1 has {}, key2 has {}",
+            key1_cols.len(),
+            key2_cols.len(),
+        )));
+    }
     // joinKind default for Table.Join is Inner (0); cf. NestedJoin which
     // defaults to LeftOuter.
     let join_kind = match args.get(4) {
@@ -2692,13 +2685,26 @@ fn join(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let (left_names, left_rows) = table_to_rows(&table1)?;
     let (right_names, right_rows) = table_to_rows(&table2)?;
 
-    let key1_idx = left_names.iter().position(|n| n == &key1).ok_or_else(|| {
-        MError::Other(format!("Table.Join: key1 column not found: {key1}"))
-    })?;
-    let key2_idx = right_names.iter().position(|n| n == &key2).ok_or_else(|| {
-        MError::Other(format!("Table.Join: key2 column not found: {key2}"))
-    })?;
-    let right_keep: Vec<usize> = (0..right_names.len()).filter(|i| *i != key2_idx).collect();
+    let key1_idxs: Vec<usize> = key1_cols
+        .iter()
+        .map(|k| {
+            left_names.iter().position(|n| n == k).ok_or_else(|| {
+                MError::Other(format!("Table.Join: key1 column not found: {k}"))
+            })
+        })
+        .collect::<Result<_, _>>()?;
+    let key2_idxs: Vec<usize> = key2_cols
+        .iter()
+        .map(|k| {
+            right_names.iter().position(|n| n == k).ok_or_else(|| {
+                MError::Other(format!("Table.Join: key2 column not found: {k}"))
+            })
+        })
+        .collect::<Result<_, _>>()?;
+    // Drop key2 columns from the right side of the output.
+    let right_keep: Vec<usize> = (0..right_names.len())
+        .filter(|i| !key2_idxs.contains(i))
+        .collect();
 
     let mut out_names: Vec<String> = left_names.clone();
     for &i in &right_keep {
@@ -2707,10 +2713,16 @@ fn join(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 
     let mut out_rows: Vec<Vec<Value>> = Vec::new();
     for left_row in &left_rows {
-        let lkey = &left_row[key1_idx];
         let mut any_match = false;
         for right_row in &right_rows {
-            if values_equal_primitive(lkey, &right_row[key2_idx])? {
+            let mut all_eq = true;
+            for (&li, &ri) in key1_idxs.iter().zip(key2_idxs.iter()) {
+                if !values_equal_primitive(&left_row[li], &right_row[ri])? {
+                    all_eq = false;
+                    break;
+                }
+            }
+            if all_eq {
                 let mut new_row = left_row.clone();
                 for &i in &right_keep {
                     new_row.push(right_row[i].clone());
