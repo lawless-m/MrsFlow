@@ -915,6 +915,39 @@ let
             let r = try Number.ToText(-1234.567, "F2") in
                 if r[HasError]
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        // q181-q185: DateTime/Date/Time/DateTimeZone.ToText format codes.
+
+        SafeSerialize("q181", () =>
+            let r = try Date.ToText(#date(2026,6,15), "d") in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q182", () =>
+            let r = try Date.ToText(#date(2026,6,15), "yyyy") in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q183", () =>
+            let r = try DateTime.ToText(#datetime(2026,6,15,14,30,45), "f") in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q184", () =>
+            let r = try DateTime.ToText(#datetime(2026,6,15,14,30,45), "O") in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q185", () =>
+            let r = try DateTimeZone.ToText(
+                #datetimezone(2026,6,15,14,30,45,1,0), "K") in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                     else [HasError=false, Value=r[Value]])
     },
 
