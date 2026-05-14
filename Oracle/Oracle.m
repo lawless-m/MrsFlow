@@ -1546,6 +1546,56 @@ let
             let r = try Record.Field(Record.Combine({[a=1], [a=2]}), "a") in
                 if r[HasError]
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        // q291-q295: Table.Schema + Table.ColumnsOfType.
+
+        SafeSerialize("q291", () =>
+            let r = try Table.Schema(
+                Table.TransformColumnTypes(
+                    #table({"n","s","b"}, {{1,"x",true}}),
+                    {{"n", Int64.Type}, {"s", type text}, {"b", type logical}}))
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q292", () =>
+            let r = try Table.RowCount(Table.Schema(
+                Table.TransformColumnTypes(
+                    #table({"n","s","b"}, {{1,"x",true}}),
+                    {{"n", Int64.Type}, {"s", type text}, {"b", type logical}})))
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q293", () =>
+            let r = try Table.ColumnsOfType(
+                Table.TransformColumnTypes(
+                    #table({"n","s"}, {{1,"x"}}),
+                    {{"n", Int64.Type}, {"s", type text}}),
+                {type number})
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q294", () =>
+            let r = try Table.ColumnsOfType(
+                Table.TransformColumnTypes(
+                    #table({"n","s","b"}, {{1,"x",true}}),
+                    {{"n", Int64.Type}, {"s", type text}, {"b", type logical}}),
+                {type number, type text})
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q295", () =>
+            let r = try Table.ColumnNames(Table.Schema(#table({"a","b"}, {{1,2}}))) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                     else [HasError=false, Value=r[Value]])
     },
 
