@@ -979,6 +979,38 @@ let
                 1, 99, Replacer.ReplaceValue, {"v"}) in
                 if r[HasError]
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        // q191-q195: Text.Format placeholder substitution.
+
+        SafeSerialize("q191", () =>
+            let r = try Text.Format("#{0} = #{1}", {"x", 42}) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q192", () =>
+            let r = try Text.Format("Hello, #{name}!", [name="world"]) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q193", () =>
+            let r = try Text.Format("#{0} and #{1}", {"only_one"}) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q194", () =>
+            let r = try Text.Format("value=#{0}", {3.14}) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q195", () =>
+            let r = try Text.Format("a##b#{0}c", {"x"}) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                     else [HasError=false, Value=r[Value]])
     },
 
