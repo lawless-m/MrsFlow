@@ -1,7 +1,36 @@
+// Oracle.m — one Power Query, one worksheet, two columns: Q | Result.
+//
+// Workflow:
+//   1. Open Oracle.xlsx. Replace the existing "Catalog" query (or
+//      create one) with this file's contents — paste into Advanced
+//      Editor.
+//   2. Load To… → Table on a single worksheet.
+//   3. QueryOracle.ps1 dumps that one sheet, no per-test tab juggling.
+//
+// Each row is one test. Bodies are wrapped in `SafeSerialize("qN",
+// () => <body>)` so that:
+//   - errors (cycles, type mismatches, missing DSN, …) come back as
+//     "ERROR: <message>" instead of halting the whole catalog,
+//   - scalars (text/number/logical/null) serialize as human-readable
+//     text,
+//   - everything else (tables, records, lists, binary, dates) goes
+//     through Json.FromValue → UTF-8 text. JSON divergence between
+//     PQ and mrsflow would manifest as every table-returning row
+//     failing identically — very loud, not a silent foot-gun.
+//
+// Adding a test = append one SafeSerialize line to `cases`.
+//
+// The same bodies live in Oracle/cases/qN.m for mrsflow-side
+// regeneration; keep them in sync.
+
 let
     Oracle.Serialize = (v as any) as text =>
         if v = null then "null"
         else if v is text then v
+        // Text.From over Number.ToText(v, "G", "en-US") — same result
+        // for integer-valued and decimal numbers, doesn't depend on the
+        // format-string overload of Number.ToText that mrsflow doesn't
+        // implement yet.
         else if v is number then Text.From(v)
         else if v is logical then (if v then "true" else "false")
         else Text.FromBinary(Json.FromValue(v), TextEncoding.Utf8),
@@ -14,9 +43,244 @@ let
                 then [Q = label, Result = "ERROR: " & r[Error][Message]]
                 else [Q = label, Result = Oracle.Serialize(r[Value])],
 
-    Catalog = Table.FromRecords({
-        SafeSerialize("q74", () =>  Table.Reverse(#table({"A"}, {{1},{2},{3}}))
-)
-    })
+    cases = {
+        // q1, q2: cycle detection cases ([X=X][X] and [a=b,b=a][a]).
+        // Power Query rejects these at *compile time* — `Name 'X' doesn't
+        // exist` — so they'd block the entire Catalog from loading rather
+        // than fail one row. mrsflow detects them at *evaluate time*
+        // (thunk re-entry). Different mechanism, same outcome on each
+        // engine. The qN.m files for q1/q2 stay under Oracle/cases/ for
+        // mrsflow-side regression; just not in the Catalog.
+
+        // q3: Date.ToText dd-MMM-yy.
+        SafeSerialize("q3", () =>
+            Date.ToText(#date(2026, 6, 15), "dd-MMM-yy")),
+
+        // q4: Date.ToText long English form — locale-dependent in PQ?
+        SafeSerialize("q4", () =>
+            Date.ToText(#date(2026, 1, 5), "dddd, MMMM d, yyyy")),
+
+        // q5: Date.ToText 2-digit year and zero-padded MM/dd.
+        SafeSerialize("q5", () =>
+            Date.ToText(#date(2026, 6, 5), "yy.MM.dd")),
+
+        // q6: Date.ToText unpadded M/d.
+        SafeSerialize("q6", () =>
+            Date.ToText(#date(2026, 6, 5), "M/d")),
+
+        // q7: Table.PromoteHeaders with PromoteAllScalars on heterogeneous
+        //     scalar header row.
+        SafeSerialize("q7", () =>
+            Table.PromoteHeaders(
+                #table({"A","B"}, {{1.5, true}, {"x", "y"}}),
+                [PromoteAllScalars=true])),
+
+        // q8: Text.ToBinary with the BinaryEncoding.Base64 quirk —
+        //     mrsflow keeps strict and errors; what does PQ do?
+        SafeSerialize("q8", () =>
+            Text.FromBinary(Text.ToBinary("hello", BinaryEncoding.Base64))),
+
+        // q9: Binary.ToText Base64 of UTF-8 "hello".
+        SafeSerialize("q9", () =>
+            Binary.ToText(Text.ToBinary("hello"), BinaryEncoding.Base64)),
+
+        // q10: Csv.Document QuoteStyle.None preserves literal quotes.
+        SafeSerialize("q10", () =>
+            Csv.Document(
+                Text.ToBinary("a,""b,c"",d"),
+                [Delimiter=",", QuoteStyle=QuoteStyle.None])),
+
+        // q11: Folder.Contents Attributes record on a known directory.
+        //      Linux mrsflow vs Windows PQ exposes a different attribute
+        //      set — divergence here is expected and informative.
+        SafeSerialize("q11", () =>
+            Folder.Contents("C:\Windows\System32"){0}[Attributes]),
+
+        // q12: Excel.CurrentWorkbook from inside the host workbook.
+        //      Includes every named cell + ListObject; the Catalog
+        //      table itself appears here on refresh #2 onwards.
+        SafeSerialize("q12", () => Excel.CurrentWorkbook()),
+
+        // q13: ODBC fold — column projection should push down to
+        //      `SELECT RITerritoryCode, RITerritoryDesc FROM RIGeographic`.
+        //      Semantics: 284 rows × 2 columns. Verified byte-for-byte
+        //      against Excel.
+        SafeSerialize("q13", () =>
+            Table.SelectColumns(
+                Odbc.DataSource("dsn=Exportmaster", [HierarchicalNavigation=true])
+                    {[Name="NISAINT_CS",Kind="Database"]}[Data]
+                    {[Name="RIGeographic",Kind="Table"]}[Data],
+                {"RITerritoryCode", "RITerritoryDesc"})),
+
+        // q14: ODBC fold — row predicate should push down to
+        //      `SELECT * FROM RIGeographic WHERE RITerritoryCode = 'GB'`.
+        SafeSerialize("q14", () =>
+            Table.SelectRows(
+                Odbc.DataSource("dsn=Exportmaster", [HierarchicalNavigation=true])
+                    {[Name="NISAINT_CS",Kind="Database"]}[Data]
+                    {[Name="RIGeographic",Kind="Table"]}[Data],
+                each [RITerritoryCode] = "GB")),
+
+        // q15: ODBC fold — combined projection + predicate.
+        //      `SELECT RITerritoryDesc FROM RIGeographic
+        //           WHERE RITerritoryCode = 'GB'`.
+        SafeSerialize("q15", () =>
+            Table.SelectColumns(
+                Table.SelectRows(
+                    Odbc.DataSource("dsn=Exportmaster", [HierarchicalNavigation=true])
+                        {[Name="NISAINT_CS",Kind="Database"]}[Data]
+                        {[Name="RIGeographic",Kind="Table"]}[Data],
+                    each [RITerritoryCode] = "GB"),
+                {"RITerritoryDesc"})),
+
+        // q16-q29: top-13 unexercised stdlib functions by corpus call
+        // frequency. Each case is the smallest one-liner that
+        // exercises the function's documented happy-path.
+
+        // q16: Table.RenameColumns — bulk rename.
+        SafeSerialize("q16", () =>
+            Table.RenameColumns(
+                #table({"A","B"}, {{1,2}}),
+                {{"A","X"},{"B","Y"}})),
+
+        // q17: Table.RemoveColumns — drop one.
+        SafeSerialize("q17", () =>
+            Table.RemoveColumns(
+                #table({"A","B","C"}, {{1,2,3}}),
+                {"B"})),
+
+        // q18: Table.TransformColumnTypes — coerce text to Int64.
+        SafeSerialize("q18", () =>
+            Table.TransformColumnTypes(
+                #table({"N"}, {{"42"}}),
+                {{"N", Int64.Type}})),
+
+        // q19: Table.AddColumn — derived column via `each`.
+        SafeSerialize("q19", () =>
+            Table.AddColumn(
+                #table({"A"}, {{10}}),
+                "B",
+                each [A] * 2)),
+
+        // q20: Text.Replace — substring substitution.
+        SafeSerialize("q20", () =>
+            Text.Replace("hello world", "world", "there")),
+
+        // q21: List.Transform — map a function over a list.
+        SafeSerialize("q21", () =>
+            List.Transform({1,2,3}, each _ * 10)),
+
+        // q22: Table.ColumnNames — returns a list of text.
+        SafeSerialize("q22", () =>
+            Table.ColumnNames(#table({"A","B","C"}, {{1,2,3}}))),
+
+        // q23: Json.Document — parse a JSON array literal.
+        SafeSerialize("q23", () =>
+            Json.Document("[1,2,3]")),
+
+        // q24: Table.FromRows — rows + column names → table.
+        SafeSerialize("q24", () =>
+            Table.FromRows({{1,2},{3,4}}, {"A","B"})),
+
+        // q25: Text.Contains — substring presence test.
+        SafeSerialize("q25", () =>
+            Text.Contains("hello world", "world")),
+
+        // q26: Table.TransformColumns — per-column transform with type.
+        SafeSerialize("q26", () =>
+            Table.TransformColumns(
+                #table({"A"}, {{5}}),
+                {{"A", each _ + 1, Int64.Type}})),
+
+        // q27: Text.From — convert a number to its text rendering.
+        SafeSerialize("q27", () => Text.From(42)),
+
+        // q28: Table.ExpandTableColumn — flatten a NestedJoin result.
+        SafeSerialize("q28", () =>
+            let
+                a = #table({"k","x"}, {{1,"hello"}}),
+                b = #table({"k","y"}, {{1,"world"}}),
+                j = Table.NestedJoin(a, {"k"}, b, {"k"}, "right", JoinKind.LeftOuter)
+            in
+                Table.ExpandTableColumn(j, "right", {"y"})),
+
+        // q29: Table.Combine — vertical concat of same-schema tables.
+        SafeSerialize("q29", () =>
+            Table.Combine({
+                #table({"A"}, {{1}}),
+                #table({"A"}, {{2}})})),
+
+        // q30-q79: breadth pass across stdlib namespaces. Each case
+        // is a one-liner that exercises one function's documented
+        // happy path. Goal: lift catalog/stdlib ratio from ~4% to
+        // ~10%+ without re-deriving novel tests every time.
+
+        // --- Text.* ---
+        SafeSerialize("q30", () => Text.Length("hello")),
+        SafeSerialize("q31", () => Text.Upper("hello")),
+        SafeSerialize("q32", () => Text.Lower("HELLO")),
+        SafeSerialize("q33", () => Text.Start("hello world", 5)),
+        SafeSerialize("q34", () => Text.End("hello world", 5)),
+        SafeSerialize("q35", () => Text.Range("hello world", 6, 5)),
+        SafeSerialize("q36", () => Text.Combine({"a", "b", "c"}, "-")),
+        SafeSerialize("q37", () => Text.Split("a,b,c", ",")),
+        SafeSerialize("q38", () => Text.Trim("  hello  ")),
+        SafeSerialize("q39", () => Text.PadStart("42", 5, "0")),
+        SafeSerialize("q40", () => Text.PadEnd("42", 5, "0")),
+        SafeSerialize("q41", () => Text.Reverse("hello")),
+        SafeSerialize("q42", () => Text.Repeat("ab", 3)),
+
+        // --- Number.* ---
+        SafeSerialize("q43", () => Number.From("3.14")),
+        SafeSerialize("q44", () => Number.ToText(3.14)),
+        SafeSerialize("q45", () => Number.Abs(-5)),
+        SafeSerialize("q46", () => Number.Round(3.7)),
+        SafeSerialize("q47", () => Number.RoundDown(3.7)),
+        SafeSerialize("q48", () => Number.RoundUp(3.2)),
+        SafeSerialize("q49", () => Number.IntegerDivide(17, 5)),
+        SafeSerialize("q50", () => Number.Mod(17, 5)),
+        SafeSerialize("q51", () => Number.Power(2, 10)),
+        SafeSerialize("q52", () => Number.Sign(-7)),
+
+        // --- List.* ---
+        SafeSerialize("q53", () => List.Count({1,2,3,4,5})),
+        SafeSerialize("q54", () => List.Sum({1,2,3,4,5})),
+        SafeSerialize("q55", () => List.Average({1,2,3,4,5})),
+        SafeSerialize("q56", () => List.Max({3,1,4,1,5,9,2,6})),
+        SafeSerialize("q57", () => List.Min({3,1,4,1,5,9,2,6})),
+        SafeSerialize("q58", () => List.First({1,2,3})),
+        SafeSerialize("q59", () => List.Last({1,2,3})),
+        SafeSerialize("q60", () => List.Reverse({1,2,3})),
+        SafeSerialize("q61", () => List.Sort({3,1,4,1,5,9,2,6})),
+        SafeSerialize("q62", () => List.Distinct({1,2,2,3,3,3})),
+        SafeSerialize("q63", () => List.Skip({1,2,3,4,5}, 2)),
+        SafeSerialize("q64", () => List.Range({1,2,3,4,5}, 1, 3)),
+        SafeSerialize("q65", () => List.Repeat({1,2}, 3)),
+
+        // --- Record.* ---
+        SafeSerialize("q66", () => Record.FieldNames([a=1, b=2, c=3])),
+        SafeSerialize("q67", () => Record.FieldValues([a=1, b=2, c=3])),
+        SafeSerialize("q68", () => Record.HasFields([a=1, b=2], "a")),
+        SafeSerialize("q69", () =>
+            Record.RemoveFields([a=1, b=2, c=3], {"b"})),
+
+        // --- Table.* (additional) ---
+        SafeSerialize("q70", () => Table.RowCount(#table({"A"}, {{1},{2},{3}}))),
+        SafeSerialize("q71", () => Table.ColumnCount(#table({"A","B","C"}, {{1,2,3}}))),
+        SafeSerialize("q72", () => Table.FirstN(#table({"A"}, {{1},{2},{3},{4}}), 2)),
+        SafeSerialize("q73", () => Table.Distinct(#table({"A"}, {{1},{2},{1},{3}}))),
+        SafeSerialize("q74", () => Table.Reverse(#table({"A"}, {{1},{2},{3}}))),
+
+        // --- Date / Time / Duration ---
+        SafeSerialize("q75", () => Date.Year(#date(2026, 6, 15))),
+        SafeSerialize("q76", () => Date.Month(#date(2026, 6, 15))),
+        SafeSerialize("q77", () => Date.Day(#date(2026, 6, 15))),
+        SafeSerialize("q78", () =>
+            Date.AddDays(#date(2026, 1, 1), 10)),
+        SafeSerialize("q79", () =>
+            Duration.Days(#date(2026, 12, 31) - #date(2026, 1, 1)))
+    },
+
+    Catalog = Table.FromRecords(cases)
 in
     Catalog

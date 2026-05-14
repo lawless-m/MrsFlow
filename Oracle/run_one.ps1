@@ -27,7 +27,7 @@ let
     Oracle.Serialize = (v as any) as text =>
         if v = null then "null"
         else if v is text then v
-        else if v is number then Text.From(v)
+        else if v is number then Number.ToText(v, "G", "en-US")
         else if v is logical then (if v then "true" else "false")
         else Text.FromBinary(Json.FromValue(v), TextEncoding.Utf8),
 

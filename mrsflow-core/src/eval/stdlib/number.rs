@@ -499,12 +499,31 @@ fn to_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     match &args[0] {
         Value::Null => Ok(Value::Null),
         Value::Number(n) => {
-            if !matches!(args.get(1), Some(Value::Null) | None) {
-                return Err(MError::NotImplemented(
-                    "Number.ToText: format string not yet supported",
-                ));
+            // Format string (arg 1): "G"/"g" (general) is equivalent to no
+            // format and renders integer-valued floats without `.0`. Other
+            // .NET format specs ("F2", "N", "P", "C", custom "0.00", etc.)
+            // aren't implemented — return NotImplemented with the actual
+            // format in the message so the caller knows which one to
+            // expand support for.
+            let general = match args.get(1) {
+                None | Some(Value::Null) => true,
+                Some(Value::Text(fmt)) => {
+                    let trimmed = fmt.trim();
+                    matches!(trimmed, "G" | "g") || trimmed.is_empty()
+                }
+                Some(other) => return Err(type_mismatch("text (format)", other)),
+            };
+            if !general {
+                let Some(Value::Text(fmt)) = args.get(1) else { unreachable!() };
+                return Err(MError::Other(format!(
+                    "Number.ToText: format string {fmt:?} not yet supported \
+                     (only G / no-format)"
+                )));
             }
-            // PQ prints whole-number floats without a trailing ".0".
+            // Culture arg (2) accepted but ignored — en-US is what our
+            // general formatting matches; other cultures would shift the
+            // decimal separator and thousand grouping. Add when needed.
+            let _ = args.get(2);
             let s = if n.is_finite() && n.fract() == 0.0 && n.abs() < 1e16 {
                 format!("{}", *n as i64)
             } else {
