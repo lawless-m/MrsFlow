@@ -1346,7 +1346,30 @@ let
             let r = try Json.Document("9007199254740993") in
                 if r[HasError]
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
-                    else [HasError=false, Value=r[Value]])
+                    else [HasError=false, Value=r[Value]]),
+
+        // q256-q260: List.Sort / Table.Sort stability on equal keys.
+
+        SafeSerialize("q256", () =>
+            List.Sort(
+                {[k=2,i=1], [k=1,i=2], [k=2,i=3], [k=1,i=4]},
+                each _[k])),
+
+        SafeSerialize("q257", () =>
+            List.Sort(
+                {[k=2,i=3], [k=1,i=4], [k=2,i=1], [k=1,i=2]},
+                each _[k])),
+
+        SafeSerialize("q258", () =>
+            Table.Sort(
+                #table({"k","i"}, {{2,1},{1,2},{2,3},{1,4}}),
+                "k")),
+
+        SafeSerialize("q259", () =>
+            List.Sort({2,1,2,1,2})),
+
+        SafeSerialize("q260", () =>
+            List.Sort({"B","a","A","b"}, Comparer.OrdinalIgnoreCase))
     },
 
     Catalog = Table.FromRecords(cases)
