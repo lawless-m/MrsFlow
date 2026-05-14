@@ -178,27 +178,24 @@ fn parse_quote_style(arg: Option<&Value>, fn_name: &str) -> Result<QuoteStyle, M
     }
 }
 
-/// CSV-aware split: only break on delimiter when not inside a quoted field;
-/// `""` inside a quoted field is an escaped quote; surrounding quotes are
-/// stripped from the emitted field.
-fn csv_split(text: &str, delim: &str) -> Vec<String> {
-    if delim.is_empty() {
-        return vec![text.to_string()];
-    }
+/// CSV-aware split: outside double-quoted regions, ask `match_delim_len`
+/// at each position whether a delimiter starts here (and its byte length).
+/// Inside quotes, `""` is an escaped quote; surrounding quotes are stripped.
+/// Quote opens only at the start of a field.
+fn csv_aware_split<F>(text: &str, mut match_delim_len: F) -> Vec<String>
+where
+    F: FnMut(&str) -> Option<usize>,
+{
     let mut parts: Vec<String> = Vec::new();
     let mut buf = String::new();
     let mut in_quote = false;
     let bytes = text.as_bytes();
-    let dbytes = delim.as_bytes();
-    let dlen = dbytes.len();
     let mut i = 0usize;
     while i < bytes.len() {
         if in_quote {
-            // Look at the current char.
             let c = text[i..].chars().next().unwrap();
             let cl = c.len_utf8();
             if c == '"' {
-                // Escaped quote?
                 if text[i + cl..].starts_with('"') {
                     buf.push('"');
                     i += cl + 1;
@@ -211,10 +208,9 @@ fn csv_split(text: &str, delim: &str) -> Vec<String> {
                 i += cl;
             }
         } else if buf.is_empty() && bytes[i] == b'"' {
-            // Quote only opens at the start of a field.
             in_quote = true;
             i += 1;
-        } else if text[i..].starts_with(delim) {
+        } else if let Some(dlen) = match_delim_len(&text[i..]) {
             parts.push(std::mem::take(&mut buf));
             i += dlen;
         } else {
@@ -227,16 +223,38 @@ fn csv_split(text: &str, delim: &str) -> Vec<String> {
     parts
 }
 
+fn csv_split(text: &str, delim: &str) -> Vec<String> {
+    if delim.is_empty() {
+        return vec![text.to_string()];
+    }
+    csv_aware_split(text, |rest| {
+        if rest.starts_with(delim) { Some(delim.len()) } else { None }
+    })
+}
+
+fn csv_split_any(text: &str, delims: &[String]) -> Vec<String> {
+    if delims.iter().all(|d| d.is_empty()) {
+        return vec![text.to_string()];
+    }
+    csv_aware_split(text, |rest| {
+        for d in delims {
+            if !d.is_empty() && rest.starts_with(d.as_str()) {
+                return Some(d.len());
+            }
+        }
+        None
+    })
+}
+
 fn split_text_by_any_delimiter(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     // Validate at factory time so the error surfaces immediately.
     let _ = expect_text_list(&args[0], "Splitter.SplitTextByAnyDelimiter")?;
-    if !matches!(args.get(1), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented(
-            "Splitter.SplitTextByAnyDelimiter: quoteStyle not yet supported",
-        ));
-    }
+    let qs = parse_quote_style(args.get(1), "Splitter.SplitTextByAnyDelimiter")?;
     Ok(make_splitter(
-        vec![("__delims".into(), args[0].clone())],
+        vec![
+            ("__delims".into(), args[0].clone()),
+            ("__qs".into(), Value::Number(qs as i64 as f64)),
+        ],
         split_text_by_any_delimiter_impl,
     ))
 }
@@ -386,36 +404,43 @@ fn split_text_by_delimiter_impl(args: &[Value], _host: &dyn IoHost) -> Result<Va
 fn split_text_by_any_delimiter_impl(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     let delims = expect_text_list(&args[1], "Splitter.SplitTextByAnyDelimiter")?;
+    let qs_n = match &args[2] {
+        Value::Number(n) => *n as i64,
+        _ => 0,
+    };
     if delims.is_empty() {
         return Ok(Value::List(vec![Value::Text(text.to_string())]));
     }
-    // Sweep the text, cutting at the first matching delimiter at each position.
-    let mut parts: Vec<String> = Vec::new();
-    let mut buf = String::new();
-    let mut i = 0;
-    let bytes = text.as_bytes();
-    while i < bytes.len() {
-        let mut matched: Option<usize> = None;
-        for d in &delims {
-            if !d.is_empty() && text[i..].starts_with(d.as_str()) {
-                matched = Some(d.len());
-                break;
+    let parts: Vec<String> = if qs_n == 1 {
+        csv_split_any(text, &delims)
+    } else {
+        let mut parts: Vec<String> = Vec::new();
+        let mut buf = String::new();
+        let mut i = 0;
+        let bytes = text.as_bytes();
+        while i < bytes.len() {
+            let mut matched: Option<usize> = None;
+            for d in &delims {
+                if !d.is_empty() && text[i..].starts_with(d.as_str()) {
+                    matched = Some(d.len());
+                    break;
+                }
+            }
+            match matched {
+                Some(skip) => {
+                    parts.push(std::mem::take(&mut buf));
+                    i += skip;
+                }
+                None => {
+                    let c = text[i..].chars().next().unwrap();
+                    buf.push(c);
+                    i += c.len_utf8();
+                }
             }
         }
-        match matched {
-            Some(skip) => {
-                parts.push(std::mem::take(&mut buf));
-                i += skip;
-            }
-            None => {
-                // Advance one char (handle UTF-8 boundary).
-                let c = text[i..].chars().next().unwrap();
-                buf.push(c);
-                i += c.len_utf8();
-            }
-        }
-    }
-    parts.push(buf);
+        parts.push(buf);
+        parts
+    };
     Ok(Value::List(parts.into_iter().map(Value::Text).collect()))
 }
 

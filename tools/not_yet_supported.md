@@ -58,7 +58,7 @@ Splitter / Combiner options. `quoteStyle` is the same enum
 the scan direction.
 
 - ✅ `Splitter.SplitTextByDelimiter`
-- `Splitter.SplitTextByAnyDelimiter`
+- ✅ `Splitter.SplitTextByAnyDelimiter`
 - `Splitter.SplitTextByEachDelimiter` (both flags)
 - `Splitter.SplitTextByLengths`
 - `Splitter.SplitTextByPositions`
