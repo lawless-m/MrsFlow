@@ -100,7 +100,7 @@ Smaller per-function options, lower aggregate impact.
 - ✅ `Table.SplitColumn` (default + extraValues)
 - ✅ `Table.TransformColumnNames` (options accepted-and-ignored)
 - ✅ `Value.FromText` (culture — accepted-and-ignored)
-- `List.Percentile` (options)
+- ✅ `List.Percentile` (options.PercentileMode — ExcelInc only)
 - ✅ `List.Random` (seed)
 - `unsupported cell type` (internal — Arrow encode path)
 

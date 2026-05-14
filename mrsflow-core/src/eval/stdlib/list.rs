@@ -1730,8 +1730,32 @@ fn percentile(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             "List.Percentile: percentile must be in [0,1] (got {other:?})"
         ))),
     };
-    if !matches!(args.get(2), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented("List.Percentile: options not yet supported"));
+    // Options: only PercentileMode.ExcelInc (0, the default) is supported;
+    // other modes are rejected. Unknown fields are silently ignored so
+    // forward-compatibility doesn't break existing call sites.
+    match args.get(2) {
+        None | Some(Value::Null) => {}
+        Some(Value::Record(r)) => {
+            if let Some((_, v)) = r.fields.iter().find(|(n, _)| n == "PercentileMode") {
+                let forced = super::super::force(v.clone(), &mut |e, env| {
+                    super::super::evaluate(e, env, &super::super::NoIoHost)
+                })?;
+                match forced {
+                    Value::Null => {}
+                    Value::Number(n) => {
+                        let k = n as i64;
+                        if k != 0 {
+                            return Err(MError::Other(format!(
+                                "List.Percentile: PercentileMode {k} not yet supported \
+                                 (only ExcelInc=0 is implemented)"
+                            )));
+                        }
+                    }
+                    other => return Err(type_mismatch("number (PercentileMode.*)", &other)),
+                }
+            }
+        }
+        Some(other) => return Err(type_mismatch("record (options) or null", other)),
     }
     if nums.is_empty() {
         return Ok(Value::Null);

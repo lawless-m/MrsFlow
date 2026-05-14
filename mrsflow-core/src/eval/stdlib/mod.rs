@@ -156,6 +156,19 @@ pub fn root_env() -> Env {
         env = env.extend(name.to_string(), Value::Number(n));
     }
 
+    // PercentileMode.* constants — List.Percentile options.PercentileMode.
+    // ExcelInc (default): linear interpolation, rank = p*(n-1) — matches
+    // Excel PERCENTILE.INC. Other modes are documented in M but not
+    // implemented here (rejected at runtime with a clear message).
+    for (name, n) in [
+        ("PercentileMode.ExcelInc", 0.0),
+        ("PercentileMode.ExcelExc", 1.0),
+        ("PercentileMode.SqlCont",  2.0),
+        ("PercentileMode.SqlDisc",  3.0),
+    ] {
+        env = env.extend(name.to_string(), Value::Number(n));
+    }
+
     // RankKind.* constants — Table.AddRankColumn options.RankKind.
     // Competition (default, 1224): ties share rank, gap after.
     // Ordinal     (1234)         : every row unique (orig-index tiebreak).
