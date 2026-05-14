@@ -278,7 +278,243 @@ let
         SafeSerialize("q78", () =>
             Date.AddDays(#date(2026, 1, 1), 10)),
         SafeSerialize("q79", () =>
-            Duration.Days(#date(2026, 12, 31) - #date(2026, 1, 1)))
+            Duration.Days(#date(2026, 12, 31) - #date(2026, 1, 1))),
+
+        // q80-q120: option-arg coverage for the work landed in the
+        // /loop slices. Each case exercises one previously-rejected
+        // option arg through the corpus path.
+
+        // --- equationCriteria / comparisonCriteria (q80-q89) ---
+
+        // q80: List.Contains with equationCriteria — case-insensitive match.
+        SafeSerialize("q80", () =>
+            List.Contains({"Hello","World"}, "HELLO",
+                (a,b) => Text.Lower(a) = Text.Lower(b))),
+
+        // q81: List.Distinct with equationCriteria — collapse case-variants.
+        SafeSerialize("q81", () =>
+            List.Distinct({"a","A","b","B","c"},
+                (x,y) => Text.Lower(x) = Text.Lower(y))),
+
+        // q82: List.Sort with custom comparisonCriteria — descending.
+        SafeSerialize("q82", () =>
+            List.Sort({3,1,4,1,5,9,2,6}, (a,b) => Value.Compare(b,a))),
+
+        // q83: List.Intersect with case-insensitive equationCriteria.
+        SafeSerialize("q83", () =>
+            List.Intersect({{"A","B","C"}, {"a","b"}},
+                (x,y) => Text.Lower(x) = Text.Lower(y))),
+
+        // q84: List.PositionOf with equationCriteria.
+        SafeSerialize("q84", () =>
+            List.PositionOf({"X","Y","z"}, "Z", Occurrence.First,
+                (a,b) => Text.Lower(a) = Text.Lower(b))),
+
+        // q85: Table.Distinct with equationCriteria (row-vs-row).
+        SafeSerialize("q85", () =>
+            Table.Distinct(
+                #table({"k","v"}, {{"a",1},{"A",2},{"b",3}}),
+                (r1,r2) => Text.Lower(r1[k]) = Text.Lower(r2[k]))),
+
+        // q86: Table.Contains with equationCriteria.
+        SafeSerialize("q86", () =>
+            Table.Contains(
+                #table({"k"}, {{"alpha"},{"beta"}}),
+                [k="ALPHA"],
+                (r,n) => Text.Lower(r[k]) = Text.Lower(n[k]))),
+
+        // q87: Value.Equals with equationCriteria callback.
+        SafeSerialize("q87", () =>
+            Value.Equals("Hello", "HELLO",
+                (a,b) => Text.Lower(a) = Text.Lower(b))),
+
+        // q88: List.Difference with equationCriteria.
+        SafeSerialize("q88", () =>
+            List.Difference({"A","B","C"}, {"a","c"},
+                (x,y) => Text.Lower(x) = Text.Lower(y))),
+
+        // q89: Table.Group with comparisonCriteria. Mrsflow's impl treats
+        //      this as a *key-equality* callback (key tuples wrapped as
+        //      records) — must return logical, not an ordering.
+        SafeSerialize("q89", () =>
+            Table.Group(
+                #table({"k","v"}, {{"A",1},{"a",2},{"B",3}}),
+                "k",
+                {{"total", each List.Sum([v])}},
+                GroupKind.Global,
+                (a,b) => Text.Lower(a[k]) = Text.Lower(b[k]))),
+
+        // --- predicate-form arguments (q90-q94) ---
+
+        // q90: List.FirstN take-while.
+        SafeSerialize("q90", () =>
+            List.FirstN({1,2,3,4,1,2}, each _ < 4)),
+
+        // q91: List.LastN take-while-from-end.
+        SafeSerialize("q91", () =>
+            List.LastN({1,2,3,4,5,6}, each _ > 3)),
+
+        // q92: List.Skip skip-while.
+        SafeSerialize("q92", () =>
+            List.Skip({1,2,3,4,3,2,1}, each _ < 4)),
+
+        // q93: Table.FirstN take-while.
+        SafeSerialize("q93", () =>
+            Table.FirstN(
+                #table({"n"}, {{1},{2},{3},{4},{1}}),
+                each [n] < 3)),
+
+        // q94: Table.Skip skip-while.
+        SafeSerialize("q94", () =>
+            Table.Skip(
+                #table({"n"}, {{1},{2},{3},{4},{1}}),
+                each [n] < 3)),
+
+        // --- quoteStyle / startAtEnd (q95-q102) ---
+
+        // q95: Splitter.SplitTextByDelimiter QuoteStyle.Csv.
+        SafeSerialize("q95", () =>
+            Splitter.SplitTextByDelimiter(",", QuoteStyle.Csv)(
+                "a,""b,c"",d")),
+
+        // q96: Splitter.SplitTextByAnyDelimiter QuoteStyle.Csv.
+        SafeSerialize("q96", () =>
+            Splitter.SplitTextByAnyDelimiter({",", ";"}, QuoteStyle.Csv)(
+                "a,""b;c"",d;e")),
+
+        // q97: Splitter.SplitTextByEachDelimiter forward.
+        SafeSerialize("q97", () =>
+            Splitter.SplitTextByEachDelimiter({"-", "/"})(
+                "abc-def/ghi")),
+
+        // q98: Splitter.SplitTextByEachDelimiter startAtEnd=true.
+        SafeSerialize("q98", () =>
+            Splitter.SplitTextByEachDelimiter({"-"}, QuoteStyle.None, true)(
+                "a-b-c-d")),
+
+        // q99: Splitter.SplitTextByLengths reverse.
+        SafeSerialize("q99", () =>
+            Splitter.SplitTextByLengths({3, 2}, true)("abcdefg")),
+
+        // q100: Splitter.SplitTextByWhitespace QuoteStyle.Csv.
+        SafeSerialize("q100", () =>
+            Splitter.SplitTextByWhitespace(QuoteStyle.Csv)(
+                "hello ""quoted text"" world")),
+
+        // q101: Combiner.CombineTextByDelimiter QuoteStyle.Csv.
+        SafeSerialize("q101", () =>
+            Combiner.CombineTextByDelimiter(",", QuoteStyle.Csv)(
+                {"a","b,c","d"})),
+
+        // q102: Combiner.CombineTextByDelimiter quotes a field with embedded quote.
+        SafeSerialize("q102", () =>
+            Combiner.CombineTextByDelimiter(",", QuoteStyle.Csv)(
+                {"plain","has ""quote""","newline" & "#(lf)" & "inside"})),
+
+        // --- missingField (q103-q107) ---
+
+        // q103: Record.SelectFields with MissingField.Ignore.
+        SafeSerialize("q103", () =>
+            Record.SelectFields([a=1, b=2], {"a","missing"}, MissingField.Ignore)),
+
+        // q104: Record.SelectFields with MissingField.UseNull.
+        SafeSerialize("q104", () =>
+            Record.SelectFields([a=1, b=2], {"a","missing"}, MissingField.UseNull)),
+
+        // q105: Record.RemoveFields with MissingField.Ignore.
+        SafeSerialize("q105", () =>
+            Record.RemoveFields([a=1, b=2, c=3], {"b","zz"}, MissingField.Ignore)),
+
+        // q106: Record.RenameFields with MissingField.Ignore.
+        SafeSerialize("q106", () =>
+            Record.RenameFields([a=1, b=2], {{"a","A"},{"zz","ZZ"}},
+                MissingField.Ignore)),
+
+        // q107: Record.TransformFields with MissingField.UseNull
+        //       — invents the missing field.
+        SafeSerialize("q107", () =>
+            Record.TransformFields([a=1], {"missing", each if _ = null then 99 else _},
+                MissingField.UseNull)),
+
+        // --- occurrence (q108-q112) ---
+
+        // q108: List.PositionOf with Occurrence.Last.
+        SafeSerialize("q108", () =>
+            List.PositionOf({1,2,3,2,4,2}, 2, Occurrence.Last)),
+
+        // q109: List.PositionOf with Occurrence.All.
+        SafeSerialize("q109", () =>
+            List.PositionOf({1,2,3,2,4,2}, 2, Occurrence.All)),
+
+        // q110: List.PositionOfAny with Occurrence.All.
+        SafeSerialize("q110", () =>
+            List.PositionOfAny({1,2,3,2,4,2}, {2,4}, Occurrence.All)),
+
+        // q111: Table.PositionOf with Occurrence.All.
+        SafeSerialize("q111", () =>
+            Table.PositionOf(
+                #table({"k"}, {{"a"},{"b"},{"a"},{"c"}}),
+                [k="a"],
+                Occurrence.All)),
+
+        // q112: Text.PositionOfAny with Occurrence.All.
+        SafeSerialize("q112", () =>
+            Text.PositionOfAny("hello world", {"l","o"}, Occurrence.All)),
+
+        // --- one-offs (q113-q120) ---
+
+        // q113: Table.AddRankColumn RankKind.Dense.
+        SafeSerialize("q113", () =>
+            Table.AddRankColumn(
+                #table({"s"}, {{10},{20},{20},{30}}),
+                "r",
+                "s",
+                [RankKind=RankKind.Dense])),
+
+        // q114: Table.AddRankColumn RankKind.Ordinal — every row unique.
+        SafeSerialize("q114", () =>
+            Table.AddRankColumn(
+                #table({"s"}, {{10},{20},{20},{30}}),
+                "r",
+                "s",
+                [RankKind=RankKind.Ordinal])),
+
+        // q115: Table.Group GroupKind.Local — consecutive-run grouping.
+        SafeSerialize("q115", () =>
+            Table.Group(
+                #table({"k","v"}, {{"a",1},{"a",2},{"b",3},{"a",4}}),
+                "k",
+                {{"total", each List.Sum([v])}},
+                GroupKind.Local)),
+
+        // q116: Table.Join composite keys.
+        SafeSerialize("q116", () =>
+            Table.Join(
+                #table({"r","y","s"},
+                    {{"EU",2024,10},{"EU",2025,20},{"US",2024,30}}),
+                {"r","y"},
+                #table({"reg","yr","t"},
+                    {{"EU",2024,15},{"EU",2025,25}}),
+                {"reg","yr"})),
+
+        // q117: Table.FromValue with options.Name.
+        SafeSerialize("q117", () =>
+            Table.FromValue(42, [Name="Answer"])),
+
+        // q118: List.Random with seed — reproducible.
+        SafeSerialize("q118", () =>
+            List.Count(List.Random(5, 42)) = 5),
+
+        // q119: Type.Is type-vs-type subtype check
+        //       (the additionalAggregates idiom).
+        SafeSerialize("q119", () =>
+            Type.Is(type number, type number)),
+
+        // q120: Table.Profile with additionalAggregates — type-driven aggregate.
+        SafeSerialize("q120", () =>
+            Table.Profile(
+                #table({"n","s"}, {{1,"a"},{2,"b"},{3,"c"}}),
+                {{"Sum", each Type.Is(_, type number), each List.Sum(_)}}))
     },
 
     Catalog = Table.FromRecords(cases)
