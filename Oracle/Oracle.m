@@ -948,6 +948,37 @@ let
                 #datetimezone(2026,6,15,14,30,45,1,0), "K") in
                 if r[HasError]
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        // q186-q190: Replacer.* + Text.Replace.
+
+        SafeSerialize("q186", () =>
+            let r = try Replacer.ReplaceValue(5, 5, 99) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q187", () =>
+            let r = try Replacer.ReplaceText("hello world", "world", "PQ") in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q188", () =>
+            let r = try Text.Replace("abc", "", "X") in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q189", () =>
+            Text.Replace("aaaa", "aa", "b")),
+
+        SafeSerialize("q190", () =>
+            let r = try Table.ReplaceValue(
+                #table({"v"}, {{1},{2},{1}}),
+                1, 99, Replacer.ReplaceValue, {"v"}) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                     else [HasError=false, Value=r[Value]])
     },
 
