@@ -264,18 +264,18 @@ fn split_text_by_each_delimiter(
     _host: &dyn IoHost,
 ) -> Result<Value, MError> {
     let _ = expect_text_list(&args[0], "Splitter.SplitTextByEachDelimiter")?;
-    if !matches!(args.get(1), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented(
-            "Splitter.SplitTextByEachDelimiter: quoteStyle not yet supported",
-        ));
-    }
-    if matches!(args.get(2), Some(Value::Logical(true))) {
-        return Err(MError::NotImplemented(
-            "Splitter.SplitTextByEachDelimiter: startAtEnd=true not yet supported",
-        ));
-    }
+    let qs = parse_quote_style(args.get(1), "Splitter.SplitTextByEachDelimiter")?;
+    let start_at_end = match args.get(2) {
+        None | Some(Value::Null) => false,
+        Some(Value::Logical(b)) => *b,
+        Some(other) => return Err(type_mismatch("logical (startAtEnd)", other)),
+    };
     Ok(make_splitter(
-        vec![("__delims".into(), args[0].clone())],
+        vec![
+            ("__delims".into(), args[0].clone()),
+            ("__qs".into(), Value::Number(qs as i64 as f64)),
+            ("__rev".into(), Value::Logical(start_at_end)),
+        ],
         split_text_by_each_delimiter_impl,
     ))
 }
@@ -444,22 +444,131 @@ fn split_text_by_any_delimiter_impl(args: &[Value], _host: &dyn IoHost) -> Resul
     Ok(Value::List(parts.into_iter().map(Value::Text).collect()))
 }
 
+/// Sweep `text` left-to-right tracking double-quote state; collect byte
+/// offsets of every position that lies *outside* a quoted region.
+/// (Inside `""`-escaped quote pairs we stay in-quote.)
+fn out_of_quote_positions(text: &str) -> Vec<usize> {
+    let mut out: Vec<usize> = Vec::with_capacity(text.len() + 1);
+    let mut in_quote = false;
+    let bytes = text.as_bytes();
+    let mut i = 0usize;
+    while i < bytes.len() {
+        if !in_quote {
+            out.push(i);
+        }
+        let c = text[i..].chars().next().unwrap();
+        let cl = c.len_utf8();
+        if c == '"' {
+            if in_quote && text[i + cl..].starts_with('"') {
+                // escaped quote — stay in quote, skip both
+                i += cl + 1;
+                continue;
+            }
+            in_quote = !in_quote;
+        }
+        i += cl;
+    }
+    if !in_quote {
+        out.push(bytes.len());
+    }
+    out
+}
+
+/// Find the first byte offset of `delim` in `text`. If `csv` is true,
+/// only matches starting at a position outside any double-quoted region
+/// count.
+fn find_delim(text: &str, delim: &str, csv: bool) -> Option<usize> {
+    if delim.is_empty() {
+        return None;
+    }
+    if !csv {
+        return text.find(delim);
+    }
+    let valid = out_of_quote_positions(text);
+    let mut start = 0usize;
+    while let Some(pos) = text[start..].find(delim) {
+        let abs = start + pos;
+        if valid.binary_search(&abs).is_ok() {
+            return Some(abs);
+        }
+        // Advance by one char beyond the match attempt.
+        let c = text[abs..].chars().next().unwrap();
+        start = abs + c.len_utf8();
+    }
+    None
+}
+
+/// Find the last byte offset of `delim` in `text`. If `csv`, only
+/// matches outside double-quoted regions count.
+fn rfind_delim(text: &str, delim: &str, csv: bool) -> Option<usize> {
+    if delim.is_empty() {
+        return None;
+    }
+    if !csv {
+        return text.rfind(delim);
+    }
+    let valid = out_of_quote_positions(text);
+    // Scan all matches and keep the last one that's out-of-quote.
+    let mut last: Option<usize> = None;
+    let mut start = 0usize;
+    while let Some(pos) = text[start..].find(delim) {
+        let abs = start + pos;
+        if valid.binary_search(&abs).is_ok() {
+            last = Some(abs);
+        }
+        let c = text[abs..].chars().next().unwrap();
+        start = abs + c.len_utf8();
+    }
+    last
+}
+
 fn split_text_by_each_delimiter_impl(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     let delims = expect_text_list(&args[1], "Splitter.SplitTextByEachDelimiter")?;
+    let csv = matches!(&args[2], Value::Number(n) if *n as i64 == 1);
+    let reverse = matches!(&args[3], Value::Logical(true));
+
+    if !reverse {
+        let mut rest = text.to_string();
+        let mut parts: Vec<String> = Vec::new();
+        for d in &delims {
+            match find_delim(&rest, d, csv) {
+                Some(pos) => {
+                    parts.push(rest[..pos].to_string());
+                    rest = rest[pos + d.len()..].to_string();
+                }
+                None => {
+                    return Err(MError::Other(format!(
+                        "Splitter.SplitTextByEachDelimiter: delimiter not found: {d:?}"
+                    )));
+                }
+            }
+        }
+        parts.push(rest);
+        return Ok(Value::List(parts.into_iter().map(Value::Text).collect()));
+    }
+
+    // Reverse mode: walk delims right-to-left, cut on each delimiter's
+    // last occurrence from the right; assemble parts from the right.
     let mut rest = text.to_string();
-    let mut parts: Vec<String> = Vec::new();
-    for d in &delims {
-        if let Some(pos) = rest.find(d.as_str()) {
-            parts.push(rest[..pos].to_string());
-            rest = rest[pos + d.len()..].to_string();
-        } else {
-            return Err(MError::Other(format!(
-                "Splitter.SplitTextByEachDelimiter: delimiter not found: {d:?}"
-            )));
+    let mut tail_parts: Vec<String> = Vec::new();
+    for d in delims.iter().rev() {
+        match rfind_delim(&rest, d, csv) {
+            Some(pos) => {
+                tail_parts.push(rest[pos + d.len()..].to_string());
+                rest.truncate(pos);
+            }
+            None => {
+                return Err(MError::Other(format!(
+                    "Splitter.SplitTextByEachDelimiter: delimiter not found: {d:?}"
+                )));
+            }
         }
     }
+    // `rest` is now the leftmost field; `tail_parts` is right-to-left order.
+    let mut parts: Vec<String> = Vec::with_capacity(tail_parts.len() + 1);
     parts.push(rest);
+    parts.extend(tail_parts.into_iter().rev());
     Ok(Value::List(parts.into_iter().map(Value::Text).collect()))
 }
 
