@@ -741,6 +741,45 @@ let
             in
                 if r[HasError]
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        // q150-q153: q139 follow-up. q139's data has all-distinct keys
+        // by accident, so "no-op" and "dedup-by-k" look the same. These
+        // probes use data with real duplicates so we can tell which
+        // PQ semantics is actually in play.
+
+        // q150: ACTUAL duplicates in column k. If PQ dedups by k,
+        //       result has 2 rows ({a,1} and {b,3} — first-seen).
+        //       If PQ is a true no-op, result has 3 rows.
+        SafeSerialize("q150", () =>
+            Table.Distinct(
+                #table({"k","v"}, {{"a",1},{"a",2},{"b",3}}),
+                "k")),
+
+        // q151: Different VALUE-column for matching k. Tells us whether
+        //       PQ keeps first-seen, last-seen, or something else.
+        SafeSerialize("q151", () =>
+            Table.Distinct(
+                #table({"k","v"}, {{"a","first"},{"a","second"},{"b","third"}}),
+                "k")),
+
+        // q152: list-of-columns form per docs. Dedup by ALL listed cols?
+        SafeSerialize("q152", () =>
+            Table.Distinct(
+                #table({"k","v","w"},
+                    {{"a",1,"x"},{"a",1,"y"},{"a",2,"z"},{"b",1,"w"}}),
+                {"k","v"})),
+
+        // q153: list-with-comparer multi-column. Speculation: like q140
+        //       but applies the comparer per-column?
+        SafeSerialize("q153", () =>
+            let
+                r = try Table.Distinct(
+                    #table({"k","v"}, {{"a",1},{"A",2},{"b",3}}),
+                    {{"k", Comparer.OrdinalIgnoreCase}})
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                     else [HasError=false, Value=r[Value]])
     },
 

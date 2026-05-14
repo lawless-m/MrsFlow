@@ -1502,61 +1502,169 @@ fn distinct(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             }
             Ok(Value::Table(values_to_table(&names, &kept)?))
         }
-        Some(Value::Text(_)) => {
-            // PQ behaviour: no-op. Returns input unchanged.
-            Ok(Value::Table(values_to_table(&names, &rows)?))
-        }
-        Some(Value::List(parts)) => {
-            // Expect {col, comparer}. Dedup by `col` using `comparer`.
-            if parts.len() != 2 {
-                return Err(MError::Other(format!(
-                    "Table.Distinct: criterion list must have 2 elements (column, comparer), got {}",
-                    parts.len(),
-                )));
-            }
-            let col_name = match &parts[0] {
-                Value::Text(s) => s.clone(),
-                other => return Err(type_mismatch("text (column name)", other)),
-            };
-            let comparer = match &parts[1] {
-                Value::Function(c) => c.clone(),
-                other => return Err(type_mismatch("function (comparer)", other)),
-            };
+        Some(Value::Text(col_name)) => {
+            // Dedup by the single named column. Per Oracle probes q150/151,
+            // PQ keeps the FIRST row for each distinct value in that column.
             let col_idx = names
                 .iter()
-                .position(|n| n == &col_name)
+                .position(|n| n == col_name)
                 .ok_or_else(|| MError::Other(format!(
                     "Table.Distinct: column not found: {col_name}"
                 )))?;
-            let mut kept: Vec<Vec<Value>> = Vec::new();
-            'rows: for row in rows {
-                let cell = &row[col_idx];
-                for k in &kept {
-                    let r = invoke_builtin_callback(
-                        &comparer,
-                        vec![cell.clone(), k[col_idx].clone()],
-                    )?;
-                    let equal = match r {
-                        Value::Number(n) => n == 0.0,
-                        Value::Logical(b) => b,
-                        other => return Err(type_mismatch(
-                            "number or logical (comparer result)",
-                            &other,
-                        )),
-                    };
-                    if equal {
-                        continue 'rows;
-                    }
-                }
-                kept.push(row);
+            distinct_by_column_subset(&names, rows, &[col_idx], None)
+        }
+        Some(Value::List(parts)) => {
+            // Three list shapes (Oracle q140/q152/q153):
+            //   {col, comparer}             — single col with user comparer
+            //   {col1, col2, ...}           — multiple cols, primitive equality
+            //   {{col, comparer}}           — list-of-pairs (single pair form)
+            //   {{col1, comparer1}, ...}    — list-of-pairs (multi-pair)
+            // Disambiguate by the second element: if it's a function, the
+            // outer list is {col, comparer}; otherwise it's a list of cols
+            // or list of pairs.
+            if parts.is_empty() {
+                return Err(MError::Other(
+                    "Table.Distinct: criterion list cannot be empty".into(),
+                ));
             }
-            Ok(Value::Table(values_to_table(&names, &kept)?))
+            match (&parts[0], parts.get(1)) {
+                (Value::Text(col_name), Some(Value::Function(c))) if parts.len() == 2 => {
+                    // {col, comparer}
+                    let col_idx = names
+                        .iter()
+                        .position(|n| n == col_name)
+                        .ok_or_else(|| MError::Other(format!(
+                            "Table.Distinct: column not found: {col_name}"
+                        )))?;
+                    distinct_by_column_subset(&names, rows, &[col_idx], Some((col_idx, c.clone())))
+                }
+                (Value::List(_), _) => {
+                    // List-of-pairs form: {{col1, cmp1}, {col2, cmp2}, ...}.
+                    // Each pair binds a per-column comparer. Empirical (q153)
+                    // confirms PQ accepts the single-pair case; multi-pair
+                    // is the natural generalisation.
+                    let mut col_idxs: Vec<usize> = Vec::with_capacity(parts.len());
+                    let mut per_col_cmps: Vec<(usize, Closure)> = Vec::new();
+                    for p in parts {
+                        let pair = match p {
+                            Value::List(xs) => xs,
+                            other => return Err(type_mismatch(
+                                "list (column, comparer) pair",
+                                other,
+                            )),
+                        };
+                        if pair.len() != 2 {
+                            return Err(MError::Other(format!(
+                                "Table.Distinct: pair must have 2 elements, got {}",
+                                pair.len(),
+                            )));
+                        }
+                        let col = match &pair[0] {
+                            Value::Text(s) => s.clone(),
+                            other => return Err(type_mismatch("text (column name)", other)),
+                        };
+                        let cmp = match &pair[1] {
+                            Value::Function(c) => c.clone(),
+                            other => return Err(type_mismatch("function (comparer)", other)),
+                        };
+                        let idx = names.iter().position(|n| n == &col).ok_or_else(|| {
+                            MError::Other(format!(
+                                "Table.Distinct: column not found: {col}"
+                            ))
+                        })?;
+                        col_idxs.push(idx);
+                        per_col_cmps.push((idx, cmp));
+                    }
+                    // v1 with one per-col comparer: pass it through.
+                    // Multi-comparer is a natural extension but would need
+                    // distinct_by_column_subset to take a Vec instead.
+                    let single = if per_col_cmps.len() == 1 {
+                        Some(per_col_cmps.into_iter().next().unwrap())
+                    } else {
+                        return Err(MError::NotImplemented(
+                            "Table.Distinct: list-of-pairs with multiple comparers not yet supported",
+                        ));
+                    };
+                    distinct_by_column_subset(&names, rows, &col_idxs, single)
+                }
+                _ => {
+                    // Plain list of column names (multi-col tuple dedup).
+                    let mut col_idxs: Vec<usize> = Vec::with_capacity(parts.len());
+                    for p in parts {
+                        match p {
+                            Value::Text(s) => {
+                                let idx = names.iter().position(|n| n == s).ok_or_else(|| {
+                                    MError::Other(format!(
+                                        "Table.Distinct: column not found: {s}"
+                                    ))
+                                })?;
+                                col_idxs.push(idx);
+                            }
+                            other => {
+                                return Err(type_mismatch(
+                                    "text (column name in criterion list)",
+                                    other,
+                                ));
+                            }
+                        }
+                    }
+                    distinct_by_column_subset(&names, rows, &col_idxs, None)
+                }
+            }
         }
         Some(other) => Err(type_mismatch(
-            "text, list {col,comparer}, function, or null",
+            "text, list of columns, {col,comparer}, function, or null",
             other,
         )),
     }
+}
+
+/// Dedup rows by a subset of columns, keeping the first-seen row for each
+/// distinct key tuple. When `comparer` is Some, equality on its column is
+/// delegated to the user callback (returning -1|0|1 number or logical);
+/// all other key columns use primitive equality.
+fn distinct_by_column_subset(
+    names: &[String],
+    rows: Vec<Vec<Value>>,
+    col_idxs: &[usize],
+    comparer: Option<(usize, Closure)>,
+) -> Result<Value, MError> {
+    let mut kept: Vec<Vec<Value>> = Vec::new();
+    'rows: for row in rows {
+        for k in &kept {
+            let mut all_eq = true;
+            for &ci in col_idxs {
+                let equal = match &comparer {
+                    Some((cmp_idx, cmp_fn)) if *cmp_idx == ci => {
+                        let r = invoke_builtin_callback(
+                            cmp_fn,
+                            vec![row[ci].clone(), k[ci].clone()],
+                        )?;
+                        match r {
+                            Value::Number(n) => n == 0.0,
+                            Value::Logical(b) => b,
+                            other => {
+                                return Err(type_mismatch(
+                                    "number or logical (comparer result)",
+                                    &other,
+                                ));
+                            }
+                        }
+                    }
+                    _ => values_equal_primitive(&row[ci], &k[ci])?,
+                };
+                if !equal {
+                    all_eq = false;
+                    break;
+                }
+            }
+            if all_eq {
+                continue 'rows;
+            }
+        }
+        kept.push(row);
+    }
+    Ok(Value::Table(values_to_table(names, &kept)?))
 }
 
 
