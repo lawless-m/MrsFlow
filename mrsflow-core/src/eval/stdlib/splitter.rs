@@ -144,15 +144,87 @@ fn split_text_by_delimiter(args: &[Value], _host: &dyn IoHost) -> Result<Value, 
     if !matches!(&args[0], Value::Text(_)) {
         return Err(type_mismatch("text", &args[0]));
     }
-    if !matches!(args.get(1), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented(
-            "Splitter.SplitTextByDelimiter: quoteStyle not yet supported",
-        ));
-    }
+    let qs = parse_quote_style(args.get(1), "Splitter.SplitTextByDelimiter")?;
     Ok(make_splitter(
-        vec![("__delim".into(), args[0].clone())],
+        vec![
+            ("__delim".into(), args[0].clone()),
+            ("__qs".into(), Value::Number(qs as i64 as f64)),
+        ],
         split_text_by_delimiter_impl,
     ))
+}
+
+/// QuoteStyle.None = 0 (no quoting); QuoteStyle.Csv = 1 (RFC4180-style).
+#[derive(Copy, Clone, PartialEq)]
+enum QuoteStyle {
+    None,
+    Csv,
+}
+
+fn parse_quote_style(arg: Option<&Value>, fn_name: &str) -> Result<QuoteStyle, MError> {
+    match arg {
+        None | Some(Value::Null) => Ok(QuoteStyle::None),
+        Some(Value::Number(n)) => {
+            let k = *n as i64;
+            match k {
+                0 => Ok(QuoteStyle::None),
+                1 => Ok(QuoteStyle::Csv),
+                _ => Err(MError::Other(format!(
+                    "{fn_name}: quoteStyle must be QuoteStyle.None (0) or QuoteStyle.Csv (1), got {k}"
+                ))),
+            }
+        }
+        Some(other) => Err(type_mismatch("number (QuoteStyle.*)", other)),
+    }
+}
+
+/// CSV-aware split: only break on delimiter when not inside a quoted field;
+/// `""` inside a quoted field is an escaped quote; surrounding quotes are
+/// stripped from the emitted field.
+fn csv_split(text: &str, delim: &str) -> Vec<String> {
+    if delim.is_empty() {
+        return vec![text.to_string()];
+    }
+    let mut parts: Vec<String> = Vec::new();
+    let mut buf = String::new();
+    let mut in_quote = false;
+    let bytes = text.as_bytes();
+    let dbytes = delim.as_bytes();
+    let dlen = dbytes.len();
+    let mut i = 0usize;
+    while i < bytes.len() {
+        if in_quote {
+            // Look at the current char.
+            let c = text[i..].chars().next().unwrap();
+            let cl = c.len_utf8();
+            if c == '"' {
+                // Escaped quote?
+                if text[i + cl..].starts_with('"') {
+                    buf.push('"');
+                    i += cl + 1;
+                } else {
+                    in_quote = false;
+                    i += cl;
+                }
+            } else {
+                buf.push(c);
+                i += cl;
+            }
+        } else if buf.is_empty() && bytes[i] == b'"' {
+            // Quote only opens at the start of a field.
+            in_quote = true;
+            i += 1;
+        } else if text[i..].starts_with(delim) {
+            parts.push(std::mem::take(&mut buf));
+            i += dlen;
+        } else {
+            let c = text[i..].chars().next().unwrap();
+            buf.push(c);
+            i += c.len_utf8();
+        }
+    }
+    parts.push(buf);
+    parts
 }
 
 fn split_text_by_any_delimiter(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
@@ -297,9 +369,14 @@ fn split_by_nothing_impl(args: &[Value], _host: &dyn IoHost) -> Result<Value, ME
 fn split_text_by_delimiter_impl(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     let delim = expect_text(&args[1])?;
+    let qs_n = match &args[2] {
+        Value::Number(n) => *n as i64,
+        _ => 0,
+    };
     let parts: Vec<Value> = if delim.is_empty() {
-        // Empty delimiter is degenerate — return the whole text as one part.
         vec![Value::Text(text.to_string())]
+    } else if qs_n == 1 {
+        csv_split(text, delim).into_iter().map(Value::Text).collect()
     } else {
         text.split(delim).map(|s| Value::Text(s.to_string())).collect()
     };

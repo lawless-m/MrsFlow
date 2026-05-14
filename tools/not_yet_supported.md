@@ -57,7 +57,7 @@ Splitter / Combiner options. `quoteStyle` is the same enum
 `Csv.Document` already honours (None / Csv); `startAtEnd` reverses
 the scan direction.
 
-- `Splitter.SplitTextByDelimiter`
+- ✅ `Splitter.SplitTextByDelimiter`
 - `Splitter.SplitTextByAnyDelimiter`
 - `Splitter.SplitTextByEachDelimiter` (both flags)
 - `Splitter.SplitTextByLengths`
