@@ -1241,7 +1241,41 @@ let
                     else [HasError=false, Value=r[Value]]),
 
         SafeSerialize("q240", () =>
-            Csv.Document(Text.ToBinary("")))
+            Csv.Document(Text.ToBinary(""))),
+
+        // q241-q245: #shared introspection. The whole record contains
+        // function values that Json.FromValue can't serialize directly,
+        // so probe only counts and field-presence.
+
+        SafeSerialize("q241", () =>
+            let r = try Record.FieldCount(#shared) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q242", () =>
+            let r = try Record.HasFields(#shared, "Number.From") in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q243", () =>
+            let r = try Record.HasFields(#shared, "Number.NonexistentXYZ") in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q244", () =>
+            let r = try Value.Is(#shared[Number.From], type function) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q245", () =>
+            let r = try #shared[Number.From]("42") in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]])
     },
 
     Catalog = Table.FromRecords(cases)
