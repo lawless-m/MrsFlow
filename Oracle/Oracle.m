@@ -40,11 +40,13 @@ let
                 else [Q = label, Result = Oracle.Serialize(r[Value])],
 
     cases = {
-        // q1: cycle detection — record's field references itself by bare name.
-        SafeSerialize("q1", () => [X = X][X]),
-
-        // q2: cycle detection — mutual reference between sibling fields.
-        SafeSerialize("q2", () => [a = b, b = a][a]),
+        // q1, q2: cycle detection cases ([X=X][X] and [a=b,b=a][a]).
+        // Power Query rejects these at *compile time* — `Name 'X' doesn't
+        // exist` — so they'd block the entire Catalog from loading rather
+        // than fail one row. mrsflow detects them at *evaluate time*
+        // (thunk re-entry). Different mechanism, same outcome on each
+        // engine. The qN.m files for q1/q2 stay under Oracle/cases/ for
+        // mrsflow-side regression; just not in the Catalog.
 
         // q3: Date.ToText dd-MMM-yy.
         SafeSerialize("q3", () =>
