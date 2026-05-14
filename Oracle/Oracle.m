@@ -1011,7 +1011,31 @@ let
             let r = try Text.Format("a##b#{0}c", {"x"}) in
                 if r[HasError]
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
-                    else [HasError=false, Value=r[Value]])
+                    else [HasError=false, Value=r[Value]]),
+
+        // q196-q200: List.Accumulate edge cases.
+
+        SafeSerialize("q196", () =>
+            let r = try List.Accumulate({1,2,3}, {}, (s,c) => s & {c*2}) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q197", () =>
+            List.Accumulate({"a","b","c"}, "", (s,c) => s & "[" & c & "]")),
+
+        SafeSerialize("q198", () =>
+            List.Accumulate({1,2,3}, {{}}, (s,c) => s & {{c, c*c}})),
+
+        SafeSerialize("q199", () =>
+            let r = try List.Accumulate({1,2,3}, 0,
+                (s,c) => if c = 2 then error "boom" else s + c) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q200", () =>
+            List.Accumulate({1..100}, 0, (s,c) => s + c))
     },
 
     Catalog = Table.FromRecords(cases)
