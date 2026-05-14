@@ -222,9 +222,21 @@ fn to_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         Value::Datetimezone(dt) => *dt,
         other => return Err(type_mismatch("datetimezone", other)),
     };
-    if !matches!(args.get(1), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented("DateTimeZone.ToText: format string not yet supported"));
+    let general = match args.get(1) {
+        None | Some(Value::Null) => true,
+        Some(Value::Text(fmt)) => {
+            let trimmed = fmt.trim();
+            matches!(trimmed, "G" | "g") || trimmed.is_empty()
+        }
+        Some(other) => return Err(type_mismatch("text (format)", other)),
+    };
+    if !general {
+        let Some(Value::Text(fmt)) = args.get(1) else { unreachable!() };
+        return Err(MError::Other(format!(
+            "DateTimeZone.ToText: format string {fmt:?} not yet supported (only G / no-format)"
+        )));
     }
+    let _ = args.get(2);
     Ok(Value::Text(dt.to_rfc3339()))
 }
 

@@ -20,7 +20,7 @@ accept `"G"` / `"g"` / empty as general (no-format equivalent),
 error on others with the actual format string in the message.
 
 - ✅ `DateTime.ToText`
-- `DateTimeZone.ToText`
+- ✅ `DateTimeZone.ToText`
 - `Duration.ToText`
 - `Time.ToText`
 
