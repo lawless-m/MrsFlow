@@ -1119,7 +1119,33 @@ let
             let r = try null & "x" in
                 if r[HasError]
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
-                    else [HasError=false, Value=r[Value]])
+                    else [HasError=false, Value=r[Value]]),
+
+        // q216-q220: Duration serialization.
+
+        SafeSerialize("q216", () =>
+            let r = try Duration.ToText(#duration(1,2,3,4)) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q217", () =>
+            let r = try Duration.FromText("1.02:03:04") in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q218", () =>
+            let r = try Duration.From(3600) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q219", () =>
+            Duration.TotalSeconds(#duration(0,1,30,0))),
+
+        SafeSerialize("q220", () =>
+            #duration(1,2,3,4))
     },
 
     Catalog = Table.FromRecords(cases)
