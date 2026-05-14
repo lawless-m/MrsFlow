@@ -1520,7 +1520,33 @@ let
                 each [total])),
 
         SafeSerialize("q285", () =>
-            List.Generate(() => 5, each _ = 5, each _ + 1))
+            List.Generate(() => 5, each _ = 5, each _ + 1)),
+
+        // q286-q290: Record.Combine collisions + Record.Field.
+
+        SafeSerialize("q286", () =>
+            Record.Combine({[a=1], [b=2]})),
+
+        SafeSerialize("q287", () =>
+            let r = try Record.Combine({[a=1], [a=2]}) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q288", () =>
+            let r = try Record.Combine({[a=1, b=2], [b=20, c=3], [c=30]}) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q289", () =>
+            Record.Combine({})),
+
+        SafeSerialize("q290", () =>
+            let r = try Record.Field(Record.Combine({[a=1], [a=2]}), "a") in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]])
     },
 
     Catalog = Table.FromRecords(cases)
