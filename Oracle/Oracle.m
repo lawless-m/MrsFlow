@@ -553,7 +553,195 @@ let
 
         // q127: Comparer.FromCulture(_, true) is case-insensitive.
         SafeSerialize("q127", () =>
-            List.Distinct({"a","A","b"}, Comparer.FromCulture("en-US", true)))
+            List.Distinct({"a","A","b"}, Comparer.FromCulture("en-US", true))),
+
+        // q128-q149: probes for the "PQ refuses lambda" family. Each
+        // function tested with 3 variants:
+        //   a) lambda-logical (mrsflow accepts; PQ throws — dump try record)
+        //   b) lambda-ordering — does PQ accept the Table.Group shape?
+        //   c) PQ-canonical Comparer.* — works in both
+        // If (b) succeeds in PQ, mrsflow needs the same shape contract.
+
+        // --- List.Distinct (q128-q130) ---
+
+        // Probe shape: drop Error.Detail (which may contain non-
+        // serializable types) so Json.FromValue doesn't choke.
+        SafeSerialize("q128", () =>
+            let
+                r = try List.Distinct({"a","A","b","B","c"},
+                    (x,y) => Text.Lower(x) = Text.Lower(y))
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q129", () =>
+            let
+                r = try List.Distinct({"a","A","b","B","c"},
+                    (x,y) => Value.Compare(Text.Lower(x), Text.Lower(y)))
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q130", () =>
+            List.Distinct({"a","A","b","B","c"}, Comparer.OrdinalIgnoreCase)),
+
+        // --- List.Intersect (q131-q133) ---
+
+        SafeSerialize("q131", () =>
+            let
+                r = try List.Intersect({{"A","B","C"}, {"a","b"}},
+                    (x,y) => Text.Lower(x) = Text.Lower(y))
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q132", () =>
+            let
+                r = try List.Intersect({{"A","B","C"}, {"a","b"}},
+                    (x,y) => Value.Compare(Text.Lower(x), Text.Lower(y)))
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q133", () =>
+            List.Intersect({{"A","B","C"}, {"a","b"}},
+                Comparer.OrdinalIgnoreCase)),
+
+        // --- List.Difference (q134-q136) ---
+
+        SafeSerialize("q134", () =>
+            let
+                r = try List.Difference({"A","B","C"}, {"a","c"},
+                    (x,y) => Text.Lower(x) = Text.Lower(y))
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q135", () =>
+            let
+                r = try List.Difference({"A","B","C"}, {"a","c"},
+                    (x,y) => Value.Compare(Text.Lower(x), Text.Lower(y)))
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q136", () =>
+            List.Difference({"A","B","C"}, {"a","c"},
+                Comparer.OrdinalIgnoreCase)),
+
+        // --- Table.Distinct (q137-q140) ---
+
+        SafeSerialize("q137", () =>
+            let
+                r = try Table.Distinct(
+                    #table({"k","v"}, {{"a",1},{"A",2},{"b",3}}),
+                    (r1,r2) => Text.Lower(r1[k]) = Text.Lower(r2[k]))
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q138", () =>
+            let
+                r = try Table.Distinct(
+                    #table({"k","v"}, {{"a",1},{"A",2},{"b",3}}),
+                    (r1,r2) => Value.Compare(Text.Lower(r1[k]), Text.Lower(r2[k])))
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        // Single column-name as criteria (per docs, allowed shape).
+        SafeSerialize("q139", () =>
+            Table.Distinct(
+                #table({"k","v"}, {{"a",1},{"A",2},{"b",3}}),
+                "k")),
+
+        // List of {column, comparer} per docs.
+        SafeSerialize("q140", () =>
+            let
+                r = try Table.Distinct(
+                    #table({"k","v"}, {{"a",1},{"A",2},{"b",3}}),
+                    {"k", Comparer.OrdinalIgnoreCase})
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        // --- Value.Equals (q141-q144) ---
+
+        SafeSerialize("q141", () =>
+            let
+                r = try Value.Equals("Hello", "HELLO",
+                    (a,b) => Text.Lower(a) = Text.Lower(b))
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q142", () =>
+            let
+                r = try Value.Equals("Hello", "HELLO",
+                    (a,b) => Value.Compare(Text.Lower(a), Text.Lower(b)))
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q143", () =>
+            Value.Equals("Hello", "HELLO", Comparer.OrdinalIgnoreCase)),
+
+        SafeSerialize("q144", () =>
+            Value.Equals("Hello", "HELLO")),
+
+        // --- Table.Sort comparisonCriteria (q145-q148) ---
+
+        SafeSerialize("q145", () =>
+            let
+                r = try Table.Sort(
+                    #table({"k"}, {{"b"},{"A"},{"a"},{"C"}}),
+                    (r1,r2) => Value.Compare(Text.Lower(r1[k]), Text.Lower(r2[k])))
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q146", () =>
+            Table.Sort(
+                #table({"k"}, {{"b"},{"A"},{"a"},{"C"}}),
+                "k")),
+
+        SafeSerialize("q147", () =>
+            Table.Sort(
+                #table({"k"}, {{"b"},{"A"},{"a"},{"C"}}),
+                {"k", Order.Descending})),
+
+        SafeSerialize("q148", () =>
+            let
+                r = try Table.Sort(
+                    #table({"k"}, {{"b"},{"A"},{"a"},{"C"}}),
+                    {{"k", Order.Ascending, Comparer.OrdinalIgnoreCase}})
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        // --- List.Sort (q149) ---
+
+        SafeSerialize("q149", () =>
+            let
+                r = try List.Sort({3,1,4,1,5,9,2,6},
+                    (a,b) => Value.Compare(b, a))
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]])
     },
 
     Catalog = Table.FromRecords(cases)

@@ -1,0 +1,3 @@
+Table.Distinct(
+    #table({"k","v"}, {{"a",1},{"A",2},{"b",3}}),
+    "k")
