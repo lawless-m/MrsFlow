@@ -1087,6 +1087,38 @@ let
             in
                 if r[HasError]
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        // q211-q215: Operator coercion deep-dive.
+
+        SafeSerialize("q211", () =>
+            let r = try null * 5 in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q212", () =>
+            let r = try null - null in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q213", () =>
+            let r = try 1 < "1" in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q214", () =>
+            let r = try 1 = "1" in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q215", () =>
+            let r = try null & "x" in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                     else [HasError=false, Value=r[Value]])
     },
 
