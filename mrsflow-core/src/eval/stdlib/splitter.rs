@@ -606,24 +606,26 @@ fn split_text_by_lengths_impl(args: &[Value], _host: &dyn IoHost) -> Result<Valu
         }
         return Ok(Value::List(parts));
     }
-    // Reverse: walk lengths right-to-left, taking chunks from the end of text.
-    let mut tail_parts: Vec<String> = Vec::with_capacity(lengths.len());
-    let mut end = chars.len();
-    for n in lengths.iter().rev() {
-        if *n > end {
-            return Err(MError::Other(format!(
-                "Splitter.SplitTextByLengths: text too short for length sequence (need {}, have {} remaining)",
-                n, end
-            )));
-        }
-        let start = end - n;
-        let chunk: String = chars[start..end].iter().collect();
-        tail_parts.push(chunk);
-        end = start;
+    // Reverse: anchor at end of text and consume lengths right-to-left.
+    // Empirically (PQ via Oracle q99): {3,2} reverse on "abcdefg" gives
+    // ["cd","efg"]. That's: from offset (len - sum(lengths)) = 2,
+    // take lengths in REVERSED order — 2 first ("cd"), then 3 ("efg").
+    // Output preserves that traversal order.
+    let total: usize = lengths.iter().sum();
+    if total > chars.len() {
+        return Err(MError::Other(format!(
+            "Splitter.SplitTextByLengths: text too short for length sequence (need {}, have {})",
+            total,
+            chars.len(),
+        )));
     }
-    // tail_parts is in right-to-left order; reverse to match original
-    // lengths-array order in the output list.
-    let parts: Vec<Value> = tail_parts.into_iter().rev().map(Value::Text).collect();
+    let mut idx = chars.len() - total;
+    let mut parts: Vec<Value> = Vec::with_capacity(lengths.len());
+    for n in lengths.iter().rev() {
+        let chunk: String = chars[idx..idx + n].iter().collect();
+        parts.push(Value::Text(chunk));
+        idx += n;
+    }
     Ok(Value::List(parts))
 }
 

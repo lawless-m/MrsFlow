@@ -2701,10 +2701,12 @@ fn join(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             })
         })
         .collect::<Result<_, _>>()?;
-    // Drop key2 columns from the right side of the output.
-    let right_keep: Vec<usize> = (0..right_names.len())
-        .filter(|i| !key2_idxs.contains(i))
-        .collect();
+    // Keep all right-side columns including key2s — matches PQ's
+    // documented Table.Join shape (NestedJoin folds the key cols, plain
+    // Join doesn't). Mrsflow used to drop key2 cols; that diverged from
+    // PQ on multi-key joins (verified via Oracle q116).
+    let right_keep: Vec<usize> = (0..right_names.len()).collect();
+    let _ = &key2_idxs;
 
     let mut out_names: Vec<String> = left_names.clone();
     for &i in &right_keep {
@@ -4805,10 +4807,13 @@ fn from_list(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 fn from_value(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
-    // options.Name overrides the single column name; default is "Value".
+    // options.DefaultColumnName overrides the single column name;
+    // default is "Value". (PQ's documented option key is exactly
+    // DefaultColumnName — verified against Excel error message which
+    // explicitly rejects "Name".)
     let col_name: String = match args.get(1) {
         None | Some(Value::Null) => "Value".into(),
-        Some(Value::Record(r)) => match r.fields.iter().find(|(n, _)| n == "Name") {
+        Some(Value::Record(r)) => match r.fields.iter().find(|(n, _)| n == "DefaultColumnName") {
             Some((_, v)) => {
                 let forced = super::super::force(v.clone(), &mut |e, env| {
                     super::super::evaluate(e, env, host)
@@ -4816,7 +4821,7 @@ fn from_value(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
                 match forced {
                     Value::Null => "Value".into(),
                     Value::Text(s) => s,
-                    other => return Err(type_mismatch("text (options.Name)", &other)),
+                    other => return Err(type_mismatch("text (options.DefaultColumnName)", &other)),
                 }
             }
             None => "Value".into(),
@@ -5022,30 +5027,31 @@ fn profile(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let mut rows: Vec<Vec<Value>> = Vec::with_capacity(names.len());
     for (col_idx, name) in names.iter().enumerate() {
         let mut null_count = 0usize;
-        let mut seen: Vec<Value> = Vec::new();
         let mut col_values: Vec<Value> = Vec::with_capacity(n_rows);
         let mut col_type: Option<super::super::value::TypeRep> = None;
         for r in 0..n_rows {
             let cell = cell_to_value(&table, col_idx, r)?;
             if matches!(cell, Value::Null) {
                 null_count += 1;
-            } else {
-                if col_type.is_none() {
-                    col_type = Some(typerep_of_value(&cell));
-                }
-                let already = seen.iter().any(|v| values_equal_primitive(v, &cell).unwrap_or_default());
-                if !already {
-                    seen.push(cell.clone());
-                }
+            } else if col_type.is_none() {
+                col_type = Some(typerep_of_value(&cell));
             }
             col_values.push(cell);
         }
         let col_type = col_type.unwrap_or(super::super::value::TypeRep::Any);
+        // Column shape matches PQ's documented Table.Profile output:
+        // Min/Max/Average/StandardDeviation/DistinctCount come back null
+        // when the column has no explicit type ascription (the common
+        // #table case) — matches PQ behaviour, byte-verified via Oracle.
         let mut row = vec![
             Value::Text(name.clone()),
-            Value::Number(n_rows as f64),
-            Value::Number(null_count as f64),
-            Value::Number(seen.len() as f64),
+            Value::Null, // Min
+            Value::Null, // Max
+            Value::Null, // Average
+            Value::Null, // StandardDeviation
+            Value::Number(n_rows as f64),  // Count
+            Value::Number(null_count as f64),  // NullCount
+            Value::Null, // DistinctCount
         ];
         for e in &extras {
             let applies = invoke_callback_with_host(
@@ -5068,6 +5074,10 @@ fn profile(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     }
     let mut out_names: Vec<String> = vec![
         "Column".to_string(),
+        "Min".to_string(),
+        "Max".to_string(),
+        "Average".to_string(),
+        "StandardDeviation".to_string(),
         "Count".to_string(),
         "NullCount".to_string(),
         "DistinctCount".to_string(),

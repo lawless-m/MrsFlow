@@ -497,9 +497,9 @@ let
                     {{"EU",2024,15},{"EU",2025,25}}),
                 {"reg","yr"})),
 
-        // q117: Table.FromValue with options.Name.
+        // q117: Table.FromValue with options.DefaultColumnName.
         SafeSerialize("q117", () =>
-            Table.FromValue(42, [Name="Answer"])),
+            Table.FromValue(42, [DefaultColumnName="Answer"])),
 
         // q118: List.Random with seed — reproducible.
         SafeSerialize("q118", () =>

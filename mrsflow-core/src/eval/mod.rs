@@ -3210,8 +3210,9 @@ mod tests {
         "#;
         match eval_str(src).unwrap() {
             Value::Table(t) => {
-                // 3 matches; right-side "cid" dropped: cols = id, name, amt.
-                assert_eq!(t.column_names(), vec!["id", "name", "amt"]);
+                // 3 matches; right-side "cid" is kept (matches PQ's
+                // Table.Join shape — both key columns survive).
+                assert_eq!(t.column_names(), vec!["id", "name", "cid", "amt"]);
                 assert_eq!(t.num_rows(), 3);
             }
             other => panic!("expected table, got {other:?}"),
@@ -3228,7 +3229,7 @@ mod tests {
         "#;
         match eval_str(src).unwrap() {
             Value::Table(t) => {
-                assert_eq!(t.column_names(), vec!["id", "name", "amt"]);
+                assert_eq!(t.column_names(), vec!["id", "name", "cid", "amt"]);
                 // alice → 1 row; ghost → 1 row with null amt; total 2.
                 assert_eq!(t.num_rows(), 2);
             }
@@ -6900,8 +6901,22 @@ mod tests {
         "#;
         match eval_str(src).unwrap() {
             Value::Table(tbl) => {
-                // Profile should have one row per column with the four counts.
-                assert_eq!(tbl.column_names(), vec!["Column", "Count", "NullCount", "DistinctCount"]);
+                // PQ-shaped Table.Profile output: 8 base columns.
+                // Min/Max/Average/StandardDeviation/DistinctCount are null
+                // when the column has no explicit type ascription.
+                assert_eq!(
+                    tbl.column_names(),
+                    vec![
+                        "Column",
+                        "Min",
+                        "Max",
+                        "Average",
+                        "StandardDeviation",
+                        "Count",
+                        "NullCount",
+                        "DistinctCount",
+                    ],
+                );
                 assert_eq!(tbl.num_rows(), 1);
             }
             other => panic!("expected table, got {other:?}"),

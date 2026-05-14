@@ -1,1 +1,1 @@
-Table.FromValue(42, [Name="Answer"])
+Table.FromValue(42, [DefaultColumnName="Answer"])
