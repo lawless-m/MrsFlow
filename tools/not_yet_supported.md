@@ -33,7 +33,7 @@ equality / natural ordering. Implementing requires a callback path.
 
 - ✅ `List.Contains` / `ContainsAll` / `ContainsAny`
 - ✅ `List.Difference` / `Intersect` / `Union`
-- `List.IsDistinct` / `Mode` / `Modes`
+- ✅ `List.IsDistinct` / `Mode` / `Modes`
 - `List.PositionOf` / `PositionOfAny`
 - `List.Sort` (comparisonCriteria, not equationCriteria)
 - `Table.Contains` / `ContainsAll` / `ContainsAny`

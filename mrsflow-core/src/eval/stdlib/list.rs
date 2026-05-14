@@ -880,12 +880,10 @@ fn contains_any(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 
 fn is_distinct(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
-    if !matches!(args.get(1), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented("List.IsDistinct: equationCriteria not yet supported"));
-    }
+    let criteria = equation_criteria_fn(args, 1, "List.IsDistinct")?;
     for (i, a) in list.iter().enumerate() {
         for b in &list[i + 1..] {
-            if values_equal_primitive(a, b)? {
+            if eq_via_criteria(a, b, criteria)? {
                 return Ok(Value::Logical(false));
             }
         }
@@ -1434,9 +1432,7 @@ fn median(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 
 fn mode(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
-    if !matches!(args.get(1), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented("List.Mode: equationCriteria not yet supported"));
-    }
+    let criteria = equation_criteria_fn(args, 1, "List.Mode")?;
     if list.is_empty() {
         return Ok(Value::Null);
     }
@@ -1445,7 +1441,7 @@ fn mode(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     for v in list {
         let mut matched = false;
         for (k, c) in tally.iter_mut() {
-            if values_equal_primitive(k, v)? {
+            if eq_via_criteria(k, v, criteria)? {
                 *c += 1;
                 matched = true;
                 break;
@@ -1462,9 +1458,7 @@ fn mode(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 
 fn modes(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
-    if !matches!(args.get(1), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented("List.Modes: equationCriteria not yet supported"));
-    }
+    let criteria = equation_criteria_fn(args, 1, "List.Modes")?;
     if list.is_empty() {
         return Ok(Value::List(Vec::new()));
     }
@@ -1472,7 +1466,7 @@ fn modes(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     for v in list {
         let mut matched = false;
         for (k, c) in tally.iter_mut() {
-            if values_equal_primitive(k, v)? {
+            if eq_via_criteria(k, v, criteria)? {
                 *c += 1;
                 matched = true;
                 break;
