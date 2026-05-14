@@ -174,9 +174,25 @@ fn to_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         Value::Datetime(dt) => *dt,
         other => return Err(type_mismatch("datetime", other)),
     };
-    if !matches!(args.get(1), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented("DateTime.ToText: format string not yet supported"));
+    // Format string (arg 1): "G"/"g" (general, .NET conv) → default ISO
+    // shape; no-arg / null behaves the same. Other .NET format specs are
+    // not implemented; surface the actual format in the error.
+    let general = match args.get(1) {
+        None | Some(Value::Null) => true,
+        Some(Value::Text(fmt)) => {
+            let trimmed = fmt.trim();
+            matches!(trimmed, "G" | "g") || trimmed.is_empty()
+        }
+        Some(other) => return Err(type_mismatch("text (format)", other)),
+    };
+    if !general {
+        let Some(Value::Text(fmt)) = args.get(1) else { unreachable!() };
+        return Err(MError::Other(format!(
+            "DateTime.ToText: format string {fmt:?} not yet supported (only G / no-format)"
+        )));
     }
+    // Culture arg (2) accepted but ignored — en-US shape.
+    let _ = args.get(2);
     Ok(Value::Text(dt.format("%Y-%m-%dT%H:%M:%S").to_string()))
 }
 

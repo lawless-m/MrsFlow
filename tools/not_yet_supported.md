@@ -19,7 +19,7 @@ Same pattern `Number.ToText` already handles after commit `8a1074e` —
 accept `"G"` / `"g"` / empty as general (no-format equivalent),
 error on others with the actual format string in the message.
 
-- `DateTime.ToText`
+- ✅ `DateTime.ToText`
 - `DateTimeZone.ToText`
 - `Duration.ToText`
 - `Time.ToText`
