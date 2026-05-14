@@ -4580,10 +4580,12 @@ fn split_column(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
 fn transform_column_names(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let name_fn = expect_function(&args[1])?;
-    if !matches!(args.get(2), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented(
-            "Table.TransformColumnNames: options not yet supported",
-        ));
+    // Options record (e.g. {Culture="en-US"}) is accepted-and-ignored:
+    // mrsflow's name transformation uses whatever case mapping the
+    // user-supplied function does, so a locale hint is a no-op here.
+    match args.get(2) {
+        None | Some(Value::Null) | Some(Value::Record(_)) => {}
+        Some(other) => return Err(type_mismatch("record (options) or null", other)),
     }
     let (names, rows) = table_to_rows(&table)?;
     let mut new_names: Vec<String> = Vec::with_capacity(names.len());

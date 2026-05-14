@@ -98,7 +98,7 @@ Smaller per-function options, lower aggregate impact.
 - `Table.Join` (composite keys)
 - `Table.Profile` (additionalAggregates)
 - `Table.SplitColumn` (default + extraValues)
-- `Table.TransformColumnNames` (options)
+- ✅ `Table.TransformColumnNames` (options accepted-and-ignored)
 - ✅ `Value.FromText` (culture — accepted-and-ignored)
 - `List.Percentile` (options)
 - ✅ `List.Random` (seed)
