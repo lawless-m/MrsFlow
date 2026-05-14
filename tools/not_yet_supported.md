@@ -92,7 +92,7 @@ Smaller per-function options, lower aggregate impact.
 
 - `Combiner.CombineTextByLengths` / `ByPositions` / `ByRanges` (template)
 - `Table.AddRankColumn` (options)
-- `Table.FromList` (default arg)
+- ✅ `Table.FromList` (default arg)
 - `Table.FromPartitions` (columnInfo)
 - `Table.FromValue` (options)
 - `Table.Join` (composite keys)

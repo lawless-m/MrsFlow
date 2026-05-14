@@ -4700,11 +4700,10 @@ fn from_list(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
         Some(Value::Null) | None => vec!["Column1".to_string()],
         Some(v) => expect_text_list(v, "Table.FromList: columns")?,
     };
-    if !matches!(args.get(3), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented(
-            "Table.FromList: default argument not yet supported",
-        ));
-    }
+    let default: Value = match args.get(3) {
+        Some(Value::Null) | None => Value::Null,
+        Some(v) => v.clone(),
+    };
     // ExtraValues controls what to do when a row has more cells than `names`.
     // List = 0, Ignore = 1, Error = 2 (per `ExtraValues.*` in the root env).
     // Default per M spec is List; missing/null also maps to List for now.
@@ -4730,10 +4729,10 @@ fn from_list(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
                 }
             }
         };
-        // Pad short rows; treat overflow per extraValues.
+        // Pad short rows with `default`; treat overflow per extraValues.
         let mut row = row;
         while row.len() < names.len() {
-            row.push(Value::Null);
+            row.push(default.clone());
         }
         if row.len() > names.len() {
             match extra_values {
