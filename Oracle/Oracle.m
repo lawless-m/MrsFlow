@@ -1153,7 +1153,25 @@ let
         SafeSerialize("q222", () => Date.AddYears(#date(2024,2,29), 1)),
         SafeSerialize("q223", () => Date.AddYears(#date(2024,2,29), 4)),
         SafeSerialize("q224", () => Date.AddDays(#date(2026,1,1), -1)),
-        SafeSerialize("q225", () => Date.AddQuarters(#date(2026,1,15), 3))
+        SafeSerialize("q225", () => Date.AddQuarters(#date(2026,1,15), 3)),
+
+        // q226-q230: Table.AddColumn 4th arg (column type ascription).
+
+        SafeSerialize("q226", () =>
+            Table.AddColumn(#table({"A"}, {{10}}), "B", each [A] * 2, Int64.Type)),
+
+        SafeSerialize("q227", () =>
+            Table.AddColumn(#table({"A"}, {{10}}), "B", each [A] * 2.5, type number)),
+
+        SafeSerialize("q228", () =>
+            Table.AddColumn(#table({"A"}, {{1}}), "label", each "row-" & Text.From([A]), type text)),
+
+        SafeSerialize("q229", () =>
+            Table.AddColumn(#table({"d"}, {{#date(2026,1,1)}}),
+                "next", each Date.AddDays([d], 1), type date)),
+
+        SafeSerialize("q230", () =>
+            Table.AddColumn(#table({"A"}, {{10}}), "B", each [A] * 2))
     },
 
     Catalog = Table.FromRecords(cases)
