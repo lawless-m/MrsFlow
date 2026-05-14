@@ -38,7 +38,7 @@ equality / natural ordering. Implementing requires a callback path.
 - ✅ `List.Sort` (comparisonCriteria, not equationCriteria)
 - ✅ `Table.Contains` / `ContainsAll` / `ContainsAny`
 - ✅ `Table.Distinct` / `IsDistinct`
-- `Table.Group` (comparisonCriteria + groupKind)
+- ✅ `Table.Group` (comparisonCriteria + groupKind)
 - `Table.PositionOf` / `PositionOfAny`
 - `Table.RemoveMatchingRows` / `ReplaceMatchingRows`
 - `Value.Equals`

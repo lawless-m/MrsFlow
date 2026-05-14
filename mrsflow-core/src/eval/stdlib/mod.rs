@@ -124,6 +124,16 @@ pub fn root_env() -> Env {
         env = env.extend(name.to_string(), Value::Number(n));
     }
 
+    // GroupKind.* constants — Table.Group groupKind arg.
+    // Global (default) groups across the whole table; Local only folds
+    // consecutive rows with equal keys into the same group.
+    for (name, n) in [
+        ("GroupKind.Global", 0.0),
+        ("GroupKind.Local",  1.0),
+    ] {
+        env = env.extend(name.to_string(), Value::Number(n));
+    }
+
     // BinaryEncoding.* constants — Binary.FromText/ToText encoding arg.
     for (name, n) in [
         ("BinaryEncoding.Base64", 0.0),

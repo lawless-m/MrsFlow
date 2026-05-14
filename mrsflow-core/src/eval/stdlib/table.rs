@@ -4862,16 +4862,21 @@ fn group(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
         other => return Err(type_mismatch("text or list of text", other)),
     };
     let agg_list = expect_list(&args[2])?;
-    if !matches!(args.get(3), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented(
-            "Table.Group: groupKind not yet supported",
-        ));
-    }
-    if !matches!(args.get(4), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented(
-            "Table.Group: comparisonCriteria not yet supported",
-        ));
-    }
+    let group_local = match args.get(3) {
+        None | Some(Value::Null) => false,
+        Some(Value::Number(n)) => {
+            let k = *n as i64;
+            match k {
+                0 => false,
+                1 => true,
+                _ => return Err(MError::Other(format!(
+                    "Table.Group: groupKind must be GroupKind.Global (0) or GroupKind.Local (1), got {k}"
+                ))),
+            }
+        }
+        Some(other) => return Err(type_mismatch("number (GroupKind.*)", other)),
+    };
+    let criteria = table_equation_criteria_fn(args, 4, "Table.Group")?;
 
     // Parse aggregations into (newColName, agg_fn).
     struct AggSpec {
@@ -4907,22 +4912,26 @@ fn group(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
         .collect::<Result<_, _>>()?;
 
     // Group rows by key tuple, preserving first-seen order.
+    // GroupKind.Global: scan all existing groups; GroupKind.Local: only
+    // fold into the most recent group (consecutive-run grouping).
     let mut groups: Vec<(Vec<Value>, Vec<Vec<Value>>)> = Vec::new();
     for row in rows {
         let key_tuple: Vec<Value> = key_indices.iter().map(|&i| row[i].clone()).collect();
         let mut placed = false;
-        for (existing_key, group_rows) in groups.iter_mut() {
-            let mut all_eq = true;
-            for (a, b) in existing_key.iter().zip(key_tuple.iter()) {
-                if !values_equal_primitive(a, b)? {
-                    all_eq = false;
-                    break;
+        if group_local {
+            if let Some((existing_key, group_rows)) = groups.last_mut() {
+                if rows_equal_with_criteria(&keys, existing_key, &key_tuple, criteria)? {
+                    group_rows.push(row.clone());
+                    placed = true;
                 }
             }
-            if all_eq {
-                group_rows.push(row.clone());
-                placed = true;
-                break;
+        } else {
+            for (existing_key, group_rows) in groups.iter_mut() {
+                if rows_equal_with_criteria(&keys, existing_key, &key_tuple, criteria)? {
+                    group_rows.push(row.clone());
+                    placed = true;
+                    break;
+                }
             }
         }
         if !placed {
