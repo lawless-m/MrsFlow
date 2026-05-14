@@ -269,7 +269,7 @@ let
         SafeSerialize("q71", () => Table.ColumnCount(#table({"A","B","C"}, {{1,2,3}}))),
         SafeSerialize("q72", () => Table.FirstN(#table({"A"}, {{1},{2},{3},{4}}), 2)),
         SafeSerialize("q73", () => Table.Distinct(#table({"A"}, {{1},{2},{1},{3}}))),
-        SafeSerialize("q74", () => Table.Reverse(#table({"A"}, {{1},{2},{3}}))),
+        SafeSerialize("q74", () => Table.ReverseRows(#table({"A"}, {{1},{2},{3}}))),
 
         // --- Date / Time / Duration ---
         SafeSerialize("q75", () => Date.Year(#date(2026, 6, 15))),

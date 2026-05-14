@@ -1,1 +1,1 @@
- Table.Reverse(#table({"A"}, {{1},{2},{3}}))
+ Table.ReverseRows(#table({"A"}, {{1},{2},{3}}))
