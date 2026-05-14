@@ -3539,47 +3539,80 @@ fn find_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(Value::Table(values_to_table(&names, &kept)?))
 }
 
+/// Occurrence mode: First (default), Last, All. Local to table.rs; the
+/// List.* parallel keeps a separate copy for the same reason.
+#[derive(Copy, Clone, PartialEq)]
+enum Occurrence {
+    First,
+    Last,
+    All,
+}
+
+fn parse_occurrence(arg: Option<&Value>, fn_name: &str) -> Result<Occurrence, MError> {
+    match arg {
+        None | Some(Value::Null) => Ok(Occurrence::First),
+        Some(Value::Number(n)) => match *n as i64 {
+            0 => Ok(Occurrence::First),
+            1 => Ok(Occurrence::Last),
+            2 => Ok(Occurrence::All),
+            k => Err(MError::Other(format!(
+                "{fn_name}: occurrence must be Occurrence.First/Last/All (0/1/2), got {k}"
+            ))),
+        },
+        Some(other) => Err(type_mismatch("number (Occurrence.*)", other)),
+    }
+}
+
+fn occurrence_result(mode: Occurrence, matches: &[usize]) -> Value {
+    match mode {
+        Occurrence::First => Value::Number(matches.first().copied().map(|i| i as f64).unwrap_or(-1.0)),
+        Occurrence::Last => Value::Number(matches.last().copied().map(|i| i as f64).unwrap_or(-1.0)),
+        Occurrence::All => Value::List(matches.iter().map(|&i| Value::Number(i as f64)).collect()),
+    }
+}
+
 fn position_of(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let needle = match &args[1] {
         Value::Record(r) => r,
         other => return Err(type_mismatch("record", other)),
     };
-    if !matches!(args.get(2), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented(
-            "Table.PositionOf: occurrence not yet supported",
-        ));
-    }
+    let mode = parse_occurrence(args.get(2), "Table.PositionOf")?;
     let criteria = table_equation_criteria_fn(args, 3, "Table.PositionOf")?;
+    let mut matches: Vec<usize> = Vec::new();
     for row in 0..table.num_rows() {
         if row_matches_with_criteria(&table, row, needle, criteria)? {
-            return Ok(Value::Number(row as f64));
+            matches.push(row);
+            if mode == Occurrence::First {
+                break;
+            }
         }
     }
-    Ok(Value::Number(-1.0))
+    Ok(occurrence_result(mode, &matches))
 }
 
 fn position_of_any(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let needles_v = expect_list(&args[1])?;
-    if !matches!(args.get(2), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented(
-            "Table.PositionOfAny: occurrence not yet supported",
-        ));
-    }
+    let mode = parse_occurrence(args.get(2), "Table.PositionOfAny")?;
     let criteria = table_equation_criteria_fn(args, 3, "Table.PositionOfAny")?;
-    for row in 0..table.num_rows() {
+    let mut matches: Vec<usize> = Vec::new();
+    'outer: for row in 0..table.num_rows() {
         for n in needles_v {
             let needle = match n {
                 Value::Record(r) => r,
                 other => return Err(type_mismatch("record (in list)", other)),
             };
             if row_matches_with_criteria(&table, row, needle, criteria)? {
-                return Ok(Value::Number(row as f64));
+                matches.push(row);
+                if mode == Occurrence::First {
+                    break 'outer;
+                }
+                break;
             }
         }
     }
-    Ok(Value::Number(-1.0))
+    Ok(occurrence_result(mode, &matches))
 }
 
 fn keys(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {

@@ -39,7 +39,7 @@ equality / natural ordering. Implementing requires a callback path.
 - ✅ `Table.Contains` / `ContainsAll` / `ContainsAny`
 - ✅ `Table.Distinct` / `IsDistinct`
 - ✅ `Table.Group` (comparisonCriteria + groupKind)
-- ✅ `Table.PositionOf` / `PositionOfAny` (equationCriteria only — occurrence still pending)
+- ✅ `Table.PositionOf` / `PositionOfAny`
 - ✅ `Table.RemoveMatchingRows` / `ReplaceMatchingRows`
 - ✅ `Value.Equals`
 
@@ -83,7 +83,7 @@ PQ enum: `MissingField.Error` (default), `MissingField.Ignore`,
 Which match to return (first / last / all). Default first.
 
 - ✅ `List.PositionOf` / `PositionOfAny`
-- `Table.PositionOf` / `PositionOfAny`
+- ✅ `Table.PositionOf` / `PositionOfAny`
 - `Text.PositionOfAny`
 
 ## Other one-offs (~16)
