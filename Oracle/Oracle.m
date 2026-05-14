@@ -1052,7 +1052,42 @@ let
             try (error "kaboom") otherwise "ok"),
 
         SafeSerialize("q205", () =>
-            try (try 1/0 otherwise error "rethrow") otherwise "caught")
+            try (try 1/0 otherwise error "rethrow") otherwise "caught"),
+
+        // q206-q210: error "msg" and error-record construction.
+
+        SafeSerialize("q206", () =>
+            let r = try error "boom" in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q207", () =>
+            let r = try error [Reason="Custom.Reason", Message="msg-here", Detail="details"] in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q208", () =>
+            let r = try error 42 in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q209", () =>
+            let r = try error Error.Record("X.Y", "the message", "the detail") in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q210", () =>
+            let
+                inner = try error "first",
+                r = try error inner[Error]
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]])
     },
 
     Catalog = Table.FromRecords(cases)
