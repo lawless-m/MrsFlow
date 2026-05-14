@@ -1314,6 +1314,38 @@ let
             let r = try Splitter.SplitTextByCharacterTransition({}, {})("abc") in
                 if r[HasError]
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        // q251-q255: Json.Document edge cases.
+
+        SafeSerialize("q251", () =>
+            let r = try Json.Document("[1.5e3]") in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q252", () =>
+            let r = try Json.Document("[""é""]") in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q253", () =>
+            let r = try Json.Document("[[[1,2],[3,4]],[[5,6]]]") in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q254", () =>
+            let r = try Json.Document("{""k"":[]}") in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q255", () =>
+            let r = try Json.Document("9007199254740993") in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                     else [HasError=false, Value=r[Value]])
     },
 
