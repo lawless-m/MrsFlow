@@ -1474,24 +1474,13 @@ fn to_records(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 
 fn distinct(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
-    if !matches!(args.get(1), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented(
-            "Table.Distinct: equationCriteria not yet supported",
-        ));
-    }
+    let criteria = table_equation_criteria_fn(args, 1, "Table.Distinct")?;
     let (names, rows) = table_to_rows(&table)?;
     let mut kept: Vec<Vec<Value>> = Vec::new();
     for row in rows {
         let mut dup = false;
         for k in &kept {
-            let mut all_eq = true;
-            for (a, b) in row.iter().zip(k.iter()) {
-                if !values_equal_primitive(a, b)? {
-                    all_eq = false;
-                    break;
-                }
-            }
-            if all_eq {
+            if rows_equal_with_criteria(&names, &row, k, criteria)? {
                 dup = true;
                 break;
             }
@@ -3341,6 +3330,44 @@ fn row_matches_with_criteria(
     }
 }
 
+/// Compare two materialised rows (cell-vectors) for equality. With no
+/// criteria, uses per-cell primitive equality; with a callback, the rows
+/// are wrapped as Records (using `names`) and passed to the function.
+fn rows_equal_with_criteria(
+    names: &[String],
+    a: &[Value],
+    b: &[Value],
+    criteria: Option<&Closure>,
+) -> Result<bool, MError> {
+    match criteria {
+        None => {
+            for (av, bv) in a.iter().zip(b.iter()) {
+                if !values_equal_primitive(av, bv)? {
+                    return Ok(false);
+                }
+            }
+            Ok(true)
+        }
+        Some(f) => {
+            let mk = |row: &[Value]| -> Value {
+                Value::Record(Record {
+                    fields: names
+                        .iter()
+                        .cloned()
+                        .zip(row.iter().cloned())
+                        .collect(),
+                    env: super::super::env::EnvNode::empty(),
+                })
+            };
+            let r = invoke_builtin_callback(f, vec![mk(a), mk(b)])?;
+            match r {
+                Value::Logical(b) => Ok(b),
+                other => Err(type_mismatch("logical (from equationCriteria)", &other)),
+            }
+        }
+    }
+}
+
 fn contains(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let needle = match &args[1] {
@@ -3399,22 +3426,11 @@ fn contains_any(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 
 fn is_distinct(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
-    if !matches!(args.get(1), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented(
-            "Table.IsDistinct: comparisonCriteria not yet supported",
-        ));
-    }
-    let (_, rows) = table_to_rows(&table)?;
+    let criteria = table_equation_criteria_fn(args, 1, "Table.IsDistinct")?;
+    let (names, rows) = table_to_rows(&table)?;
     for i in 0..rows.len() {
         for j in (i + 1)..rows.len() {
-            let mut all_eq = true;
-            for (a, b) in rows[i].iter().zip(rows[j].iter()) {
-                if !values_equal_primitive(a, b)? {
-                    all_eq = false;
-                    break;
-                }
-            }
-            if all_eq {
+            if rows_equal_with_criteria(&names, &rows[i], &rows[j], criteria)? {
                 return Ok(Value::Logical(false));
             }
         }
