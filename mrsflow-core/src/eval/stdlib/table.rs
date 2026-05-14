@@ -3432,6 +3432,58 @@ fn rows_equal_with_criteria(
     }
 }
 
+/// Compare two key tuples for Table.Group's comparisonCriteria. PQ
+/// passes single-column keys to the callback BY VALUE (not wrapped as
+/// a record), as verified empirically:
+///   Table.Group(t, "k", aggs, GroupKind.Global,
+///     (a,b) => ...)
+/// calls the lambda with (a = "A", b = "B"), not ([k="A"], [k="B"]).
+/// For multi-column keys we still wrap as a record — PQ's exact shape
+/// there is undocumented, and record is the natural fallback.
+fn keys_equal_with_criteria(
+    names: &[String],
+    a: &[Value],
+    b: &[Value],
+    criteria: Option<&Closure>,
+) -> Result<bool, MError> {
+    match criteria {
+        None => {
+            for (av, bv) in a.iter().zip(b.iter()) {
+                if !values_equal_primitive(av, bv)? {
+                    return Ok(false);
+                }
+            }
+            Ok(true)
+        }
+        Some(f) => {
+            let (left, right) = if names.len() == 1 {
+                (a[0].clone(), b[0].clone())
+            } else {
+                let mk = |row: &[Value]| -> Value {
+                    Value::Record(Record {
+                        fields: names
+                            .iter()
+                            .cloned()
+                            .zip(row.iter().cloned())
+                            .collect(),
+                        env: super::super::env::EnvNode::empty(),
+                    })
+                };
+                (mk(a), mk(b))
+            };
+            let r = invoke_builtin_callback(f, vec![left, right])?;
+            match r {
+                Value::Logical(b) => Ok(b),
+                Value::Number(n) => Ok(n == 0.0),
+                other => Err(type_mismatch(
+                    "logical or number (from comparisonCriteria)",
+                    &other,
+                )),
+            }
+        }
+    }
+}
+
 fn contains(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let needle = match &args[1] {
@@ -5168,14 +5220,14 @@ fn group(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
         let mut placed = false;
         if group_local {
             if let Some((existing_key, group_rows)) = groups.last_mut() {
-                if rows_equal_with_criteria(&keys, existing_key, &key_tuple, criteria)? {
+                if keys_equal_with_criteria(&keys, existing_key, &key_tuple, criteria)? {
                     group_rows.push(row.clone());
                     placed = true;
                 }
             }
         } else {
             for (existing_key, group_rows) in groups.iter_mut() {
-                if rows_equal_with_criteria(&keys, existing_key, &key_tuple, criteria)? {
+                if keys_equal_with_criteria(&keys, existing_key, &key_tuple, criteria)? {
                     group_rows.push(row.clone());
                     placed = true;
                     break;

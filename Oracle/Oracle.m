@@ -333,16 +333,20 @@ let
             List.Difference({"A","B","C"}, {"a","c"},
                 (x,y) => Text.Lower(x) = Text.Lower(y))),
 
-        // q89: Table.Group with comparisonCriteria. Mrsflow's impl treats
-        //      this as a *key-equality* callback (key tuples wrapped as
-        //      records) — must return logical, not an ordering.
+        // q89: Table.Group with comparisonCriteria. Two PQ contracts
+        //      verified via the q128-family probes:
+        //        - callback receives bare key VALUES (not records) for
+        //          single-key grouping
+        //        - callback MUST return an ordering -1|0|1 (not logical
+        //          — PQ throws "We cannot convert true to Number")
+        //      So this uses Value.Compare to return the ordering shape.
         SafeSerialize("q89", () =>
             Table.Group(
                 #table({"k","v"}, {{"A",1},{"a",2},{"B",3}}),
                 "k",
                 {{"total", each List.Sum([v])}},
                 GroupKind.Global,
-                (a,b) => Text.Lower(a[k]) = Text.Lower(b[k]))),
+                (a,b) => Value.Compare(Text.Lower(a), Text.Lower(b)))),
 
         // --- predicate-form arguments (q90-q94) ---
 
