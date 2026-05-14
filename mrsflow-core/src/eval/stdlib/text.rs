@@ -312,10 +312,19 @@ fn from(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     match v {
         Value::Null => Ok(Value::Null),
         Value::Text(s) => Ok(Value::Text(s.clone())),
-        // {:?} for f64 matches `value_dump`'s canonical num format
-        // (always-trailing fractional digit). Keeping parity here so
-        // Text.From(42) prints the same as the differential's `(num 42.0)`.
-        Value::Number(n) => Ok(Value::Text(format!("{n:?}"))),
+        // Render integer-valued f64 without the `.0` to match PQ:
+        // `Text.From(42)` is "42", not "42.0". Same approach
+        // Json.FromValue uses for the same reason. (Oracle case q27
+        // was the catalog row that flagged this.) Non-integer floats
+        // keep default Rust formatting.
+        Value::Number(n) => {
+            let text = if n.is_finite() && n.fract() == 0.0 && n.abs() < 1e15 {
+                format!("{}", *n as i64)
+            } else {
+                format!("{n}")
+            };
+            Ok(Value::Text(text))
+        }
         Value::Logical(b) => Ok(Value::Text(
             if *b { "true" } else { "false" }.to_string(),
         )),

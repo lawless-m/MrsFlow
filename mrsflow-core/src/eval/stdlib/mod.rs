@@ -132,6 +132,22 @@ pub fn root_env() -> Env {
         env = env.extend(name.to_string(), Value::Number(n));
     }
 
+    // TextEncoding.* constants — Text.FromBinary/ToBinary encoding arg.
+    // Values match the Windows code-page numbers PQ uses. Only Utf8
+    // (65001) is actually decoded; the others are accepted-as-numbers
+    // so source compiles, but Text.ToBinary errors on non-65001 per
+    // the strict-encodings memory.
+    for (name, n) in [
+        ("TextEncoding.Ascii",             20127.0),
+        ("TextEncoding.BigEndianUnicode",  1201.0),
+        ("TextEncoding.Unicode",           1200.0),
+        ("TextEncoding.Utf16",             1200.0),
+        ("TextEncoding.Utf8",              65001.0),
+        ("TextEncoding.Windows",           1252.0),
+    ] {
+        env = env.extend(name.to_string(), Value::Number(n));
+    }
+
     // Compression.* constants — Binary.Compress/Decompress compressionType arg.
     for (name, n) in [
         ("Compression.None",    0.0),

@@ -5632,9 +5632,12 @@ mod tests {
 
     #[test]
     fn text_from_number() {
-        // Debug-format gives "42.0" for f64 whole numbers (parity with
-        // the differential's `(num 42.0)`).
-        assert_eq!(eval_text(r#"Text.From(42)"#), "42.0");
+        // Integer-valued f64 renders without `.0` to match PQ
+        // (Oracle q27). Non-integer keeps default float formatting.
+        assert_eq!(eval_text(r#"Text.From(42)"#), "42");
+        assert_eq!(eval_text(r#"Text.From(-5)"#), "-5");
+        assert_eq!(eval_text(r#"Text.From(0)"#), "0");
+        assert_eq!(eval_text(r#"Text.From(1.5)"#), "1.5");
     }
 
     #[test]

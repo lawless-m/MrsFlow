@@ -52,6 +52,12 @@ fn from_value(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let json = value_to_json(&forced)?;
     let text = serde_json::to_string(&json)
         .map_err(|e| MError::Other(format!("Json.FromValue: {e}")))?;
+    // PQ escapes `/` as `\/` (allowed but uncommon per RFC 8259);
+    // serde_json doesn't. Global replace inside strings is safe
+    // because `/` never appears as a structural JSON character —
+    // only inside string contexts. Matches Oracle q13-q15 byte
+    // output exactly.
+    let text = text.replace('/', "\\/");
     // Returns Binary per the M spec — UTF-8 bytes of the JSON text.
     Ok(Value::Binary(text.into_bytes()))
 }

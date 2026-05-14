@@ -1,1 +1,1 @@
-(record (("Kind" (text "Folder")) ("Size" (num 0.0)) ("Hidden" (bool false)) ("Directory" (bool true))))
+{"Kind":"Folder","Size":0,"Hidden":false,"Directory":true}
