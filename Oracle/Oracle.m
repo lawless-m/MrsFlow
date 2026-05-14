@@ -1275,6 +1275,45 @@ let
             let r = try #shared[Number.From]("42") in
                 if r[HasError]
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        // q246-q250: Splitter.SplitTextByCharacterTransition char-set
+        // notations. q174 showed the {"a".."z"} range syntax fails in
+        // mrsflow — these probes try alternatives.
+
+        SafeSerialize("q246", () =>
+            let r = try Splitter.SplitTextByCharacterTransition(
+                {"a","b","c"}, {"0","1","2","3","4","5","6","7","8","9"})("abc123") in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q247", () =>
+            let r = try Splitter.SplitTextByCharacterTransition(
+                {"a".."z"}, {"0".."9"})("hello123world456") in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q248", () =>
+            let r = try Splitter.SplitTextByCharacterTransition(
+                {"0".."9"}, {"a".."z"})("123hello456world") in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q249", () =>
+            let r = try Splitter.SplitTextByCharacterTransition(
+                {"a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z"},
+                {"0","1","2","3","4","5","6","7","8","9"})("hello123world456") in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q250", () =>
+            let r = try Splitter.SplitTextByCharacterTransition({}, {})("abc") in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                     else [HasError=false, Value=r[Value]])
     },
 
