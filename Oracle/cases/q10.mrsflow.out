@@ -1,1 +1,1 @@
-(table ((cols ("Column1" "Column2" "Column3" "Column4")) (rows (((text "a") (text "\"b") (text "c\"") (text "d"))))))
+(table ((cols ("Column1" "Column2" "Column3")) (rows (((text "a") (text "b,c") (text "d"))))))

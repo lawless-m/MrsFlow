@@ -55,7 +55,18 @@ fn document(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     if let Some(d) = opts.delimiter {
         builder.delimiter(d);
     }
-    builder.quoting(opts.quoting);
+    // Quote handling matching Power Query's QuoteStyle semantics:
+    //   - QuoteStyle.Csv (default): RFC 4180 — quotes delimit fields,
+    //     `""` inside a quoted field is an escape for a literal `"`.
+    //     csv crate: quoting=true, double_quote=true (default).
+    //   - QuoteStyle.None: quotes still delimit fields, but `""` is NOT
+    //     an escape. PQ's reading; verified against Excel q10 in
+    //     Oracle/cases/. csv crate: quoting=true, double_quote=false.
+    // The naive interpretation ("quoting=false makes every quote
+    // literal") splits `a,"b,c",d` into 4 fields, which diverged from
+    // Excel's 3 in the oracle round.
+    builder.quoting(true);
+    builder.double_quote(opts.quoting);
     builder.flexible(true); // ragged-row tolerance, normalised below
 
     let mut reader = builder.from_reader(bytes.as_slice());
