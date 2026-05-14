@@ -4055,14 +4055,40 @@ fn row_matches_full_record(
     Ok(true)
 }
 
+/// Same as row_matches_full_record but with optional equationCriteria.
+/// With a callback, the materialised row is wrapped as a Record (using
+/// the table's column names) and (row_record, needle) is invoked.
+fn materialised_row_matches_with_criteria(
+    names: &[String],
+    row: &[Value],
+    needle: &Record,
+    criteria: Option<&Closure>,
+) -> Result<bool, MError> {
+    match criteria {
+        None => row_matches_full_record(names, row, needle),
+        Some(f) => {
+            let row_rec = Value::Record(Record {
+                fields: names
+                    .iter()
+                    .cloned()
+                    .zip(row.iter().cloned())
+                    .collect(),
+                env: super::super::env::EnvNode::empty(),
+            });
+            let needle_v = Value::Record(needle.clone());
+            let r = invoke_builtin_callback(f, vec![row_rec, needle_v])?;
+            match r {
+                Value::Logical(b) => Ok(b),
+                other => Err(type_mismatch("logical (from equationCriteria)", &other)),
+            }
+        }
+    }
+}
+
 fn remove_matching_rows(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let needles = expect_list(&args[1])?;
-    if !matches!(args.get(2), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented(
-            "Table.RemoveMatchingRows: equationCriteria not yet supported",
-        ));
-    }
+    let criteria = table_equation_criteria_fn(args, 2, "Table.RemoveMatchingRows")?;
     let (names, rows) = table_to_rows(&table)?;
     let mut kept: Vec<Vec<Value>> = Vec::with_capacity(rows.len());
     'row: for row in rows {
@@ -4071,7 +4097,7 @@ fn remove_matching_rows(args: &[Value], _host: &dyn IoHost) -> Result<Value, MEr
                 Value::Record(r) => r,
                 other => return Err(type_mismatch("record (in list)", other)),
             };
-            if row_matches_full_record(&names, &row, needle)? {
+            if materialised_row_matches_with_criteria(&names, &row, needle, criteria)? {
                 continue 'row;
             }
         }
@@ -4089,11 +4115,7 @@ fn remove_rows_with_errors(args: &[Value], _host: &dyn IoHost) -> Result<Value, 
 fn replace_matching_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let pairs = expect_list(&args[1])?;
-    if !matches!(args.get(2), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented(
-            "Table.ReplaceMatchingRows: equationCriteria not yet supported",
-        ));
-    }
+    let criteria = table_equation_criteria_fn(args, 2, "Table.ReplaceMatchingRows")?;
     // Parse pairs: each is a list with two records (old, new).
     struct Pair {
         old: Record,
@@ -4126,7 +4148,7 @@ fn replace_matching_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MEr
     for row in rows {
         let mut replaced = false;
         for p in &owned {
-            if row_matches_full_record(&names, &row, &p.old)? {
+            if materialised_row_matches_with_criteria(&names, &row, &p.old, criteria)? {
                 // Build replacement row from new record, falling back to original
                 // cell when a column is not mentioned in `new`.
                 let mut new_row: Vec<Value> = Vec::with_capacity(names.len());

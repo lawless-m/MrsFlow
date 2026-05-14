@@ -40,7 +40,7 @@ equality / natural ordering. Implementing requires a callback path.
 - ✅ `Table.Distinct` / `IsDistinct`
 - ✅ `Table.Group` (comparisonCriteria + groupKind)
 - ✅ `Table.PositionOf` / `PositionOfAny` (equationCriteria only — occurrence still pending)
-- `Table.RemoveMatchingRows` / `ReplaceMatchingRows`
+- ✅ `Table.RemoveMatchingRows` / `ReplaceMatchingRows`
 - `Value.Equals`
 
 ## Predicate-form arguments (8)
