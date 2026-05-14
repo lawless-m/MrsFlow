@@ -369,12 +369,11 @@ fn split_text_by_repeated_lengths(
 }
 
 fn split_text_by_whitespace(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    if !matches!(args.first(), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented(
-            "Splitter.SplitTextByWhitespace: quoteStyle not yet supported",
-        ));
-    }
-    Ok(make_splitter(vec![], split_text_by_whitespace_impl))
+    let qs = parse_quote_style(args.first(), "Splitter.SplitTextByWhitespace")?;
+    Ok(make_splitter(
+        vec![("__qs".into(), Value::Number(qs as i64 as f64))],
+        split_text_by_whitespace_impl,
+    ))
 }
 
 // --- Inner impls ---
@@ -744,9 +743,66 @@ fn split_text_by_repeated_lengths_impl(
 
 fn split_text_by_whitespace_impl(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
-    let parts: Vec<Value> = text
-        .split_whitespace()
-        .map(|s| Value::Text(s.to_string()))
-        .collect();
-    Ok(Value::List(parts))
+    let qs_n = match &args[1] {
+        Value::Number(n) => *n as i64,
+        _ => 0,
+    };
+    if qs_n != 1 {
+        let parts: Vec<Value> = text
+            .split_whitespace()
+            .map(|s| Value::Text(s.to_string()))
+            .collect();
+        return Ok(Value::List(parts));
+    }
+    // Csv-aware: whitespace runs separate fields only when scanned outside
+    // a double-quoted region. Inside "...", `""` is an escaped quote.
+    let mut parts: Vec<String> = Vec::new();
+    let mut buf = String::new();
+    let mut in_quote = false;
+    let bytes = text.as_bytes();
+    let mut i = 0usize;
+    let mut at_field_start = true;
+    while i < bytes.len() {
+        let c = text[i..].chars().next().unwrap();
+        let cl = c.len_utf8();
+        if in_quote {
+            if c == '"' {
+                if text[i + cl..].starts_with('"') {
+                    buf.push('"');
+                    i += cl + 1;
+                    continue;
+                }
+                in_quote = false;
+            } else {
+                buf.push(c);
+            }
+            i += cl;
+            at_field_start = false;
+        } else if c == '"' && at_field_start {
+            in_quote = true;
+            i += cl;
+        } else if c.is_whitespace() {
+            if !buf.is_empty() {
+                parts.push(std::mem::take(&mut buf));
+            }
+            // collapse the rest of the whitespace run
+            i += cl;
+            while i < bytes.len() {
+                let nc = text[i..].chars().next().unwrap();
+                if !nc.is_whitespace() {
+                    break;
+                }
+                i += nc.len_utf8();
+            }
+            at_field_start = true;
+        } else {
+            buf.push(c);
+            i += cl;
+            at_field_start = false;
+        }
+    }
+    if !buf.is_empty() {
+        parts.push(buf);
+    }
+    Ok(Value::List(parts.into_iter().map(Value::Text).collect()))
 }

@@ -63,7 +63,7 @@ the scan direction.
 - ✅ `Splitter.SplitTextByLengths`
 - `Splitter.SplitTextByPositions`
 - `Splitter.SplitTextByRanges`
-- `Splitter.SplitTextByWhitespace`
+- ✅ `Splitter.SplitTextByWhitespace`
 - `Combiner.CombineTextByDelimiter`
 
 ## missingField option (5)
