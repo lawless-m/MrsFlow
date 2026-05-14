@@ -134,6 +134,17 @@ pub fn root_env() -> Env {
         env = env.extend(name.to_string(), Value::Number(n));
     }
 
+    // MissingField.* constants — Record.* missingField arg.
+    // Error (default) raises on a missing field; Ignore silently
+    // skips it; UseNull behaves as if it existed with value null.
+    for (name, n) in [
+        ("MissingField.Error",   0.0),
+        ("MissingField.Ignore",  1.0),
+        ("MissingField.UseNull", 2.0),
+    ] {
+        env = env.extend(name.to_string(), Value::Number(n));
+    }
+
     // BinaryEncoding.* constants — Binary.FromText/ToText encoding arg.
     for (name, n) in [
         ("BinaryEncoding.Base64", 0.0),

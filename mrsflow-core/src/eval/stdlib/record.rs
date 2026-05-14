@@ -221,17 +221,14 @@ fn remove_fields(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             .collect::<Result<_, _>>()?,
         other => return Err(type_mismatch("text or list of text", other)),
     };
-    if !matches!(args.get(2), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented(
-            "Record.RemoveFields: missingField option not yet supported",
-        ));
-    }
-    // Default behaviour: any name not present in the record is an error.
-    for n in &drop_names {
-        if !record.fields.iter().any(|(fname, _)| fname == n) {
-            return Err(MError::Other(format!(
-                "Record.RemoveFields: field not found: {n}"
-            )));
+    let missing = parse_missing_field(args.get(2), "Record.RemoveFields")?;
+    if missing == MissingField::Error {
+        for n in &drop_names {
+            if !record.fields.iter().any(|(fname, _)| fname == n) {
+                return Err(MError::Other(format!(
+                    "Record.RemoveFields: field not found: {n}"
+                )));
+            }
         }
     }
     let kept: Vec<(String, Value)> = record
@@ -331,11 +328,7 @@ fn rename_fields(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         Value::Record(r) => r,
         other => return Err(type_mismatch("record", other)),
     };
-    if !matches!(args.get(2), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented(
-            "Record.RenameFields: missingField option not yet supported",
-        ));
-    }
+    let missing = parse_missing_field(args.get(2), "Record.RenameFields")?;
     // renames may be a single {old, new} pair or a list of such pairs.
     let raw = expect_list(&args[1])?;
     let pairs: Vec<(String, String)> = if raw.iter().all(|v| matches!(v, Value::List(_))) {
@@ -347,9 +340,17 @@ fn rename_fields(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     };
     let mut fields = record.fields.clone();
     for (old, new) in pairs {
-        let pos = fields.iter().position(|(n, _)| n == &old).ok_or_else(|| {
-            MError::Other(format!("Record.RenameFields: field not found: {old}"))
-        })?;
+        let pos = match fields.iter().position(|(n, _)| n == &old) {
+            Some(p) => p,
+            None => match missing {
+                MissingField::Error => {
+                    return Err(MError::Other(format!(
+                        "Record.RenameFields: field not found: {old}"
+                    )));
+                }
+                MissingField::Ignore | MissingField::UseNull => continue,
+            },
+        };
         if old != new && fields.iter().any(|(n, _)| n == &new) {
             return Err(MError::Other(format!(
                 "Record.RenameFields: target field already exists: {new}"
@@ -363,6 +364,29 @@ fn rename_fields(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     }))
 }
 
+
+/// MissingField mode: Error (0, default), Ignore (1), UseNull (2).
+#[derive(Copy, Clone, PartialEq)]
+enum MissingField {
+    Error,
+    Ignore,
+    UseNull,
+}
+
+fn parse_missing_field(arg: Option<&Value>, fn_name: &str) -> Result<MissingField, MError> {
+    match arg {
+        None | Some(Value::Null) => Ok(MissingField::Error),
+        Some(Value::Number(n)) => match *n as i64 {
+            0 => Ok(MissingField::Error),
+            1 => Ok(MissingField::Ignore),
+            2 => Ok(MissingField::UseNull),
+            k => Err(MError::Other(format!(
+                "{fn_name}: missingField must be MissingField.Error/Ignore/UseNull (0/1/2), got {k}"
+            ))),
+        },
+        Some(other) => Err(type_mismatch("number (MissingField.*)", other)),
+    }
+}
 
 fn parse_rename_pair(v: &Value) -> Result<(String, String), MError> {
     let xs = expect_list(v)?;
@@ -383,29 +407,27 @@ fn reorder_fields(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         Value::Record(r) => r,
         other => return Err(type_mismatch("record", other)),
     };
-    if !matches!(args.get(2), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented(
-            "Record.ReorderFields: missingField option not yet supported",
-        ));
-    }
+    let missing = parse_missing_field(args.get(2), "Record.ReorderFields")?;
     let order = expect_text_list(&args[1], "Record.ReorderFields")?;
-    // Power Query allows partial reorder — listed fields move to the front
-    // in the given order, remaining fields keep their original order behind.
-    for n in &order {
-        if !record.fields.iter().any(|(fname, _)| fname == n) {
-            return Err(MError::Other(format!(
-                "Record.ReorderFields: field not found: {n}"
-            )));
+    if missing == MissingField::Error {
+        for n in &order {
+            if !record.fields.iter().any(|(fname, _)| fname == n) {
+                return Err(MError::Other(format!(
+                    "Record.ReorderFields: field not found: {n}"
+                )));
+            }
         }
     }
     let mut fields: Vec<(String, Value)> = Vec::with_capacity(record.fields.len());
     for n in &order {
-        let (fname, fv) = record
-            .fields
-            .iter()
-            .find(|(fname, _)| fname == n)
-            .unwrap();
-        fields.push((fname.clone(), fv.clone()));
+        match record.fields.iter().find(|(fname, _)| fname == n) {
+            Some((fname, fv)) => fields.push((fname.clone(), fv.clone())),
+            None => match missing {
+                MissingField::Ignore => continue,
+                MissingField::UseNull => fields.push((n.clone(), Value::Null)),
+                MissingField::Error => unreachable!(),
+            },
+        }
     }
     for (fname, fv) in &record.fields {
         if !order.iter().any(|n| n == fname) {
@@ -424,11 +446,7 @@ fn select_fields(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         Value::Record(r) => r,
         other => return Err(type_mismatch("record", other)),
     };
-    if !matches!(args.get(2), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented(
-            "Record.SelectFields: missingField option not yet supported",
-        ));
-    }
+    let missing = parse_missing_field(args.get(2), "Record.SelectFields")?;
     let keep: Vec<String> = match &args[1] {
         Value::Text(s) => vec![s.clone()],
         Value::List(_) => expect_text_list(&args[1], "Record.SelectFields")?,
@@ -436,14 +454,18 @@ fn select_fields(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     };
     let mut fields: Vec<(String, Value)> = Vec::with_capacity(keep.len());
     for n in &keep {
-        let (fname, fv) = record
-            .fields
-            .iter()
-            .find(|(fname, _)| fname == n)
-            .ok_or_else(|| {
-                MError::Other(format!("Record.SelectFields: field not found: {n}"))
-            })?;
-        fields.push((fname.clone(), fv.clone()));
+        match record.fields.iter().find(|(fname, _)| fname == n) {
+            Some((fname, fv)) => fields.push((fname.clone(), fv.clone())),
+            None => match missing {
+                MissingField::Error => {
+                    return Err(MError::Other(format!(
+                        "Record.SelectFields: field not found: {n}"
+                    )));
+                }
+                MissingField::Ignore => continue,
+                MissingField::UseNull => fields.push((n.clone(), Value::Null)),
+            },
+        }
     }
     Ok(Value::Record(Record {
         fields,
@@ -492,11 +514,7 @@ fn transform_fields(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> 
         Value::Record(r) => r,
         other => return Err(type_mismatch("record", other)),
     };
-    if !matches!(args.get(2), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented(
-            "Record.TransformFields: missingField option not yet supported",
-        ));
-    }
+    let missing = parse_missing_field(args.get(2), "Record.TransformFields")?;
     let raw = expect_list(&args[1])?;
     // Accept either a single {name, fn} pair or a list of such pairs.
     let pair_values: Vec<&Vec<Value>> = if raw.iter().all(|v| matches!(v, Value::List(_))) {
@@ -519,14 +537,28 @@ fn transform_fields(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> 
         }
         let name = expect_text(&xs[0])?.to_string();
         let closure = expect_function(&xs[1])?;
-        let pos = fields.iter().position(|(n, _)| n == &name).ok_or_else(|| {
-            MError::Other(format!("Record.TransformFields: field not found: {name}"))
-        })?;
-        let forced = super::super::force(fields[pos].1.clone(), &mut |e, env| {
-            super::super::evaluate(e, env, host)
-        })?;
-        let new_val = invoke_callback_with_host(closure, vec![forced], host)?;
-        fields[pos].1 = new_val;
+        match fields.iter().position(|(n, _)| n == &name) {
+            Some(pos) => {
+                let forced = super::super::force(fields[pos].1.clone(), &mut |e, env| {
+                    super::super::evaluate(e, env, host)
+                })?;
+                let new_val = invoke_callback_with_host(closure, vec![forced], host)?;
+                fields[pos].1 = new_val;
+            }
+            None => match missing {
+                MissingField::Error => {
+                    return Err(MError::Other(format!(
+                        "Record.TransformFields: field not found: {name}"
+                    )));
+                }
+                MissingField::Ignore => continue,
+                MissingField::UseNull => {
+                    // Transform null and append as a new field.
+                    let new_val = invoke_callback_with_host(closure, vec![Value::Null], host)?;
+                    fields.push((name, new_val));
+                }
+            },
+        }
     }
     Ok(Value::Record(Record {
         fields,

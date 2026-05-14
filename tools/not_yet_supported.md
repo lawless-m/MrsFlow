@@ -70,12 +70,12 @@ support.
 - ✅ `Splitter.SplitTextByWhitespace`
 - ✅ `Combiner.CombineTextByDelimiter`
 
-## missingField option (5)
+## missingField option — DONE
 
 PQ enum: `MissingField.Error` (default), `MissingField.Ignore`,
 `MissingField.UseNull`. Add as numeric constants then dispatch.
 
-- `Record.RemoveFields` / `RenameFields` / `ReorderFields`
+- ✅ `Record.RemoveFields` / `RenameFields` / `ReorderFields`
   / `SelectFields` / `TransformFields`
 
 ## occurrence (5)
