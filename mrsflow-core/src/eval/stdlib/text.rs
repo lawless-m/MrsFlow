@@ -614,22 +614,52 @@ fn split_any(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
+/// Occurrence mode: First (default), Last, All. Local to text.rs;
+/// list.rs and table.rs each keep their own copy for the same reason.
+#[derive(Copy, Clone, PartialEq)]
+enum Occurrence {
+    First,
+    Last,
+    All,
+}
+
+fn parse_occurrence(arg: Option<&Value>, fn_name: &str) -> Result<Occurrence, MError> {
+    match arg {
+        None | Some(Value::Null) => Ok(Occurrence::First),
+        Some(Value::Number(n)) => match *n as i64 {
+            0 => Ok(Occurrence::First),
+            1 => Ok(Occurrence::Last),
+            2 => Ok(Occurrence::All),
+            k => Err(MError::Other(format!(
+                "{fn_name}: occurrence must be Occurrence.First/Last/All (0/1/2), got {k}"
+            ))),
+        },
+        Some(other) => Err(type_mismatch("number (Occurrence.*)", other)),
+    }
+}
+
+fn occurrence_result(mode: Occurrence, matches: &[usize]) -> Value {
+    match mode {
+        Occurrence::First => Value::Number(matches.first().copied().map(|i| i as f64).unwrap_or(-1.0)),
+        Occurrence::Last => Value::Number(matches.last().copied().map(|i| i as f64).unwrap_or(-1.0)),
+        Occurrence::All => Value::List(matches.iter().map(|&i| Value::Number(i as f64)).collect()),
+    }
+}
+
 fn position_of_any(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     let chars = chars_from_arg(&args[1], "Text.PositionOfAny")?;
-    if !matches!(args.get(2), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented(
-            "Text.PositionOfAny: occurrence arg not yet supported",
-        ));
+    let mode = parse_occurrence(args.get(2), "Text.PositionOfAny")?;
+    let mut matches: Vec<usize> = Vec::new();
+    for (char_pos, (_, c)) in text.char_indices().enumerate() {
+        if chars.contains(&c) {
+            matches.push(char_pos);
+            if mode == Occurrence::First {
+                break;
+            }
+        }
     }
-    let idx = text
-        .char_indices()
-        .find(|(_, c)| chars.contains(c))
-        .map(|(byte_idx, _)| text[..byte_idx].chars().count());
-    Ok(Value::Number(match idx {
-        Some(i) => i as f64,
-        None => -1.0,
-    }))
+    Ok(occurrence_result(mode, &matches))
 }
 
 /// Find the byte offsets of every occurrence of `delim` in `text`.

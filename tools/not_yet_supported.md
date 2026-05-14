@@ -78,13 +78,13 @@ PQ enum: `MissingField.Error` (default), `MissingField.Ignore`,
 - ✅ `Record.RemoveFields` / `RenameFields` / `ReorderFields`
   / `SelectFields` / `TransformFields`
 
-## occurrence (5)
+## occurrence — DONE
 
 Which match to return (first / last / all). Default first.
 
 - ✅ `List.PositionOf` / `PositionOfAny`
 - ✅ `Table.PositionOf` / `PositionOfAny`
-- `Text.PositionOfAny`
+- ✅ `Text.PositionOfAny`
 
 ## Other one-offs (~16)
 
