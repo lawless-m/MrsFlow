@@ -1493,52 +1493,85 @@ fn distinct(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn first_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn row_predicate_holds(
+    f: &Closure,
+    row_rec: Value,
+    host: &dyn IoHost,
+    fn_name: &str,
+) -> Result<bool, MError> {
+    let r = invoke_callback_with_host(f, vec![row_rec], host)?;
+    match r {
+        Value::Logical(b) => Ok(b),
+        other => Err(MError::Other(format!(
+            "{fn_name}: predicate must return logical, got {}",
+            super::super::type_name(&other),
+        ))),
+    }
+}
+
+fn first_n(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
-    let n = match &args[1] {
+    match &args[1] {
         Value::Number(n) => {
             if !n.is_finite() || *n < 0.0 {
                 return Err(MError::Other(
                     "Table.FirstN: count must be a non-negative integer".into(),
                 ));
             }
-            *n as usize
+            let (names, rows) = table_to_rows(&table)?;
+            let kept: Vec<Vec<Value>> = rows.into_iter().take(*n as usize).collect();
+            Ok(Value::Table(values_to_table(&names, &kept)?))
         }
-        Value::Function(_) => {
-            return Err(MError::NotImplemented(
-                "Table.FirstN: predicate (take-while) form not yet supported",
-            ));
+        Value::Function(f) => {
+            // take-while: stop on first false
+            let (names, rows) = table_to_rows(&table)?;
+            let mut kept: Vec<Vec<Value>> = Vec::new();
+            for (i, row) in rows.iter().enumerate() {
+                let rec = row_to_record(&table, i)?;
+                if row_predicate_holds(f, rec, host, "Table.FirstN")? {
+                    kept.push(row.clone());
+                } else {
+                    break;
+                }
+            }
+            Ok(Value::Table(values_to_table(&names, &kept)?))
         }
-        other => return Err(type_mismatch("number or function", other)),
-    };
-    let (names, rows) = table_to_rows(&table)?;
-    let kept: Vec<Vec<Value>> = rows.into_iter().take(n).collect();
-    Ok(Value::Table(values_to_table(&names, &kept)?))
+        other => Err(type_mismatch("number or function", other)),
+    }
 }
 
-fn last_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn last_n(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
-    let n = match &args[1] {
+    match &args[1] {
         Value::Number(n) => {
             if !n.is_finite() || *n < 0.0 {
                 return Err(MError::Other(
                     "Table.LastN: count must be a non-negative integer".into(),
                 ));
             }
-            *n as usize
+            let (names, rows) = table_to_rows(&table)?;
+            let total = rows.len();
+            let skip = total.saturating_sub(*n as usize);
+            let kept: Vec<Vec<Value>> = rows.into_iter().skip(skip).collect();
+            Ok(Value::Table(values_to_table(&names, &kept)?))
         }
-        Value::Function(_) => {
-            return Err(MError::NotImplemented(
-                "Table.LastN: predicate (drop-while-from-start) form not yet supported",
-            ));
+        Value::Function(f) => {
+            // from-end take-while: scan reversed, stop on first false
+            let (names, rows) = table_to_rows(&table)?;
+            let mut start = rows.len();
+            for i in (0..rows.len()).rev() {
+                let rec = row_to_record(&table, i)?;
+                if row_predicate_holds(f, rec, host, "Table.LastN")? {
+                    start -= 1;
+                } else {
+                    break;
+                }
+            }
+            let kept: Vec<Vec<Value>> = rows[start..].to_vec();
+            Ok(Value::Table(values_to_table(&names, &kept)?))
         }
-        other => return Err(type_mismatch("number or function", other)),
-    };
-    let (names, rows) = table_to_rows(&table)?;
-    let total = rows.len();
-    let skip = total.saturating_sub(n);
-    let kept: Vec<Vec<Value>> = rows.into_iter().skip(skip).collect();
-    Ok(Value::Table(values_to_table(&names, &kept)?))
+        other => Err(type_mismatch("number or function", other)),
+    }
 }
 
 fn reverse(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
@@ -2118,16 +2151,25 @@ fn parse_col_fn_pairs(transforms: &[Value]) -> Result<ColFnPairs<'_>, MError> {
 }
 
 
-fn skip(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn skip(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let count = match &args[1] {
         Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
-        Value::Function(_) => {
-            return Err(MError::NotImplemented(
-                "Table.Skip: predicate (skip-while) form not yet supported",
-            ));
+        Value::Function(f) => {
+            // skip-while: count rows from the start while predicate is true.
+            // Then fall through to the optimised slice path with that count.
+            let mut k = 0usize;
+            for i in 0..table.num_rows() {
+                let rec = row_to_record(&table, i)?;
+                if row_predicate_holds(f, rec, host, "Table.Skip")? {
+                    k += 1;
+                } else {
+                    break;
+                }
+            }
+            k
         }
-        other => return Err(type_mismatch("non-negative integer", other)),
+        other => return Err(type_mismatch("non-negative integer or function", other)),
     };
     let n_rows = table.num_rows();
     let skip = count.min(n_rows);

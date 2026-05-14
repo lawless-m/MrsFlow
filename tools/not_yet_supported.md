@@ -49,7 +49,7 @@ The Nth-item form (`(table, 5)`) works; the predicate form
 (`(table, each [x] > 10)` — take-while or skip-while) is unimplemented.
 
 - ✅ `List.FirstN` / `LastN` / `Skip` / `RemoveFirstN` / `RemoveLastN`
-- `Table.FirstN` / `LastN` / `Skip`
+- ✅ `Table.FirstN` / `LastN` / `Skip`
 
 ## quoteStyle / startAtEnd flags (9)
 
