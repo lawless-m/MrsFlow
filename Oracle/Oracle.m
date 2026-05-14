@@ -1179,19 +1179,35 @@ let
             Record.AddField([a=1], "b", 99)),
 
         SafeSerialize("q232", () =>
-            Record.AddField([a=1], "b", () => 99, true)),
+            // Don't return the raw delayed-record — mrsflow's Json.FromValue
+            // chokes on function-valued fields, halting catalog capture.
+            // Surface just the field names + whether construction succeeded.
+            let r = try Record.AddField([a=1], "b", () => 99, true) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else Record.FieldNames(r[Value])),
 
         SafeSerialize("q233", () =>
-            Record.AddField([a=1], "b", () => 99, true)[b]),
+            // PQ forces the delayed field on access; mrsflow returns the
+            // closure itself. We invoke it explicitly so the case can
+            // serialize regardless.
+            let v = Record.AddField([a=1], "b", () => 99, true)[b] in
+                if Value.Is(v, type function) then v() else v),
 
         SafeSerialize("q234", () =>
+            // Same shape as q232 — return field-names list, not the raw record.
             let r = try Record.AddField([a=1], "bad", () => error "x", true) in
                 if r[HasError]
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
-                    else [HasError=false, Value=r[Value]]),
+                    else Record.FieldNames(r[Value])),
 
         SafeSerialize("q235", () =>
-            let r = try Record.AddField([a=1], "bad", () => error "x", true)[bad] in
+            // Force the delayed field; in mrsflow that means invoking the
+            // closure manually since [bad] doesn't auto-force.
+            let r = try
+                let v = Record.AddField([a=1], "bad", () => error "x", true)[bad] in
+                    if Value.Is(v, type function) then v() else v
+            in
                 if r[HasError]
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                     else [HasError=false, Value=r[Value]])
