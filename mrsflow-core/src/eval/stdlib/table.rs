@@ -5060,15 +5060,38 @@ fn group(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     Ok(Value::Table(values_to_table(&out_names, &out_rows)?))
 }
 
-fn add_rank_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn add_rank_column(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let new_col = expect_text(&args[1])?.to_string();
     let crit = &args[2];
-    if !matches!(args.get(3), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented(
-            "Table.AddRankColumn: options not yet supported",
-        ));
-    }
+    // options.RankKind: 0 Competition (default) / 1 Ordinal / 2 Dense.
+    // Modified (3) is documented in M but not implemented here.
+    let rank_kind: i64 = match args.get(3) {
+        None | Some(Value::Null) => 0,
+        Some(Value::Record(r)) => match r.fields.iter().find(|(n, _)| n == "RankKind") {
+            Some((_, v)) => {
+                let forced = super::super::force(v.clone(), &mut |e, env| {
+                    super::super::evaluate(e, env, host)
+                })?;
+                match forced {
+                    Value::Null => 0,
+                    Value::Number(n) => {
+                        let k = n as i64;
+                        if !(0..=2).contains(&k) {
+                            return Err(MError::Other(format!(
+                                "Table.AddRankColumn: RankKind {k} not yet supported \
+                                 (Competition/Ordinal/Dense only)"
+                            )));
+                        }
+                        k
+                    }
+                    other => return Err(type_mismatch("number (RankKind.*)", &other)),
+                }
+            }
+            None => 0,
+        },
+        Some(other) => return Err(type_mismatch("record (options) or null", other)),
+    };
     let names = table.column_names();
     // v1: criterion is a column-name text → ascending; pair of {col, order} → descending toggle.
     let (col_name, desc): (String, bool) = match crit {
@@ -5103,16 +5126,29 @@ fn add_rank_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> 
         let o = compare_cells(&a.1, &b.1);
         if desc { o.reverse() } else { o }
     });
-    // Build rank-by-original-index using dense rank (equal values get equal rank).
+    // Build rank-by-original-index. Strategy depends on rank_kind:
+    //   0 Competition (1224): equal values share rank; gap after.
+    //   1 Ordinal     (1234): every row unique — i+1 directly.
+    //   2 Dense       (1223): equal values share rank; consecutive.
     let mut rank_per_row: Vec<usize> = vec![0; rows.len()];
-    let mut current_rank = 0usize;
+    let mut competition_rank = 0usize;
+    let mut dense_rank = 0usize;
     let mut prev: Option<&Value> = None;
     for (i, (orig_idx, val)) in idx_with_val.iter().enumerate() {
-        match prev {
-            Some(p) if compare_cells(p, val) == std::cmp::Ordering::Equal => {}
-            _ => current_rank = i + 1,
+        let tied = match prev {
+            Some(p) => compare_cells(p, val) == std::cmp::Ordering::Equal,
+            None => false,
+        };
+        if !tied {
+            competition_rank = i + 1;
+            dense_rank += 1;
         }
-        rank_per_row[*orig_idx] = current_rank;
+        rank_per_row[*orig_idx] = match rank_kind {
+            0 => competition_rank,
+            1 => i + 1,
+            2 => dense_rank,
+            _ => unreachable!(),
+        };
         prev = Some(val);
     }
 

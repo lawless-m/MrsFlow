@@ -91,7 +91,7 @@ Which match to return (first / last / all). Default first.
 Smaller per-function options, lower aggregate impact.
 
 - `Combiner.CombineTextByLengths` / `ByPositions` / `ByRanges` (template)
-- `Table.AddRankColumn` (options)
+- ✅ `Table.AddRankColumn` (options.RankKind — Competition/Ordinal/Dense; Modified unsupported)
 - ✅ `Table.FromList` (default arg)
 - `Table.FromPartitions` (columnInfo)
 - ✅ `Table.FromValue` (options.Name)

@@ -156,6 +156,20 @@ pub fn root_env() -> Env {
         env = env.extend(name.to_string(), Value::Number(n));
     }
 
+    // RankKind.* constants — Table.AddRankColumn options.RankKind.
+    // Competition (default, 1224): ties share rank, gap after.
+    // Ordinal     (1234)         : every row unique (orig-index tiebreak).
+    // Dense       (1223)         : ties share rank, no gap.
+    // Modified    (3344, not implemented yet — rejected at runtime).
+    for (name, n) in [
+        ("RankKind.Competition", 0.0),
+        ("RankKind.Ordinal",     1.0),
+        ("RankKind.Dense",       2.0),
+        ("RankKind.Modified",    3.0),
+    ] {
+        env = env.extend(name.to_string(), Value::Number(n));
+    }
+
     // BinaryEncoding.* constants — Binary.FromText/ToText encoding arg.
     for (name, n) in [
         ("BinaryEncoding.Base64", 0.0),
