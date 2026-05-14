@@ -883,7 +883,39 @@ let
                 {"a".."z"}, {"0".."9"})("abc123def456")),
 
         SafeSerialize("q175", () =>
-            Splitter.SplitTextByRepeatedLengths(2)("abcdefgh"))
+            Splitter.SplitTextByRepeatedLengths(2)("abcdefgh")),
+
+        // q176-q180: Number.ToText format strings v2 — extended coverage.
+
+        SafeSerialize("q176", () =>
+            let r = try Number.ToText(3.7, "F0") in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q177", () =>
+            let r = try Number.ToText(1234567.891, "N2") in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q178", () =>
+            let r = try Number.ToText(1234.5, "#,##0.00") in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q179", () =>
+            let r = try Number.ToText(0.456, "0.00%") in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q180", () =>
+            let r = try Number.ToText(-1234.567, "F2") in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]])
     },
 
     Catalog = Table.FromRecords(cases)
