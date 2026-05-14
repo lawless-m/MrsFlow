@@ -94,7 +94,7 @@ Smaller per-function options, lower aggregate impact.
 - `Table.AddRankColumn` (options)
 - ✅ `Table.FromList` (default arg)
 - `Table.FromPartitions` (columnInfo)
-- `Table.FromValue` (options)
+- ✅ `Table.FromValue` (options.Name)
 - `Table.Join` (composite keys)
 - `Table.Profile` (additionalAggregates)
 - `Table.SplitColumn` (default + extraValues)

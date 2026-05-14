@@ -4760,13 +4760,26 @@ fn from_list(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     Ok(Value::Table(values_to_table(&names, &rows)?))
 }
 
-fn from_value(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    if !matches!(args.get(1), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented(
-            "Table.FromValue: options not yet supported",
-        ));
-    }
-    let names = vec!["Value".to_string()];
+fn from_value(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+    // options.Name overrides the single column name; default is "Value".
+    let col_name: String = match args.get(1) {
+        None | Some(Value::Null) => "Value".into(),
+        Some(Value::Record(r)) => match r.fields.iter().find(|(n, _)| n == "Name") {
+            Some((_, v)) => {
+                let forced = super::super::force(v.clone(), &mut |e, env| {
+                    super::super::evaluate(e, env, host)
+                })?;
+                match forced {
+                    Value::Null => "Value".into(),
+                    Value::Text(s) => s,
+                    other => return Err(type_mismatch("text (options.Name)", &other)),
+                }
+            }
+            None => "Value".into(),
+        },
+        Some(other) => return Err(type_mismatch("record (options) or null", other)),
+    };
+    let names = vec![col_name];
     let rows = vec![vec![args[0].clone()]];
     Ok(Value::Table(values_to_table(&names, &rows)?))
 }
