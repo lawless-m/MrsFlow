@@ -500,13 +500,9 @@ fn position_of(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             "List.PositionOf: occurrence arg not yet supported",
         ));
     }
-    if !matches!(args.get(3), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented(
-            "List.PositionOf: equationCriteria not yet supported",
-        ));
-    }
+    let criteria = equation_criteria_fn(args, 3, "List.PositionOf")?;
     for (i, v) in list.iter().enumerate() {
-        if values_equal_primitive(v, target)? {
+        if eq_via_criteria(v, target, criteria)? {
             return Ok(Value::Number(i as f64));
         }
     }
@@ -938,12 +934,10 @@ fn position_of_any(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> 
     if !matches!(args.get(2), Some(Value::Null) | None) {
         return Err(MError::NotImplemented("List.PositionOfAny: occurrence not yet supported"));
     }
-    if !matches!(args.get(3), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented("List.PositionOfAny: equationCriteria not yet supported"));
-    }
+    let criteria = equation_criteria_fn(args, 3, "List.PositionOfAny")?;
     for (i, v) in list.iter().enumerate() {
         for t in values {
-            if values_equal_primitive(v, t)? {
+            if eq_via_criteria(v, t, criteria)? {
                 return Ok(Value::Number(i as f64));
             }
         }
