@@ -1187,15 +1187,13 @@ fn buffer(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 fn difference(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list1 = expect_list(&args[0])?;
     let list2 = expect_list(&args[1])?;
-    if !matches!(args.get(2), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented("List.Difference: equationCriteria not yet supported"));
-    }
+    let criteria = equation_criteria_fn(args, 2, "List.Difference")?;
     // PQ semantics: multiplicities are subtracted (each list2 occurrence removes
     // one matching list1 occurrence, in order).
     let mut remaining: Vec<bool> = vec![true; list1.len()];
     for v in list2 {
         for (i, x) in list1.iter().enumerate() {
-            if remaining[i] && values_equal_primitive(x, v)? {
+            if remaining[i] && eq_via_criteria(x, v, criteria)? {
                 remaining[i] = false;
                 break;
             }
@@ -1210,9 +1208,7 @@ fn difference(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 
 fn intersect(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let lists = expect_list(&args[0])?;
-    if !matches!(args.get(1), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented("List.Intersect: equationCriteria not yet supported"));
-    }
+    let criteria = equation_criteria_fn(args, 1, "List.Intersect")?;
     if lists.is_empty() {
         return Ok(Value::List(Vec::new()));
     }
@@ -1222,13 +1218,13 @@ fn intersect(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     'outer: for v in first {
         // Skip if already added (dedupe in result).
         for existing in &out {
-            if values_equal_primitive(existing, v)? { continue 'outer; }
+            if eq_via_criteria(existing, v, criteria)? { continue 'outer; }
         }
         // Must appear in every other sublist.
         for other in &sublists[1..] {
             let mut found = false;
             for x in *other {
-                if values_equal_primitive(v, x)? { found = true; break; }
+                if eq_via_criteria(v, x, criteria)? { found = true; break; }
             }
             if !found { continue 'outer; }
         }
@@ -1633,15 +1629,13 @@ fn random(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 
 fn union_(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let lists = expect_list(&args[0])?;
-    if !matches!(args.get(1), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented("List.Union: equationCriteria not yet supported"));
-    }
+    let criteria = equation_criteria_fn(args, 1, "List.Union")?;
     let mut out: Vec<Value> = Vec::new();
     for v in lists {
         let sub = expect_list(v)?;
         'inner: for x in sub {
             for existing in &out {
-                if values_equal_primitive(existing, x)? { continue 'inner; }
+                if eq_via_criteria(existing, x, criteria)? { continue 'inner; }
             }
             out.push(x.clone());
         }

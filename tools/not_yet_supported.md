@@ -32,7 +32,7 @@ ordering. Default behaviour (omitted criteria) uses primitive
 equality / natural ordering. Implementing requires a callback path.
 
 - ✅ `List.Contains` / `ContainsAll` / `ContainsAny`
-- `List.Difference` / `Intersect` / `Union`
+- ✅ `List.Difference` / `Intersect` / `Union`
 - `List.IsDistinct` / `Mode` / `Modes`
 - `List.PositionOf` / `PositionOfAny`
 - `List.Sort` (comparisonCriteria, not equationCriteria)
