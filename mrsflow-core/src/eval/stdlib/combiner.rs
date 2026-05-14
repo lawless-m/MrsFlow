@@ -137,16 +137,33 @@ fn combine_text_by_each_delimiter(
     ))
 }
 
+/// Validate the optional `template` arg used by CombineTextBy{Lengths,
+/// Positions,Ranges}. Null or an empty/whitespace-only text trivially
+/// degenerates to the default layout — pass through. Any text that
+/// looks like it contains placeholders ($1, $2, …) requires a real
+/// templating engine and is rejected as not yet supported.
+fn accept_trivial_template(arg: Option<&Value>, fn_name: &str) -> Result<(), MError> {
+    match arg {
+        None | Some(Value::Null) => Ok(()),
+        Some(Value::Text(s)) => {
+            if s.trim().is_empty() {
+                Ok(())
+            } else {
+                Err(MError::Other(format!(
+                    "{fn_name}: non-trivial template ({s:?}) not yet supported"
+                )))
+            }
+        }
+        Some(other) => Err(type_mismatch("text (template) or null", other)),
+    }
+}
+
 fn combine_text_by_lengths(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let xs = expect_list(&args[0])?;
     for v in xs {
         let _ = expect_int(v, "Combiner.CombineTextByLengths")?;
     }
-    if !matches!(args.get(1), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented(
-            "Combiner.CombineTextByLengths: template not yet supported",
-        ));
-    }
+    accept_trivial_template(args.get(1), "Combiner.CombineTextByLengths")?;
     Ok(make_combiner(
         vec![("__lengths".into(), args[0].clone())],
         combine_text_by_lengths_impl,
@@ -158,11 +175,7 @@ fn combine_text_by_positions(args: &[Value], _host: &dyn IoHost) -> Result<Value
     for v in xs {
         let _ = expect_int(v, "Combiner.CombineTextByPositions")?;
     }
-    if !matches!(args.get(1), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented(
-            "Combiner.CombineTextByPositions: template not yet supported",
-        ));
-    }
+    accept_trivial_template(args.get(1), "Combiner.CombineTextByPositions")?;
     Ok(make_combiner(
         vec![("__positions".into(), args[0].clone())],
         combine_text_by_positions_impl,
@@ -185,11 +198,7 @@ fn combine_text_by_ranges(args: &[Value], _host: &dyn IoHost) -> Result<Value, M
         let _ = expect_int(&pair[0], "Combiner.CombineTextByRanges (offset)")?;
         let _ = expect_int(&pair[1], "Combiner.CombineTextByRanges (count)")?;
     }
-    if !matches!(args.get(1), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented(
-            "Combiner.CombineTextByRanges: template not yet supported",
-        ));
-    }
+    accept_trivial_template(args.get(1), "Combiner.CombineTextByRanges")?;
     Ok(make_combiner(
         vec![("__ranges".into(), args[0].clone())],
         combine_text_by_ranges_impl,

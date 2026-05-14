@@ -90,7 +90,7 @@ Which match to return (first / last / all). Default first.
 
 Smaller per-function options, lower aggregate impact.
 
-- `Combiner.CombineTextByLengths` / `ByPositions` / `ByRanges` (template)
+- ✅ `Combiner.CombineTextByLengths` / `ByPositions` / `ByRanges` (template — null/empty only; non-trivial rejected)
 - ✅ `Table.AddRankColumn` (options.RankKind — Competition/Ordinal/Dense; Modified unsupported)
 - ✅ `Table.FromList` (default arg)
 - ✅ `Table.FromPartitions` (columnInfo accepted-and-ignored)
