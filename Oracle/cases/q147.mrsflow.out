@@ -1,1 +1,1 @@
-ERROR: expected text or pair (sort criterion), found number
+[{"k":"b"},{"k":"a"},{"k":"C"},{"k":"A"}]

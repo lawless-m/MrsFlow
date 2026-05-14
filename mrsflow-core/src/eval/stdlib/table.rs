@@ -1474,22 +1474,89 @@ fn to_records(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 
 fn distinct(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
-    let criteria = table_equation_criteria_fn(args, 1, "Table.Distinct")?;
     let (names, rows) = table_to_rows(&table)?;
-    let mut kept: Vec<Vec<Value>> = Vec::new();
-    for row in rows {
-        let mut dup = false;
-        for k in &kept {
-            if rows_equal_with_criteria(&names, &row, k, criteria)? {
-                dup = true;
-                break;
+
+    // Per Oracle probes (q139/q140), PQ's Table.Distinct criteria arg has
+    // several shapes:
+    //   - omitted/null: full-row primitive-equality dedup
+    //   - Function: full-row callback dedup (mrsflow extension — PQ
+    //     rejects this with "distinct criteria is invalid")
+    //   - Text "k": PQ silently returns input unchanged (a documented
+    //     no-op; matching PQ here is the least surprising choice)
+    //   - List {col, comparer}: dedup by `col` using `comparer`
+    match args.get(1) {
+        None | Some(Value::Null) | Some(Value::Function(_)) => {
+            let criteria = table_equation_criteria_fn(args, 1, "Table.Distinct")?;
+            let mut kept: Vec<Vec<Value>> = Vec::new();
+            for row in rows {
+                let mut dup = false;
+                for k in &kept {
+                    if rows_equal_with_criteria(&names, &row, k, criteria)? {
+                        dup = true;
+                        break;
+                    }
+                }
+                if !dup {
+                    kept.push(row);
+                }
             }
+            Ok(Value::Table(values_to_table(&names, &kept)?))
         }
-        if !dup {
-            kept.push(row);
+        Some(Value::Text(_)) => {
+            // PQ behaviour: no-op. Returns input unchanged.
+            Ok(Value::Table(values_to_table(&names, &rows)?))
         }
+        Some(Value::List(parts)) => {
+            // Expect {col, comparer}. Dedup by `col` using `comparer`.
+            if parts.len() != 2 {
+                return Err(MError::Other(format!(
+                    "Table.Distinct: criterion list must have 2 elements (column, comparer), got {}",
+                    parts.len(),
+                )));
+            }
+            let col_name = match &parts[0] {
+                Value::Text(s) => s.clone(),
+                other => return Err(type_mismatch("text (column name)", other)),
+            };
+            let comparer = match &parts[1] {
+                Value::Function(c) => c.clone(),
+                other => return Err(type_mismatch("function (comparer)", other)),
+            };
+            let col_idx = names
+                .iter()
+                .position(|n| n == &col_name)
+                .ok_or_else(|| MError::Other(format!(
+                    "Table.Distinct: column not found: {col_name}"
+                )))?;
+            let mut kept: Vec<Vec<Value>> = Vec::new();
+            'rows: for row in rows {
+                let cell = &row[col_idx];
+                for k in &kept {
+                    let r = invoke_builtin_callback(
+                        &comparer,
+                        vec![cell.clone(), k[col_idx].clone()],
+                    )?;
+                    let equal = match r {
+                        Value::Number(n) => n == 0.0,
+                        Value::Logical(b) => b,
+                        other => return Err(type_mismatch(
+                            "number or logical (comparer result)",
+                            &other,
+                        )),
+                    };
+                    if equal {
+                        continue 'rows;
+                    }
+                }
+                kept.push(row);
+            }
+            Ok(Value::Table(values_to_table(&names, &kept)?))
+        }
+        Some(other) => Err(type_mismatch(
+            "text, list {col,comparer}, function, or null",
+            other,
+        )),
     }
-    Ok(Value::Table(values_to_table(&names, &kept)?))
 }
 
 
@@ -3763,15 +3830,75 @@ fn compare_cells(a: &Value, b: &Value) -> std::cmp::Ordering {
     }
 }
 
-fn sort(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn sort(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let names = table.column_names();
-    // Parse criteria into a list of (column_index, descending) tuples.
+
+    // Lambda form: comparisonCriteria is a 2-arg function that takes two
+    // row records and returns -1/0/1. Verified empirically via Oracle q145:
+    //   Table.Sort(t, (r1,r2) => Value.Compare(...))
+    // works in PQ.
+    if let Value::Function(cmp) = &args[1] {
+        let (_, rows) = table_to_rows(&table)?;
+        let n_rows = rows.len();
+        // Build row-records up-front so we only pay row_to_record once
+        // per row, not per comparison.
+        let mut records: Vec<Value> = Vec::with_capacity(n_rows);
+        for i in 0..n_rows {
+            records.push(row_to_record(&table, i)?);
+        }
+        // Sort indices by invoking the comparer; error-slot pattern so we
+        // can surface a callback failure after the borrow ends.
+        let mut sort_err: Option<MError> = None;
+        let mut idxs: Vec<usize> = (0..n_rows).collect();
+        idxs.sort_by(|&i, &j| {
+            if sort_err.is_some() {
+                return std::cmp::Ordering::Equal;
+            }
+            match invoke_callback_with_host(
+                cmp,
+                vec![records[i].clone(), records[j].clone()],
+                host,
+            ) {
+                Ok(Value::Number(n)) => {
+                    if n < 0.0 { std::cmp::Ordering::Less }
+                    else if n > 0.0 { std::cmp::Ordering::Greater }
+                    else { std::cmp::Ordering::Equal }
+                }
+                Ok(other) => {
+                    sort_err = Some(type_mismatch(
+                        "number (comparisonCriteria result)",
+                        &other,
+                    ));
+                    std::cmp::Ordering::Equal
+                }
+                Err(e) => {
+                    sort_err = Some(e);
+                    std::cmp::Ordering::Equal
+                }
+            }
+        });
+        if let Some(e) = sort_err {
+            return Err(e);
+        }
+        let sorted_rows: Vec<Vec<Value>> = idxs.into_iter().map(|i| rows[i].clone()).collect();
+        return Ok(Value::Table(values_to_table(&names, &sorted_rows)?));
+    }
+
+    // Otherwise: column-name(s) form. The outer list disambiguates by the
+    // first element: if it's a Text, the list IS a single {col, order}
+    // pair (q147). If the first element is itself a list, it's a list
+    // of pairs.
     let mut keys: Vec<(usize, bool)> = Vec::new();
     let pairs: Vec<&Value> = match &args[1] {
         Value::Text(_) => vec![&args[1]],
-        Value::List(xs) => xs.iter().collect(),
-        other => return Err(type_mismatch("text or list (sort criteria)", other)),
+        Value::List(xs) => {
+            match xs.first() {
+                Some(Value::Text(_)) => vec![&args[1]],
+                _ => xs.iter().collect(),
+            }
+        }
+        other => return Err(type_mismatch("text, list, or function (sort criteria)", other)),
     };
     for p in pairs {
         let (col_name, desc) = match p {

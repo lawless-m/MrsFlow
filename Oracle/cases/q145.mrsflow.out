@@ -1,1 +1,1 @@
-{"HasError":true,"Reason":"Expression.Error","Message":"expected text or list (sort criteria), found function"}
+{"HasError":false,"Value":[{"k":"A"},{"k":"a"},{"k":"b"},{"k":"C"}]}
