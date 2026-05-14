@@ -48,7 +48,7 @@ equality / natural ordering. Implementing requires a callback path.
 The Nth-item form (`(table, 5)`) works; the predicate form
 (`(table, each [x] > 10)` — take-while or skip-while) is unimplemented.
 
-- `List.FirstN` / `LastN` / `Skip` / `RemoveFirstN` / `RemoveLastN`
+- ✅ `List.FirstN` / `LastN` / `Skip` / `RemoveFirstN` / `RemoveLastN`
 - `Table.FirstN` / `LastN` / `Skip`
 
 ## quoteStyle / startAtEnd flags (9)

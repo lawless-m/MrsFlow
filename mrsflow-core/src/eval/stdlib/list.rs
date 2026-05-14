@@ -451,24 +451,30 @@ fn zip(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 
 fn remove_first_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
-    let n = match args.get(1) {
+    match args.get(1) {
         Some(Value::Number(n)) => {
             if !n.is_finite() || *n < 0.0 {
                 return Err(MError::Other(
                     "List.RemoveFirstN: count must be a non-negative integer".into(),
                 ));
             }
-            *n as usize
+            Ok(Value::List(list.iter().skip(*n as usize).cloned().collect()))
         }
-        Some(Value::Function(_)) => {
-            return Err(MError::NotImplemented(
-                "List.RemoveFirstN: predicate (skip-while) form not yet supported",
-            ));
+        Some(Value::Function(f)) => {
+            // skip-while: drop while predicate true, then keep rest
+            let mut start = 0usize;
+            for v in list {
+                if predicate_holds(f, v, "List.RemoveFirstN")? {
+                    start += 1;
+                } else {
+                    break;
+                }
+            }
+            Ok(Value::List(list[start..].to_vec()))
         }
-        Some(Value::Null) | None => 1,
-        Some(other) => return Err(type_mismatch("number or function", other)),
-    };
-    Ok(Value::List(list.iter().skip(n).cloned().collect()))
+        Some(Value::Null) | None => Ok(Value::List(list.iter().skip(1).cloned().collect())),
+        Some(other) => Err(type_mismatch("number or function", other)),
+    }
 }
 
 
@@ -699,35 +705,67 @@ fn reverse(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 
 fn first_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
-    // Power Query also accepts a predicate (take-while) form; not yet supported.
-    let count = match &args[1] {
-        Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
-        Value::Function(_) => {
-            return Err(MError::NotImplemented(
-                "List.FirstN: predicate (take-while) form not yet supported",
-            ));
+    match &args[1] {
+        Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => {
+            let count = *n as usize;
+            Ok(Value::List(list.iter().take(count).cloned().collect()))
         }
-        other => return Err(type_mismatch("non-negative integer", other)),
-    };
-    Ok(Value::List(list.iter().take(count).cloned().collect()))
+        Value::Function(f) => {
+            // take-while: stop on first false
+            let mut out: Vec<Value> = Vec::new();
+            for v in list {
+                if predicate_holds(f, v, "List.FirstN")? {
+                    out.push(v.clone());
+                } else {
+                    break;
+                }
+            }
+            Ok(Value::List(out))
+        }
+        other => Err(type_mismatch("non-negative integer or function", other)),
+    }
+}
+
+fn predicate_holds(f: &Closure, v: &Value, fn_name: &str) -> Result<bool, MError> {
+    let r = invoke_builtin_callback(f, vec![v.clone()])?;
+    match r {
+        Value::Logical(b) => Ok(b),
+        other => Err(MError::Other(format!(
+            "{fn_name}: predicate must return logical, got {}",
+            super::super::type_name(&other),
+        ))),
+    }
 }
 
 
 fn last_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
-    let count = match args.get(1) {
-        Some(Value::Number(n)) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
-        Some(Value::Function(_)) => {
-            return Err(MError::NotImplemented(
-                "List.LastN: predicate form not yet supported",
-            ));
+    match args.get(1) {
+        Some(Value::Number(n)) if n.fract() == 0.0 && *n >= 0.0 => {
+            let count = *n as usize;
+            let len = list.len();
+            let start = len.saturating_sub(count);
+            Ok(Value::List(list[start..].to_vec()))
         }
-        Some(Value::Null) | None => 1,
-        Some(other) => return Err(type_mismatch("non-negative integer", other)),
-    };
-    let n = list.len();
-    let start = n.saturating_sub(count);
-    Ok(Value::List(list[start..].to_vec()))
+        Some(Value::Function(f)) => {
+            // take-from-end-while: scan from end, keep while predicate true
+            let mut start = list.len();
+            for v in list.iter().rev() {
+                if predicate_holds(f, v, "List.LastN")? {
+                    start -= 1;
+                } else {
+                    break;
+                }
+            }
+            Ok(Value::List(list[start..].to_vec()))
+        }
+        Some(Value::Null) | None => {
+            let len = list.len();
+            let start = len.saturating_sub(1);
+            Ok(Value::List(list[start..].to_vec()))
+        }
+        Some(other) => Err(type_mismatch("non-negative integer or function", other)),
+    }
 }
 
 /// Structural equality for primitive cell types only — number, text, logical,
@@ -806,16 +844,25 @@ fn distinct(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 
 fn skip(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
-    let count = match &args[1] {
-        Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
-        Value::Function(_) => {
-            return Err(MError::NotImplemented(
-                "List.Skip: predicate (skip-while) form not yet supported",
-            ));
+    match &args[1] {
+        Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => {
+            let count = *n as usize;
+            Ok(Value::List(list.iter().skip(count).cloned().collect()))
         }
-        other => return Err(type_mismatch("non-negative integer", other)),
-    };
-    Ok(Value::List(list.iter().skip(count).cloned().collect()))
+        Value::Function(f) => {
+            // skip-while: drop while predicate true, then keep rest
+            let mut start = 0usize;
+            for v in list {
+                if predicate_holds(f, v, "List.Skip")? {
+                    start += 1;
+                } else {
+                    break;
+                }
+            }
+            Ok(Value::List(list[start..].to_vec()))
+        }
+        other => Err(type_mismatch("non-negative integer or function", other)),
+    }
 }
 
 
@@ -1015,16 +1062,29 @@ fn range(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 
 fn remove_last_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
-    let n = match args.get(1) {
-        Some(Value::Number(n)) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
-        Some(Value::Function(_)) => {
-            return Err(MError::NotImplemented("List.RemoveLastN: predicate form not yet supported"));
+    match args.get(1) {
+        Some(Value::Number(n)) if n.fract() == 0.0 && *n >= 0.0 => {
+            let keep = list.len().saturating_sub(*n as usize);
+            Ok(Value::List(list[..keep].to_vec()))
         }
-        Some(Value::Null) | None => 1,
-        Some(other) => return Err(type_mismatch("non-negative integer", other)),
-    };
-    let keep = list.len().saturating_sub(n);
-    Ok(Value::List(list[..keep].to_vec()))
+        Some(Value::Function(f)) => {
+            // drop tail items while predicate true, scan from end
+            let mut keep = list.len();
+            for v in list.iter().rev() {
+                if predicate_holds(f, v, "List.RemoveLastN")? {
+                    keep -= 1;
+                } else {
+                    break;
+                }
+            }
+            Ok(Value::List(list[..keep].to_vec()))
+        }
+        Some(Value::Null) | None => {
+            let keep = list.len().saturating_sub(1);
+            Ok(Value::List(list[..keep].to_vec()))
+        }
+        Some(other) => Err(type_mismatch("non-negative integer or function", other)),
+    }
 }
 
 fn remove_nulls(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
