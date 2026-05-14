@@ -4955,46 +4955,127 @@ fn schema(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     )?))
 }
 
-fn profile(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    let table = expect_table(&args[0])?;
-    if !matches!(args.get(1), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented(
-            "Table.Profile: additionalAggregates not yet supported",
-        ));
+/// Best-effort TypeRep mapping for a non-null cell — only the primitive
+/// shapes that matter for additionalAggregates conditions. Mirrors the
+/// private typerep_of in value_ops.rs without growing a public surface.
+fn typerep_of_value(v: &Value) -> super::super::value::TypeRep {
+    use super::super::value::TypeRep as T;
+    match v {
+        Value::Null => T::Null,
+        Value::Logical(_) => T::Logical,
+        Value::Number(_) | Value::Decimal { .. } => T::Number,
+        Value::Text(_) => T::Text,
+        Value::Date(_) => T::Date,
+        Value::Datetime(_) => T::Datetime,
+        Value::Datetimezone(_) => T::Datetimezone,
+        Value::Time(_) => T::Time,
+        Value::Duration(_) => T::Duration,
+        Value::Binary(_) => T::Binary,
+        Value::List(_) => T::List,
+        Value::Record(_) => T::Record,
+        Value::Table(_) => T::Table,
+        Value::Function(_) => T::Function,
+        Value::Type(_) => T::Type,
+        _ => T::Any,
     }
+}
+
+fn profile(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+    let table = expect_table(&args[0])?;
+    // additionalAggregates: optional list of {newColumnName, condition, aggregator}.
+    // condition is called with the column's TypeRep (derived from the first
+    // non-null cell, or `type any` for all-null); when it returns true,
+    // aggregator is called with the column's value list and the result fills
+    // the new cell — otherwise the new cell is null.
+    struct ExtraAgg {
+        name: String,
+        cond: Closure,
+        agg: Closure,
+    }
+    let extras: Vec<ExtraAgg> = match args.get(1) {
+        None | Some(Value::Null) => Vec::new(),
+        Some(Value::List(xs)) => {
+            let mut out = Vec::with_capacity(xs.len());
+            for v in xs {
+                let triple = match v {
+                    Value::List(t) => t,
+                    other => return Err(type_mismatch("list (aggregate triple)", other)),
+                };
+                if triple.len() != 3 {
+                    return Err(MError::Other(format!(
+                        "Table.Profile: additionalAggregates triple must have 3 elements, got {}",
+                        triple.len(),
+                    )));
+                }
+                let name = expect_text(&triple[0])?.to_string();
+                let cond = expect_function(&triple[1])?.clone();
+                let agg = expect_function(&triple[2])?.clone();
+                out.push(ExtraAgg { name, cond, agg });
+            }
+            out
+        }
+        Some(other) => return Err(type_mismatch("list (additionalAggregates) or null", other)),
+    };
+
     let names = table.column_names();
     let n_rows = table.num_rows();
     let mut rows: Vec<Vec<Value>> = Vec::with_capacity(names.len());
     for (col_idx, name) in names.iter().enumerate() {
         let mut null_count = 0usize;
         let mut seen: Vec<Value> = Vec::new();
+        let mut col_values: Vec<Value> = Vec::with_capacity(n_rows);
+        let mut col_type: Option<super::super::value::TypeRep> = None;
         for r in 0..n_rows {
             let cell = cell_to_value(&table, col_idx, r)?;
             if matches!(cell, Value::Null) {
                 null_count += 1;
-                continue;
+            } else {
+                if col_type.is_none() {
+                    col_type = Some(typerep_of_value(&cell));
+                }
+                let already = seen.iter().any(|v| values_equal_primitive(v, &cell).unwrap_or_default());
+                if !already {
+                    seen.push(cell.clone());
+                }
             }
-            let already = seen.iter().any(|v| values_equal_primitive(v, &cell).unwrap_or_default());
-            if !already {
-                seen.push(cell);
-            }
+            col_values.push(cell);
         }
-        rows.push(vec![
+        let col_type = col_type.unwrap_or(super::super::value::TypeRep::Any);
+        let mut row = vec![
             Value::Text(name.clone()),
             Value::Number(n_rows as f64),
             Value::Number(null_count as f64),
             Value::Number(seen.len() as f64),
-        ]);
+        ];
+        for e in &extras {
+            let applies = invoke_callback_with_host(
+                &e.cond,
+                vec![Value::Type(col_type.clone())],
+                host,
+            )?;
+            let cell = match applies {
+                Value::Logical(true) => invoke_callback_with_host(
+                    &e.agg,
+                    vec![Value::List(col_values.clone())],
+                    host,
+                )?,
+                Value::Logical(false) => Value::Null,
+                other => return Err(type_mismatch("logical (condition result)", &other)),
+            };
+            row.push(cell);
+        }
+        rows.push(row);
     }
-    Ok(Value::Table(values_to_table(
-        &[
-            "Column".to_string(),
-            "Count".to_string(),
-            "NullCount".to_string(),
-            "DistinctCount".to_string(),
-        ],
-        &rows,
-    )?))
+    let mut out_names: Vec<String> = vec![
+        "Column".to_string(),
+        "Count".to_string(),
+        "NullCount".to_string(),
+        "DistinctCount".to_string(),
+    ];
+    for e in &extras {
+        out_names.push(e.name.clone());
+    }
+    Ok(Value::Table(values_to_table(&out_names, &rows)?))
 }
 
 // --- Slice #164: Group + AddRankColumn + Split + Buffer ---
