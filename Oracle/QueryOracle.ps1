@@ -35,12 +35,16 @@ try {
     $excel.CalculateUntilAsyncQueriesDone()
     $wb.Save()
 
-    # Locate the Catalog ListObject. PQ "Load To Table" names the
-    # ListObject after the query.
+    # Locate the catalog ListObject by COLUMN SHAPE, not by name. PQ
+    # "Load To Table" names the LO after the query, and the query name
+    # is whatever the workbook author saved (e.g. "Invoked_FunctionEvalFile"
+    # for the EvalFile-wrapper setup). Matching on `Q` + `Result` headers
+    # works regardless of rename.
     $catalog = $null
     foreach ($sheet in $wb.Sheets) {
         foreach ($lo in $sheet.ListObjects) {
-            if ($lo.Name -eq 'Catalog') {
+            $headers = @($lo.HeaderRowRange.Cells | ForEach-Object { [string]$_.Value2 })
+            if ($headers.Count -ge 2 -and $headers[0] -eq 'Q' -and $headers[1] -eq 'Result') {
                 $catalog = $lo
                 break
             }
@@ -49,7 +53,7 @@ try {
     }
 
     if (-not $catalog) {
-        Write-Error 'Catalog ListObject not found. Did Oracle.m load successfully?'
+        Write-Error 'No Q/Result ListObject found. Did Oracle.m load successfully?'
         exit 1
     }
 
