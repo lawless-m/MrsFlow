@@ -616,11 +616,16 @@ pub(super) fn values_equal_deep(a: &Value, b: &Value) -> Result<bool, MError> {
     }
 }
 
-fn equals(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn equals(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+    if let Some(Value::Function(c)) = args.get(2) {
+        let result = invoke_callback_with_host(c, vec![args[0].clone(), args[1].clone()], host)?;
+        return match result {
+            Value::Logical(_) => Ok(result),
+            other => Err(type_mismatch("logical (from equationCriteria)", &other)),
+        };
+    }
     if !matches!(args.get(2), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented(
-            "Value.Equals: equationCriteria not yet supported",
-        ));
+        return Err(type_mismatch("function or null (equationCriteria)", &args[2]));
     }
     Ok(Value::Logical(values_equal_deep(&args[0], &args[1])?))
 }

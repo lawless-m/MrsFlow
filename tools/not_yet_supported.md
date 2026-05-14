@@ -24,7 +24,7 @@ error on others with the actual format string in the message.
 - ✅ `Duration.ToText`
 - ✅ `Time.ToText`
 
-## equationCriteria / comparisonCriteria (24)
+## equationCriteria / comparisonCriteria — DONE
 
 The biggest bucket. Functions take an optional record / function /
 list that customises how two values are compared for equality or
@@ -41,7 +41,7 @@ equality / natural ordering. Implementing requires a callback path.
 - ✅ `Table.Group` (comparisonCriteria + groupKind)
 - ✅ `Table.PositionOf` / `PositionOfAny` (equationCriteria only — occurrence still pending)
 - ✅ `Table.RemoveMatchingRows` / `ReplaceMatchingRows`
-- `Value.Equals`
+- ✅ `Value.Equals`
 
 ## Predicate-form arguments (8)
 
