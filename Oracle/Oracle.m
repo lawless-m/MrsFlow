@@ -1035,7 +1035,24 @@ let
                     else [HasError=false, Value=r[Value]]),
 
         SafeSerialize("q200", () =>
-            List.Accumulate({1..100}, 0, (s,c) => s + c))
+            List.Accumulate({1..100}, 0, (s,c) => s + c)),
+
+        // q201-q205: try ... otherwise.
+
+        SafeSerialize("q201", () =>
+            try 1/0 otherwise -1),
+
+        SafeSerialize("q202", () =>
+            try 1+1 otherwise -1),
+
+        SafeSerialize("q203", () =>
+            try (1 + "x") otherwise "fallback"),
+
+        SafeSerialize("q204", () =>
+            try (error "kaboom") otherwise "ok"),
+
+        SafeSerialize("q205", () =>
+            try (try 1/0 otherwise error "rethrow") otherwise "caught")
     },
 
     Catalog = Table.FromRecords(cases)
