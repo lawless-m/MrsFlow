@@ -109,9 +109,21 @@ fn from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 fn to_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     if matches!(args[0], Value::Null) { return Ok(Value::Null); }
     let t = extract_time(&args[0], "Time.ToText")?;
-    if !matches!(args.get(1), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented("Time.ToText: format string not yet supported"));
+    let general = match args.get(1) {
+        None | Some(Value::Null) => true,
+        Some(Value::Text(fmt)) => {
+            let trimmed = fmt.trim();
+            matches!(trimmed, "G" | "g") || trimmed.is_empty()
+        }
+        Some(other) => return Err(type_mismatch("text (format)", other)),
+    };
+    if !general {
+        let Some(Value::Text(fmt)) = args.get(1) else { unreachable!() };
+        return Err(MError::Other(format!(
+            "Time.ToText: format string {fmt:?} not yet supported (only G / no-format)"
+        )));
     }
+    let _ = args.get(2);
     Ok(Value::Text(t.format("%H:%M:%S").to_string()))
 }
 
