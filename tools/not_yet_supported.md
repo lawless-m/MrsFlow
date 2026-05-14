@@ -101,7 +101,7 @@ Smaller per-function options, lower aggregate impact.
 - `Table.TransformColumnNames` (options)
 - ✅ `Value.FromText` (culture — accepted-and-ignored)
 - `List.Percentile` (options)
-- `List.Random` (seed)
+- ✅ `List.Random` (seed)
 - `unsupported cell type` (internal — Arrow encode path)
 
 ## How to use this list

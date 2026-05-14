@@ -1751,10 +1751,18 @@ fn random(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
         other => return Err(type_mismatch("non-negative integer", other)),
     };
-    if !matches!(args.get(1), Some(Value::Null) | None) {
-        return Err(MError::NotImplemented("List.Random: seed not yet supported"));
-    }
-    let out: Vec<Value> = (0..count).map(|_| Value::Number(rand::random::<f64>())).collect();
+    let seed: Option<u64> = match args.get(1) {
+        None | Some(Value::Null) => None,
+        Some(Value::Number(n)) => Some(*n as u64),
+        Some(other) => return Err(type_mismatch("number (seed) or null", other)),
+    };
+    let out: Vec<Value> = if let Some(s) = seed {
+        use rand::{Rng, SeedableRng, rngs::StdRng};
+        let mut rng = StdRng::seed_from_u64(s);
+        (0..count).map(|_| Value::Number(rng.r#gen::<f64>())).collect()
+    } else {
+        (0..count).map(|_| Value::Number(rand::random::<f64>())).collect()
+    };
     Ok(Value::List(out))
 }
 
