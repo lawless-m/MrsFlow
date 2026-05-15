@@ -3040,6 +3040,66 @@ let
             in
                 if r[HasError]
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q481", () =>
+            let r = try {
+                    try Number.Mod(10, 0) otherwise "err",
+                    try Number.IntegerDivide(10, 0) otherwise "err",
+                    try Number.Mod(0, 5) otherwise "err",
+                    try Number.IntegerDivide(0, 5) otherwise "err"
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q482", () =>
+            let r = try {
+                    Number.Mod(7.5, 2),
+                    Number.Mod(10, 2.5),
+                    Number.Mod(-7.5, 2),
+                    Number.Mod(7.5, -2)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q483", () =>
+            let r = try {
+                    Number.IntegerDivide(10, 3),
+                    Number.IntegerDivide(-10, 3),
+                    Number.IntegerDivide(10, -3),
+                    Number.IntegerDivide(-10, -3)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q484", () =>
+            let r = try {
+                    Number.Mod(null, 5),
+                    Number.Mod(5, null),
+                    Number.IntegerDivide(null, 5),
+                    Number.IntegerDivide(5, null)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q485", () =>
+            let r = try
+                let
+                    naninf = Number.NaN,
+                    pinf = Number.PositiveInfinity
+                in
+                    {
+                        try Number.Mod(naninf, 1) otherwise "err",
+                        try Number.Mod(1, pinf) otherwise "err",
+                        try Number.IntegerDivide(pinf, 1) otherwise "err"
+                    }
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                     else [HasError=false, Value=r[Value]])
     },
 
