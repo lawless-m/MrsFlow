@@ -4087,7 +4087,52 @@ let
             in
                 if r[HasError]
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
-                    else [HasError=false, Value=r[Value]])
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q581", () =>
+            let r = try Table.Distinct(
+                    #table({"k", "v"}, {{"a", 1}, {"b", 2}, {"a", 1}, {"c", 3}, {"b", 2}})
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q582", () =>
+            let r = try Table.Distinct(
+                    #table({"k", "v"}, {{"a", 1}, {"a", 2}, {"b", 3}, {"a", 1}}),
+                    "k"
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q583", () =>
+            let r = try Table.Distinct(
+                    #table({"a", "b", "c"}, {{"x", 1, 10}, {"x", 1, 20}, {"y", 1, 10}}),
+                    {"a", "b"}
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q584", () =>
+            let r = try Table.Distinct(
+                    #table({"k"}, {{"A"}, {"a"}, {"B"}, {"b"}}),
+                    {"k", Comparer.OrdinalIgnoreCase}
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q585", () =>
+            let r = try {
+                    Table.RowCount(Table.Distinct(#table({"k"}, {{"a"}, {"a"}, {"a"}}))),
+                    Table.RowCount(Table.Distinct(#table({"k"}, {}))),
+                    Table.RowCount(Table.Distinct(#table({"k"}, {{"a"}, {"b"}, {"c"}})))
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]])
     },
 
     Catalog = Table.FromRecords(cases)
