@@ -3727,7 +3727,65 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
-                        else [HasError=false, Value=r[Value]])
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q546", () =>
+            let r = try {
+                    Number.Sin(0),
+                    Number.Cos(0),
+                    Number.Tan(0),
+                    Number.Sin(1.5707963267948966)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q547", () =>
+            let r = try {
+                    Number.Asin(0),
+                    Number.Asin(1),
+                    Number.Acos(1),
+                    Number.Acos(0),
+                    Number.Atan(0),
+                    Number.Atan(1)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q548", () =>
+            let r = try {
+                    Number.Atan2(1, 1),
+                    Number.Atan2(1, 0),
+                    Number.Atan2(0, -1),
+                    Number.Atan2(-1, -1)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q549", () =>
+            let r = try {
+                    try Number.Asin(2) otherwise "err",
+                    try Number.Acos(-2) otherwise "err",
+                    try Number.Tan(1.5707963267948966) otherwise "err"
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q550", () =>
+            let r = try
+                let
+                    sin_sq = Number.Power(Number.Sin(0.5), 2),
+                    cos_sq = Number.Power(Number.Cos(0.5), 2),
+                    identity = sin_sq + cos_sq
+                in
+                    Number.Abs(identity - 1) < 0.0000001
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]])
     },
 
     Catalog = Table.FromRecords(cases)
