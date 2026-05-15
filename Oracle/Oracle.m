@@ -5920,6 +5920,111 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        // q726-q732: Number.ToText "E" exponent format.
+
+        SafeSerialize("q726", () =>
+            let r = try {
+                    Number.ToText(1234.5, "E"),
+                    Number.ToText(1234.5, "E0"),
+                    Number.ToText(1234.5, "E2"),
+                    Number.ToText(1234.5, "E6"),
+                    Number.ToText(0, "E2"),
+                    Number.ToText(-1234.5, "E2"),
+                    Number.ToText(0.000123, "E2"),
+                    Number.ToText(-0.000123, "E2")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q727", () =>
+            let r = try {
+                    Number.ToText(3.14159265358979, "E0"),
+                    Number.ToText(3.14159265358979, "E1"),
+                    Number.ToText(3.14159265358979, "E5"),
+                    Number.ToText(3.14159265358979, "E10"),
+                    Number.ToText(3.14159265358979, "E15"),
+                    Number.ToText(3.14159265358979, "E20"),
+                    Number.ToText(1, "E5"),
+                    Number.ToText(0.5, "E5")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q728", () =>
+            let r = try {
+                    Number.ToText(1234.5, "E2"),
+                    Number.ToText(1234.5, "e2"),
+                    Number.ToText(1234.5, "E2", "en-US"),
+                    Number.ToText(1234.5, "E2", "de-DE"),
+                    Number.ToText(1234.5, "E2", "fr-FR"),
+                    Number.ToText(-1234.5, "e2", "de-DE"),
+                    Number.ToText(0.0001, "e3", "fr-FR")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q729", () =>
+            let r = try {
+                    Number.ToText(1e100, "E2"),
+                    Number.ToText(1e-100, "E2"),
+                    Number.ToText(1e308, "E2"),
+                    Number.ToText(1e-308, "E2"),
+                    Number.ToText(2.225e-308, "E5"),
+                    Number.ToText(1.7976931348623157e308, "E5"),
+                    Number.ToText(-1e100, "E3"),
+                    Number.ToText(-1e-100, "E3")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q730", () =>
+            let r = try {
+                    try Number.ToText(Number.NaN, "E2") otherwise "err",
+                    try Number.ToText(Number.PositiveInfinity, "E2") otherwise "err",
+                    try Number.ToText(Number.NegativeInfinity, "E2") otherwise "err",
+                    try Number.ToText(null, "E2") otherwise "err",
+                    Number.ToText(0.0, "E2"),
+                    Number.ToText(-0.0, "E2")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q731", () =>
+            let r = try {
+                    Number.ToText(1.5, "E0"),
+                    Number.ToText(2.5, "E0"),
+                    Number.ToText(3.5, "E0"),
+                    Number.ToText(-1.5, "E0"),
+                    Number.ToText(-2.5, "E0"),
+                    Number.ToText(1.25, "E1"),
+                    Number.ToText(2.25, "E1"),
+                    Number.ToText(0.0005, "E0"),
+                    Number.ToText(0.0015, "E0")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q732", () =>
+            let r = try {
+                    Number.ToText(1, "E2"),
+                    Number.ToText(10, "E2"),
+                    Number.ToText(100, "E2"),
+                    Number.ToText(1000, "E2"),
+                    Number.ToText(1e10, "E2"),
+                    Number.ToText(0.1, "E2"),
+                    Number.ToText(0.01, "E2"),
+                    Number.ToText(0.001, "E2")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 

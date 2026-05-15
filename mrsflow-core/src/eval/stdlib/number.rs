@@ -860,18 +860,36 @@ fn format_integer_padded(n: f64, width: i32) -> Option<String> {
 }
 
 fn format_exponent(n: f64, prec: i32, upper: bool) -> String {
+    // PQ "E"/"e": NaN/Inf drop the exponent suffix and just emit the
+    // special-value text — matches F/N/P/C semantics.
+    if n.is_nan() { return "NaN".to_string(); }
+    if n.is_infinite() {
+        return if n > 0.0 { "∞".to_string() } else { "-∞".to_string() };
+    }
     let p = prec.max(0) as usize;
-    let raw = format!("{n:.*e}", p);
-    // Rust produces "1.23e4"; .NET produces "1.23E+004" (E with sign and
-    // 3-digit exponent). Normalise.
-    let (mantissa, exp) = match raw.find('e') {
-        Some(i) => (&raw[..i], &raw[i + 1..]),
-        None => (raw.as_str(), "0"),
-    };
-    let exp_n: i32 = exp.parse().unwrap_or(0);
+    // Compute decomposition manually so we control mantissa rounding mode
+    // (.NET uses MidpointRounding.AwayFromZero — same as F/N).
     let e_char = if upper { 'E' } else { 'e' };
-    let sign = if exp_n < 0 { '-' } else { '+' };
-    format!("{mantissa}{e_char}{sign}{:03}", exp_n.abs())
+    if n == 0.0 {
+        let mantissa = if p == 0 { "0".to_string() } else { format!("0.{}", "0".repeat(p)) };
+        return format!("{mantissa}{e_char}+000");
+    }
+    let abs = n.abs();
+    let exp_n = abs.log10().floor() as i32;
+    let mantissa_val = abs / 10f64.powi(exp_n);
+    // Round mantissa to `p` decimal places, away from zero.
+    let factor = 10f64.powi(p as i32);
+    let rounded = (mantissa_val * factor + 0.5).floor() / factor;
+    // If rounding pushed mantissa to 10 (e.g. 9.95 → 10.0), normalise.
+    let (mantissa_val, exp_n) = if rounded >= 10.0 {
+        (rounded / 10.0, exp_n + 1)
+    } else {
+        (rounded, exp_n)
+    };
+    let mantissa_text = format!("{mantissa_val:.*}", p);
+    let sign_char = if n < 0.0 { "-" } else { "" };
+    let exp_sign = if exp_n < 0 { '-' } else { '+' };
+    format!("{sign_char}{mantissa_text}{e_char}{exp_sign}{:03}", exp_n.abs())
 }
 
 /// Swap separators for comma-decimal locales. fr-FR uses NBSP ( ,
