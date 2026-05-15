@@ -3518,6 +3518,60 @@ let
             let r = try List.Union({{1, 2, 3}, {2, 3, 4}, {3, 4, 5}}, Comparer.Ordinal) in
                 if r[HasError]
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q526", () =>
+            let r = try {
+                    List.Skip({1, 2, 3, 4, 5}, 2),
+                    List.Skip({1, 2, 3, 4, 5}, 0),
+                    List.Skip({1, 2, 3, 4, 5}, 100),
+                    List.Skip({}, 3)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q527", () =>
+            let r = try {
+                    List.Skip({1, 2, 3, 4, 5}, each _ < 3),
+                    List.Skip({5, 4, 3, 2, 1}, each _ < 3),
+                    List.Skip({1, 2, 3}, each _ < 100)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q528", () =>
+            let r = try {
+                    List.Range({1, 2, 3, 4, 5}, 1, 3),
+                    List.Range({1, 2, 3, 4, 5}, 0, 5),
+                    List.Range({1, 2, 3, 4, 5}, 2, 0),
+                    List.Range({1, 2, 3, 4, 5}, 2)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q529", () =>
+            let r = try {
+                    try List.Range({1, 2, 3, 4, 5}, 10, 3) otherwise "err",
+                    try List.Range({1, 2, 3, 4, 5}, 0, 100) otherwise "err",
+                    try List.Range({1, 2, 3, 4, 5}, -1, 2) otherwise "err"
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q530", () =>
+            let r = try
+                let
+                    big = {1..100},
+                    window = List.Range(big, 45, 10)
+                in
+                    window
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                     else [HasError=false, Value=r[Value]])
     },
 
