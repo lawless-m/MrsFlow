@@ -2524,7 +2524,53 @@ let
             in
                 if r[HasError]
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
-                    else [HasError=false, Value=r[Value]])
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q431", () =>
+            let r = try Table.TransformColumnTypes(
+                    #table({"n", "t"}, {{"1", "a"}, {"2", "b"}, {"3", "c"}}),
+                    {{"n", Int64.Type}}
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q432", () =>
+            let r = try Table.TransformColumnTypes(
+                    #table({"d"}, {{"2024-01-15"}, {"2024-06-30"}, {"2024-12-31"}}),
+                    {{"d", type date}}
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q433", () =>
+            let r = try Table.TransformColumnTypes(
+                    #table({"n"}, {{"1.5"}, {"2.7"}, {"3.14"}}),
+                    {{"n", type number}}
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q434", () =>
+            let r = try Table.TransformColumnTypes(
+                    #table({"a", "b", "c"}, {{"1", "true", "2024-01-01"}, {"2", "false", "2024-06-15"}}),
+                    {{"a", Int64.Type}, {"b", type logical}, {"c", type date}}
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q435", () =>
+            let r = try Table.TransformColumnTypes(
+                    #table({"n"}, {{"1.234,56"}, {"2.345,67"}}),
+                    {{"n", type number}},
+                    "de-DE"
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]])
     },
 
     Catalog = Table.FromRecords(cases)
