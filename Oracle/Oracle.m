@@ -9470,6 +9470,70 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1053", () =>
+            let r = try {
+                    Record.TransformFields([a=1, b=2, c=3], {"a", each _ * 10}),
+                    Record.TransformFields([a=1, b=2], {"a", each Text.From(_)}),
+                    Record.TransformFields([a=1], {"a", each _})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1054", () =>
+            let r = try {
+                    Record.TransformFields([a=1, b=2, c=3], {{"a", each _ * 10}, {"c", each _ + 100}}),
+                    Record.TransformFields([a="hello"], {{"a", each Text.Upper(_)}})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1055", () =>
+            let r = try {
+                    Record.TransformFields([a=1], {"missing", each _ * 10}),
+                    Record.TransformFields([a=1], {"missing", each _ * 10}, MissingField.Ignore)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1056", () =>
+            let r = try {
+                    Record.FromList({1, 2, 3}, {"a", "b", "c"}),
+                    Record.FromList({}, {}),
+                    Record.FromList({"x"}, {"name"})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1057", () =>
+            let r = try {
+                    Record.FromList({1, 2, 3}, {"a", "b"}),
+                    Record.FromList({1, 2}, {"a", "b", "c"})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1058", () =>
+            let r = try {
+                    Record.RemoveFields([a=1, b=2, c=3], {"b"}),
+                    Record.RemoveFields([a=1, b=2], {"a", "b"}),
+                    Record.RemoveFields([a=1], {}),
+                    Record.RemoveFields([a=1], {"missing"})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1059", () =>
+            let r = try {
+                    Record.HasFields([a=1, b=2], "a"),
+                    Record.HasFields([a=1, b=2], "missing"),
+                    Record.HasFields([a=1, b=2], {"a", "b"}),
+                    Record.HasFields([a=1, b=2], {"a", "missing"}),
+                    Record.Field([a=1, b=2], "a"),
+                    Record.Field([a=1, b=2], "missing")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
