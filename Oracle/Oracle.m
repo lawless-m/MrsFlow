@@ -4857,6 +4857,110 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        // q656-q662: Number.Round corner sweep — RoundingMode × digit counts ×
+        // signed inputs × Inf/NaN. Phase 2 depth probes.
+
+        SafeSerialize("q656", () =>
+            let r = try {
+                    Number.Round(0.5, 0, RoundingMode.AwayFromZero),
+                    Number.Round(1.5, 0, RoundingMode.AwayFromZero),
+                    Number.Round(2.5, 0, RoundingMode.AwayFromZero),
+                    Number.Round(-0.5, 0, RoundingMode.AwayFromZero),
+                    Number.Round(-1.5, 0, RoundingMode.AwayFromZero),
+                    Number.Round(-2.5, 0, RoundingMode.AwayFromZero)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q657", () =>
+            let r = try {
+                    Number.Round(0.5, 0, RoundingMode.ToEven),
+                    Number.Round(1.5, 0, RoundingMode.ToEven),
+                    Number.Round(2.5, 0, RoundingMode.ToEven),
+                    Number.Round(3.5, 0, RoundingMode.ToEven),
+                    Number.Round(-0.5, 0, RoundingMode.ToEven),
+                    Number.Round(-1.5, 0, RoundingMode.ToEven),
+                    Number.Round(-2.5, 0, RoundingMode.ToEven)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q658", () =>
+            let r = try {
+                    Number.Round(1.25, 1, RoundingMode.AwayFromZero),
+                    Number.Round(1.25, 1, RoundingMode.ToEven),
+                    Number.Round(1.25, 1, RoundingMode.Down),
+                    Number.Round(1.25, 1, RoundingMode.Up),
+                    Number.Round(1.25, 1, RoundingMode.TowardZero),
+                    Number.Round(-1.25, 1, RoundingMode.Down),
+                    Number.Round(-1.25, 1, RoundingMode.Up),
+                    Number.Round(-1.25, 1, RoundingMode.TowardZero)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q659", () =>
+            let r = try {
+                    Number.Round(1234.5678, -2, RoundingMode.AwayFromZero),
+                    Number.Round(1234.5678, -1, RoundingMode.AwayFromZero),
+                    Number.Round(1234.5678, 0, RoundingMode.AwayFromZero),
+                    Number.Round(1234.5678, 1, RoundingMode.AwayFromZero),
+                    Number.Round(1234.5678, 2, RoundingMode.AwayFromZero),
+                    Number.Round(1234.5678, 6, RoundingMode.AwayFromZero),
+                    Number.Round(0.000123456, 4, RoundingMode.AwayFromZero),
+                    Number.Round(0.000123456, 8, RoundingMode.AwayFromZero)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q660", () =>
+            let r = try {
+                    Number.Round(0, 0, RoundingMode.AwayFromZero),
+                    Number.Round(0, 0, RoundingMode.ToEven),
+                    Number.Round(0.0, 2, RoundingMode.Down),
+                    Number.Round(-0.0, 0, RoundingMode.AwayFromZero),
+                    Number.Round(1, 0, RoundingMode.ToEven),
+                    Number.Round(-1, 0, RoundingMode.ToEven),
+                    Number.Round(100, -2, RoundingMode.AwayFromZero),
+                    Number.Round(100, -3, RoundingMode.AwayFromZero)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q661", () =>
+            let r = try {
+                    try Number.Round(Number.NaN, 0, RoundingMode.AwayFromZero) otherwise "err",
+                    try Number.Round(Number.PositiveInfinity, 0, RoundingMode.AwayFromZero) otherwise "err",
+                    try Number.Round(Number.NegativeInfinity, 0, RoundingMode.AwayFromZero) otherwise "err",
+                    try Number.Round(Number.NaN, 0, RoundingMode.ToEven) otherwise "err",
+                    try Number.Round(Number.PositiveInfinity, 2, RoundingMode.ToEven) otherwise "err",
+                    try Number.Round(null, 0, RoundingMode.ToEven) otherwise "err",
+                    try Number.Round(1.5, null, RoundingMode.ToEven) otherwise "err"
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q662", () =>
+            let r = try {
+                    Number.Round(1234.5, 0, RoundingMode.Up),
+                    Number.Round(1234.5, 0, RoundingMode.Down),
+                    Number.Round(-1234.5, 0, RoundingMode.Up),
+                    Number.Round(-1234.5, 0, RoundingMode.Down),
+                    Number.Round(0.5, 0, RoundingMode.TowardZero),
+                    Number.Round(-0.5, 0, RoundingMode.TowardZero),
+                    Number.Round(2.675, 2, RoundingMode.ToEven),
+                    Number.Round(2.675, 2, RoundingMode.AwayFromZero)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
