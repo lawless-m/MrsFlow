@@ -8054,6 +8054,76 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q920", () =>
+            let a = Number.Random(), b = Number.Random(), c = Number.Random() in
+            let r = try {
+                    a >= 0 and a < 1,
+                    b >= 0 and b < 1,
+                    c >= 0 and c < 1,
+                    not (a = b and b = c)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q921", () =>
+            let r = try {
+                    Number.RandomBetween(0, 1) >= 0,
+                    Number.RandomBetween(0, 1) <= 1,
+                    Number.RandomBetween(-10, 10) >= -10,
+                    Number.RandomBetween(-10, 10) <= 10,
+                    Number.RandomBetween(100, 100) = 100
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q922", () =>
+            let r = try {
+                    List.Count(List.Random(10)) = 10,
+                    List.Count(List.Random(0)) = 0,
+                    List.Random(5, 42) = List.Random(5, 42),
+                    List.Random(5, 42) <> List.Random(5, 99)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q923", () =>
+            let xs = List.Transform(List.Numbers(1, 1000), each Number.RandomBetween(0, 100)) in
+            let r = try {
+                    List.Max(xs) <= 100,
+                    List.Min(xs) >= 0,
+                    List.Average(xs) > 30 and List.Average(xs) < 70,
+                    List.Count(List.Distinct(xs)) > 500
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q924", () =>
+            let r = try {
+                    Number.RandomBetween(10, 0),
+                    Number.RandomBetween(5, 5),
+                    Number.RandomBetween(-1, 1)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q925", () =>
+            let r = try {
+                    Number.RandomBetween(null, 10),
+                    Number.RandomBetween(0, null),
+                    List.Random(null)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q926", () =>
+            let r = try {
+                    Number.Random() <> Number.Random(),
+                    Number.Random() >= 0,
+                    Number.RandomBetween(0, 1) <> Number.RandomBetween(0, 1)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
