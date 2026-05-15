@@ -1852,15 +1852,36 @@ fn add_column(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
         (&table.repr, &inferred)
     {
         // Fast path: Arrow input + Arrow-encodable new column.
+        // Type-ascription handling: in PQ the `type` arg is metadata, not
+        // coercive — if the cells don't fit the declared type we keep the
+        // inferred encoding rather than erroring. Try the cast and accept
+        // it only if it doesn't drop information (no all-null result for
+        // non-null inputs).
         let (dtype, new_array, nullable) = match &target_type {
             Some(Value::Type(t)) if !matches!(t, super::super::value::TypeRep::Any) => {
                 let (target_dtype, target_nullable) = type_rep_to_datatype(t)?;
-                let cast = arrow::compute::cast(inferred_array, &target_dtype).map_err(|e| {
-                    MError::Other(format!(
-                        "Table.AddColumn: cast {new_name} to {target_dtype:?} failed: {e}"
-                    ))
-                })?;
-                (target_dtype, cast, target_nullable)
+                match arrow::compute::cast(inferred_array, &target_dtype) {
+                    Ok(cast) => {
+                        // If the cast nulled every previously-non-null cell,
+                        // PQ would keep the original text/etc. — fall back
+                        // to the inferred encoding.
+                        let src_non_null = inferred_array.len() - inferred_array.null_count();
+                        let dst_non_null = cast.len() - cast.null_count();
+                        if src_non_null > 0 && dst_non_null == 0 {
+                            let nullable = matches!(inferred_dtype, DataType::Null)
+                                || new_cells.iter().any(|v| matches!(v, Value::Null));
+                            (inferred_dtype.clone(), inferred_array.clone(), nullable)
+                        } else {
+                            (target_dtype, cast, target_nullable)
+                        }
+                    }
+                    Err(_) => {
+                        // Unsupported cast → keep inferred type.
+                        let nullable = matches!(inferred_dtype, DataType::Null)
+                            || new_cells.iter().any(|v| matches!(v, Value::Null));
+                        (inferred_dtype.clone(), inferred_array.clone(), nullable)
+                    }
+                }
             }
             Some(Value::Type(_)) | Some(Value::Null) | None => {
                 let nullable = matches!(inferred_dtype, DataType::Null)

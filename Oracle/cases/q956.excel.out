@@ -1,0 +1,1 @@
+{"HasError":false,"Value":[[{"a":1,"doubled":2},{"a":2,"doubled":4},{"a":3,"doubled":6}],[{"a":1,"text":"1"},{"a":2,"text":"2"},{"a":3,"text":"3"}],[{"a":1,"isOdd":true},{"a":2,"isOdd":false},{"a":3,"isOdd":true}],[{"a":1,"now":"2026-01-01"},{"a":2,"now":"2026-01-01"},{"a":3,"now":"2026-01-01"}]]}

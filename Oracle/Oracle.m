@@ -8450,6 +8450,68 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q955", () =>
+            let t = Table.FromRecords({[a=1, b=2], [a=3, b=4]}) in
+            let r = try {
+                    Table.AddColumn(t, "c", each [a] + [b]),
+                    Table.AddColumn(t, "c", each [a] * [b]),
+                    Table.AddColumn(t, "c", each Text.From([a]))
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q956", () =>
+            let t = Table.FromRecords({[a=1], [a=2], [a=3]}) in
+            let r = try {
+                    Table.AddColumn(t, "doubled",  each [a] * 2, type number),
+                    Table.AddColumn(t, "text",     each Text.From([a]), type text),
+                    Table.AddColumn(t, "isOdd",    each Number.Mod([a], 2) = 1, type logical),
+                    Table.AddColumn(t, "now",      each #date(2026, 1, 1), type date)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q957", () =>
+            let t = Table.FromRecords({[a=1]}) in
+            let r = try {
+                    Table.AddColumn(t, "c", each "not a number", type number)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q958", () =>
+            let t = Table.FromRecords({[a=1], [a=2]}) in
+            let r = try {
+                    Table.AddColumn(t, "nullable", each null, type nullable number),
+                    Table.AddColumn(t, "list", each {[a], [a]*2}, type list)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q959", () =>
+            let t = Table.FromRecords({[a=1, b=2]}) in
+            let r = try {
+                    Table.AddColumn(t, "a", each 99)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q960", () =>
+            let t = Table.FromRecords({}) in
+            let r = try {
+                    Table.AddColumn(t, "c", each 1, type number)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q961", () =>
+            let t = Table.FromRecords({[a=1], [a=0], [a=2]}) in
+            let r = try {
+                    Table.AddColumn(t, "div", each 1 / [a])
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
