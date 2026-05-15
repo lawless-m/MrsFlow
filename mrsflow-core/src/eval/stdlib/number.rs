@@ -111,14 +111,21 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ("Number.BitwiseShiftLeft", two("a", "n"), bitwise_shift_left),
         ("Number.BitwiseShiftRight", two("a", "n"), bitwise_shift_right),
         ("Byte.From", one("value"), from),
-        ("Currency.From", one("value"), from),
+        ("Currency.From", one("value"), currency_from),
         ("Decimal.From", one("value"), from),
         ("Double.From", one("value"), from),
-        ("Int8.From", one("value"), from),
-        ("Int16.From", one("value"), from),
-        ("Int32.From", one("value"), from),
-        ("Int64.From", one("value"), from),
-        ("Percentage.From", one("value"), from),
+        ("Int8.From", one("value"), int_from),
+        ("Int16.From", one("value"), int_from),
+        ("Int32.From", one("value"), int_from),
+        ("Int64.From", one("value"), int_from),
+        (
+            "Percentage.From",
+            vec![
+                Param { name: "value".into(),   optional: false, type_annotation: None },
+                Param { name: "culture".into(), optional: true,  type_annotation: None },
+            ],
+            percentage_from,
+        ),
         ("Single.From", one("value"), from),
         (
             "Number.FromText",
@@ -131,8 +138,9 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         (
             "Number.Round",
             vec![
-                Param { name: "number".into(), optional: false, type_annotation: None },
-                Param { name: "digits".into(), optional: true,  type_annotation: None },
+                Param { name: "number".into(),        optional: false, type_annotation: None },
+                Param { name: "digits".into(),        optional: true,  type_annotation: None },
+                Param { name: "roundingMode".into(),  optional: true,  type_annotation: None },
             ],
             round,
         ),
@@ -163,11 +171,16 @@ fn mod_(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         Value::Null => return Ok(Value::Null),
         other => return Err(type_mismatch("number", other)),
     };
-    if b == 0.0 {
-        return Err(MError::Other("Number.Mod: division by zero".into()));
+    // PQ semantics: divide-by-zero, NaN, and Infinity divisor → null.
+    // For finite a and infinite b, PQ returns a (1 mod ∞ = 1).
+    if b == 0.0 || a.is_nan() || b.is_nan() {
+        return Ok(Value::Null);
     }
-    // Mathematical (floor) mod: result has the same sign as divisor.
-    Ok(Value::Number(a - b * (a / b).floor()))
+    if b.is_infinite() {
+        return if a.is_infinite() { Ok(Value::Null) } else { Ok(Value::Number(a)) };
+    }
+    // Truncated mod: result has the sign of the dividend (PQ behavior).
+    Ok(Value::Number(a - b * (a / b).trunc()))
 }
 
 
@@ -182,10 +195,15 @@ fn integer_divide(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         Value::Null => return Ok(Value::Null),
         other => return Err(type_mismatch("number", other)),
     };
-    if b == 0.0 {
-        return Err(MError::Other("Number.IntegerDivide: division by zero".into()));
+    if b == 0.0 || a.is_nan() || b.is_nan() || a.is_infinite() {
+        return Ok(Value::Null);
     }
-    Ok(Value::Number((a / b).floor()))
+    // PQ: finite ÷ infinite → 0 (the infinite divisor "absorbs" the dividend).
+    if b.is_infinite() {
+        return Ok(Value::Number(0.0));
+    }
+    // Truncate toward zero (sign of dividend).
+    Ok(Value::Number((a / b).trunc()))
 }
 
 
@@ -481,6 +499,60 @@ fn from(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     }
 }
 
+/// Int*.From — coerce to integer using banker's rounding (PQ semantics).
+fn int_from(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+    match from(args, host)? {
+        Value::Null => Ok(Value::Null),
+        Value::Number(n) if n.is_finite() => Ok(Value::Number(round_half_to_even(n))),
+        Value::Number(n) => Ok(Value::Number(n)),
+        other => Ok(other),
+    }
+}
+
+/// Percentage.From — text input strips a trailing "%" before numeric coercion.
+/// Culture (2nd arg) accepted; de/fr swap `,` for `.` before parsing.
+fn percentage_from(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+    if let Value::Text(s) = &args[0] {
+        let t = s.trim();
+        if let Some(stripped) = t.strip_suffix('%') {
+            let culture = match args.get(1) {
+                Some(Value::Text(c)) => Some(c.to_ascii_lowercase()),
+                _ => None,
+            };
+            let is_comma_decimal = matches!(culture.as_deref(), Some(c) if {
+                c.starts_with("de") || c.starts_with("fr") || c.starts_with("es")
+                    || c.starts_with("it") || c.starts_with("nl") || c.starts_with("pt")
+            });
+            let s_norm: String = if is_comma_decimal {
+                stripped.trim().chars()
+                    .filter(|c| *c != '.')
+                    .map(|c| if c == ',' { '.' } else { c })
+                    .collect()
+            } else {
+                stripped.trim().to_string()
+            };
+            let n: f64 = s_norm
+                .parse()
+                .map_err(|_| MError::Other(format!("Percentage.From: cannot parse {s:?}")))?;
+            return Ok(Value::Number(n / 100.0));
+        }
+    }
+    // Strip the optional culture arg before delegating to `from` (which is
+    // 1-arg only).
+    from(&args[..1], host)
+}
+
+/// Currency.From — rounds to 4 decimal places (Currency.Type precision).
+fn currency_from(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+    match from(args, host)? {
+        Value::Null => Ok(Value::Null),
+        Value::Number(n) if n.is_finite() => {
+            Ok(Value::Number(round_half_to_even(n * 10_000.0) / 10_000.0))
+        }
+        other => Ok(other),
+    }
+}
+
 
 fn from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     match &args[0] {
@@ -505,33 +577,241 @@ fn to_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             // aren't implemented — return NotImplemented with the actual
             // format in the message so the caller knows which one to
             // expand support for.
-            let general = match args.get(1) {
-                None | Some(Value::Null) => true,
-                Some(Value::Text(fmt)) => {
-                    let trimmed = fmt.trim();
-                    matches!(trimmed, "G" | "g") || trimmed.is_empty()
+            let fmt = match args.get(1) {
+                None | Some(Value::Null) => None,
+                Some(Value::Text(f)) => {
+                    let t = f.trim();
+                    if t.is_empty() || matches!(t, "G" | "g") { None } else { Some(f.clone()) }
                 }
                 Some(other) => return Err(type_mismatch("text (format)", other)),
             };
-            if !general {
-                let Some(Value::Text(fmt)) = args.get(1) else { unreachable!() };
-                return Err(MError::Other(format!(
-                    "Number.ToText: format string {fmt:?} not yet supported \
-                     (only G / no-format)"
-                )));
-            }
-            // Culture arg (2) accepted but ignored — en-US is what our
-            // general formatting matches; other cultures would shift the
-            // decimal separator and thousand grouping. Add when needed.
-            let _ = args.get(2);
-            let s = if n.is_finite() && n.fract() == 0.0 && n.abs() < 1e16 {
-                format!("{}", *n as i64)
-            } else {
-                n.to_string()
+            // Culture arg (2) accepted; en-GB inferred for currency (£) when
+            // present, else en-US shapes used.
+            let culture = match args.get(2) {
+                Some(Value::Text(c)) => Some(c.clone()),
+                _ => None,
+            };
+            let s = match fmt {
+                None => default_number_text(*n),
+                Some(f) => format_number_dotnet(*n, &f, culture.as_deref())?,
             };
             Ok(Value::Text(s))
         }
         other => Err(type_mismatch("number", other)),
+    }
+}
+
+/// Format `n` according to a .NET-style numeric format string.
+/// Supported standard codes: F[N]/N[N]/P[N]/C[N]/D[N]/E[N] and the
+/// uppercase/lowercase variants. Falls back to a basic custom-pattern
+/// renderer for patterns containing `#`, `0`, `,`, `.`, `%`, `E+`.
+fn format_number_dotnet(n: f64, fmt: &str, culture: Option<&str>) -> Result<String, MError> {
+    let f = fmt.trim();
+    if f.is_empty() {
+        return Ok(default_number_text(n));
+    }
+    // Standard format codes: a single letter optionally followed by precision.
+    let bytes = f.as_bytes();
+    if bytes.len() >= 1 && bytes[0].is_ascii_alphabetic() {
+        let code = bytes[0] as char;
+        let prec_str: String = f[1..].chars().collect();
+        let precision: Option<i32> = if prec_str.is_empty() {
+            None
+        } else {
+            prec_str.parse::<i32>().ok()
+        };
+        // Only treat as a standard code when EVERYTHING after the leading
+        // letter is digits — otherwise fall through to custom pattern.
+        if precision.is_some() || prec_str.is_empty() {
+            match code {
+                'F' | 'f' => return Ok(format_fixed(n, precision.unwrap_or(2))),
+                'N' | 'n' => return Ok(format_number_grouped(n, precision.unwrap_or(2))),
+                'P' | 'p' => return Ok(format_percent(n, precision.unwrap_or(2))),
+                'C' | 'c' => {
+                    let symbol = currency_symbol_for(culture);
+                    return Ok(format!("{}{}", symbol, format_number_grouped(n, precision.unwrap_or(2))));
+                }
+                'D' | 'd' => return Ok(format_integer_padded(n, precision.unwrap_or(0))),
+                'E' | 'e' => return Ok(format_exponent(n, precision.unwrap_or(6), code == 'E')),
+                'R' | 'r' => return Ok(n.to_string()),
+                'X' | 'x' => {
+                    let i = n as i64;
+                    let prec = precision.unwrap_or(0) as usize;
+                    return Ok(if code == 'X' {
+                        format!("{i:0prec$X}")
+                    } else {
+                        format!("{i:0prec$x}")
+                    });
+                }
+                _ => {}
+            }
+        }
+    }
+    // Custom pattern fallback — handles `0.00`, `#,##0.00`, `0.00%`, `#.##E+0`.
+    Ok(format_custom_pattern(n, f))
+}
+
+fn round_half_even(x: f64) -> f64 {
+    let r = x.round();
+    if (x - x.trunc()).abs() == 0.5 {
+        let t = x.trunc();
+        if (t as i64) % 2 == 0 { t } else { r }
+    } else {
+        r
+    }
+}
+
+fn format_fixed(n: f64, prec: i32) -> String {
+    let p = prec.max(0) as usize;
+    let factor = 10f64.powi(prec.max(0));
+    let rounded = round_half_even(n * factor) / factor;
+    format!("{rounded:.*}", p)
+}
+
+fn format_number_grouped(n: f64, prec: i32) -> String {
+    let fixed = format_fixed(n, prec);
+    insert_thousands(&fixed)
+}
+
+fn insert_thousands(s: &str) -> String {
+    // Insert `,` every 3 digits before the decimal point.
+    let (sign, rest) = if let Some(r) = s.strip_prefix('-') { ("-", r) } else { ("", s) };
+    let (int_part, frac_part) = match rest.find('.') {
+        Some(i) => (&rest[..i], Some(&rest[i..])),
+        None => (rest, None),
+    };
+    let mut out = String::new();
+    let chars: Vec<char> = int_part.chars().collect();
+    for (i, c) in chars.iter().enumerate() {
+        let pos_from_end = chars.len() - i;
+        out.push(*c);
+        if pos_from_end > 1 && pos_from_end % 3 == 1 {
+            out.push(',');
+        }
+    }
+    if let Some(f) = frac_part {
+        out.push_str(f);
+    }
+    format!("{sign}{out}")
+}
+
+fn format_percent(n: f64, prec: i32) -> String {
+    let scaled = n * 100.0;
+    let body = format_number_grouped(scaled, prec);
+    format!("{body}%")
+}
+
+fn format_integer_padded(n: f64, width: i32) -> String {
+    let i = n as i64;
+    let neg = i < 0;
+    let abs_str = i.unsigned_abs().to_string();
+    let w = (width.max(0) as usize).saturating_sub(abs_str.len());
+    let zeros: String = std::iter::repeat('0').take(w).collect();
+    let body = format!("{zeros}{abs_str}");
+    if neg { format!("-{body}") } else { body }
+}
+
+fn format_exponent(n: f64, prec: i32, upper: bool) -> String {
+    let p = prec.max(0) as usize;
+    let raw = format!("{n:.*e}", p);
+    // Rust produces "1.23e4"; .NET produces "1.23E+004" (E with sign and
+    // 3-digit exponent). Normalise.
+    let (mantissa, exp) = match raw.find('e') {
+        Some(i) => (&raw[..i], &raw[i + 1..]),
+        None => (raw.as_str(), "0"),
+    };
+    let exp_n: i32 = exp.parse().unwrap_or(0);
+    let e_char = if upper { 'E' } else { 'e' };
+    let sign = if exp_n < 0 { '-' } else { '+' };
+    format!("{mantissa}{e_char}{sign}{:03}", exp_n.abs())
+}
+
+fn currency_symbol_for(culture: Option<&str>) -> &'static str {
+    match culture.map(str::to_ascii_lowercase).as_deref() {
+        Some(c) if c.starts_with("en-gb") => "£",
+        Some(c) if c.starts_with("en-us") => "$",
+        Some(c) if c.starts_with("de") || c.starts_with("fr") => "€",
+        Some(c) if c.starts_with("ja") => "¥",
+        _ => "£", // Corpus runs en-GB by default
+    }
+}
+
+/// Render `n` using a custom .NET pattern. Supported tokens:
+///   `0`     digit (zero-pad)
+///   `#`     digit (no zero-pad)
+///   `,`     thousands separator (between digits in integer part)
+///   `.`     decimal point
+///   `%`     multiply by 100, append `%`
+///   `E+0`   exponent
+fn format_custom_pattern(n: f64, pat: &str) -> String {
+    let has_percent = pat.contains('%');
+    let value = if has_percent { n * 100.0 } else { n };
+    let has_exp = pat.to_ascii_uppercase().contains('E');
+    if has_exp {
+        // Find E+0 or E+00 etc.
+        let upper_idx = pat.find(|c: char| c == 'E' || c == 'e');
+        if let Some(idx) = upper_idx {
+            let mantissa_pat = &pat[..idx];
+            let exp_pat = &pat[idx..]; // includes E
+            // Figure out exponent digit width.
+            let exp_digits = exp_pat.chars().filter(|c| *c == '0').count().max(1);
+            let raw = format!("{value:E}");
+            let (m, e) = raw.split_once('E').unwrap_or((raw.as_str(), "0"));
+            let e_n: i32 = e.parse().unwrap_or(0);
+            let m_f: f64 = m.parse().unwrap_or(value);
+            let m_rendered = render_digit_pattern(m_f, mantissa_pat);
+            let e_char = if exp_pat.starts_with('E') { 'E' } else { 'e' };
+            let sign = if e_n < 0 { '-' } else { '+' };
+            return format!("{m_rendered}{e_char}{sign}{:0width$}", e_n.abs(), width = exp_digits);
+        }
+    }
+    let body = render_digit_pattern(value, pat.trim_end_matches('%'));
+    if has_percent { format!("{body}%") } else { body }
+}
+
+fn render_digit_pattern(n: f64, pat: &str) -> String {
+    // Split pattern at the decimal point.
+    let (int_pat, frac_pat) = match pat.find('.') {
+        Some(i) => (&pat[..i], Some(&pat[i + 1..])),
+        None => (pat, None),
+    };
+    let frac_digits = frac_pat.map(|p| p.chars().filter(|c| *c == '0' || *c == '#').count()).unwrap_or(0);
+    let fixed = format_fixed(n, frac_digits as i32);
+    let grouped = if int_pat.contains(',') {
+        insert_thousands(&fixed)
+    } else {
+        fixed
+    };
+    // The pattern's int part may demand a minimum number of digits (`0`s).
+    // For simplicity, leave `grouped` as-is when no zero-pad is needed.
+    let min_int_digits = int_pat.chars().filter(|c| *c == '0').count();
+    if min_int_digits == 0 {
+        return grouped;
+    }
+    let (sign, rest) = if let Some(r) = grouped.strip_prefix('-') { ("-", r) } else { ("", grouped.as_str()) };
+    let (int_part, frac_part) = match rest.find('.') {
+        Some(i) => (&rest[..i], Some(&rest[i..])),
+        None => (rest, None),
+    };
+    let bare_digit_count = int_part.chars().filter(char::is_ascii_digit).count();
+    let pad = min_int_digits.saturating_sub(bare_digit_count);
+    let zeros: String = std::iter::repeat('0').take(pad).collect();
+    let mut out = format!("{sign}{zeros}{int_part}");
+    if let Some(f) = frac_part { out.push_str(f); }
+    out
+}
+
+fn default_number_text(n: f64) -> String {
+    if n.is_nan() {
+        return "NaN".to_string();
+    }
+    if n.is_infinite() {
+        return if n > 0.0 { "∞".to_string() } else { "-∞".to_string() };
+    }
+    if n.fract() == 0.0 && n.abs() < 1e16 {
+        format!("{}", n as i64)
+    } else {
+        n.to_string()
     }
 }
 
@@ -571,6 +851,10 @@ fn power(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         Value::Number(n) => *n,
         other => return Err(type_mismatch("number", other)),
     };
+    // PQ: 0^0 is indeterminate → null. Math convention says 1; PQ disagrees.
+    if base == 0.0 && exp == 0.0 {
+        return Ok(Value::Null);
+    }
     Ok(Value::Number(base.powf(exp)))
 }
 
@@ -595,10 +879,34 @@ fn round(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         Some(Value::Null) | None => 0,
         Some(other) => return Err(type_mismatch("number or null", other)),
     };
-    // Simple half-away-from-zero. M's default is banker's, but the corpus
-    // only relies on basic rounding for display.
+    // RoundingMode: 0 AwayFromZero, 1 Down, 2 ToEven (default), 3 TowardZero, 4 Up.
+    let mode = match args.get(2) {
+        Some(Value::Number(m)) => *m as i32,
+        Some(Value::Null) | None => 2,
+        Some(other) => return Err(type_mismatch("number or null", other)),
+    };
     let factor = 10f64.powi(digits);
-    Ok(Value::Number((n * factor).round() / factor))
+    let scaled = n * factor;
+    let rounded = match mode {
+        0 => scaled.round(),                    // AwayFromZero (Rust's f64::round)
+        1 => scaled.floor(),                    // Down
+        2 => round_half_to_even(scaled),        // ToEven (banker's)
+        3 => scaled.trunc(),                    // TowardZero
+        4 => scaled.ceil(),                     // Up
+        _ => return Err(MError::Other(format!("Number.Round: unknown rounding mode {mode}"))),
+    };
+    Ok(Value::Number(rounded / factor))
+}
+
+fn round_half_to_even(x: f64) -> f64 {
+    let r = x.round();
+    // round() goes away from zero; correct the .5 case toward even.
+    if (x - x.trunc()).abs() == 0.5 {
+        let t = x.trunc();
+        if (t as i64) % 2 == 0 { t } else { r }
+    } else {
+        r
+    }
 }
 
 // --- Text.* ---

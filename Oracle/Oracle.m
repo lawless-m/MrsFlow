@@ -5066,7 +5066,116 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
-                        else [HasError=false, Value=r[Value]])
+                        else [HasError=false, Value=r[Value]]),
+
+        // q670-q676: Number.IntegerDivide overflow + sign matrix.
+
+        SafeSerialize("q670", () =>
+            let r = try {
+                    Number.IntegerDivide(10, 3),
+                    Number.IntegerDivide(-10, 3),
+                    Number.IntegerDivide(10, -3),
+                    Number.IntegerDivide(-10, -3),
+                    Number.IntegerDivide(0, 5),
+                    Number.IntegerDivide(0, -5),
+                    Number.IntegerDivide(3, 3),
+                    Number.IntegerDivide(-3, 3)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q671", () =>
+            let r = try {
+                    Number.IntegerDivide(7.5, 2),
+                    Number.IntegerDivide(-7.5, 2),
+                    Number.IntegerDivide(7.5, -2),
+                    Number.IntegerDivide(-7.5, -2),
+                    Number.IntegerDivide(7, 2.5),
+                    Number.IntegerDivide(-7, 2.5),
+                    Number.IntegerDivide(0.5, 0.25),
+                    Number.IntegerDivide(-0.5, 0.25)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q672", () =>
+            let r = try {
+                    try Number.IntegerDivide(1, 0) otherwise "err",
+                    try Number.IntegerDivide(-1, 0) otherwise "err",
+                    try Number.IntegerDivide(0, 0) otherwise "err",
+                    try Number.IntegerDivide(1.5, 0) otherwise "err",
+                    try Number.IntegerDivide(null, 5) otherwise "err",
+                    try Number.IntegerDivide(5, null) otherwise "err",
+                    try Number.IntegerDivide(null, null) otherwise "err"
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q673", () =>
+            let r = try {
+                    try Number.IntegerDivide(Number.NaN, 3) otherwise "err",
+                    try Number.IntegerDivide(3, Number.NaN) otherwise "err",
+                    try Number.IntegerDivide(Number.PositiveInfinity, 3) otherwise "err",
+                    try Number.IntegerDivide(3, Number.PositiveInfinity) otherwise "err",
+                    try Number.IntegerDivide(Number.NegativeInfinity, 3) otherwise "err",
+                    try Number.IntegerDivide(3, Number.NegativeInfinity) otherwise "err",
+                    try Number.IntegerDivide(Number.PositiveInfinity, Number.NegativeInfinity) otherwise "err"
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q674", () =>
+            // Edge values near i64 bounds.
+            let r = try {
+                    Number.IntegerDivide(9007199254740992, 2),
+                    Number.IntegerDivide(-9007199254740992, 2),
+                    Number.IntegerDivide(9007199254740992, -2),
+                    Number.IntegerDivide(-9007199254740992, -2),
+                    Number.IntegerDivide(9007199254740992, 9007199254740992),
+                    Number.IntegerDivide(9223372036854775000, 1),
+                    Number.IntegerDivide(-9223372036854775000, 1)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q675", () =>
+            let r = try {
+                    Number.IntegerDivide(100, -1),
+                    Number.IntegerDivide(-100, -1),
+                    Number.IntegerDivide(100, 1),
+                    Number.IntegerDivide(-100, 1),
+                    Number.IntegerDivide(1, 100),
+                    Number.IntegerDivide(-1, 100),
+                    Number.IntegerDivide(99, 100),
+                    Number.IntegerDivide(-99, 100)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q676", () =>
+            // IntegerDivide-Mod relation: (a - a mod b) / b == IntegerDivide(a, b).
+            let r = try
+                    let
+                        a1 = 17, b1 = 5,
+                        a2 = -17, b2 = 5,
+                        a3 = 17, b3 = -5,
+                        a4 = -17, b4 = -5
+                    in {
+                        Number.IntegerDivide(a1, b1) = (a1 - Number.Mod(a1, b1)) / b1,
+                        Number.IntegerDivide(a2, b2) = (a2 - Number.Mod(a2, b2)) / b2,
+                        Number.IntegerDivide(a3, b3) = (a3 - Number.Mod(a3, b3)) / b3,
+                        Number.IntegerDivide(a4, b4) = (a4 - Number.Mod(a4, b4)) / b4
+                    }
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]])
     },
 
     Catalog = Table.FromRecords(cases)
