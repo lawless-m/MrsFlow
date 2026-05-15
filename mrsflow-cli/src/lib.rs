@@ -529,12 +529,31 @@ fn folder_impl(path: &str, recursive: bool) -> Result<Value, IoError> {
         // need them, switch to a platform-cfg'd path.
         let hidden = name.starts_with('.');
         let kind = if is_dir { "Folder" } else { "File" };
+        let size_val = if is_dir { Value::Null } else { Value::Number(md.len() as f64) };
+        let change_time = systime_to_datetime(md.modified().ok());
+        let read_only = md.permissions().readonly();
         let attrs = Value::Record(Record {
             fields: vec![
+                ("Content Type".into(), Value::Text(String::new())),
                 ("Kind".into(), Value::Text(kind.into())),
-                ("Size".into(), Value::Number(md.len() as f64)),
+                ("Size".into(), size_val),
+                ("ReadOnly".into(), Value::Logical(read_only)),
                 ("Hidden".into(), Value::Logical(hidden)),
+                ("System".into(), Value::Logical(false)),
                 ("Directory".into(), Value::Logical(is_dir)),
+                ("Archive".into(), Value::Logical(false)),
+                ("Device".into(), Value::Logical(false)),
+                ("Normal".into(), Value::Logical(false)),
+                ("Temporary".into(), Value::Logical(false)),
+                ("SparseFile".into(), Value::Logical(false)),
+                ("ReparsePoint".into(), Value::Logical(false)),
+                ("Compressed".into(), Value::Logical(false)),
+                ("Offline".into(), Value::Logical(false)),
+                ("NotContentIndexed".into(), Value::Logical(false)),
+                ("Encrypted".into(), Value::Logical(false)),
+                ("ChangeTime".into(), change_time.clone()),
+                ("SymbolicLink".into(), Value::Logical(false)),
+                ("MountPoint".into(), Value::Logical(false)),
             ],
             env: mrsflow_core::eval::EnvNode::empty(),
         });
