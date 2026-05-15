@@ -630,27 +630,30 @@ fn format_number_dotnet(n: f64, fmt: &str, culture: Option<&str>) -> Result<Stri
         // Only treat as a standard code when EVERYTHING after the leading
         // letter is digits — otherwise fall through to custom pattern.
         if precision.is_some() || prec_str.is_empty() {
-            match code {
-                'F' | 'f' => return Ok(format_fixed(n, precision.unwrap_or(2))),
-                'N' | 'n' => return Ok(format_number_grouped(n, precision.unwrap_or(2))),
-                'P' | 'p' => return Ok(format_percent(n, precision.unwrap_or(2))),
+            let result: Option<String> = match code {
+                'F' | 'f' => Some(format_fixed(n, precision.unwrap_or(2))),
+                'N' | 'n' => Some(format_number_grouped(n, precision.unwrap_or(2))),
+                'P' | 'p' => Some(format_percent(n, precision.unwrap_or(2))),
                 'C' | 'c' => {
                     let symbol = currency_symbol_for(culture);
-                    return Ok(format!("{}{}", symbol, format_number_grouped(n, precision.unwrap_or(2))));
+                    Some(format!("{}{}", symbol, format_number_grouped(n, precision.unwrap_or(2))))
                 }
-                'D' | 'd' => return Ok(format_integer_padded(n, precision.unwrap_or(0))),
-                'E' | 'e' => return Ok(format_exponent(n, precision.unwrap_or(6), code == 'E')),
-                'R' | 'r' => return Ok(n.to_string()),
+                'D' | 'd' => Some(format_integer_padded(n, precision.unwrap_or(0))),
+                'E' | 'e' => Some(format_exponent(n, precision.unwrap_or(6), code == 'E')),
+                'R' | 'r' => Some(n.to_string()),
                 'X' | 'x' => {
                     let i = n as i64;
                     let prec = precision.unwrap_or(0) as usize;
-                    return Ok(if code == 'X' {
+                    Some(if code == 'X' {
                         format!("{i:0prec$X}")
                     } else {
                         format!("{i:0prec$x}")
-                    });
+                    })
                 }
-                _ => {}
+                _ => None,
+            };
+            if let Some(s) = result {
+                return Ok(apply_culture_decimal(s, culture));
             }
         }
     }
@@ -669,9 +672,23 @@ fn round_half_even(x: f64) -> f64 {
 }
 
 fn format_fixed(n: f64, prec: i32) -> String {
+    if n.is_nan() { return "NaN".to_string(); }
+    if n.is_infinite() {
+        return if n > 0.0 { "∞".to_string() } else { "-∞".to_string() };
+    }
     let p = prec.max(0) as usize;
+    // .NET's "F" format uses MidpointRounding.AwayFromZero, not banker's.
+    // Compute the rounded value with away-from-zero semantics before
+    // formatting, then use Rust's {:.*} for the final text — which itself
+    // uses round-half-to-even, but the value will already be at the right
+    // boundary so it's just printed.
     let factor = 10f64.powi(prec.max(0));
-    let rounded = round_half_even(n * factor) / factor;
+    let scaled = n * factor;
+    let rounded = if scaled >= 0.0 {
+        (scaled + 0.5).floor()
+    } else {
+        (scaled - 0.5).ceil()
+    } / factor;
     format!("{rounded:.*}", p)
 }
 
@@ -731,6 +748,23 @@ fn format_exponent(n: f64, prec: i32, upper: bool) -> String {
     let e_char = if upper { 'E' } else { 'e' };
     let sign = if exp_n < 0 { '-' } else { '+' };
     format!("{mantissa}{e_char}{sign}{:03}", exp_n.abs())
+}
+
+/// Swap `.` for `,` (and `,` thousands for `.` thousands) when the culture
+/// is a comma-decimal locale (de, fr, es, it, nl, pt, …). Currency symbol
+/// stays as-is. Idempotent: if no swap needed, returns input unchanged.
+fn apply_culture_decimal(s: String, culture: Option<&str>) -> String {
+    let is_comma_decimal = matches!(culture.map(str::to_ascii_lowercase).as_deref(), Some(c) if {
+        c.starts_with("de") || c.starts_with("fr") || c.starts_with("es")
+            || c.starts_with("it") || c.starts_with("nl") || c.starts_with("pt")
+    });
+    if !is_comma_decimal { return s; }
+    // Use a placeholder for thousands `,` so the decimal `.` swap doesn't
+    // collide with it. Then swap placeholder → `.` for de/fr thousands.
+    let placeholder = '\u{1}';
+    let with_holder: String = s.chars().map(|c| if c == ',' { placeholder } else { c }).collect();
+    let dec_swapped: String = with_holder.chars().map(|c| if c == '.' { ',' } else { c }).collect();
+    dec_swapped.chars().map(|c| if c == placeholder { '.' } else { c }).collect()
 }
 
 fn currency_symbol_for(culture: Option<&str>) -> &'static str {

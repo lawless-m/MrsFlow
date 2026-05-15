@@ -5394,6 +5394,109 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        // q691-q697: Number.ToText "F" precision.
+
+        SafeSerialize("q691", () =>
+            let r = try {
+                    Number.ToText(3.14159, "F0"),
+                    Number.ToText(3.14159, "F1"),
+                    Number.ToText(3.14159, "F2"),
+                    Number.ToText(0, "F2"),
+                    Number.ToText(-3.14159, "F2"),
+                    Number.ToText(0.5, "F0"),
+                    Number.ToText(1.5, "F0"),
+                    Number.ToText(2.5, "F0")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q692", () =>
+            let r = try {
+                    Number.ToText(3.14159265358979, "F5"),
+                    Number.ToText(3.14159265358979, "F10"),
+                    Number.ToText(0, "F5"),
+                    Number.ToText(-3.14159265358979, "F5"),
+                    Number.ToText(1, "F5"),
+                    Number.ToText(1.23456789, "F5"),
+                    Number.ToText(1.23456789, "F10")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q693", () =>
+            let r = try {
+                    Number.ToText(0.1, "F20"),
+                    Number.ToText(0.2, "F20"),
+                    Number.ToText(0.3, "F20"),
+                    Number.ToText(1, "F20"),
+                    Number.ToText(0, "F20"),
+                    Number.ToText(-0.1, "F20")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q694", () =>
+            let r = try {
+                    Number.ToText(0.5, "F0"),
+                    Number.ToText(1.5, "F0"),
+                    Number.ToText(2.5, "F0"),
+                    Number.ToText(3.5, "F0"),
+                    Number.ToText(-0.5, "F0"),
+                    Number.ToText(-1.5, "F0"),
+                    Number.ToText(0.05, "F1"),
+                    Number.ToText(0.15, "F1"),
+                    Number.ToText(0.25, "F1"),
+                    Number.ToText(0.35, "F1")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q695", () =>
+            let r = try {
+                    Number.ToText(1234567.89, "F2"),
+                    Number.ToText(0.0001, "F4"),
+                    Number.ToText(0.0001, "F2"),
+                    Number.ToText(1e10, "F2"),
+                    Number.ToText(1e-10, "F12"),
+                    Number.ToText(123456789012345, "F0"),
+                    Number.ToText(-1234567.89, "F2")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q696", () =>
+            let r = try {
+                    try Number.ToText(Number.NaN, "F2") otherwise "err",
+                    try Number.ToText(Number.PositiveInfinity, "F2") otherwise "err",
+                    try Number.ToText(Number.NegativeInfinity, "F2") otherwise "err",
+                    try Number.ToText(null, "F2") otherwise "err",
+                    Number.ToText(3.14159, "F"),
+                    Number.ToText(3.14159, "f0"),
+                    Number.ToText(3.14159, "f2")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q697", () =>
+            let r = try {
+                    Number.ToText(3.14, "F2", "en-US"),
+                    Number.ToText(3.14, "F2", "en-GB"),
+                    Number.ToText(3.14, "F2", "de-DE"),
+                    Number.ToText(3.14, "F2", "fr-FR"),
+                    Number.ToText(1234.5, "F2", "en-US"),
+                    Number.ToText(1234.5, "F2", "de-DE"),
+                    Number.ToText(-0.5, "F1", "de-DE")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
