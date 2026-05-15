@@ -64,7 +64,15 @@ fn to_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         Some(Value::Null) | None => "\r\n".to_string(),
         Some(other) => return Err(type_mismatch("text", other)),
     };
-    Ok(Value::Text(lines.join(&sep)))
+    // PQ Lines.ToText terminates every line with the separator, not
+    // just between lines — so the result always ends with the
+    // separator (except for the empty input case).
+    let mut out = String::new();
+    for line in &lines {
+        out.push_str(line);
+        out.push_str(&sep);
+    }
+    Ok(Value::Text(out))
 }
 
 fn from_binary(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
@@ -99,6 +107,9 @@ fn to_binary(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 /// Split `text` on \r\n / \r / \n. When `keep_seps` is true, each emitted
 /// line includes the separator that terminated it.
 fn split_lines(text: &str, keep_seps: bool) -> Vec<Value> {
+    if text.is_empty() {
+        return Vec::new();
+    }
     let mut out: Vec<Value> = Vec::new();
     let bytes = text.as_bytes();
     let mut start = 0;
@@ -117,9 +128,9 @@ fn split_lines(text: &str, keep_seps: bool) -> Vec<Value> {
         start = sep_end;
         i = sep_end;
     }
-    // Tail after last separator. Power Query emits this even when empty —
-    // matching the "trailing newline → empty last element" behaviour.
-    if start <= bytes.len() {
+    // Tail after last separator. PQ skips a trailing empty (text ending in a
+    // newline produces no trailing element).
+    if start < bytes.len() {
         out.push(Value::Text(text[start..].to_string()));
     }
     out

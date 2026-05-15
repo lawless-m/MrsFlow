@@ -7549,10 +7549,12 @@ mod tests {
     }
 
     #[test]
-    fn lines_to_text_joins_with_crlf() {
+    fn lines_to_text_terminates_each_line_with_crlf() {
+        // PQ Lines.ToText terminates every line with the separator
+        // (including the last), so the result always ends with CRLF.
         let src = r#"Lines.ToText({"x", "y", "z"})"#;
         match eval_str(src).unwrap() {
-            Value::Text(s) => assert_eq!(s, "x\r\ny\r\nz"),
+            Value::Text(s) => assert_eq!(s, "x\r\ny\r\nz\r\n"),
             other => panic!("expected text, got {other:?}"),
         }
     }

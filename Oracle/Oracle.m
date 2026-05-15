@@ -9823,6 +9823,74 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1088", () =>
+            let csv = "a,b,c#(cr,lf)1,2,3#(cr,lf)4,5,6" in
+            let r = try {
+                    Csv.Document(Text.ToBinary(csv, TextEncoding.Utf8))
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1089", () =>
+            let q = """" in
+            let crlf = "#(cr,lf)" in
+            let csv = "a,b" & crlf & q & "hello, world" & q & "," & q & "say " & q & q & "hi" & q & q & q & crlf in
+            let r = try {
+                    Csv.Document(Text.ToBinary(csv, TextEncoding.Utf8))
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1090", () =>
+            let csv = "a,b#(cr,lf)""quoted"",unquoted#(cr,lf)" in
+            let r = try {
+                    Csv.Document(Text.ToBinary(csv, TextEncoding.Utf8), [QuoteStyle = QuoteStyle.None]),
+                    Csv.Document(Text.ToBinary(csv, TextEncoding.Utf8), [QuoteStyle = QuoteStyle.Csv])
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1091", () =>
+            let csv = "a,b,c#(cr,lf)1,2#(cr,lf)4,5,6,7#(cr,lf)#(cr,lf)8,9,10" in
+            let r = try {
+                    Csv.Document(Text.ToBinary(csv, TextEncoding.Utf8))
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1092", () =>
+            let tsv = "a#(tab)b#(tab)c#(cr,lf)1#(tab)2#(tab)3" in
+            let pipe = "a|b#(cr,lf)X|Y" in
+            let r = try {
+                    Csv.Document(Text.ToBinary(tsv, TextEncoding.Utf8), [Delimiter = "#(tab)"]),
+                    Csv.Document(Text.ToBinary(pipe, TextEncoding.Utf8), [Delimiter = "|"])
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1093", () =>
+            let r = try {
+                    Lines.FromText("a#(cr,lf)b#(lf)c#(cr)d"),
+                    Lines.FromText("a#(lf)b"),
+                    Lines.FromText("a#(cr)b"),
+                    Lines.FromText(""),
+                    Lines.FromText("single")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1094", () =>
+            let lines = {"a", "b", "c"} in
+            let r = try {
+                    Lines.ToText(lines),
+                    Lines.ToText(lines, "|"),
+                    Lines.ToText(lines, " - "),
+                    Lines.ToText({}, "|"),
+                    Lines.ToText({"single"}, "|")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
