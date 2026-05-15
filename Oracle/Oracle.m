@@ -1647,7 +1647,15 @@ let
             List.RemoveItems({1,2,3,2,4}, {2})),
 
         SafeSerialize("q310", () =>
-            List.Combine({}))
+            List.Combine({})),
+
+        // q311-q315: Date.Day vs DayOfWeek/DayOfYear/DaysInMonth/DayOfWeekName.
+
+        SafeSerialize("q311", () => Date.Day(#date(2026,3,15))),
+        SafeSerialize("q312", () => Date.DayOfWeek(#date(2026,3,15))),
+        SafeSerialize("q313", () => Date.DayOfWeekName(#date(2026,3,15))),
+        SafeSerialize("q314", () => Date.DayOfYear(#date(2026,3,15))),
+        SafeSerialize("q315", () => Date.DaysInMonth(#date(2026,3,15)))
     },
 
     Catalog = Table.FromRecords(cases)
