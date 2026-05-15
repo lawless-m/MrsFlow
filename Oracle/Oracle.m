@@ -2027,6 +2027,36 @@ let
             let r = try Splitter.SplitTextByLengths({2, 3, 1})("abcdefg") in
                 if r[HasError]
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q376", () =>
+            let r = try Combiner.CombineTextByDelimiter(",")({"a", "b", "c", "d"}) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q377", () =>
+            let r = try Combiner.CombineTextByDelimiter(",", QuoteStyle.Csv)({"a", "b,c", "d""e"}) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q378", () =>
+            let r = try Combiner.CombineTextByEachDelimiter({",", ";", "|"})({"a", "b", "c", "d"}) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q379", () =>
+            let r = try Combiner.CombineTextByLengths({2, 3, 1})({"ab", "cde", "f"}) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q380", () =>
+            let r = try Combiner.CombineTextByPositions({0, 5, 10})({"abc", "defg", "hi"}) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                     else [HasError=false, Value=r[Value]])
     },
 
