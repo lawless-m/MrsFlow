@@ -265,25 +265,67 @@ fn to_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         Value::Datetimezone(dt) => *dt,
         other => return Err(type_mismatch("datetimezone", other)),
     };
-    let fmt = match args.get(1) {
-        None | Some(Value::Null) => None,
+    // PQ accepts either a plain text Format string or an options record
+    // `[Format = "...", Culture = "..."]`. The record form is what
+    // Power Query docs document; the plain-text form is a shorthand.
+    let (fmt, culture_from_rec) = match args.get(1) {
+        None | Some(Value::Null) => (None, None),
         Some(Value::Text(s)) => {
             let t = s.trim();
-            if t.is_empty() { None } else { Some(s.clone()) }
+            (if t.is_empty() { None } else { Some(s.clone()) }, None)
         }
-        Some(other) => return Err(type_mismatch("text (format)", other)),
+        Some(Value::Record(rec)) => {
+            // Record fields can be thunks (lazy bindings) — force before
+            // typecheck. NoIoHost is fine since these are pure literals.
+            let force = |v: Value| -> Result<Value, MError> {
+                super::super::force(v, &mut |e, env| {
+                    super::super::evaluate(e, env, &super::super::NoIoHost)
+                })
+            };
+            let f = rec.fields.iter()
+                .find(|(k, _)| k == "Format")
+                .map(|(_, v)| v.clone());
+            let c = rec.fields.iter()
+                .find(|(k, _)| k == "Culture")
+                .map(|(_, v)| v.clone());
+            let f = match f { Some(v) => Some(force(v)?), None => None };
+            let c = match c { Some(v) => Some(force(v)?), None => None };
+            let fmt_text = match f {
+                None | Some(Value::Null) => None,
+                Some(Value::Text(s)) => {
+                    let t = s.trim();
+                    if t.is_empty() { None } else { Some(s) }
+                }
+                Some(other) => return Err(type_mismatch("text (Format)", &other)),
+            };
+            let cul_text = match c {
+                Some(Value::Text(s)) => Some(s),
+                _ => None,
+            };
+            (fmt_text, cul_text)
+        }
+        Some(other) => return Err(type_mismatch("text or record (format)", other)),
     };
     let culture = match args.get(2) {
         Some(Value::Text(c)) => Some(c.clone()),
-        _ => None,
+        _ => culture_from_rec,
     };
-    let pattern = match fmt {
-        None => return Ok(Value::Text(dt.to_rfc3339())),
+    // .NET's "u" and "R" standard formats convert to UTC before rendering.
+    // Detect those before pattern translation so the offset is normalised.
+    let (effective_dt, pattern) = match fmt {
+        None => {
+            // No format: default emits short culture-specific date-time-offset.
+            // PQ's en-GB default is "dd/MM/yyyy HH:mm:ss zzz" (offset spelled out).
+            let s = dt.format("%d/%m/%Y %H:%M:%S %:z").to_string();
+            return Ok(Value::Text(s));
+        }
         Some(f) => {
             let trimmed = f.trim();
-            // PQ rejects standalone "K" (kind specifier) format with this exact
-            // message — covers q185's expectation.
-            if trimmed == "K" {
+            // PQ rejects standalone "K" / "z" / "zz" / "zzz" — these are
+            // offset-only specifiers and PQ's documented behaviour is to
+            // refuse when used alone. (q185 covers K; q1159/q1160/q1164 cover
+            // zzz/z/zz/half-offset variants — all surfaced via Excel-empty.)
+            if matches!(trimmed, "K" | "z" | "zz" | "zzz") {
                 return Err(MError::Other(
                     "The output DateTimeZone format specified isn't supported.".into()
                 ));
@@ -291,11 +333,25 @@ fn to_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             if matches!(trimmed, "G" | "g") {
                 return Ok(Value::Text(dt.to_rfc3339()));
             }
-            let expanded = super::date::expand_standard_date_format(&f, culture.as_deref());
-            super::date::dotnet_to_strftime(&expanded)
+            // u/R convert to UTC; everything else keeps the local offset.
+            let dt2 = if matches!(trimmed, "u" | "R" | "r") {
+                use chrono::TimeZone;
+                let utc = chrono::Utc.from_utc_datetime(&dt.naive_utc());
+                utc.with_timezone(&chrono::FixedOffset::east_opt(0).unwrap())
+            } else {
+                dt
+            };
+            let mut expanded = super::date::expand_standard_date_format(&f, culture.as_deref());
+            // .NET's "O"/"o" round-trip format on DateTimeZone appends K
+            // (offset). expand_standard_date_format omits K so the plain-date
+            // DateTime.ToText path stays safe; we add it here for tz values.
+            if matches!(trimmed, "O" | "o") {
+                expanded.push('K');
+            }
+            (dt2, super::date::dotnet_to_strftime(&expanded))
         }
     };
-    Ok(Value::Text(dt.format(&pattern).to_string()))
+    Ok(Value::Text(effective_dt.format(&pattern).to_string()))
 }
 
 

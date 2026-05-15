@@ -1134,10 +1134,12 @@ pub(super) fn expand_standard_date_format(fmt: &str, culture: Option<&str>) -> S
         'G' => if is_en_us { "M/d/yyyy h:mm:ss tt" } else { "dd/MM/yyyy HH:mm:ss" },
         // Month/day
         'M' | 'm' => "MMMM d",
-        // Round-trip ISO 8601
+        // Round-trip ISO 8601. .NET appends K = ±hh:mm for datetimezone;
+        // DateTimeZone.to_text overrides this expansion to add K back.
         'O' | 'o' => "yyyy-MM-ddTHH:mm:ss.fffffff",
-        // RFC 1123
-        'R' | 'r' => "ddd, dd MMM yyyy HH:mm:ss",
+        // RFC 1123. .NET converts to UTC first then appends literal " GMT".
+        // DateTimeZone.to_text already handles the UTC conversion.
+        'R' | 'r' => "ddd, dd MMM yyyy HH:mm:ss 'GMT'",
         // Sortable
         's' => "yyyy-MM-ddTHH:mm:ss",
         // Short time
@@ -1188,8 +1190,25 @@ pub(super) fn dotnet_to_strftime(fmt: &str) -> String {
             ('m', 1) => out.push_str("%-M"),
             ('s', 2) => out.push_str("%S"),
             ('s', 1) => out.push_str("%-S"),
-            ('f', n) => { let _ = n; out.push_str("%f"); }
+            ('f', n) => {
+                // .NET 'f' / 'ff' / 'fff' / … = fractional seconds at given
+                // precision. chrono only supports %3f / %6f / %9f directly.
+                // For 7 (the value the "o" round-trip format uses) we map to
+                // %6f and accept losing 1 digit of trailing-zero output.
+                match n {
+                    3 => out.push_str("%3f"),
+                    6 | 7 => out.push_str("%6f"),
+                    9 => out.push_str("%9f"),
+                    _ => out.push_str("%f"),
+                }
+            }
             ('t', 2) => out.push_str("%p"),
+            // Timezone offset tokens. .NET:
+            //   K   → "+hh:mm" with sign (Z for UTC in .NET; chrono emits "+00:00")
+            //   zzz → "+hh:mm"
+            //   z / zz → "+h" / "+hh" — chrono has no zero-padded-hours-only
+            //   form, so emit %:z (full "+hh:mm") and accept the minutes suffix.
+            ('K', 1) | ('z', 1) | ('z', 2) | ('z', 3) => out.push_str("%:z"),
             ('\'', _) => {
                 // Literal block: copy through to matching quote, skipping the quotes.
                 i = j;

@@ -10585,6 +10585,89 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1158", () =>
+            let dtz = #datetimezone(2026, 6, 15, 10, 30, 45, 1, 0) in
+            let r = try {
+                    DateTimeZone.ToText(dtz, [Format="o"]),
+                    DateTimeZone.ToText(dtz, [Format="s"]),
+                    DateTimeZone.ToText(dtz, [Format="u"]),
+                    DateTimeZone.ToText(dtz, [Format="R"]),
+                    DateTimeZone.ToText(dtz, [Format="yyyy-MM-dd HH:mm:ss"])
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1159", () =>
+            let dtz_pos = #datetimezone(2026, 6, 15, 10, 30, 0, 5, 30) in
+            let dtz_utc = #datetimezone(2026, 6, 15, 10, 30, 0, 0, 0) in
+            let dtz_neg = #datetimezone(2026, 6, 15, 10, 30, 0, -8, 0) in
+            let r = try {
+                    DateTimeZone.ToText(dtz_pos, [Format="K"]),
+                    DateTimeZone.ToText(dtz_utc, [Format="K"]),
+                    DateTimeZone.ToText(dtz_neg, [Format="K"]),
+                    DateTimeZone.ToText(dtz_pos, [Format="zzz"]),
+                    DateTimeZone.ToText(dtz_utc, [Format="zzz"]),
+                    DateTimeZone.ToText(dtz_neg, [Format="zzz"])
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1160", () =>
+            let dtz_pos = #datetimezone(2026, 6, 15, 10, 30, 0, 5, 0) in
+            let dtz_utc = #datetimezone(2026, 6, 15, 10, 30, 0, 0, 0) in
+            let dtz_neg = #datetimezone(2026, 6, 15, 10, 30, 0, -3, 0) in
+            let r = try {
+                    DateTimeZone.ToText(dtz_pos, [Format="z"]),
+                    DateTimeZone.ToText(dtz_utc, [Format="z"]),
+                    DateTimeZone.ToText(dtz_neg, [Format="z"]),
+                    DateTimeZone.ToText(dtz_pos, [Format="zz"]),
+                    DateTimeZone.ToText(dtz_neg, [Format="zz"])
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1161", () =>
+            let dtz = #datetimezone(2026, 6, 15, 10, 30, 45, 1, 30) in
+            let r = try {
+                    DateTimeZone.ToText(dtz, [Format="yyyy-MM-ddTHH:mm:ssK"]),
+                    DateTimeZone.ToText(dtz, [Format="dd MMM yyyy HH:mm zzz", Culture="en-US"]),
+                    DateTimeZone.ToText(dtz, [Format="HH:mm K"]),
+                    DateTimeZone.ToText(dtz, [Format="yyyy/MM/dd"])
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1162", () =>
+            let r = try {
+                    DateTimeZone.ToText(#datetimezone(2026, 6, 15, 10, 30, 0, 1, 0)),
+                    DateTimeZone.ToText(#datetimezone(2026, 6, 15, 10, 30, 0, 0, 0)),
+                    DateTimeZone.ToText(#datetimezone(2026, 6, 15, 10, 30, 0, -5, 0))
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1163", () =>
+            let original = #datetimezone(2026, 6, 15, 10, 30, 45, 2, 0) in
+            let r = try {
+                    DateTimeZone.ToText(original, [Format="o"]),
+                    DateTimeZone.FromText(DateTimeZone.ToText(original, [Format="o"])) = original,
+                    DateTimeZone.FromText("2026-06-15T10:30:00+02:00") = #datetimezone(2026, 6, 15, 10, 30, 0, 2, 0)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1164", () =>
+            let dtz_half = #datetimezone(2026, 6, 15, 10, 30, 0, 5, 30) in
+            let dtz_45 = #datetimezone(2026, 6, 15, 10, 30, 0, 5, 45) in
+            let r = try {
+                    DateTimeZone.ToText(dtz_half, [Format="K"]),
+                    DateTimeZone.ToText(dtz_45, [Format="K"]),
+                    DateTimeZone.ToText(dtz_half, [Format="zzz"]),
+                    DateTimeZone.ToText(dtz_45, [Format="zzz"])
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
