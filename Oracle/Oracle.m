@@ -2570,6 +2570,61 @@ let
                 ) in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q436", () =>
+            let r = try Table.SplitColumn(
+                    #table({"full"}, {{"a,b"}, {"c,d"}, {"e,f"}}),
+                    "full",
+                    Splitter.SplitTextByDelimiter(","),
+                    {"first", "second"}
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q437", () =>
+            let r = try Table.SplitColumn(
+                    #table({"full"}, {{"a,b,c"}, {"d,e"}, {"f"}}),
+                    "full",
+                    Splitter.SplitTextByDelimiter(","),
+                    {"p1", "p2", "p3"}
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q438", () =>
+            let r = try Table.CombineColumns(
+                    #table({"first", "second", "third"}, {{"a", "b", "c"}, {"d", "e", "f"}}),
+                    {"first", "second", "third"},
+                    Combiner.CombineTextByDelimiter("-"),
+                    "joined"
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q439", () =>
+            let r = try Table.SplitColumn(
+                    #table({"csv"}, {{"a,""b,c"",d"}, {"e,""f,g"",h"}}),
+                    "csv",
+                    Splitter.SplitTextByDelimiter(",", QuoteStyle.Csv),
+                    {"p1", "p2", "p3"}
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q440", () =>
+            let r = try Table.SplitColumn(
+                    #table({"by_pos"}, {{"abcdef"}, {"123456"}}),
+                    "by_pos",
+                    Splitter.SplitTextByLengths({2, 2, 2}),
+                    {"p1", "p2", "p3"}
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
