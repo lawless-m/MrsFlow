@@ -10347,6 +10347,92 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1137", () =>
+            let t = Table.FromRecords({[id=1, r=[a=10, b=20]], [id=2, r=[a=30, b=40]]}) in
+            let t2 = Table.AddColumn(t, "r2", each if [id] = 2 then error "boom" else [r]) in
+            let r = try {
+                    Table.ColumnNames(Table.ExpandRecordColumn(t, "r", {"a", "b"})),
+                    Table.ReplaceErrorValues(t2, {{"r2", null}})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1138", () =>
+            let t = Table.FromRecords({[g="A", v=1], [g="A", v=2], [g="B", v=3], [g="A", v=4]}) in
+            let t2 = Table.AddColumn(t, "v2", each if [v] = 2 then error "bad" else [v]) in
+            let r = try {
+                    Table.Group(t, {"g"}, {{"sum", each List.Sum([v]), Int64.Type}}),
+                    Table.Group(
+                        Table.ReplaceErrorValues(t2, {{"v2", 0}}),
+                        {"g"},
+                        {{"sum2", each List.Sum([v2]), Int64.Type}}
+                    )
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1139", () =>
+            let l = Table.FromRecords({[id=1, name="A"], [id=2, name="B"]}) in
+            let r0 = Table.FromRecords({[id=1, v=10], [id=2, v=20]}) in
+            let r1 = Table.AddColumn(r0, "v2", each if [id] = 1 then error "bad" else [v]) in
+            let r2 = Table.ReplaceErrorValues(r1, {{"v2", -1}}) in
+            let r = try {
+                    Table.NestedJoin(l, {"id"}, r2, {"id"}, "joined", JoinKind.Inner),
+                    Table.ExpandTableColumn(
+                        Table.NestedJoin(l, {"id"}, r2, {"id"}, "joined", JoinKind.Inner),
+                        "joined", {"v2"}
+                    )
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1140", () =>
+            let t = Table.FromRecords({[a=1], [a=null], [a=null], [a=4], [a=null]}) in
+            let t2 = Table.AddColumn(t, "b", each if [a] = 4 then error "oops" else [a]) in
+            let r = try {
+                    Table.FillDown(t, {"a"}),
+                    Table.FillDown(Table.ReplaceErrorValues(t2, {{"b", -1}}), {"b"})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1141", () =>
+            let t = Table.FromRecords({[a=1], [a=2], [a=3], [a=4]}) in
+            let t2 = Table.AddColumn(t, "b", each if Number.Mod([a], 2) = 0 then error "even" else [a] * 10) in
+            let r = try {
+                    Table.RowCount(Table.ReplaceErrorValues(t2, {{"b", -1}})),
+                    Table.SelectRows(Table.ReplaceErrorValues(t2, {{"b", -1}}), each [b] > 0),
+                    Table.SelectRows(Table.ReplaceErrorValues(t2, {{"b", -1}}), each [b] = -1)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1142", () =>
+            let t = Table.FromRecords({[a=1], [a=2], [a=3]}) in
+            let t2 = Table.AddColumn(t, "b", each if [a] = 2 then error "oops" else [a] * 10) in
+            let r = try {
+                    Table.ReplaceValue(
+                        Table.ReplaceErrorValues(t2, {{"b", -1}}),
+                        -1, 99, Replacer.ReplaceValue, {"b"}
+                    ),
+                    Table.ReplaceValue(
+                        Table.ReplaceErrorValues(t2, {{"b", -1}}),
+                        10, 100, Replacer.ReplaceValue, {"b"}
+                    )
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1143", () =>
+            let t = Table.FromRecords({[id=1, xs={10, 20}], [id=2, xs={30, 40}]}) in
+            let t2 = Table.AddColumn(t, "ys", each if [id] = 2 then error "bad" else [xs]) in
+            let r = try {
+                    Table.ExpandListColumn(t, "xs"),
+                    Table.RowCount(Table.ExpandListColumn(Table.ReplaceErrorValues(t2, {{"ys", {}}}), "ys"))
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
