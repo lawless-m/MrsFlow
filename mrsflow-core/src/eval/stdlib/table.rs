@@ -3442,10 +3442,10 @@ fn force_and_read(
 
 fn combine(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let tables_list = expect_list(&args[0])?;
+    // Empty list → empty zero-column table (matches PQ).
     if tables_list.is_empty() {
-        return Err(MError::Other("Table.Combine: empty table list".into()));
+        return Ok(Value::Table(Table::from_rows(vec![], vec![])));
     }
-    // Collect input tables.
     let tables: Vec<&Table> = tables_list
         .iter()
         .map(|t| match t {
@@ -3478,23 +3478,35 @@ fn combine(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         // Schemas mismatch — fall through to Rows path which unions columns.
     }
 
-    // Row-major fallback: take column names from the first table; verify
-    // subsequent tables have the same names in the same order (PQ's Combine
-    // requires aligned column sets); concatenate rows.
-    let names = tables[0].column_names();
-    for (i, t) in tables.iter().enumerate().skip(1) {
-        if t.column_names() != names {
-            return Err(MError::Other(format!(
-                "Table.Combine: column set of table {i} does not match table 0"
-            )));
+    // Row-major path with column union. PQ Table.Combine:
+    //   - The output column order is the union of input column names,
+    //     in the order they first appear across the table list.
+    //   - Cells missing from a table are filled with null.
+    let mut out_names: Vec<String> = Vec::new();
+    for t in &tables {
+        for name in t.column_names() {
+            if !out_names.contains(&name) {
+                out_names.push(name);
+            }
         }
     }
     let mut all_rows: Vec<Vec<Value>> = Vec::new();
     for t in &tables {
-        let (_, rows) = table_to_rows(t)?;
-        all_rows.extend(rows);
+        let (names, rows) = table_to_rows(t)?;
+        // Map this table's column index → output column index.
+        let mapping: Vec<usize> = names
+            .iter()
+            .map(|n| out_names.iter().position(|on| on == n).unwrap())
+            .collect();
+        for row in rows {
+            let mut new_row: Vec<Value> = vec![Value::Null; out_names.len()];
+            for (i, cell) in row.into_iter().enumerate() {
+                new_row[mapping[i]] = cell;
+            }
+            all_rows.push(new_row);
+        }
     }
-    Ok(Value::Table(values_to_table(&names, &all_rows)?))
+    Ok(Value::Table(values_to_table(&out_names, &all_rows)?))
 }
 
 

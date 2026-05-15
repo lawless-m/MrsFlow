@@ -5678,10 +5678,14 @@ mod tests {
     }
 
     #[test]
-    fn table_combine_empty_errors() {
-        match eval_str("Table.Combine({})") {
-            Err(MError::Other(msg)) => assert!(msg.contains("empty"), "got: {msg}"),
-            other => panic!("expected error, got {other:?}"),
+    fn table_combine_empty_returns_empty_table() {
+        // PQ returns an empty zero-column table for Table.Combine({}).
+        match eval_str("Table.Combine({})").unwrap() {
+            Value::Table(t) => {
+                assert_eq!(t.num_rows(), 0);
+                assert_eq!(t.num_columns(), 0);
+            }
+            other => panic!("expected empty table, got {other:?}"),
         }
     }
 

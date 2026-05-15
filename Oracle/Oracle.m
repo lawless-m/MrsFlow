@@ -9337,6 +9337,73 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1039", () =>
+            let a = Table.FromRecords({[k=1, v="a1"], [k=2, v="a2"]}) in
+            let b = Table.FromRecords({[k=3, v="b3"], [k=4, v="b4"]}) in
+            let r = try {
+                    Table.Combine({a, b})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1040", () =>
+            let a = Table.FromRecords({[k=1, v="a1"]}) in
+            let b = Table.FromRecords({[k=2, v="b2", extra=100]}) in
+            let r = try {
+                    Table.Combine({a, b})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1041", () =>
+            let a = Table.FromRecords({[a=1, b=2]}) in
+            let b = Table.FromRecords({[c=3, d=4]}) in
+            let r = try {
+                    Table.Combine({a, b})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1042", () =>
+            let t = Table.FromRecords({[k=1]}) in
+            let r = try {
+                    Table.Combine({}),
+                    Table.Combine({t}),
+                    Table.Combine({Table.FromRecords({}), Table.FromRecords({})}),
+                    Table.Combine({t, Table.FromRecords({})})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1043", () =>
+            let a = Table.FromRecords({[v=1], [v=2]}) in
+            let b = Table.FromRecords({[v="text"]}) in
+            let r = try {
+                    Table.Combine({a, b})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1044", () =>
+            let a = Table.FromRecords({[a=1]}) in
+            let b = Table.FromRecords({[a=2, b=20]}) in
+            let c = Table.FromRecords({[a=3, b=30, c="three"]}) in
+            let r = try {
+                    Table.Combine({a, b, c})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1045", () =>
+            let a = Table.FromRecords({[x=1, y=2]}) in
+            let b = Table.FromRecords({[y=20, z=30]}) in
+            let r = try {
+                    Table.Combine({a, b}),
+                    Table.Combine({b, a})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
