@@ -4177,6 +4177,51 @@ let
                 ) in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q591", () =>
+            let r = try Table.SelectRows(
+                    #table({"n"}, {{1}, {2}, {3}, {4}, {5}}),
+                    each [n] > 2
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q592", () =>
+            let r = try Table.SelectRows(
+                    #table({"a", "b"}, {{1, 10}, {2, 20}, {3, 30}, {4, 40}, {5, 50}}),
+                    each [a] > 1 and [b] < 40
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q593", () =>
+            let r = try Table.SelectRows(
+                    #table({"name", "score"}, {{"Alice", 85}, {"Bob", 72}, {"Charlie", 91}, {"Dave", 67}}),
+                    each Text.StartsWith([name], "A") or [score] > 80
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q594", () =>
+            let r = try Table.SelectRows(
+                    #table({"v"}, {{1}, {null}, {3}, {null}, {5}}),
+                    each [v] <> null
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q595", () =>
+            let r = try Table.SelectRows(
+                    #table({"n"}, {{1}, {2}, {3}, {4}, {5}}),
+                    (row) => Number.Mod(row[n], 2) = 0
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
