@@ -8273,6 +8273,100 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q941", () =>
+            let t = Table.FromRecords({
+                    [name="b", v=2],
+                    [name="a", v=3],
+                    [name="c", v=1]
+                }) in
+            let r = try {
+                    Table.Sort(t, "name"),
+                    Table.Sort(t, "v")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q942", () =>
+            let t = Table.FromRecords({
+                    [name="b", v=2],
+                    [name="a", v=3],
+                    [name="c", v=1]
+                }) in
+            let r = try {
+                    Table.Sort(t, {"v", Order.Descending}),
+                    Table.Sort(t, {"name", Order.Descending}),
+                    Table.Sort(t, {"v", Order.Ascending})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q943", () =>
+            let t = Table.FromRecords({
+                    [g=1, v=30],
+                    [g=2, v=10],
+                    [g=1, v=20],
+                    [g=2, v=40]
+                }) in
+            let r = try {
+                    Table.Sort(t, {{"g", Order.Ascending}, {"v", Order.Descending}}),
+                    Table.Sort(t, {{"g", Order.Descending}, {"v", Order.Ascending}}),
+                    Table.Sort(t, {"g", "v"})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q944", () =>
+            let t = Table.FromRecords({
+                    [k=1, tag="A"],
+                    [k=2, tag="B"],
+                    [k=1, tag="C"],
+                    [k=2, tag="D"],
+                    [k=1, tag="E"]
+                }) in
+            let r = try {
+                    Table.Sort(t, "k")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q945", () =>
+            let t = Table.FromRecords({
+                    [v=2],
+                    [v=null],
+                    [v=1],
+                    [v=null],
+                    [v=3]
+                }) in
+            let r = try {
+                    Table.Sort(t, "v"),
+                    Table.Sort(t, {"v", Order.Descending})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q946", () =>
+            let t = Table.FromRecords({
+                    [name="Apple"],
+                    [name="banana"],
+                    [name="Cherry"]
+                }) in
+            let r = try {
+                    Table.Sort(t, "name"),
+                    Table.Sort(t, {"name", (a, b) => Value.Compare(Text.Lower(a), Text.Lower(b))})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q947", () =>
+            let t = Table.FromRecords({[a=1, b=2]}) in
+            let r = try {
+                    Table.Sort(Table.FromRecords({}), "a"),
+                    Table.Sort(t, "a"),
+                    Table.Sort(t, "missing")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
