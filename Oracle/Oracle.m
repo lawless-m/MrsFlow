@@ -7701,6 +7701,75 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q885", () =>
+            let r = try {
+                    List.Zip({{1, 2, 3}, {"a", "b", "c"}}),
+                    List.Zip({{1, 2}, {"a", "b"}, {true, false}}),
+                    List.Zip({{}}),
+                    List.Zip({})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q886", () =>
+            let r = try {
+                    List.Zip({{1, 2, 3}, {"a", "b"}}),
+                    List.Zip({{1}, {"a", "b", "c"}}),
+                    List.Zip({{1, 2}, {}}),
+                    List.Zip({{}, {1, 2}})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q887", () =>
+            let r = try {
+                    List.Zip({{1, 2, 3}, {"a", "b", "c"}, {true, false, true}, {10, 20, 30}}),
+                    List.Zip({{1}}),
+                    List.Zip({{1, 2}, {"a", "b"}, {}})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q888", () =>
+            let r = try {
+                    List.Zip(null),
+                    List.Zip({null}),
+                    List.Zip({{1, 2}, null}),
+                    List.Zip({"not-a-list"})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q889", () =>
+            let pairs = List.Zip({{1, 2, 3}, {"a", "b", "c"}}) in
+            let r = try {
+                    List.Count(pairs) = 3,
+                    List.Count(pairs{0}) = 2,
+                    List.Zip(List.Zip({{1, 2}, {"a", "b"}})) = {{1, 2}, {"a", "b"}}
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q890", () =>
+            let r = try {
+                    List.Combine({{1, 2}, {3, 4}}),
+                    List.Combine({}),
+                    List.Combine({{1, 2}}),
+                    List.Combine({{}, {}, {}}),
+                    List.Combine({{1, 2}, "abc"})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q891", () =>
+            let r = try {
+                    List.Combine({{{1, 2}}, {{3, 4}}}),
+                    List.Combine({{null, 1}, {2, null}}),
+                    List.Combine({{1, 2}, null})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
