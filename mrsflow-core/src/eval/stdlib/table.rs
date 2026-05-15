@@ -1399,6 +1399,13 @@ fn select_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     }
     match &table.repr {
         super::super::value::TableRepr::Arrow(batch) => {
+            // Empty schema (zero columns) can't go through Arrow's
+            // RecordBatch::try_new — it requires either a row count or
+            // at least one column. PQ returns an empty table here,
+            // match that by short-circuiting.
+            if batch.num_columns() == 0 {
+                return Ok(Value::Table(Table::from_rows(vec![], vec![])));
+            }
             let indices = arrow::array::UInt32Array::from(keep);
             let new_columns: Vec<ArrayRef> = batch
                 .columns()

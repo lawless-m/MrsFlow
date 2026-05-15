@@ -8367,6 +8367,89 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q948", () =>
+            let t = Table.FromRecords({
+                    [n=1, v=10],
+                    [n=2, v=20],
+                    [n=3, v=30]
+                }) in
+            let r = try {
+                    Table.SelectRows(t, each [n] > 1),
+                    Table.SelectRows(t, each [v] >= 20),
+                    Table.SelectRows(t, each false),
+                    Table.SelectRows(t, each true)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q949", () =>
+            let t = Table.FromRecords({
+                    [n=1, v=10],
+                    [n=2, v=null],
+                    [n=3, v=30]
+                }) in
+            let r = try {
+                    Table.SelectRows(t, each [v] > 15)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q950", () =>
+            let t = Table.FromRecords({
+                    [n=1],
+                    [n=2],
+                    [n=3]
+                }) in
+            let r = try {
+                    Table.SelectRows(t, each null),
+                    Table.SelectRows(t, each if [n] = 2 then null else [n] > 1)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q951", () =>
+            let t = Table.FromRecords({}) in
+            let r = try {
+                    Table.SelectRows(t, each true),
+                    Table.SelectRows(t, each false)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q952", () =>
+            let t = Table.FromRecords({[n=1], [n=2]}) in
+            let r = try {
+                    Table.SelectRows(t, each [n]),
+                    Table.SelectRows(t, each "yes")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q953", () =>
+            let t = Table.FromRecords({
+                    [a=1, b=10],
+                    [a=2, b=20],
+                    [a=1, b=30],
+                    [a=2, b=40]
+                }) in
+            let r = try {
+                    Table.SelectRows(t, each [a] = 1 and [b] > 15),
+                    Table.SelectRows(t, each [a] = 1 or [b] > 30),
+                    Table.SelectRows(t, each not ([a] = 1))
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q954", () =>
+            let t = Table.FromRecords({[n=1]}) in
+            let r = try {
+                    Table.SelectRows(t, null),
+                    Table.SelectRows(t, "string-not-function"),
+                    Table.SelectRows(null, each true)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
