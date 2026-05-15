@@ -4384,7 +4384,61 @@ let
             in
                 if r[HasError]
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
-                    else [HasError=false, Value=r[Value]])
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q611", () =>
+            let r = try {
+                    DateTime.ToText(#datetime(2024, 6, 15, 14, 30, 45), "yyyy-MM-dd HH:mm:ss"),
+                    DateTime.ToText(#datetime(2024, 6, 15, 14, 30, 45), "yyyy/MM/dd"),
+                    DateTime.ToText(#datetime(2024, 6, 15, 14, 30, 45), "dd-MMM-yyyy"),
+                    DateTime.ToText(#datetime(2024, 6, 15, 14, 30, 45), "HH:mm")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q612", () =>
+            let r = try {
+                    DateTime.ToText(#datetime(2024, 1, 5, 9, 5, 7), "yyyy-MM-dd"),
+                    DateTime.ToText(#datetime(2024, 1, 5, 9, 5, 7), "yyyy-M-d"),
+                    DateTime.ToText(#datetime(2024, 1, 5, 9, 5, 7), "H:m:s"),
+                    DateTime.ToText(#datetime(2024, 1, 5, 9, 5, 7), "HH:mm:ss")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q613", () =>
+            let r = try {
+                    DateTime.ToText(#datetime(2024, 6, 15, 14, 30, 0), "dddd"),
+                    DateTime.ToText(#datetime(2024, 6, 15, 14, 30, 0), "ddd"),
+                    DateTime.ToText(#datetime(2024, 6, 15, 14, 30, 0), "MMMM"),
+                    DateTime.ToText(#datetime(2024, 6, 15, 14, 30, 0), "MMM")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q614", () =>
+            let r = try {
+                    DateTime.ToText(#datetime(2024, 6, 15, 14, 30, 0), "tt"),
+                    DateTime.ToText(#datetime(2024, 6, 15, 9, 30, 0), "h:mm tt"),
+                    DateTime.ToText(#datetime(2024, 6, 15, 23, 59, 0), "h:mm tt"),
+                    DateTime.ToText(#datetime(2024, 6, 15, 0, 0, 0), "h:mm tt")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q615", () =>
+            let r = try {
+                    DateTime.ToText(#datetime(2024, 6, 15, 14, 30, 45), "yyyy-MM-dd'T'HH:mm:ss"),
+                    DateTime.ToText(#datetime(2024, 6, 15, 14, 30, 45), "yyyyMMdd"),
+                    DateTime.ToText(#datetime(2024, 6, 15, 14, 30, 45), "yyyy-DDD")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]])
     },
 
     Catalog = Table.FromRecords(cases)
