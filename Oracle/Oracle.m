@@ -2181,7 +2181,48 @@ let
             let r = try Function.Invoke((x as number) => x * 2, {21}) in
                 if r[HasError]
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
-                    else [HasError=false, Value=r[Value]])
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q396", () =>
+            let r = try {
+                    Type.Is(type number, type any),
+                    Type.Is(type text, type number),
+                    Type.Is(type number, type number),
+                    Type.Is(type {number}, type list)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q397", () =>
+            let r = try Record.FieldNames(Type.RecordFields(type [a = number, b = text, c = logical])) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q398", () =>
+            let r = try Record.FieldNames(Type.FunctionParameters(type function (x as number, y as text) as logical)) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q399", () =>
+            let r = try Value.Is(42, type number) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q400", () =>
+            let r = try {
+                    Value.Is(42, type number),
+                    Value.Is("hi", type number),
+                    Value.Is(null, type number),
+                    Value.Is(null, type nullable number),
+                    Value.Is({1, 2}, type list)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]])
     },
 
     Catalog = Table.FromRecords(cases)
