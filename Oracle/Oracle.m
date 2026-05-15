@@ -8185,6 +8185,94 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q934", () =>
+            let t = Table.FromRecords({
+                    [k="a", v=1],
+                    [k="b", v=2],
+                    [k="a", v=3],
+                    [k="b", v=4]
+                }) in
+            let r = try {
+                    Table.Group(t, "k", {{"sum", each List.Sum([v]), type number}}),
+                    Table.Group(t, "k", {{"count", each Table.RowCount(_), type number}})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q935", () =>
+            let t = Table.FromRecords({
+                    [a=1, b="x", v=10],
+                    [a=1, b="y", v=20],
+                    [a=1, b="x", v=30],
+                    [a=2, b="x", v=40]
+                }) in
+            let r = try {
+                    Table.Group(t, {"a", "b"}, {{"sum", each List.Sum([v]), type number}})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q936", () =>
+            let t = Table.FromRecords({
+                    [k="a", v=1],
+                    [k="a", v=2],
+                    [k="b", v=3],
+                    [k="a", v=4]
+                }) in
+            let r = try {
+                    Table.Group(t, "k", {{"sum", each List.Sum([v]), type number}}, GroupKind.Global),
+                    Table.Group(t, "k", {{"sum", each List.Sum([v]), type number}}, GroupKind.Local)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q937", () =>
+            let t = Table.FromRecords({
+                    [k="a", v=10],
+                    [k="b", v=20],
+                    [k="a", v=30],
+                    [k="b", v=40]
+                }) in
+            let r = try {
+                    Table.Group(t, "k", {
+                        {"sum",   each List.Sum([v]),     type number},
+                        {"avg",   each List.Average([v]), type number},
+                        {"count", each Table.RowCount(_), type number},
+                        {"items", each [v],               type list}
+                    })
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q938", () =>
+            let empty = Table.FromRecords({}) in
+            let r = try {
+                    Table.Group(empty, "k", {{"sum", each 0, type number}})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q939", () =>
+            let t = Table.FromRecords({
+                    [k=null, v=1],
+                    [k="a", v=2],
+                    [k=null, v=3],
+                    [k="a", v=4]
+                }) in
+            let r = try {
+                    Table.Group(t, "k", {{"sum", each List.Sum([v]), type number}})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q940", () =>
+            let t = Table.FromRecords({[k="a", v=1]}) in
+            let r = try {
+                    Table.Group(t, "missing", {{"sum", each List.Sum([v]), type number}})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
