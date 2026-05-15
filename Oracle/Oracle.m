@@ -3468,6 +3468,56 @@ let
             in
                 if r[HasError]
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q521", () =>
+            let r = try {
+                    List.Distinct({1, 2, 2, 3, 3, 3, 4}),
+                    List.Distinct({"a", "A", "b"}),
+                    List.Distinct({"a", "A", "b"}, Comparer.OrdinalIgnoreCase),
+                    List.Distinct({})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q522", () =>
+            let r = try {
+                    List.Union({{1, 2, 3}, {3, 4, 5}}),
+                    List.Union({{1, 2}, {3, 4}, {5, 6}}),
+                    List.Union({{}, {1}}),
+                    List.Union({})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q523", () =>
+            let r = try {
+                    List.Intersect({{1, 2, 3, 4}, {2, 3, 5}}),
+                    List.Intersect({{1, 2, 3}, {4, 5, 6}}),
+                    List.Intersect({{1, 2}, {1, 2}, {1, 2}}),
+                    List.Intersect({{1, 2, 3}, {}})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q524", () =>
+            let r = try {
+                    List.Difference({1, 2, 3, 4, 5}, {2, 4}),
+                    List.Difference({1, 2, 3}, {}),
+                    List.Difference({}, {1, 2, 3}),
+                    List.Difference({"a", "B", "c"}, {"A", "C"}, Comparer.OrdinalIgnoreCase)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q525", () =>
+            let r = try List.Union({{1, 2, 3}, {2, 3, 4}, {3, 4, 5}}, Comparer.Ordinal) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                     else [HasError=false, Value=r[Value]])
     },
 
