@@ -1203,6 +1203,11 @@ fn abs(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 fn sign(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     match &args[0] {
         Value::Null => Ok(Value::Null),
+        Value::Number(n) if n.is_nan() => {
+            // PQ Number.Sign on NaN errors (NaN comparisons return null, but
+            // the function itself raises a domain error).
+            Err(MError::Other("Number.Sign: argument is NaN".into()))
+        }
         Value::Number(n) => Ok(Value::Number(if *n > 0.0 {
             1.0
         } else if *n < 0.0 {

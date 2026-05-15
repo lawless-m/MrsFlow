@@ -6241,6 +6241,114 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        // q747-q753: Number.Sign / Number.Abs edge cases.
+
+        SafeSerialize("q747", () =>
+            let r = try {
+                    Number.Sign(5),
+                    Number.Sign(-5),
+                    Number.Sign(0),
+                    Number.Sign(0.0),
+                    Number.Sign(-0.0),
+                    Number.Sign(0.001),
+                    Number.Sign(-0.001),
+                    Number.Sign(1e-300),
+                    Number.Sign(-1e-300)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q748", () =>
+            let r = try {
+                    try Number.Sign(Number.NaN) otherwise "err",
+                    try Number.Sign(Number.PositiveInfinity) otherwise "err",
+                    try Number.Sign(Number.NegativeInfinity) otherwise "err",
+                    try Number.Sign(null) otherwise "err",
+                    Number.Sign(1234567890),
+                    Number.Sign(-1234567890),
+                    Number.Sign(1e308),
+                    Number.Sign(-1e308)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q749", () =>
+            let r = try {
+                    Number.Abs(5),
+                    Number.Abs(-5),
+                    Number.Abs(0),
+                    Number.Abs(0.0),
+                    Number.Abs(-0.0),
+                    Number.Abs(3.14),
+                    Number.Abs(-3.14),
+                    Number.Abs(1e-300),
+                    Number.Abs(-1e-300)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q750", () =>
+            let r = try {
+                    try Number.Abs(Number.NaN) otherwise "err",
+                    try Number.Abs(Number.PositiveInfinity) otherwise "err",
+                    try Number.Abs(Number.NegativeInfinity) otherwise "err",
+                    try Number.Abs(null) otherwise "err",
+                    Number.Abs(1e308),
+                    Number.Abs(-1e308),
+                    Number.Abs(-1.7976931348623157e308),
+                    Number.Abs(-9007199254740992)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q751", () =>
+            let r = try {
+                    Number.Sign(42) * Number.Abs(42),
+                    Number.Sign(-42) * Number.Abs(-42),
+                    Number.Sign(3.14) * Number.Abs(3.14),
+                    Number.Sign(-3.14) * Number.Abs(-3.14),
+                    Number.Sign(0) * Number.Abs(0),
+                    Number.Sign(1e10) * Number.Abs(1e10),
+                    Number.Sign(-1e-10) * Number.Abs(-1e-10)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q752", () =>
+            let r = try {
+                    Number.Abs(4.9e-324),
+                    Number.Abs(-4.9e-324),
+                    Number.Sign(4.9e-324),
+                    Number.Sign(-4.9e-324),
+                    Number.Abs(2.2250738585072014e-308),
+                    Number.Sign(2.2250738585072014e-308),
+                    Number.Sign(1e-323),
+                    Number.Sign(-1e-323)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q753", () =>
+            let r = try {
+                    Number.Sign(Number.Sqrt(-1)),
+                    Number.Abs(Number.Sqrt(-1)),
+                    try Number.Sign(Number.Power(-2, 0.5)) otherwise "err",
+                    try Number.Abs(Number.Power(-2, 0.5)) otherwise "err",
+                    Number.Sign(Number.Round(0.001, 0)),
+                    Number.Abs(Number.Round(-0.001, 0)),
+                    Number.Sign(Number.Mod(-5, 3)),
+                    Number.Abs(Number.Mod(-5, 3))
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
