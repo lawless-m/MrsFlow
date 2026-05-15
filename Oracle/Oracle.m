@@ -1953,6 +1953,50 @@ let
             let r = try Text.Repeat("ab", -1) in
                 if r[HasError]
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q366", () =>
+            let r = try {
+                    List.PositionOf({"a", "b", "c", "b", "a"}, "b"),
+                    List.PositionOf({"a", "b", "c", "b", "a"}, "z"),
+                    List.PositionOf({}, "x"),
+                    List.PositionOf({1, 2, 3}, 2)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q367", () =>
+            let r = try List.PositionOf({"a", "b", "c", "b", "a"}, "b", Occurrence.All) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q368", () =>
+            let r = try {
+                    List.PositionOfAny({"a", "b", "c"}, {"b", "z"}),
+                    List.PositionOfAny({"a", "b", "c"}, {"z", "y"}),
+                    List.PositionOfAny({"a", "b", "c"}, {})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q369", () =>
+            let r = try {
+                    List.Contains({"a", "b", "c"}, "b"),
+                    List.Contains({"a", "b", "c"}, "z"),
+                    List.Contains({}, "x"),
+                    List.Contains({1, 2, null}, null)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q370", () =>
+            let r = try List.PositionOf({"A", "b", "C"}, "a", Occurrence.First, Comparer.OrdinalIgnoreCase) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                     else [HasError=false, Value=r[Value]])
     },
 
