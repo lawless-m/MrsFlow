@@ -6197,11 +6197,21 @@ fn parse_text_to_date(
         .downcast_ref::<StringArray>()
         .ok_or_else(|| MError::Other(format!("{ctx}: {col_name}: expected Utf8 source")))?;
     let epoch = chrono::NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
-    // Format priority: ISO first (machine-generated), then UK DD/MM/YYYY
-    // (what the user's Excel-emitted corpus tends to produce), then US
-    // MM/DD/YYYY (other locales). First match wins, per row. If none parse,
-    // raise — we'd rather a clear error than silent nulls.
-    let formats = ["%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y"];
+    // Culture-aware format priority. ISO always first (machine output).
+    // de-DE and similar dotted-date cultures use dd.MM.yyyy as primary.
+    // Everything else: UK DD/MM/YYYY then US MM/DD/YYYY.
+    let culture = transform_culture::get();
+    let dotted_culture = matches!(culture.as_deref(), Some(c) if {
+        let c = c.to_ascii_lowercase();
+        c.starts_with("de") || c.starts_with("tr") || c.starts_with("cs")
+            || c.starts_with("sk") || c.starts_with("pl") || c.starts_with("hu")
+            || c.starts_with("nb") || c.starts_with("fi")
+    });
+    let formats: &[&str] = if dotted_culture {
+        &["%Y-%m-%d", "%d.%m.%Y", "%d/%m/%Y", "%m/%d/%Y"]
+    } else {
+        &["%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y", "%d.%m.%Y"]
+    };
     let mut out: Vec<Option<i32>> = Vec::with_capacity(s.len());
     for i in 0..s.len() {
         if s.is_null(i) {
@@ -6210,7 +6220,7 @@ fn parse_text_to_date(
         }
         let text = s.value(i).trim();
         let mut parsed: Option<chrono::NaiveDate> = None;
-        for fmt in &formats {
+        for fmt in formats {
             if let Ok(d) = chrono::NaiveDate::parse_from_str(text, fmt) {
                 parsed = Some(d);
                 break;

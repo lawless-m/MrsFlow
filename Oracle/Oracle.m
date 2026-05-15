@@ -9056,6 +9056,71 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1011", () =>
+            let t = Table.FromRecords({[v="1"], [v="2.5"], [v="-3"]}) in
+            let r = try {
+                    Table.TransformColumnTypes(t, {{"v", type number}})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1012", () =>
+            let t = Table.FromRecords({[v="1,5"], [v="2,75"], [v="-3,14"]}) in
+            let r = try {
+                    Table.TransformColumnTypes(t, {{"v", type number}}, "de-DE"),
+                    Table.TransformColumnTypes(t, {{"v", type number}}, "en-US")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1013", () =>
+            let t = Table.FromRecords({[v="1234,5"], [v="1234,56"]}) in
+            let r = try {
+                    Table.TransformColumnTypes(t, {{"v", type number}}, "fr-FR")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1014", () =>
+            let t = Table.FromRecords({[d="15.06.2026"], [d="01.01.2026"]}) in
+            let r = try {
+                    Table.TransformColumnTypes(t, {{"d", type date}}, "de-DE")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1015", () =>
+            let t = Table.FromRecords({
+                    [a="1", b="2.5"],
+                    [a="3", b="4.0"]
+                }) in
+            let r = try {
+                    Table.TransformColumnTypes(t, {{"a", type number}, {"b", type number}})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1016", () =>
+            let t = Table.FromRecords({
+                    [v="1"],
+                    [v="not-a-number"],
+                    [v="3"]
+                }) in
+            let r = try {
+                    Table.TransformColumnTypes(t, {{"v", type number}})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1017", () =>
+            let t = Table.FromRecords({[v=1.5], [v=2.0], [v=-3.14]}) in
+            let asText = Table.TransformColumnTypes(t, {{"v", type text}}) in
+            let r = try {
+                    Table.TransformColumnTypes(asText, {{"v", type number}}) = t
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
