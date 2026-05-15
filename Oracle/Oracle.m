@@ -4641,6 +4641,58 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q636", () =>
+            let r = try {
+                    Table.RowCount(#table({"a"}, {{1}, {2}, {3}})),
+                    Table.RowCount(#table({"a"}, {})),
+                    Table.ColumnCount(#table({"a", "b", "c"}, {{1, 2, 3}})),
+                    Table.ColumnCount(#table({}, {}))
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q637", () =>
+            let r = try {
+                    Table.First(#table({"v"}, {{1}, {2}, {3}})),
+                    Table.Last(#table({"v"}, {{1}, {2}, {3}})),
+                    Table.First(#table({"v"}, {})),
+                    Table.Last(#table({"v"}, {}))
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q638", () =>
+            let r = try {
+                    Table.Min(#table({"v"}, {{3}, {1}, {2}}), "v"),
+                    Table.Max(#table({"v"}, {{3}, {1}, {2}}), "v")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q639", () =>
+            let r = try {
+                    Table.RowCount(#table({"a", "b"}, {{1, 2}, {3, 4}, {5, 6}, {7, 8}, {9, 10}})),
+                    Table.ColumnCount(#table({"a", "b"}, {{1, 2}, {3, 4}})),
+                    Table.RowCount(#table({}, {})),
+                    Table.ColumnCount(#table({"only"}, {{1}}))
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q640", () =>
+            let r = try {
+                    Table.IsEmpty(#table({"a"}, {})),
+                    Table.IsEmpty(#table({"a"}, {{1}})),
+                    Table.IsEmpty(#table({}, {}))
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
