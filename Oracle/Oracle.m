@@ -4595,7 +4595,53 @@ let
             in
                 if r[HasError]
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
-                    else [HasError=false, Value=r[Value]])
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q631", () =>
+            let r = try Table.ReorderColumns(
+                    #table({"a", "b", "c", "d"}, {{1, 2, 3, 4}}),
+                    {"c", "a", "d", "b"}
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q632", () =>
+            let r = try Table.RemoveColumns(
+                    #table({"a", "b", "c"}, {{1, 2, 3}, {4, 5, 6}}),
+                    {"b"}
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q633", () =>
+            let r = try Table.Column(
+                    #table({"a", "b", "c"}, {{1, 2, 3}, {4, 5, 6}, {7, 8, 9}}),
+                    "b"
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q634", () =>
+            let r = try Table.SelectColumns(
+                    #table({"a", "b", "c", "d"}, {{1, 2, 3, 4}}),
+                    {"c", "a"}
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q635", () =>
+            let r = try {
+                    try Table.RemoveColumns(#table({"a", "b"}, {{1, 2}}), {"x"}) otherwise "err",
+                    try Table.SelectColumns(#table({"a", "b"}, {{1, 2}}), {"x"}) otherwise "err",
+                    try Table.Column(#table({"a"}, {{1}}), "x") otherwise "err"
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]])
     },
 
     Catalog = Table.FromRecords(cases)
