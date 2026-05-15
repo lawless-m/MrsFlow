@@ -9757,6 +9757,72 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1081", () =>
+            let r = try {
+                    Json.Document("42"),
+                    Json.Document("3.14"),
+                    Json.Document("""hello"""),
+                    Json.Document("true"),
+                    Json.Document("null"),
+                    Json.Document("[]"),
+                    Json.Document("{}")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1082", () =>
+            let r = try {
+                    Json.Document("{""a"": {""b"": {""c"": {""d"": 42}}}}"),
+                    Json.Document("[[[1, 2], [3, 4]], [[5, 6]]]"),
+                    Json.Document("{""arr"": [1, ""two"", null, true, [1, 2]]}")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1083", () =>
+            let bs = "#(005c)" in
+            let r = try {
+                    Json.Document("""" & bs & "t" & bs & "n" & bs & "r" & bs & "b" & bs & "f"""),
+                    Json.Document("""é"""),
+                    Json.Document("""→""")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1084", () =>
+            let r = try {
+                    Json.Document("""é"""),
+                    Json.Document("""→"""),
+                    Json.Document("""F600""")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1085", () =>
+            let r = try {
+                    Json.Document(Json.FromValue([a=1, b="hello"])),
+                    Json.Document(Json.FromValue({1, 2, 3})),
+                    Json.Document(Json.FromValue(null))
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1086", () =>
+            let r = try {
+                    Json.Document("not valid json")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1087", () =>
+            let r = try {
+                    Json.FromValue(0/0),
+                    Json.FromValue(1/0),
+                    Json.FromValue(-1/0)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
