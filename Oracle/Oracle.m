@@ -3572,7 +3572,62 @@ let
             in
                 if r[HasError]
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
-                    else [HasError=false, Value=r[Value]])
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q531", () =>
+            let r = try {
+                    Character.FromNumber(65),
+                    Character.FromNumber(97),
+                    Character.FromNumber(48),
+                    Character.FromNumber(32)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q532", () =>
+            let r = try {
+                    Character.ToNumber("A"),
+                    Character.ToNumber("a"),
+                    Character.ToNumber("0"),
+                    Character.ToNumber(" ")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q533", () =>
+            let r = try
+                let
+                    roundtrip = Character.FromNumber(Character.ToNumber("Z"))
+                in
+                    roundtrip
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q534", () =>
+            let r = try {
+                    Character.FromNumber(8364),
+                    Character.FromNumber(233),
+                    Character.FromNumber(9731),
+                    Character.ToNumber("€")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q535", () =>
+            let r = try {
+                    try Character.FromNumber(-1) otherwise "err",
+                    try Character.FromNumber(1114112) otherwise "err",
+                    try Character.ToNumber("") otherwise "err",
+                    try Character.ToNumber("ab") otherwise "err"
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]])
     },
 
     Catalog = Table.FromRecords(cases)
