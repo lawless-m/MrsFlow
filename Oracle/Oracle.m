@@ -5175,7 +5175,114 @@ let
             in
                 if r[HasError]
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
-                    else [HasError=false, Value=r[Value]])
+                    else [HasError=false, Value=r[Value]]),
+
+        // q677-q683: Number.Power edge cases.
+
+        SafeSerialize("q677", () =>
+            let r = try {
+                    Number.Power(2, 10),
+                    Number.Power(10, 3),
+                    Number.Power(3, 0),
+                    Number.Power(2, -3),
+                    Number.Power(1, 100),
+                    Number.Power(1, -100),
+                    Number.Power(0, 5),
+                    Number.Power(0, 1)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q678", () =>
+            let r = try {
+                    try Number.Power(-2, 0.5) otherwise "err",
+                    try Number.Power(-2, 1.5) otherwise "err",
+                    try Number.Power(-1, 0.5) otherwise "err",
+                    try Number.Power(-1, 0.3) otherwise "err",
+                    Number.Power(-2, 2),
+                    Number.Power(-2, 3),
+                    Number.Power(-2, -2),
+                    Number.Power(-2, -3)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q679", () =>
+            let r = try {
+                    Number.Power(0, 0),
+                    try Number.Power(0, -1) otherwise "err",
+                    try Number.Power(0, -0.5) otherwise "err",
+                    try Number.Power(0, -2) otherwise "err",
+                    Number.Power(0, 0.5),
+                    Number.Power(0, 1.5),
+                    Number.Power(-0, 0),
+                    Number.Power(-0, 2)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q680", () =>
+            let r = try {
+                    try Number.Power(Number.PositiveInfinity, 0) otherwise "err",
+                    try Number.Power(Number.PositiveInfinity, 1) otherwise "err",
+                    try Number.Power(Number.PositiveInfinity, -1) otherwise "err",
+                    try Number.Power(1, Number.PositiveInfinity) otherwise "err",
+                    try Number.Power(1, Number.NaN) otherwise "err",
+                    try Number.Power(Number.NaN, 0) otherwise "err",
+                    try Number.Power(Number.NaN, Number.NaN) otherwise "err",
+                    try Number.Power(Number.NegativeInfinity, 2) otherwise "err"
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q681", () =>
+            let r = try {
+                    Number.Power(2, 53),
+                    Number.Power(2, 62),
+                    Number.Power(0.5, 10),
+                    Number.Power(0.5, 50),
+                    Number.Power(10, 100),
+                    Number.Power(10, -100),
+                    Number.Power(1.0000001, 1000000),
+                    Number.Power(0.9999999, 1000000)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q682", () =>
+            let r = try {
+                    Number.Power(2, 0.5),
+                    Number.Power(4, 0.5),
+                    Number.Power(8, 1/3),
+                    Number.Power(27, 1/3),
+                    Number.Power(2, 1/3),
+                    Number.Power(100, 0.5),
+                    Number.Power(0.25, 0.5),
+                    Number.Power(1, 0.5)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q683", () =>
+            let r = try {
+                    try Number.Power(null, 5) otherwise "err",
+                    try Number.Power(5, null) otherwise "err",
+                    try Number.Power(null, null) otherwise "err",
+                    try Number.Power(null, 0) otherwise "err",
+                    Number.Power(2, 1024),
+                    Number.Power(2, 1023),
+                    Number.Power(2, -1024),
+                    Number.Power(2, -1074)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]])
     },
 
     Catalog = Table.FromRecords(cases)

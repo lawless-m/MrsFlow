@@ -855,6 +855,15 @@ fn power(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     if base == 0.0 && exp == 0.0 {
         return Ok(Value::Null);
     }
+    // PQ: NaN in either operand → null. Infinite exponent → null. Infinite
+    // base with non-negative exponent → null (only the negative-exponent case
+    // survives, giving 0 via IEEE).
+    if base.is_nan() || exp.is_nan() || exp.is_infinite() {
+        return Ok(Value::Null);
+    }
+    if base.is_infinite() && exp >= 0.0 {
+        return Ok(Value::Null);
+    }
     Ok(Value::Number(base.powf(exp)))
 }
 
