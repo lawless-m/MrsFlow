@@ -2252,6 +2252,57 @@ let
             let r = try Expression.Evaluate("let a = 5, b = 7 in a * b") in
                 if r[HasError]
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q406", () =>
+            let r = try Record.FieldNames(Record.AddField([a=1], "b", 2, false)) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q407", () =>
+            let r = try Record.FieldNames(Record.AddField([a=1], "b", () => 42, true)) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q408", () =>
+            let r = try
+                let
+                    rec = Record.AddField([a=1], "b", () => 42, true),
+                    v = Record.Field(rec, "b"),
+                    forced = if Value.Is(v, type function) then v() else v
+                in
+                    forced
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q409", () =>
+            let r = try
+                let
+                    rec = Record.AddField([], "computed", () => 10 * 3, true),
+                    v = Record.Field(rec, "computed"),
+                    forced = if Value.Is(v, type function) then v() else v
+                in
+                    forced
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q410", () =>
+            let r = try
+                let
+                    rec = Record.AddField([], "x", () => error "computed!", true),
+                    v = Record.Field(rec, "x"),
+                    forced = try (if Value.Is(v, type function) then v() else v)
+                in
+                    if forced[HasError] then "errored: " & forced[Error][Message] else "no error"
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                     else [HasError=false, Value=r[Value]])
     },
 
