@@ -3411,6 +3411,63 @@ let
             in
                 if r[HasError]
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q516", () =>
+            let r = try {
+                    List.AllTrue({true, true, true}),
+                    List.AllTrue({true, false, true}),
+                    List.AllTrue({false, false}),
+                    List.AllTrue({})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q517", () =>
+            let r = try {
+                    List.AnyTrue({true, false, false}),
+                    List.AnyTrue({false, false, false}),
+                    List.AnyTrue({true, true, true}),
+                    List.AnyTrue({})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q518", () =>
+            let r = try {
+                    try List.AllTrue({true, null, true}) otherwise "err",
+                    try List.AnyTrue({null, false}) otherwise "err",
+                    try List.AllTrue({1, 2, 3}) otherwise "err"
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q519", () =>
+            let r = try
+                let
+                    nums = {1, 2, 3, 4, 5},
+                    checks = List.Transform(nums, each _ > 0)
+                in
+                    List.AllTrue(checks)
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q520", () =>
+            let r = try
+                let
+                    a = 5,
+                    b = 10,
+                    checks = {a > 0, b > 0, a < b}
+                in
+                    {List.AllTrue(checks), List.AnyTrue(checks)}
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                     else [HasError=false, Value=r[Value]])
     },
 
