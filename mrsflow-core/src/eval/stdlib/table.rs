@@ -4710,9 +4710,31 @@ fn remove_matching_rows(args: &[Value], _host: &dyn IoHost) -> Result<Value, MEr
 }
 
 fn remove_rows_with_errors(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    // v1: cells don't carry per-cell error state, so this is a no-op.
-    let _ = expect_table(&args[0])?;
-    Ok(args[0].clone())
+    let table = expect_table(&args[0])?;
+    // Optional 2nd arg: list of column names to check (None → all columns).
+    let limit_cols: Option<Vec<String>> = match args.get(1) {
+        Some(Value::Null) | None => None,
+        Some(v) => Some(expect_text_list(v, "Table.RemoveRowsWithErrors: columns")?),
+    };
+    let (names, rows) = table_to_rows(&table)?;
+    let check_indices: Vec<usize> = match &limit_cols {
+        None => (0..names.len()).collect(),
+        Some(cols) => cols
+            .iter()
+            .map(|c| names.iter().position(|n| n == c).ok_or_else(|| {
+                MError::Other(format!(
+                    "Table.RemoveRowsWithErrors: column not found: {c}"
+                ))
+            }))
+            .collect::<Result<_, _>>()?,
+    };
+    let kept: Vec<Vec<Value>> = rows
+        .into_iter()
+        .filter(|row| {
+            !check_indices.iter().any(|&i| super::super::is_cell_error(&row[i]))
+        })
+        .collect();
+    Ok(Value::Table(values_to_table(&names, &kept)?))
 }
 
 fn replace_matching_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {

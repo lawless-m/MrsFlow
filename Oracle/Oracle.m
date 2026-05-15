@@ -9182,6 +9182,74 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1025", () =>
+            let t = Table.FromRecords({
+                    [k=1, v="a"],
+                    [k=2, v="b"],
+                    [k=3, v="c"]
+                }) in
+            let r = try {
+                    Table.RemoveRowsWithErrors(t) = t
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1026", () =>
+            let t = Table.FromRecords({[a=1], [a=0], [a=2], [a=0]}) in
+            let withErrs = Table.AddColumn(t, "div", each
+                if [a] = 0 then error "divide-by-zero" else 1 / [a]) in
+            let r = try {
+                    Table.RemoveRowsWithErrors(withErrs)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1027", () =>
+            let t = Table.FromRecords({}) in
+            let r = try {
+                    Table.RemoveRowsWithErrors(t)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1028", () =>
+            let t = Table.FromRecords({[a=0], [a=0], [a=0]}) in
+            let withErrs = Table.AddColumn(t, "div", each
+                if [a] = 0 then error "zero" else 1) in
+            let r = try {
+                    Table.RemoveRowsWithErrors(withErrs)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1029", () =>
+            let t = Table.FromRecords({[a=1], [a=0], [a=2], [a=0]}) in
+            let withErrs = Table.AddColumn(t, "da", each
+                if [a] = 0 then error "a-zero" else [a] * 10) in
+            let r = try {
+                    Table.RemoveRowsWithErrors(withErrs, {"da"})
+                        = Table.RemoveRowsWithErrors(withErrs)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1030", () =>
+            let r = try {
+                    Table.RemoveRowsWithErrors(null)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1031", () =>
+            let t = Table.FromRecords({[a=1], [a=0], [a=2], [a=0], [a=3]}) in
+            let withErrs = Table.AddColumn(t, "x", each
+                if [a] = 0 then error "zero" else [a] * 10) in
+            let r = try {
+                    Table.RowCount(Table.RemoveRowsWithErrors(withErrs)) = 3
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
