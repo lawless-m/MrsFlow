@@ -9680,6 +9680,83 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1074", () =>
+            let r = try {
+                    Duration.From("P1D"),
+                    Duration.From("P1DT2H30M"),
+                    Duration.From(1.5),
+                    Duration.From(#duration(1, 2, 3, 4)),
+                    Duration.From(null)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1075", () =>
+            let r = try {
+                    #duration(0, 25, 0, 0),
+                    #duration(0, 0, 90, 0),
+                    #duration(0, 0, 0, 3600),
+                    #duration(1, 24, 0, 0)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1076", () =>
+            let r = try {
+                    #duration(-1, 0, 0, 0),
+                    #duration(0, -1, 0, 0),
+                    #duration(1, -1, 0, 0),
+                    #duration(-1, 12, 0, 0)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1077", () =>
+            let r = try {
+                    Time.From(0.0),
+                    Time.From(0.25),
+                    Time.From(0.5),
+                    Time.From(0.75),
+                    Time.From(0.999),
+                    Time.From("10:30:00"),
+                    Time.From(#datetime(2026, 6, 15, 10, 30, 45))
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1078", () =>
+            let d = #duration(1, 12, 0, 0) in
+            let r = try {
+                    Duration.TotalDays(d),
+                    Duration.TotalHours(d),
+                    Duration.TotalMinutes(d),
+                    Duration.Days(d),
+                    Duration.Hours(d),
+                    Duration.Minutes(d)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1079", () =>
+            let r = try {
+                    #duration(1, 0, 0, 0) + #duration(0, 12, 0, 0),
+                    #duration(2, 0, 0, 0) - #duration(1, 12, 0, 0),
+                    #duration(1, 0, 0, 0) < #duration(2, 0, 0, 0),
+                    #duration(1, 0, 0, 0) = #duration(0, 24, 0, 0)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1080", () =>
+            let r = try {
+                    #date(2026, 6, 15) + #duration(1, 0, 0, 0),
+                    #date(2026, 6, 15) - #duration(1, 0, 0, 0),
+                    #datetime(2026, 6, 15, 10, 0, 0) + #duration(0, 5, 30, 0),
+                    #datetime(2026, 6, 15, 23, 30, 0) + #duration(0, 1, 0, 0)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 

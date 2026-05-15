@@ -163,7 +163,8 @@ fn from(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     }
 }
 
-/// Parse PQ duration text: "[d.]hh:mm:ss[.fff]" or just "hh:mm:ss".
+/// Parse PQ duration text: "[d.]hh:mm:ss[.fff]" or "hh:mm:ss" or
+/// ISO-8601 "P[nD][T[nH][nM][nS]]".
 fn from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?.trim();
     let (negative, body) = if let Some(rest) = text.strip_prefix('-') {
@@ -171,6 +172,10 @@ fn from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     } else {
         (false, text)
     };
+    // ISO-8601 form. PQ accepts "P1D", "P1DT2H30M", "PT5M", etc.
+    if let Some(iso_body) = body.strip_prefix('P') {
+        return parse_iso8601_duration(iso_body, negative);
+    }
     // Split off optional days prefix.
     let (days, time_part) = if let Some(dot) = body.find('.') {
         // Could be "d.HH:MM:SS" or "HH:MM:SS.fff".
@@ -205,6 +210,72 @@ fn from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let mut total = days * 86400 + h * 3600 + m * 60 + s;
     if negative { total = -total; }
     Ok(Value::Duration(chrono::Duration::seconds(total)))
+}
+
+/// Parse ISO-8601 duration body (after the leading `P`).
+/// Supports nD, T-section with nH/nM/nS. Fractional seconds permitted.
+fn parse_iso8601_duration(body: &str, negative: bool) -> Result<Value, MError> {
+    let mut total_secs: i64 = 0;
+    let (date_part, time_part) = match body.find('T') {
+        Some(i) => (&body[..i], &body[i + 1..]),
+        None => (body, ""),
+    };
+    // Date part: only D is supported (M/Y vary in length so PQ doesn't
+    // round-trip them through Duration anyway).
+    if !date_part.is_empty() {
+        let n_end = date_part.len() - 1;
+        let last = date_part.as_bytes()[n_end];
+        if last != b'D' {
+            return Err(MError::Other(format!(
+                "Duration.FromText: unsupported ISO-8601 date unit in {body:?}"
+            )));
+        }
+        let days: i64 = date_part[..n_end].parse().map_err(|_| MError::Other(
+            format!("Duration.FromText: bad days in {body:?}"),
+        ))?;
+        total_secs += days * 86400;
+    }
+    // Time part: H, M, S terminated tokens.
+    if !time_part.is_empty() {
+        let mut num_start = 0usize;
+        let bytes = time_part.as_bytes();
+        for i in 0..bytes.len() {
+            let c = bytes[i];
+            if matches!(c, b'H' | b'M' | b'S') {
+                let tok = &time_part[num_start..i];
+                let secs = match c {
+                    b'H' => tok.parse::<i64>().map_err(|_| MError::Other(
+                        format!("Duration.FromText: bad hours in {body:?}"),
+                    ))? * 3600,
+                    b'M' => tok.parse::<i64>().map_err(|_| MError::Other(
+                        format!("Duration.FromText: bad minutes in {body:?}"),
+                    ))? * 60,
+                    b'S' => {
+                        // Allow fractional seconds — truncate to whole seconds.
+                        if let Some(dot) = tok.find('.') {
+                            tok[..dot].parse::<i64>().map_err(|_| MError::Other(
+                                format!("Duration.FromText: bad seconds in {body:?}"),
+                            ))?
+                        } else {
+                            tok.parse::<i64>().map_err(|_| MError::Other(
+                                format!("Duration.FromText: bad seconds in {body:?}"),
+                            ))?
+                        }
+                    }
+                    _ => unreachable!(),
+                };
+                total_secs += secs;
+                num_start = i + 1;
+            }
+        }
+        if num_start != bytes.len() {
+            return Err(MError::Other(format!(
+                "Duration.FromText: trailing unterminated token in {body:?}"
+            )));
+        }
+    }
+    if negative { total_secs = -total_secs; }
+    Ok(Value::Duration(chrono::Duration::seconds(total_secs)))
 }
 
 
