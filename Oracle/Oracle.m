@@ -6530,6 +6530,77 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q768", () =>
+            let r = try {
+                    Text.Split("abc", ""),
+                    Text.Split("", ""),
+                    Text.Split("a", ""),
+                    Text.Split("→é!", "")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q769", () =>
+            let r = try {
+                    Text.Split("a--b--c", "--"),
+                    Text.Split("a--", "--"),
+                    Text.Split("--a", "--"),
+                    Text.Split("----", "--"),
+                    Text.Split("abc", "xyz")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q770", () =>
+            let r = try {
+                    Text.Split("a,,b", ","),
+                    Text.Split(",a,b", ","),
+                    Text.Split("a,b,", ","),
+                    Text.Split(",,,", ","),
+                    Text.Split(",", ",")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q771", () =>
+            let r = try {
+                    Text.SplitAny("a,b;c|d", ",;|"),
+                    Text.SplitAny("a,,b", ",;"),
+                    Text.SplitAny("abc", ""),
+                    Text.SplitAny("", ",;"),
+                    Text.SplitAny("→é→é", "→é")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q772", () =>
+            let r = try {
+                    Text.Split("abc", "abc"),
+                    Text.Split("", "x"),
+                    Text.Split("abc", "b"),
+                    Text.Split("abcabc", "abc")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q773", () =>
+            let r = try {
+                    Text.SplitAny("a→b←c", "→←"),
+                    Text.SplitAny("café", "é"),
+                    Text.SplitAny("naïve", "ï"),
+                    Text.SplitAny("abc", null)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q774", () =>
+            let r = try {
+                    Text.Split(null, ","),
+                    Text.Split("abc", null)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 

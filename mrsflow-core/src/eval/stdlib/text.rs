@@ -46,16 +46,77 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
             ],
             to_binary,
         ),
-        ("Text.Contains", two("text", "substring"), contains),
+        (
+            "Text.Contains",
+            vec![
+                Param { name: "text".into(),      optional: false, type_annotation: None },
+                Param { name: "substring".into(), optional: false, type_annotation: None },
+                Param { name: "comparer".into(),  optional: true,  type_annotation: None },
+            ],
+            contains,
+        ),
         ("Text.Replace", three("text", "old", "new"), replace),
-        ("Text.Trim", one("text"), trim),
-        ("Text.Lower", one("text"), lower),
-        ("Text.Upper", one("text"), upper),
+        (
+            "Text.Trim",
+            vec![
+                Param { name: "text".into(), optional: false, type_annotation: None },
+                Param { name: "trim".into(), optional: true,  type_annotation: None },
+            ],
+            trim,
+        ),
+        (
+            "Text.Lower",
+            vec![
+                Param { name: "text".into(),    optional: false, type_annotation: None },
+                Param { name: "culture".into(), optional: true,  type_annotation: None },
+            ],
+            lower,
+        ),
+        (
+            "Text.Upper",
+            vec![
+                Param { name: "text".into(),    optional: false, type_annotation: None },
+                Param { name: "culture".into(), optional: true,  type_annotation: None },
+            ],
+            upper,
+        ),
         ("Text.Length", one("text"), length),
-        ("Text.PositionOf", two("text", "substring"), position_of),
-        ("Text.EndsWith", two("text", "suffix"), ends_with),
-        ("Text.StartsWith", two("text", "prefix"), starts_with),
-        ("Text.TrimEnd", one("text"), trim_end),
+        (
+            "Text.PositionOf",
+            vec![
+                Param { name: "text".into(),       optional: false, type_annotation: None },
+                Param { name: "substring".into(),  optional: false, type_annotation: None },
+                Param { name: "occurrence".into(), optional: true,  type_annotation: None },
+                Param { name: "comparer".into(),   optional: true,  type_annotation: None },
+            ],
+            position_of,
+        ),
+        (
+            "Text.EndsWith",
+            vec![
+                Param { name: "text".into(),     optional: false, type_annotation: None },
+                Param { name: "suffix".into(),   optional: false, type_annotation: None },
+                Param { name: "comparer".into(), optional: true,  type_annotation: None },
+            ],
+            ends_with,
+        ),
+        (
+            "Text.StartsWith",
+            vec![
+                Param { name: "text".into(),     optional: false, type_annotation: None },
+                Param { name: "prefix".into(),   optional: false, type_annotation: None },
+                Param { name: "comparer".into(), optional: true,  type_annotation: None },
+            ],
+            starts_with,
+        ),
+        (
+            "Text.TrimEnd",
+            vec![
+                Param { name: "text".into(), optional: false, type_annotation: None },
+                Param { name: "trim".into(), optional: true,  type_annotation: None },
+            ],
+            trim_end,
+        ),
         (
             "Text.TrimStart",
             vec![
@@ -290,9 +351,13 @@ fn to_binary(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         Value::Null => return Ok(Value::Null),
         other => return Err(type_mismatch("text", other)),
     };
-    check_utf8_encoding(args.get(1), "Text.ToBinary")?;
-    // includeByteOrderMark (args.get(2)) is accepted but ignored: we
-    // never emit a BOM. M's default is false anyway.
+    // PQ Text.ToBinary tolerates any encoding number (treats unknowns as a
+    // pass-through to UTF-8 bytes). Only reject if a non-number/non-null
+    // is supplied — matches PQ's softer enforcement.
+    match args.get(1) {
+        None | Some(Value::Null) | Some(Value::Number(_)) => {}
+        Some(other) => return Err(type_mismatch("number or null", other)),
+    }
     Ok(Value::Binary(s.as_bytes().to_vec()))
 }
 
@@ -308,6 +373,7 @@ fn check_utf8_encoding(arg: Option<&Value>, fname: &str) -> Result<(), MError> {
 }
 
 fn from(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    use chrono::{Datelike, Timelike};
     let v = &args[0];
     match v {
         Value::Null => Ok(Value::Null),
@@ -318,8 +384,14 @@ fn from(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         // was the catalog row that flagged this.) Non-integer floats
         // keep default Rust formatting.
         Value::Number(n) => {
-            let text = if n.is_finite() && n.fract() == 0.0 && n.abs() < 1e15 {
-                format!("{}", *n as i64)
+            let text = if n.is_nan() {
+                "NaN".to_string()
+            } else if n.is_infinite() {
+                if *n > 0.0 { "∞".to_string() } else { "-∞".to_string() }
+            } else if n.fract() == 0.0 && n.abs() < 1e21 {
+                // Whole-valued — render as integer text without `.0`, even for
+                // values above 2^53 where f64 loses 1-digit precision.
+                format!("{:.0}", n)
             } else {
                 format!("{n}")
             };
@@ -328,15 +400,57 @@ fn from(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         Value::Logical(b) => Ok(Value::Text(
             if *b { "true" } else { "false" }.to_string(),
         )),
-        other => Err(type_mismatch("text/number/logical/null", other)),
+        // PQ Text.From for date/datetime/time uses the current culture's short
+        // form. Corpus runs en-GB → dd/MM/yyyy for dates.
+        Value::Date(d) => Ok(Value::Text(format!("{:02}/{:02}/{:04}", d.day(), d.month(), d.year()))),
+        Value::Datetime(dt) => Ok(Value::Text(format!(
+            "{:02}/{:02}/{:04} {:02}:{:02}:{:02}",
+            dt.day(), dt.month(), dt.year(), dt.hour(), dt.minute(), dt.second()
+        ))),
+        Value::Time(t) => Ok(Value::Text(format!("{:02}:{:02}:{:02}", t.hour(), t.minute(), t.second()))),
+        Value::Duration(d) => {
+            let total = d.num_seconds();
+            let days = total / 86400;
+            let rem = total.rem_euclid(86400);
+            let h = rem / 3600;
+            let m = (rem / 60) % 60;
+            let s = rem % 60;
+            Ok(Value::Text(if days != 0 {
+                format!("{days}.{h:02}:{m:02}:{s:02}")
+            } else {
+                format!("{h:02}:{m:02}:{s:02}")
+            }))
+        }
+        // PQ rejects List/Record/Table/Function/Type in Text.From with a clear
+        // "cannot convert" error.
+        Value::List(_) | Value::Record(_) | Value::Table(_)
+        | Value::Function(_) | Value::Type(_) => {
+            // PQ message wording, capitalised type name.
+            let t = match v {
+                Value::List(_) => "List",
+                Value::Record(_) => "Record",
+                Value::Table(_) => "Table",
+                Value::Function(_) => "Function",
+                Value::Type(_) => "Type",
+                _ => unreachable!(),
+            };
+            Err(MError::Other(format!(
+                "We cannot convert a value of type {t} to type Text."
+            )))
+        }
+        other => Err(type_mismatch("text/number/logical/date/null", other)),
     }
 }
 
 
-fn contains(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn contains(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     let sub = expect_text(&args[1])?;
-    Ok(Value::Logical(text.contains(sub)))
+    if comparer_is_ordinal_ignore_case(args.get(2), host)? {
+        Ok(Value::Logical(text.to_lowercase().contains(&sub.to_lowercase())))
+    } else {
+        Ok(Value::Logical(text.contains(sub)))
+    }
 }
 
 
@@ -344,25 +458,80 @@ fn replace(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     let old = expect_text(&args[1])?;
     let new = expect_text(&args[2])?;
+    // PQ: empty old → no-op (avoid the str::replace behaviour of inserting
+    // `new` between every char and at both ends).
+    if old.is_empty() {
+        return Ok(Value::Text(text.to_string()));
+    }
     Ok(Value::Text(text.replace(old, new)))
 }
 
 
 fn trim(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
-    Ok(Value::Text(text.trim().to_string()))
+    match args.get(1) {
+        Some(Value::Null) | None => Ok(Value::Text(text.trim().to_string())),
+        Some(v) => {
+            let chars = chars_from_arg(v, "Text.Trim")?;
+            Ok(Value::Text(text.trim_matches(|c| chars.contains(&c)).to_string()))
+        }
+    }
 }
 
 
 fn lower(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
-    Ok(Value::Text(text.to_lowercase()))
+    let culture = culture_arg(args.get(1), "Text.Lower")?;
+    Ok(Value::Text(case_map(text, culture, false)))
 }
 
 
 fn upper(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
-    Ok(Value::Text(text.to_uppercase()))
+    let culture = culture_arg(args.get(1), "Text.Upper")?;
+    Ok(Value::Text(case_map(text, culture, true)))
+}
+
+fn culture_arg(v: Option<&Value>, ctx: &str) -> Result<Option<String>, MError> {
+    match v {
+        None | Some(Value::Null) => Ok(None),
+        Some(Value::Text(s)) => Ok(Some(s.clone())),
+        Some(other) => Err(MError::Other(format!(
+            "{ctx}: culture must be text (got {})", super::super::type_name(other)
+        ))),
+    }
+}
+
+fn case_map(text: &str, culture: Option<String>, upper: bool) -> String {
+    let turkish = matches!(culture.as_deref(), Some(c) if {
+        let c = c.to_ascii_lowercase();
+        c.starts_with("tr") || c.starts_with("az")
+    });
+    if !turkish {
+        // PQ uses legacy .NET case mapping where ß stays ß under ToUpper
+        // (not the Unicode 5.1+ behaviour that maps to "SS").
+        return text.chars().map(|c| -> String {
+            if upper {
+                match c {
+                    'ß' => "ß".into(),
+                    _ => c.to_uppercase().collect(),
+                }
+            } else {
+                c.to_lowercase().collect()
+            }
+        }).collect();
+    }
+    // Turkish: I↔ı (dotless), İ↔i (dotted). Char-by-char to keep the special
+    // pairs intact; everything else uses default Unicode casing.
+    text.chars()
+        .map(|c| match (upper, c) {
+            (true,  'i') => "İ".to_string(),
+            (true,  'ı') => "I".to_string(),
+            (false, 'I') => "ı".to_string(),
+            (false, 'İ') => "i".to_string(),
+            _ => if upper { c.to_uppercase().collect() } else { c.to_lowercase().collect() },
+        })
+        .collect()
 }
 
 
@@ -373,39 +542,79 @@ fn length(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn position_of(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn position_of(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     let sub = expect_text(&args[1])?;
-    // Per spec: -1 when not found, byte offset on miss... but for parity
-    // with the M spec (and the corpus), return a char index. The empty-sub
-    // edge case isn't load-bearing for slice-6 tests.
-    let idx = text.find(sub).map(|byte_idx| {
-        text[..byte_idx].chars().count()
-    });
-    Ok(Value::Number(match idx {
-        Some(i) => i as f64,
-        None => -1.0,
-    }))
+    let mode = parse_occurrence(args.get(2), "Text.PositionOf")?;
+    let case_insensitive = comparer_is_ordinal_ignore_case(args.get(3), host)?;
+    let (hay, needle): (String, String) = if case_insensitive {
+        (text.to_lowercase(), sub.to_lowercase())
+    } else {
+        (text.to_string(), sub.to_string())
+    };
+    // PQ: empty needle matches at position 0.
+    if needle.is_empty() {
+        return Ok(occurrence_result(mode, &[0]));
+    }
+    let byte_offsets = delimiter_byte_offsets(&hay, &needle);
+    let char_indices: Vec<usize> = byte_offsets
+        .iter()
+        .map(|&b| hay[..b].chars().count())
+        .collect();
+    Ok(occurrence_result(mode, &char_indices))
+}
+
+/// Detect a Comparer argument that should produce case-insensitive matching.
+/// Returns true only for `Comparer.OrdinalIgnoreCase` (which we recognise by
+/// invoking the comparer on the pair "a"/"A" and seeing if it returns 0).
+fn comparer_is_ordinal_ignore_case(arg: Option<&Value>, host: &dyn IoHost) -> Result<bool, MError> {
+    use super::common::invoke_callback_with_host;
+    match arg {
+        None | Some(Value::Null) => Ok(false),
+        Some(Value::Function(c)) => {
+            let r = invoke_callback_with_host(
+                c,
+                vec![Value::Text("a".into()), Value::Text("A".into())],
+                host,
+            )?;
+            Ok(matches!(r, Value::Number(n) if n == 0.0))
+        }
+        Some(other) => Err(type_mismatch("function (Comparer.*)", other)),
+    }
 }
 
 
-fn ends_with(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn ends_with(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     let suffix = expect_text(&args[1])?;
-    Ok(Value::Logical(text.ends_with(suffix)))
+    if comparer_is_ordinal_ignore_case(args.get(2), host)? {
+        Ok(Value::Logical(text.to_lowercase().ends_with(&suffix.to_lowercase())))
+    } else {
+        Ok(Value::Logical(text.ends_with(suffix)))
+    }
 }
 
 
-fn starts_with(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn starts_with(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     let prefix = expect_text(&args[1])?;
-    Ok(Value::Logical(text.starts_with(prefix)))
+    if comparer_is_ordinal_ignore_case(args.get(2), host)? {
+        Ok(Value::Logical(text.to_lowercase().starts_with(&prefix.to_lowercase())))
+    } else {
+        Ok(Value::Logical(text.starts_with(prefix)))
+    }
 }
 
 
 fn trim_end(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
-    Ok(Value::Text(text.trim_end().to_string()))
+    match args.get(1) {
+        Some(Value::Null) | None => Ok(Value::Text(text.trim_end().to_string())),
+        Some(v) => {
+            let chars = chars_from_arg(v, "Text.TrimEnd")?;
+            Ok(Value::Text(text.trim_end_matches(|c| chars.contains(&c)).to_string()))
+        }
+    }
 }
 
 /// Helper: extract chars from a text-or-list-of-text "chars" argument.
@@ -458,8 +667,10 @@ fn range(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     if offset > chars.len() {
         return Err(MError::Other("Text.Range: offset out of range".into()));
     }
-    let end = (offset + count).min(chars.len());
-    Ok(Value::Text(chars[offset..end].iter().collect()))
+    if offset + count > chars.len() {
+        return Err(MError::Other("Text.Range: offset+count out of range".into()));
+    }
+    Ok(Value::Text(chars[offset..offset + count].iter().collect()))
 }
 
 
@@ -540,8 +751,16 @@ fn pad_start(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         other => return Err(type_mismatch("non-negative integer", other)),
     };
     let pad_char = match args.get(2) {
-        Some(Value::Text(s)) => s.chars().next().ok_or_else(||
-            MError::Other("Text.PadStart: pad character is empty".into()))?,
+        Some(Value::Text(s)) => {
+            let mut it = s.chars();
+            let c = it.next().ok_or_else(||
+                MError::Other("Text.PadStart: pad character is empty".into()))?;
+            if it.next().is_some() {
+                return Err(MError::Other(
+                    "The value isn't a single-character string.".into()));
+            }
+            c
+        }
         Some(Value::Null) | None => ' ',
         Some(other) => return Err(type_mismatch("text", other)),
     };
@@ -563,8 +782,16 @@ fn pad_end(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         other => return Err(type_mismatch("non-negative integer", other)),
     };
     let pad_char = match args.get(2) {
-        Some(Value::Text(s)) => s.chars().next().ok_or_else(||
-            MError::Other("Text.PadEnd: pad character is empty".into()))?,
+        Some(Value::Text(s)) => {
+            let mut it = s.chars();
+            let c = it.next().ok_or_else(||
+                MError::Other("Text.PadEnd: pad character is empty".into()))?;
+            if it.next().is_some() {
+                return Err(MError::Other(
+                    "The value isn't a single-character string.".into()));
+            }
+            c
+        }
         Some(Value::Null) | None => ' ',
         Some(other) => return Err(type_mismatch("text", other)),
     };
@@ -583,6 +810,9 @@ fn repeat(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     let count = match &args[1] {
         Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
+        Value::Number(n) if *n < 0.0 => return Err(MError::Other(
+            "The 'count' argument is out of range.".into(),
+        )),
         other => return Err(type_mismatch("non-negative integer", other)),
     };
     Ok(Value::Text(text.repeat(count)))
@@ -818,14 +1048,19 @@ fn format(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
                     "Text.Format: unterminated #{...} placeholder".into(),
                 ));
             }
+            // PQ Text.Format placeholders must be numeric indices; named
+            // placeholders error with PQ's standard message.
+            if key.parse::<usize>().is_err() {
+                return Err(MError::Other(
+                    "Invalid placeholder or value in format string. Underlying error message: We expected an integer value.".into(),
+                ));
+            }
             let value = match &args[1] {
                 Value::List(xs) => {
-                    let idx: usize = key.parse().map_err(|_| MError::Other(format!(
-                        "Text.Format: index {key:?} not a number for list arguments"
-                    )))?;
-                    xs.get(idx).cloned().ok_or_else(|| MError::Other(format!(
-                        "Text.Format: index {idx} out of range"
-                    )))?
+                    let idx: usize = key.parse().unwrap();
+                    xs.get(idx).cloned().ok_or_else(|| MError::Other(
+                        "Invalid placeholder or value in format string. Underlying error message: There weren't enough elements in the enumeration to complete the operation.".into()
+                    ))?
                 }
                 Value::Record(r) => {
                     let raw = r
@@ -983,10 +1218,10 @@ fn middle(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 fn split(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     let sep = expect_text(&args[1])?;
-    // Power Query Text.Split on empty separator returns a list of single-char
-    // texts; we emulate that to be on the safe side.
+    // PQ: empty separator → no split, returns the whole text as a single
+    // element (or [""] for empty text).
     let parts: Vec<Value> = if sep.is_empty() {
-        text.chars().map(|c| Value::Text(c.to_string())).collect()
+        vec![Value::Text(text.to_string())]
     } else {
         text.split(sep).map(|s| Value::Text(s.to_string())).collect()
     };
