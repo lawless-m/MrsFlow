@@ -306,6 +306,10 @@ fn remove_metadata(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> 
 // --- Slice #169 impls ---
 
 pub(crate) fn value_add(a: &Value, b: &Value) -> Result<Value, MError> {
+    // PQ: null propagates through `+` for any operand type.
+    if matches!(a, Value::Null) || matches!(b, Value::Null) {
+        return Ok(Value::Null);
+    }
     match (a, b) {
         (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a + b)),
         (
@@ -347,14 +351,18 @@ pub(crate) fn value_add(a: &Value, b: &Value) -> Result<Value, MError> {
         (Value::Datetimezone(a), Value::Duration(b))
         | (Value::Duration(b), Value::Datetimezone(a)) => Ok(Value::Datetimezone(*a + *b)),
         (a, b) => Err(MError::Other(format!(
-            "Value.Add: cannot add {} and {}",
-            super::super::type_name(a),
-            super::super::type_name(b),
+            "We cannot apply operator + to types {} and {}.",
+            pq_type_name(a),
+            pq_type_name(b),
         ))),
     }
 }
 
 pub(crate) fn value_subtract(a: &Value, b: &Value) -> Result<Value, MError> {
+    // PQ: null propagates through `-`.
+    if matches!(a, Value::Null) || matches!(b, Value::Null) {
+        return Ok(Value::Null);
+    }
     match (a, b) {
         (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a - b)),
         (
@@ -385,9 +393,9 @@ pub(crate) fn value_subtract(a: &Value, b: &Value) -> Result<Value, MError> {
         (Value::Datetime(dt), Value::Duration(dur)) => Ok(Value::Datetime(*dt - *dur)),
         (Value::Datetimezone(dt), Value::Duration(dur)) => Ok(Value::Datetimezone(*dt - *dur)),
         (a, b) => Err(MError::Other(format!(
-            "Value.Subtract: cannot subtract {} from {}",
-            super::super::type_name(b),
-            super::super::type_name(a),
+            "We cannot apply operator - to types {} and {}.",
+            pq_type_name(a),
+            pq_type_name(b),
         ))),
     }
 }
@@ -401,6 +409,9 @@ fn subtract(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 fn multiply(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    if matches!(args[0], Value::Null) || matches!(args[1], Value::Null) {
+        return Ok(Value::Null);
+    }
     match (&args[0], &args[1]) {
         (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a * b)),
         (
@@ -413,14 +424,19 @@ fn multiply(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             ))
         }
         (a, b) => Err(MError::Other(format!(
-            "Value.Multiply: cannot multiply {} by {}",
-            super::super::type_name(a),
-            super::super::type_name(b),
+            "We cannot apply operator * to types {} and {}.",
+            pq_type_name(a),
+            pq_type_name(b),
         ))),
     }
 }
 
 fn divide(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    // Null propagates as null. Divide-by-zero yields IEEE ±Infinity (the `/`
+    // operator's PQ semantics — Number.Mod/IntegerDivide return null instead).
+    if matches!(args[0], Value::Null) || matches!(args[1], Value::Null) {
+        return Ok(Value::Null);
+    }
     match (&args[0], &args[1]) {
         (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a / b)),
         (
@@ -428,14 +444,12 @@ fn divide(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             Value::Decimal { mantissa: mb, scale: sb, precision: pb },
         ) => decimal_divide(*ma, *sa, *pa, *mb, *sb, *pb),
         (Value::Decimal { .. }, Value::Number(_)) | (Value::Number(_), Value::Decimal { .. }) => {
-            Ok(Value::Number(
-                args[0].as_f64_lossy().unwrap() / args[1].as_f64_lossy().unwrap(),
-            ))
+            Ok(Value::Number(args[0].as_f64_lossy().unwrap() / args[1].as_f64_lossy().unwrap()))
         }
         (a, b) => Err(MError::Other(format!(
-            "Value.Divide: cannot divide {} by {}",
-            super::super::type_name(a),
-            super::super::type_name(b),
+            "We cannot apply operator / to types {} and {}.",
+            pq_type_name(a),
+            pq_type_name(b),
         ))),
     }
 }
@@ -562,7 +576,7 @@ pub(crate) fn pow10_i256(n: u32) -> arrow::datatypes::i256 {
 
 /// Deep structural equality. Lists / records compare element-wise (forcing
 /// thunks first); tables compare via their backing rows.
-pub(super) fn values_equal_deep(a: &Value, b: &Value) -> Result<bool, MError> {
+pub(crate) fn values_equal_deep(a: &Value, b: &Value) -> Result<bool, MError> {
     match (a, b) {
         (Value::List(xs), Value::List(ys)) => {
             if xs.len() != ys.len() {
@@ -576,13 +590,15 @@ pub(super) fn values_equal_deep(a: &Value, b: &Value) -> Result<bool, MError> {
             Ok(true)
         }
         (Value::Record(a), Value::Record(b)) => {
+            // PQ record equality is order-insensitive: [a=1,b=2] = [b=2,a=1].
             if a.fields.len() != b.fields.len() {
                 return Ok(false);
             }
-            for ((an, av), (bn, bv)) in a.fields.iter().zip(b.fields.iter()) {
-                if an != bn {
+            for (an, av) in a.fields.iter() {
+                let Some(bv) = b.fields.iter().find_map(|(bn, bv)| (bn == an).then_some(bv))
+                else {
                     return Ok(false);
-                }
+                };
                 let av = super::super::force(av.clone(), &mut |e, env| {
                     super::super::evaluate(e, env, &super::super::NoIoHost)
                 })?;
@@ -618,19 +634,13 @@ pub(super) fn values_equal_deep(a: &Value, b: &Value) -> Result<bool, MError> {
     }
 }
 
-fn equals(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
-    if let Some(Value::Function(c)) = args.get(2) {
-        let result = invoke_callback_with_host(c, vec![args[0].clone(), args[1].clone()], host)?;
-        // Accept both logical (mrsflow extension) and number (PQ Comparer
-        // shape — equal iff 0).
-        return match result {
-            Value::Logical(_) => Ok(result),
-            Value::Number(n) => Ok(Value::Logical(n == 0.0)),
-            other => Err(type_mismatch(
-                "logical or number (from equationCriteria)",
-                &other,
-            )),
-        };
+fn equals(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    if matches!(args.get(2), Some(Value::Function(_))) {
+        // PQ: Value.Equals rejects ALL function comparers (probes q87/q143
+        // confirmed: even Comparer.OrdinalIgnoreCase is refused).
+        return Err(MError::Other(
+            "We cannot convert a value of type Function to type Number.".into(),
+        ));
     }
     if !matches!(args.get(2), Some(Value::Null) | None) {
         return Err(type_mismatch("function or null (equationCriteria)", &args[2]));
@@ -652,6 +662,33 @@ fn compare(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     }
     let cmp = compare_values(&args[0], &args[1])?;
     Ok(Value::Number(cmp as f64))
+}
+
+pub(crate) fn compare_values_pub(a: &Value, b: &Value) -> Result<i32, MError> {
+    compare_values(a, b)
+}
+
+/// Capitalised type name in PQ's error-message style ("Number", "Text", …).
+fn pq_type_name(v: &Value) -> &'static str {
+    match v {
+        Value::Null => "Null",
+        Value::Logical(_) => "Logical",
+        Value::Number(_) | Value::Decimal { .. } => "Number",
+        Value::Text(_) => "Text",
+        Value::Date(_) => "Date",
+        Value::Datetime(_) => "DateTime",
+        Value::Datetimezone(_) => "DateTimeZone",
+        Value::Time(_) => "Time",
+        Value::Duration(_) => "Duration",
+        Value::Binary(_) => "Binary",
+        Value::List(_) => "List",
+        Value::Record(_) => "Record",
+        Value::Table(_) => "Table",
+        Value::Function(_) => "Function",
+        Value::Type(_) => "Type",
+        Value::Thunk(_) => "Thunk",
+        Value::WithMetadata { .. } => "Value",
+    }
 }
 
 fn compare_values(a: &Value, b: &Value) -> Result<i32, MError> {
@@ -684,11 +721,24 @@ fn compare_values(a: &Value, b: &Value) -> Result<i32, MError> {
         (Value::Time(x), Value::Time(y)) => x.cmp(y),
         (Value::Duration(x), Value::Duration(y)) => x.cmp(y),
         (a, b) => {
-            return Err(MError::Other(format!(
-                "Value.Compare: cannot compare {} and {}",
-                super::super::type_name(a),
-                super::super::type_name(b),
-            )));
+            // Cross-type ordering — PQ defines a total order across kinds so
+            // List.Max/Min on mixed lists works. Approximate ranking:
+            //   null < logical < number < date < datetime < duration < text < binary
+            let rank = |v: &Value| -> u8 {
+                match v {
+                    Value::Null => 0,
+                    Value::Logical(_) => 1,
+                    Value::Number(_) | Value::Decimal { .. } => 2,
+                    Value::Date(_) => 3,
+                    Value::Datetime(_) | Value::Datetimezone(_) => 4,
+                    Value::Time(_) => 5,
+                    Value::Duration(_) => 6,
+                    Value::Text(_) => 7,
+                    Value::Binary(_) => 8,
+                    _ => 9,
+                }
+            };
+            rank(a).cmp(&rank(b))
         }
     };
     Ok(match ord {

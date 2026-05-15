@@ -202,28 +202,12 @@ pub(crate) fn values_equal_primitive(a: &Value, b: &Value) -> Result<bool, MErro
         (Value::Date(x), Value::Date(y)) => Ok(x == y),
         (Value::Datetime(x), Value::Datetime(y)) => Ok(x == y),
         (Value::Duration(x), Value::Duration(y)) => Ok(x == y),
-        // Different primitive variants are not equal — null vs non-null included.
-        (
-            Value::Null
-            | Value::Logical(_)
-            | Value::Number(_)
-            | Value::Decimal { .. }
-            | Value::Text(_)
-            | Value::Date(_)
-            | Value::Datetime(_)
-            | Value::Duration(_),
-            Value::Null
-            | Value::Logical(_)
-            | Value::Number(_)
-            | Value::Decimal { .. }
-            | Value::Text(_)
-            | Value::Date(_)
-            | Value::Datetime(_)
-            | Value::Duration(_),
-        ) => Ok(false),
-        _ => Err(MError::NotImplemented(
-            "equality on compound values (list/record/table/etc.) deferred",
-        )),
+        (Value::Time(x), Value::Time(y)) => Ok(x == y),
+        (Value::Datetimezone(x), Value::Datetimezone(y)) => Ok(x == y),
+        (Value::Binary(x), Value::Binary(y)) => Ok(x == y),
+        (Value::Type(x), Value::Type(y)) => Ok(x == y),
+        // Mismatched kinds (including primitive-vs-compound) are not equal.
+        _ => Ok(false),
     }
 }
 
@@ -239,11 +223,12 @@ pub(super) fn int_n_arg(v: &Value, ctx: &str) -> Result<i64, MError> {
 
 
 pub(super) fn invoke_builtin_callback(closure: &Closure, args: Vec<Value>) -> Result<Value, MError> {
-    if args.len() != closure.params.len() {
+    let required = closure.params.iter().filter(|p| !p.optional).count();
+    let total = closure.params.len();
+    if args.len() < required || args.len() > total {
         return Err(MError::Other(format!(
-            "callback: arity mismatch: expected {}, got {}",
-            closure.params.len(),
-            args.len()
+            "callback: arity mismatch: expected {} (up to {}), got {}",
+            required, total, args.len()
         )));
     }
     // Callbacks from List.Transform/Select can't reach the original host
@@ -271,11 +256,12 @@ pub(super) fn invoke_callback_with_host(
     args: Vec<Value>,
     host: &dyn IoHost,
 ) -> Result<Value, MError> {
-    if args.len() != closure.params.len() {
+    let required = closure.params.iter().filter(|p| !p.optional).count();
+    let total = closure.params.len();
+    if args.len() < required || args.len() > total {
         return Err(MError::Other(format!(
-            "callback: arity mismatch: expected {}, got {}",
-            closure.params.len(),
-            args.len()
+            "callback: arity mismatch: expected {} (up to {}), got {}",
+            required, total, args.len()
         )));
     }
     match &closure.body {

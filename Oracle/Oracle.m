@@ -6970,6 +6970,82 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q813", () =>
+            let g = Text.NewGuid() in
+            let r = try {
+                    Text.Length(g) = 36,
+                    Text.PositionOf(g, "-") = 8,
+                    Text.PositionOf(g, "-", Occurrence.All) = {8, 13, 18, 23},
+                    Text.Length(Text.Replace(g, "-", "")) = 32,
+                    Text.Range(g, 14, 1) = "4"
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q814", () =>
+            let a = Text.NewGuid(), b = Text.NewGuid() in
+            let r = try {
+                    a <> b,
+                    Text.Length(a) = Text.Length(b)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q815", () =>
+            let g = Text.NewGuid() in
+            let variantChar = Text.Range(g, 19, 1) in
+            let r = try {
+                    List.Contains({"8", "9", "a", "b"}, variantChar),
+                    Text.Upper(g) <> g,
+                    Text.Lower(g) = g
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q816", () =>
+            let g = Text.NewGuid() in
+            let allValidChars =
+                List.AllTrue(
+                    List.Transform(
+                        Text.ToList(g),
+                        (c) => List.Contains({"0","1","2","3","4","5","6","7","8","9","a","b","c","d","e","f","-"}, c)
+                    )
+                ) in
+            let r = try {
+                    allValidChars
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q817", () =>
+            let guids = List.Generate(() => 0, (i) => i < 10, (i) => i + 1, (i) => Text.NewGuid()) in
+            let r = try {
+                    List.Count(List.Distinct(guids)) = 10
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q818", () =>
+            let r = try {
+                    Text.NewGuid("D")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q819", () =>
+            let g = Text.NewGuid() in
+            let parts = Text.Split(g, "-") in
+            let r = try {
+                    List.Count(parts) = 5,
+                    Text.Length(parts{0}) = 8,
+                    Text.Length(parts{1}) = 4,
+                    Text.Length(parts{2}) = 4,
+                    Text.Length(parts{3}) = 4,
+                    Text.Length(parts{4}) = 12
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 

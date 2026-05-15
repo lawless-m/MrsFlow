@@ -258,23 +258,57 @@ pub fn evaluate(ast: &Expr, env: &Env, host: &dyn IoHost) -> Result<Value, MErro
                         let sv = force(sv, &mut |e, env| evaluate(e, env, host))?;
                         let ev = evaluate(end, env, host)?;
                         let ev = force(ev, &mut |e, env| evaluate(e, env, host))?;
-                        let s = expect_number(&sv)?;
-                        let e = expect_number(&ev)?;
-                        if s.fract() != 0.0 || e.fract() != 0.0 {
-                            return Err(MError::Other(format!(
-                                "range bounds must be integers, got {s} and {e}"
-                            )));
-                        }
-                        if s > e {
-                            return Err(MError::Other(format!(
-                                "range start must be <= end, got {s}..{e}"
-                            )));
-                        }
-                        let mut i = s as i64;
-                        let end_i = e as i64;
-                        while i <= end_i {
-                            values.push(Value::Number(i as f64));
-                            i += 1;
+                        match (&sv, &ev) {
+                            // Numeric range: inclusive integer sequence.
+                            (Value::Number(s_n), Value::Number(e_n)) => {
+                                let s = *s_n;
+                                let e = *e_n;
+                                if s.fract() != 0.0 || e.fract() != 0.0 {
+                                    return Err(MError::Other(format!(
+                                        "range bounds must be integers, got {s} and {e}"
+                                    )));
+                                }
+                                if s > e {
+                                    return Err(MError::Other(format!(
+                                        "range start must be <= end, got {s}..{e}"
+                                    )));
+                                }
+                                let mut i = s as i64;
+                                let end_i = e as i64;
+                                while i <= end_i {
+                                    values.push(Value::Number(i as f64));
+                                    i += 1;
+                                }
+                            }
+                            // Character range: each bound is a single-char text;
+                            // expands to every single-char text in [start, end].
+                            (Value::Text(s_t), Value::Text(e_t)) => {
+                                let s_chars: Vec<char> = s_t.chars().collect();
+                                let e_chars: Vec<char> = e_t.chars().collect();
+                                if s_chars.len() != 1 || e_chars.len() != 1 {
+                                    return Err(MError::Other(format!(
+                                        "range bounds must be single-character text, got {s_t:?} and {e_t:?}"
+                                    )));
+                                }
+                                let s = s_chars[0] as u32;
+                                let e = e_chars[0] as u32;
+                                if s > e {
+                                    return Err(MError::Other(format!(
+                                        "range start must be <= end, got {s_t:?}..{e_t:?}"
+                                    )));
+                                }
+                                for cp in s..=e {
+                                    if let Some(c) = char::from_u32(cp) {
+                                        values.push(Value::Text(c.to_string()));
+                                    }
+                                }
+                            }
+                            (a, b) => {
+                                return Err(MError::Other(format!(
+                                    "range bounds must both be numbers or single-character text, got {} and {}",
+                                    type_name(a), type_name(b)
+                                )));
+                            }
                         }
                     }
                 }
@@ -491,10 +525,11 @@ pub fn evaluate(ast: &Expr, env: &Env, host: &dyn IoHost) -> Result<Value, MErro
                 ),
                 Value::Record(r) => Value::Record(r),
                 other => {
-                    return Err(MError::TypeMismatch {
-                        expected: "text or record",
-                        found: type_name(&other),
-                    });
+                    // PQ message: "We cannot convert the value X to type Record."
+                    return Err(MError::Other(format!(
+                        "We cannot convert the value {} to type Record.",
+                        format_pq_value(&other)
+                    )));
                 }
             };
             Err(MError::Raised(record))
@@ -528,6 +563,81 @@ pub fn evaluate(ast: &Expr, env: &Env, host: &dyn IoHost) -> Result<Value, MErro
         | Expr::FunctionType { .. } => Err(MError::NotImplemented(
             "expression form deferred to a later eval slice",
         )),
+    }
+}
+
+/// PQ-style capitalised type name for error messages.
+fn pq_capital_type_name(v: &Value) -> &'static str {
+    match v {
+        Value::Null => "Null",
+        Value::Logical(_) => "Logical",
+        Value::Number(_) | Value::Decimal { .. } => "Number",
+        Value::Text(_) => "Text",
+        Value::Date(_) => "Date",
+        Value::Datetime(_) => "DateTime",
+        Value::Datetimezone(_) => "DateTimeZone",
+        Value::Time(_) => "Time",
+        Value::Duration(_) => "Duration",
+        Value::Binary(_) => "Binary",
+        Value::List(_) => "List",
+        Value::Record(_) => "Record",
+        Value::Table(_) => "Table",
+        Value::Function(_) => "Function",
+        Value::Type(_) => "Type",
+        Value::Thunk(_) => "Thunk",
+        Value::WithMetadata { .. } => "Value",
+    }
+}
+
+/// Render a Value in the shape PQ uses inside error messages — used by
+/// `error <non-record>` and similar conversion-failure paths.
+fn format_pq_value(v: &Value) -> String {
+    match v {
+        Value::Null => "null".to_string(),
+        Value::Logical(true) => "true".to_string(),
+        Value::Logical(false) => "false".to_string(),
+        Value::Number(n) => {
+            if n.is_finite() && n.fract() == 0.0 && n.abs() < 1e15 {
+                format!("{}", *n as i64)
+            } else {
+                format!("{n}")
+            }
+        }
+        Value::Text(s) => format!("\"{s}\""),
+        other => type_name(other).into(),
+    }
+}
+
+/// Build a DataFormat.Error record — PQ uses this Reason for parsing failures
+/// (Date.FromText, Number.FromText, DateTime.FromText, …).
+pub(crate) fn build_data_format_error(message: String) -> Value {
+    build_standard_error_record("DataFormat.Error".into(), message)
+}
+
+/// Encode an MError as a "cell-level error" Value. Used by Table.AddColumn et
+/// al. so Table.ReplaceErrorValues can replace per-cell errors. The marker is
+/// a WithMetadata wrapping the standard error record, with a sentinel meta
+/// field that downstream code keys on.
+pub(crate) fn error_to_cell_marker(err: MError) -> Value {
+    let rec = error_to_record(err);
+    let inner = match rec {
+        Value::Record(r) => Value::Record(r),
+        other => other,
+    };
+    Value::WithMetadata {
+        inner: Box::new(inner),
+        meta: Record {
+            fields: vec![("__cell_error".into(), Value::Logical(true))],
+            env: EnvNode::empty(),
+        },
+    }
+}
+
+/// Is `v` a cell-error marker produced by `error_to_cell_marker`?
+pub(crate) fn is_cell_error(v: &Value) -> bool {
+    match v {
+        Value::WithMetadata { meta, .. } => meta.fields.iter().any(|(k, _)| k == "__cell_error"),
+        _ => false,
     }
 }
 
@@ -652,13 +762,13 @@ fn evaluate_as_type(expr: &Expr, env: &Env, host: &dyn IoHost) -> Result<TypeRep
             }
         }
         Expr::FunctionType { params, return_type } => {
-            let mut ps: Vec<(TypeRep, bool)> = Vec::with_capacity(params.len());
+            let mut ps: Vec<(String, TypeRep, bool)> = Vec::with_capacity(params.len());
             for p in params {
                 let t = match &p.type_annotation {
                     Some(ann) => evaluate_as_type(ann, env, host)?,
                     None => TypeRep::Any,
                 };
-                ps.push((t, p.optional));
+                ps.push((p.name.clone(), t, p.optional));
             }
             let r = evaluate_as_type(return_type, env, host)?;
             Ok(TypeRep::FunctionOf {
@@ -680,7 +790,7 @@ pub(crate) fn type_conforms(v: &Value, t: &TypeRep) -> bool {
         TypeRep::AnyNonNull => !matches!(v, Value::Null),
         TypeRep::Null => matches!(v, Value::Null),
         TypeRep::Logical => matches!(v, Value::Logical(_)),
-        TypeRep::Number => matches!(v, Value::Number(_) | Value::Decimal { .. }),
+        TypeRep::Number | TypeRep::NamedNumeric(_) => matches!(v, Value::Number(_) | Value::Decimal { .. }),
         TypeRep::Text => matches!(v, Value::Text(_)),
         TypeRep::Date => matches!(v, Value::Date(_)),
         TypeRep::Datetime => matches!(v, Value::Datetime(_)),
@@ -772,6 +882,19 @@ pub(crate) fn type_is_subtype(a: &TypeRep, b: &TypeRep) -> bool {
     if let TypeRep::Nullable(inner) = b {
         return type_is_subtype(a, inner);
     }
+    // Typed compounds are subtypes of their unrefined base.
+    if matches!(b, TypeRep::List) && matches!(a, TypeRep::ListOf(_)) {
+        return true;
+    }
+    if matches!(b, TypeRep::Record) && matches!(a, TypeRep::RecordOf { .. }) {
+        return true;
+    }
+    if matches!(b, TypeRep::Table) && matches!(a, TypeRep::TableOf { .. }) {
+        return true;
+    }
+    if matches!(b, TypeRep::Function) && matches!(a, TypeRep::FunctionOf { .. }) {
+        return true;
+    }
     // Otherwise no implicit subtyping.
     false
 }
@@ -784,6 +907,7 @@ pub(crate) fn type_rep_name(t: &TypeRep) -> String {
         TypeRep::Null => "null".into(),
         TypeRep::Logical => "logical".into(),
         TypeRep::Number => "number".into(),
+        TypeRep::NamedNumeric(n) => n.to_string(),
         TypeRep::Text => "text".into(),
         TypeRep::Date => "date".into(),
         TypeRep::Datetime => "datetime".into(),
@@ -821,9 +945,9 @@ pub(crate) fn type_rep_name(t: &TypeRep) -> String {
         TypeRep::FunctionOf { params, return_type } => {
             let ps: Vec<String> = params
                 .iter()
-                .map(|(t, opt)| {
+                .map(|(n, t, opt)| {
                     let pfx = if *opt { "optional " } else { "" };
-                    format!("{}{}", pfx, type_rep_name(t))
+                    format!("{}{} as {}", pfx, n, type_rep_name(t))
                 })
                 .collect();
             format!("function ({}) as {}", ps.join(", "), type_rep_name(return_type))
@@ -931,24 +1055,51 @@ fn apply_unary(op: UnaryOp, v: Value) -> Result<Value, MError> {
 
 fn apply_binary(op: BinaryOp, lv: Value, rv: Value) -> Result<Value, MError> {
     match op {
-        BinaryOp::Multiply => arithmetic(lv, rv, |a, b| a * b),
-        BinaryOp::Divide => arithmetic(lv, rv, |a, b| a / b),
+        BinaryOp::Multiply => {
+            if matches!(lv, Value::Null) || matches!(rv, Value::Null) {
+                return Ok(Value::Null);
+            }
+            arithmetic(lv, rv, |a, b| a * b)
+        }
+        BinaryOp::Divide => {
+            // Null operands propagate as null.
+            if matches!(lv, Value::Null) || matches!(rv, Value::Null) {
+                return Ok(Value::Null);
+            }
+            let l = expect_number(&lv)?;
+            let r = expect_number(&rv)?;
+            // PQ semantics for the `/` operator: divide-by-zero yields IEEE
+            // ±Infinity (Oracle.Serialize then renders as "∞"). Note that
+            // Number.Mod / Number.IntegerDivide return null instead — that
+            // divergence is in those functions, not the operator.
+            Ok(Value::Number(l / r))
+        }
         BinaryOp::Add => stdlib::value_ops::value_add(&lv, &rv),
         BinaryOp::Subtract => stdlib::value_ops::value_subtract(&lv, &rv),
-        BinaryOp::Concat => match (lv, rv) {
-            (Value::Text(l), Value::Text(r)) => Ok(Value::Text(l + &r)),
-            // List concat is reachable only once eval-3 introduces list values.
-            (l, _) => Err(MError::TypeMismatch {
-                expected: "text",
-                found: type_name(&l),
-            }),
-        },
+        BinaryOp::Concat => {
+            if matches!(lv, Value::Null) || matches!(rv, Value::Null) {
+                return Ok(Value::Null);
+            }
+            match (lv, rv) {
+                (Value::Text(l), Value::Text(r)) => Ok(Value::Text(l + &r)),
+                (Value::List(l), Value::List(r)) => {
+                    let mut out = l;
+                    out.extend(r);
+                    Ok(Value::List(out))
+                }
+                (l, r) => Err(MError::Other(format!(
+                    "We cannot apply operator & to types {} and {}.",
+                    pq_capital_type_name(&l),
+                    pq_capital_type_name(&r),
+                ))),
+            }
+        }
         BinaryOp::LessThan => compare(lv, rv, std::cmp::Ordering::Less, false),
         BinaryOp::LessEquals => compare(lv, rv, std::cmp::Ordering::Less, true),
         BinaryOp::GreaterThan => compare(lv, rv, std::cmp::Ordering::Greater, false),
         BinaryOp::GreaterEquals => compare(lv, rv, std::cmp::Ordering::Greater, true),
-        BinaryOp::Equal => Ok(Value::Logical(values_equal(&lv, &rv))),
-        BinaryOp::NotEqual => Ok(Value::Logical(!values_equal(&lv, &rv))),
+        BinaryOp::Equal => Ok(Value::Logical(stdlib::value_ops::values_equal_deep(&lv, &rv)?)),
+        BinaryOp::NotEqual => Ok(Value::Logical(!stdlib::value_ops::values_equal_deep(&lv, &rv)?)),
         BinaryOp::And | BinaryOp::Or => unreachable!("short-circuited above"),
         BinaryOp::As | BinaryOp::Is => unreachable!(
             "as/is intercepted in evaluate (RHS is in type context)"
@@ -1036,13 +1187,22 @@ fn compare(
             let ord = l.cmp(r);
             ord == expected || (allow_equal && ord == std::cmp::Ordering::Equal)
         }
-        // Cross-type and other-type comparisons error. Spec covers more
-        // coercions (nullable etc.); they land with later slices as needed.
+        // Cross-type and other-type comparisons error.
         _ => {
-            return Err(MError::TypeMismatch {
-                expected: "two numbers, texts, or temporal values of the same kind",
-                found: type_name(&lv),
-            });
+            let op_sym = match (expected, allow_equal) {
+                (std::cmp::Ordering::Less, false) => "<",
+                (std::cmp::Ordering::Less, true) => "<=",
+                (std::cmp::Ordering::Greater, false) => ">",
+                (std::cmp::Ordering::Greater, true) => ">=",
+                _ => "<",
+            };
+            // PQ reports the type pair in RHS-then-LHS order for comparison ops.
+            return Err(MError::Other(format!(
+                "We cannot apply operator {} to types {} and {}.",
+                op_sym,
+                pq_capital_type_name(&rv),
+                pq_capital_type_name(&lv),
+            )));
         }
     };
     Ok(Value::Logical(result))
@@ -1296,6 +1456,7 @@ mod tests {
 
     #[test]
     fn divide_by_zero_is_infinity() {
+        // PQ operator `/` semantics: 1/0 → +Inf, -1/0 → -Inf, 0/0 → NaN.
         let v = eval_number("1 / 0");
         assert!(v.is_infinite() && v > 0.0);
         let v = eval_number("-1 / 0");
@@ -1305,7 +1466,7 @@ mod tests {
     #[test]
     fn arithmetic_type_mismatch() {
         match eval_str(r#""hi" + 1"#) {
-            Err(MError::Other(msg)) if msg.contains("cannot add") => {}
+            Err(MError::Other(msg)) if msg.contains("cannot apply operator +") => {}
             other => panic!("expected Value.Add type error, got {other:?}"),
         }
     }
@@ -2905,9 +3066,10 @@ mod tests {
     }
 
     #[test]
-    fn type_intrinsic_int64_type_resolves_to_number_column() {
-        // Int64.Type should bind to Value::Type(Number) at root_env, and
-        // using it as Table.AddColumn's 4th arg should produce a Float64 column.
+    fn type_intrinsic_int64_type_produces_int64_column() {
+        // Int64.Type now binds to TypeRep::NamedNumeric("Int64.Type") which
+        // maps to Arrow's Int64 — so Table.AddColumn's 4th arg produces an
+        // Int64 column, matching PQ's Table.Schema TypeName output.
         match eval_str(
             r#"Table.AddColumn(#table({"a"}, {{1}}), "b", each 1, Int64.Type)"#,
         )
@@ -2915,7 +3077,7 @@ mod tests {
         {
             Value::Table(t) => {
                 use arrow::datatypes::DataType;
-                assert_eq!(t.as_arrow().unwrap().schema().field(1).data_type(), &DataType::Float64);
+                assert_eq!(t.as_arrow().unwrap().schema().field(1).data_type(), &DataType::Int64);
             }
             other => panic!("expected table, got {other:?}"),
         }
@@ -3544,9 +3706,10 @@ mod tests {
 
     #[test]
     fn number_mod_negative_dividend() {
-        // Floor mod: -7 mod 3 = 2 (since -7 = -3*3 + 2)
+        // Truncated mod (PQ semantics): sign of dividend.
+        // -7 mod 3 = -1  (since -7 = -2*3 + (-1))
         match eval_str("Number.Mod(-7, 3)").unwrap() {
-            Value::Number(n) => assert_eq!(n, 2.0),
+            Value::Number(n) => assert_eq!(n, -1.0),
             other => panic!("expected number, got {other:?}"),
         }
     }
@@ -3598,10 +3761,11 @@ mod tests {
     }
 
     #[test]
-    fn text_format_named() {
-        match eval_str(r##"Text.Format("#{name} = #{val}", [name = "x", val = 7])"##).unwrap() {
-            Value::Text(s) => assert_eq!(s, "x = 7"),
-            other => panic!("expected text, got {other:?}"),
+    fn text_format_named_rejected_per_pq() {
+        // PQ rejects named placeholders in Text.Format with this message.
+        match eval_str(r##"Text.Format("#{name} = #{val}", [name = "x", val = 7])"##) {
+            Err(MError::Other(msg)) if msg.contains("Invalid placeholder") => {}
+            other => panic!("expected placeholder error, got {other:?}"),
         }
     }
 
@@ -3984,9 +4148,10 @@ mod tests {
     }
 
     #[test]
-    fn time_to_text_round_trip() {
+    fn time_to_text_default_omits_seconds() {
+        // PQ Time.ToText default format is HH:mm — no seconds.
         match eval_str(r#"Time.ToText(Time.FromText("09:15:30"))"#).unwrap() {
-            Value::Text(s) => assert_eq!(s, "09:15:30"),
+            Value::Text(s) => assert_eq!(s, "09:15"),
             other => panic!("expected text, got {other:?}"),
         }
     }
@@ -4078,20 +4243,24 @@ mod tests {
     }
 
     #[test]
-    fn date_start_of_week_default_sunday() {
-        // 2024-01-10 is Wednesday. Sunday-start → 2024-01-07.
+    fn date_start_of_week_default_monday() {
+        // PQ default is Monday-start. 2024-01-10 is Wednesday → 2024-01-08.
         match eval_str("Date.StartOfWeek(#date(2024, 1, 10))").unwrap() {
             Value::Date(d) => {
-                assert_eq!(d, chrono::NaiveDate::from_ymd_opt(2024, 1, 7).unwrap());
+                assert_eq!(d, chrono::NaiveDate::from_ymd_opt(2024, 1, 8).unwrap());
             }
             other => panic!("expected date, got {other:?}"),
         }
     }
 
     #[test]
-    fn date_day_of_week_default_sunday() {
-        // 2024-01-07 is a Sunday. Sunday=0 with default firstDayOfWeek.
+    fn date_day_of_week_default_monday() {
+        // PQ default is Monday-start, so 2024-01-07 (Sun) → 6, 2024-01-08 (Mon) → 0.
         match eval_str("Date.DayOfWeek(#date(2024, 1, 7))").unwrap() {
+            Value::Number(n) => assert_eq!(n, 6.0),
+            other => panic!("expected number, got {other:?}"),
+        }
+        match eval_str("Date.DayOfWeek(#date(2024, 1, 8))").unwrap() {
             Value::Number(n) => assert_eq!(n, 0.0),
             other => panic!("expected number, got {other:?}"),
         }
@@ -5272,16 +5441,12 @@ mod tests {
     }
 
     #[test]
-    fn date_to_text_unknown_format_errors() {
-        // Date.ToText now translates M format tokens generally
-        // (yyyy/MM/dd/HH/mm/ss/MMM/MMMM/ddd/dddd/etc.), so previously-
-        // rejected combos like "yyyy.MM.dd" are accepted. Genuine
-        // unknowns — an unrecognised letter run — still error.
-        match eval_str(r#"Date.ToText(#date(2024, 1, 15), "qqqq")"#) {
-            Err(MError::Other(msg)) => {
-                assert!(msg.contains("unsupported format token"), "got: {msg}");
-            }
-            other => panic!("expected error, got {other:?}"),
+    fn date_to_text_unknown_format_passes_through() {
+        // Per PQ, unrecognised tokens in a custom format pass through as
+        // literal characters in the output.
+        match eval_str(r#"Date.ToText(#date(2024, 1, 15), "qqqq")"#).unwrap() {
+            Value::Text(s) => assert_eq!(s, "qqqq"),
+            other => panic!("expected text, got {other:?}"),
         }
     }
 
@@ -6043,8 +6208,8 @@ mod tests {
 
     #[test]
     fn replacer_replace_text_substring() {
-        // Replacer.ReplaceText returns a 3-arg fn; apply it to substitute "o" → "0".
-        let src = r#"Replacer.ReplaceText()("foo bar", "o", "0")"#;
+        // PQ shape: Replacer.ReplaceText itself is a 3-arg function (no factory).
+        let src = r#"Replacer.ReplaceText("foo bar", "o", "0")"#;
         match eval_str(src).unwrap() {
             Value::Text(s) => assert_eq!(s, "f00 bar"),
             other => panic!("expected text, got {other:?}"),
@@ -6600,10 +6765,10 @@ mod tests {
     }
 
     #[test]
-    fn table_fuzzy_group_errors_not_implemented() {
+    fn table_fuzzy_group_now_implemented() {
+        // FuzzyGroup now delegates to Table.Group (exact-match approximation).
         let src = r#"Table.FuzzyGroup(#table({"k"}, {{"a"}}), "k", {})"#;
-        let err = eval_str(src).unwrap_err();
-        assert!(matches!(err, MError::NotImplemented(_)), "got {err:?}");
+        let _ = eval_str(src).expect("FuzzyGroup should run");
     }
 
     #[test]
@@ -6876,7 +7041,8 @@ mod tests {
     }
 
     #[test]
-    fn table_schema_returns_name_typename() {
+    fn table_schema_returns_pq_shape() {
+        // Table.Schema emits the full PQ schema-record shape (18 columns).
         let src = r#"
             let
                 t = #table({"n", "s"}, {{1, "x"}, {2, "y"}}),
@@ -6885,7 +7051,12 @@ mod tests {
         "#;
         match eval_str(src).unwrap() {
             Value::Table(t) => {
-                assert_eq!(t.column_names(), vec!["Name", "TypeName"]);
+                let cols = t.column_names();
+                assert_eq!(cols[0], "Name");
+                assert_eq!(cols[1], "Position");
+                assert_eq!(cols[2], "TypeName");
+                assert_eq!(cols[3], "Kind");
+                assert_eq!(cols.len(), 18);
                 assert_eq!(t.num_rows(), 2);
             }
             other => panic!("expected table, got {other:?}"),
@@ -7105,7 +7276,7 @@ mod tests {
         let src = r#"
             let
                 t = #table({"s"}, {{"foo"}, {"bar"}, {"boo"}}),
-                r = Table.ReplaceValue(t, "o", "0", Replacer.ReplaceText(), {"s"})
+                r = Table.ReplaceValue(t, "o", "0", Replacer.ReplaceText, {"s"})
             in Table.Column(r, "s")
         "#;
         match eval_str(src).unwrap() {
@@ -7324,23 +7495,17 @@ mod tests {
     }
 
     #[test]
-    fn table_columns_of_type_picks_matching_columns() {
+    fn table_columns_of_type_pq_strict_match() {
+        // PQ Table.ColumnsOfType uses type-identity matching: a `type number`
+        // reference at the call site does NOT match the column's declared
+        // Number.Type — so the conservative answer is [].
         let src = r#"
             let
                 t = #table({"n", "s"}, {{1, "x"}, {2, "y"}})
             in Table.ColumnsOfType(t, {type number})
         "#;
         match eval_str(src).unwrap() {
-            Value::List(xs) => {
-                let names: Vec<&str> = xs
-                    .iter()
-                    .map(|v| match v {
-                        Value::Text(s) => s.as_str(),
-                        _ => panic!("expected text"),
-                    })
-                    .collect();
-                assert_eq!(names, vec!["n"]);
-            }
+            Value::List(xs) => assert!(xs.is_empty()),
             other => panic!("expected list, got {other:?}"),
         }
     }
@@ -7436,12 +7601,13 @@ mod tests {
 
     #[test]
     fn replacer_replace_value_equality() {
+        // PQ shape: Replacer.ReplaceValue itself is a 3-arg function.
         // Equal → replaced; not equal → unchanged.
-        match eval_str(r#"Replacer.ReplaceValue()(5, 5, 99)"#).unwrap() {
+        match eval_str(r#"Replacer.ReplaceValue(5, 5, 99)"#).unwrap() {
             Value::Number(n) => assert_eq!(n, 99.0),
             other => panic!("expected number, got {other:?}"),
         }
-        match eval_str(r#"Replacer.ReplaceValue()(5, 3, 99)"#).unwrap() {
+        match eval_str(r#"Replacer.ReplaceValue(5, 3, 99)"#).unwrap() {
             Value::Number(n) => assert_eq!(n, 5.0),
             other => panic!("expected number, got {other:?}"),
         }
