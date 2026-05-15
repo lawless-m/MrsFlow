@@ -1997,6 +1997,36 @@ let
             let r = try List.PositionOf({"A", "b", "C"}, "a", Occurrence.First, Comparer.OrdinalIgnoreCase) in
                 if r[HasError]
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q371", () =>
+            let r = try Splitter.SplitByNothing()("hello") in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q372", () =>
+            let r = try Splitter.SplitTextByDelimiter(",")("a,b,c,d") in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q373", () =>
+            let r = try Splitter.SplitTextByDelimiter(",", QuoteStyle.Csv)("a,""b,c"",d") in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q374", () =>
+            let r = try Splitter.SplitTextByEachDelimiter({",", ";", "|"})("a,b;c|d,e") in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q375", () =>
+            let r = try Splitter.SplitTextByLengths({2, 3, 1})("abcdefg") in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                     else [HasError=false, Value=r[Value]])
     },
 
