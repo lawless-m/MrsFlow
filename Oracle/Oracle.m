@@ -1613,7 +1613,24 @@ let
             Lines.FromText("")),
 
         SafeSerialize("q300", () =>
-            Lines.ToText(Lines.FromText("a#(lf)b#(lf)c")))
+            Lines.ToText(Lines.FromText("a#(lf)b#(lf)c"))),
+
+        // q301-q305: Text.Split/Combine roundtrips.
+
+        SafeSerialize("q301", () =>
+            Text.Combine(Text.Split("a,b,c", ","), ",")),
+
+        SafeSerialize("q302", () =>
+            Text.Combine(Text.Split("a,b,", ","), ",")),
+
+        SafeSerialize("q303", () =>
+            Text.Split("a,,b", ",")),
+
+        SafeSerialize("q304", () =>
+            Text.SplitAny("a;b,c|d", ",;|")),
+
+        SafeSerialize("q305", () =>
+            Text.Combine(Text.Split("", ","), ","))
     },
 
     Catalog = Table.FromRecords(cases)
