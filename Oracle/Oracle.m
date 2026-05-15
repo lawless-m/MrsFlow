@@ -1630,7 +1630,24 @@ let
             Text.SplitAny("a;b,c|d", ",;|")),
 
         SafeSerialize("q305", () =>
-            Text.Combine(Text.Split("", ","), ","))
+            Text.Combine(Text.Split("", ","), ",")),
+
+        // q306-q310: List.Combine/Zip/RemoveItems edge cases.
+
+        SafeSerialize("q306", () =>
+            List.Combine({{1,2},{3},{}})),
+
+        SafeSerialize("q307", () =>
+            List.Zip({{1,2,3},{"a","b"}})),
+
+        SafeSerialize("q308", () =>
+            List.Zip({})),
+
+        SafeSerialize("q309", () =>
+            List.RemoveItems({1,2,3,2,4}, {2})),
+
+        SafeSerialize("q310", () =>
+            List.Combine({}))
     },
 
     Catalog = Table.FromRecords(cases)
