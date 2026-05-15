@@ -2874,6 +2874,56 @@ let
             let r = try Percentage.From("50,5%", "fr-FR") in
                 if r[HasError]
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q466", () =>
+            let r = try {
+                    Currency.From(123.45),
+                    Currency.From(0),
+                    Currency.From(null),
+                    Currency.From(-5.99)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q467", () =>
+            let r = try {
+                    try Currency.From("123.45") otherwise "err",
+                    try Currency.From("$100.50") otherwise "err"
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q468", () =>
+            let r = try Value.Is(123.45, Currency.Type) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q469", () =>
+            let r = try
+                let
+                    v = Currency.From(123.456789)
+                in
+                    v
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q470", () =>
+            let r = try
+                let
+                    a = Currency.From(10.5),
+                    b = Currency.From(2.25),
+                    sum = a + b
+                in
+                    sum
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                     else [HasError=false, Value=r[Value]])
     },
 
