@@ -3979,7 +3979,61 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
-                        else [HasError=false, Value=r[Value]])
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q571", () =>
+            let r = try {
+                    List.Transform({1, 2, 3}, each _ * 2),
+                    List.Transform({1, 2, 3}, (x) => x * 2),
+                    List.Transform({1, 2, 3}, Number.Sqrt),
+                    List.Transform({}, each _)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q572", () =>
+            let r = try
+                let
+                    multiplyBy = (factor) => (x) => x * factor,
+                    triple = multiplyBy(3)
+                in
+                    List.Transform({1, 2, 3, 4}, triple)
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q573", () =>
+            let r = try List.Transform({1..5}, each _ * _) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q574", () =>
+            let r = try
+                let
+                    pairs = {{1, 2}, {3, 4}, {5, 6}}
+                in
+                    List.Transform(pairs, each _{0} + _{1})
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q575", () =>
+            let r = try
+                let
+                    adder = (a) => (b) => a + b,
+                    add5 = adder(5),
+                    add10 = adder(10),
+                    applied = List.Transform({1, 2, 3}, add5)
+                in
+                    applied
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]])
     },
 
     Catalog = Table.FromRecords(cases)
