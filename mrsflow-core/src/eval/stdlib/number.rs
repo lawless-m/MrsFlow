@@ -677,19 +677,103 @@ fn format_fixed(n: f64, prec: i32) -> String {
         return if n > 0.0 { "∞".to_string() } else { "-∞".to_string() };
     }
     let p = prec.max(0) as usize;
-    // .NET's "F" format uses MidpointRounding.AwayFromZero, not banker's.
-    // Compute the rounded value with away-from-zero semantics before
-    // formatting, then use Rust's {:.*} for the final text — which itself
-    // uses round-half-to-even, but the value will already be at the right
-    // boundary so it's just printed.
-    let factor = 10f64.powi(prec.max(0));
-    let scaled = n * factor;
-    let rounded = if scaled >= 0.0 {
-        (scaled + 0.5).floor()
+    // .NET's "F" format uses MidpointRounding.AwayFromZero and rounds at
+    // the requested precision via text-based round-half-up. Render with
+    // extra digits, then truncate-with-rounding to avoid f64-scaling
+    // imprecision (e.g. 1234567.123456 * 1e10 doesn't land on the integer
+    // 12345671234560 due to IEEE rep).
+    text_round_half_away(n, p)
+}
+
+/// Format `n` to exactly `prec` fractional digits, rounding half-away-from
+/// zero. .NET's "F"/"N" formats convert f64 → Decimal first (taking the
+/// shortest decimal that round-trips), then pad/round to prec digits — so
+/// `1234567.123456` formatted to N10 is `1234567.1234560000`, not
+/// `1234567.1234559999`. We mimic by using Rust's `to_string` (which is
+/// also shortest-round-trip) as the source, then doing text-based rounding.
+fn text_round_half_away(n: f64, prec: usize) -> String {
+    // Use shortest round-trip representation as the "true" decimal.
+    let short = format!("{n}");
+    // Parse into sign / int_part / frac_part (no exponent expected for
+    // typical use; for very large/small magnitudes Rust may emit exponent
+    // form — fall back to {:.prec+2} rendering in that case).
+    if short.contains('e') || short.contains('E') {
+        // Magnitude outside f64::to_string's plain-notation range. Fall back
+        // to high-digit rendering.
+        let extra = prec + 2;
+        let s = format!("{n:.*}", extra);
+        return finalise_rounded(&s, prec);
+    }
+    finalise_rounded(&short, prec)
+}
+
+fn finalise_rounded(s: &str, prec: usize) -> String {
+    let neg = s.starts_with('-');
+    let body = if neg { &s[1..] } else { &s };
+    let dot = body.find('.').unwrap_or(body.len());
+    let int_part = &body[..dot];
+    let frac_full = if dot < body.len() { &body[dot + 1..] } else { "" };
+    // Truncate frac_full to prec+1 digits, round on the trailing digit.
+    if frac_full.len() <= prec {
+        // Already short enough — pad with zeros to reach prec.
+        let mut out = String::new();
+        if neg { out.push('-'); }
+        out.push_str(int_part);
+        if prec > 0 {
+            out.push('.');
+            out.push_str(frac_full);
+            for _ in frac_full.len()..prec { out.push('0'); }
+        }
+        return out;
+    }
+    let kept = &frac_full[..prec];
+    let next_digit = frac_full.as_bytes()[prec];
+    let round_up = next_digit >= b'5';
+    // Combine int_part + "." + kept, then add 1 in the last decimal place
+    // if round_up. Carry across digits.
+    let combined: String = format!("{int_part}{kept}");
+    let combined_rounded = if round_up {
+        carry_add_one(&combined)
     } else {
-        (scaled - 0.5).ceil()
-    } / factor;
-    format!("{rounded:.*}", p)
+        combined
+    };
+    // Now combined_rounded has (int_part.len() + prec) digits, possibly +1
+    // if the carry rolled over (e.g. 999...9 → 1000...0). Split back.
+    let total = combined_rounded.len();
+    let int_target_len = total.saturating_sub(prec);
+    let (final_int, final_frac) = combined_rounded.split_at(int_target_len);
+    let mut out = String::new();
+    if neg && !is_all_zeros(&combined_rounded) { out.push('-'); }
+    out.push_str(final_int);
+    if prec > 0 {
+        out.push('.');
+        out.push_str(final_frac);
+    }
+    out
+}
+
+/// Increment a decimal-digit string by 1 with carry, e.g. "129" → "130",
+/// "999" → "1000". Returns a new owned String.
+fn carry_add_one(s: &str) -> String {
+    let mut bytes: Vec<u8> = s.bytes().collect();
+    let mut i = bytes.len();
+    while i > 0 {
+        i -= 1;
+        if bytes[i] < b'9' {
+            bytes[i] += 1;
+            return String::from_utf8(bytes).unwrap();
+        }
+        bytes[i] = b'0';
+    }
+    // All digits were 9 — prepend a '1'.
+    let mut out = String::with_capacity(bytes.len() + 1);
+    out.push('1');
+    out.push_str(std::str::from_utf8(&bytes).unwrap());
+    out
+}
+
+fn is_all_zeros(s: &str) -> bool {
+    s.bytes().all(|b| b == b'0')
 }
 
 fn format_number_grouped(n: f64, prec: i32) -> String {
@@ -750,21 +834,27 @@ fn format_exponent(n: f64, prec: i32, upper: bool) -> String {
     format!("{mantissa}{e_char}{sign}{:03}", exp_n.abs())
 }
 
-/// Swap `.` for `,` (and `,` thousands for `.` thousands) when the culture
-/// is a comma-decimal locale (de, fr, es, it, nl, pt, …). Currency symbol
-/// stays as-is. Idempotent: if no swap needed, returns input unchanged.
+/// Swap separators for comma-decimal locales. fr-FR uses NBSP ( ,
+/// narrow no-break space) for thousands; de/es/it/nl/pt use `.`. All use
+/// `,` for the decimal. Currency symbol stays as-is.
 fn apply_culture_decimal(s: String, culture: Option<&str>) -> String {
-    let is_comma_decimal = matches!(culture.map(str::to_ascii_lowercase).as_deref(), Some(c) if {
+    let lc = culture.map(str::to_ascii_lowercase);
+    let is_comma_decimal = matches!(lc.as_deref(), Some(c) if {
         c.starts_with("de") || c.starts_with("fr") || c.starts_with("es")
             || c.starts_with("it") || c.starts_with("nl") || c.starts_with("pt")
     });
     if !is_comma_decimal { return s; }
-    // Use a placeholder for thousands `,` so the decimal `.` swap doesn't
-    // collide with it. Then swap placeholder → `.` for de/fr thousands.
+    let thousands_sep: char = if matches!(lc.as_deref(), Some(c) if c.starts_with("fr")) {
+        '\u{202F}' // narrow no-break space
+    } else {
+        '.'
+    };
+    // Use a placeholder for the original thousands `,` so the decimal `.`
+    // swap doesn't collide with it. Then swap placeholder → thousands_sep.
     let placeholder = '\u{1}';
     let with_holder: String = s.chars().map(|c| if c == ',' { placeholder } else { c }).collect();
     let dec_swapped: String = with_holder.chars().map(|c| if c == '.' { ',' } else { c }).collect();
-    dec_swapped.chars().map(|c| if c == placeholder { '.' } else { c }).collect()
+    dec_swapped.chars().map(|c| if c == placeholder { thousands_sep } else { c }).collect()
 }
 
 fn currency_symbol_for(culture: Option<&str>) -> &'static str {
