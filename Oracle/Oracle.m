@@ -7614,6 +7614,93 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q877", () =>
+            let xs = {10, 20, 30, 40, 50} in
+            let r = try {
+                    List.Range(xs, 0),
+                    List.Range(xs, 2),
+                    List.Range(xs, 5),
+                    List.Range(xs, 0, 2),
+                    List.Range(xs, 1, 3),
+                    List.Range(xs, 3, 10),
+                    List.Range(xs, 0, 0)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q878", () =>
+            let xs = {10, 20, 30} in
+            let r = try {
+                    List.Range(xs, 10)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q879", () =>
+            let xs = {10, 20, 30} in
+            let r = try {
+                    List.Range(xs, -1)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q880", () =>
+            let xs = {10, 20, 30, 40, 50} in
+            let r = try {
+                    List.Skip(xs, 0),
+                    List.Skip(xs, 2),
+                    List.Skip(xs, 5),
+                    List.Skip(xs, 10),
+                    List.Skip({}, 3),
+                    List.Skip(xs)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q881", () =>
+            let r = try {
+                    List.Skip({10, 20, 30}, -1)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q882", () =>
+            let xs = {10, 20, 30, 40, 50} in
+            let r = try {
+                    List.FirstN(xs, 0),
+                    List.FirstN(xs, 2),
+                    List.FirstN(xs, 5),
+                    List.FirstN(xs, 10),
+                    List.LastN(xs, 0),
+                    List.LastN(xs, 2),
+                    List.LastN(xs, 5),
+                    List.LastN(xs, 10)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q883", () =>
+            let r = try {
+                    List.FirstN({}, 3),
+                    List.LastN({}, 3),
+                    List.FirstN({1, 2, 3}, -1),
+                    List.LastN({1, 2, 3}, -1)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q884", () =>
+            let xs = {1, 3, 5, 2, 4, 6} in
+            let r = try {
+                    List.FirstN(xs, each _ < 5),
+                    List.FirstN(xs, each _ > 0),
+                    List.FirstN(xs, each _ > 100),
+                    List.LastN(xs, each _ > 3),
+                    List.LastN(xs, each _ > 100)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 

@@ -95,7 +95,14 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
             ],
             last_n,
         ),
-        ("List.Skip", two("list", "countOrCondition"), skip),
+        (
+            "List.Skip",
+            vec![
+                Param { name: "list".into(),             optional: false, type_annotation: None },
+                Param { name: "countOrCondition".into(), optional: true,  type_annotation: None },
+            ],
+            skip,
+        ),
         (
             "List.Distinct",
             vec![
@@ -854,7 +861,10 @@ fn distinct(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 
 fn skip(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
-    match &args[1] {
+    // PQ: omitted countOrCondition defaults to 1.
+    let arg1 = args.get(1).cloned().unwrap_or(Value::Number(1.0));
+    match &arg1 {
+        Value::Null => Ok(Value::List(list.iter().skip(1).cloned().collect())),
         Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => {
             let count = *n as usize;
             Ok(Value::List(list.iter().skip(count).cloned().collect()))
