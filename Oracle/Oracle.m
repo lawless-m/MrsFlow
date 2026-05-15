@@ -7126,6 +7126,72 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q828", () =>
+            let r = try {
+                    Text.Format("hello #{0}", {"world"}),
+                    Text.Format("#{0} #{1}", {"hello", "world"}),
+                    Text.Format("#{1} #{0}", {"hello", "world"}),
+                    Text.Format("#{0}#{0}", {"X"}),
+                    Text.Format("no placeholders", {"X"})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q829", () =>
+            let r = try {
+                    Text.Format("price: #25", {"X"}),
+                    Text.Format("a#b", {"X"}),
+                    Text.Format("#", {"X"}),
+                    Text.Format("# is literal", {"X"})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q830", () =>
+            let r = try {
+                    Text.Format("##", {"X"}),
+                    Text.Format("##{0}", {"X"}),
+                    Text.Format("###{0}", {"X"}),
+                    Text.Format("####", {"X"}),
+                    Text.Format("a##b", {"X"})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q831", () =>
+            let r = try {
+                    Text.Format("hello #{name}", [name="world"]),
+                    Text.Format("#{a} + #{b}", [a=1, b=2]),
+                    Text.Format("#{0}", [a=1])
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q832", () =>
+            let r = try {
+                    Text.Format("n=#{0}", {42}),
+                    Text.Format("n=#{0}", {3.14}),
+                    Text.Format("n=#{0}", {null}),
+                    Text.Format("n=#{0}", {true}),
+                    Text.Format("n=#{0}", {"text"})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q833", () =>
+            let r = try {
+                    Text.Format("#{0}", {})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q834", () =>
+            let r = try {
+                    Text.Format("#{0", {"X"})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 

@@ -1047,7 +1047,7 @@ fn clean(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 /// Stringify a value for Text.Format substitution.
 fn format_arg_to_text(v: &Value) -> String {
     match v {
-        Value::Null => "".into(),
+        Value::Null => "null".into(),
         Value::Text(s) => s.clone(),
         Value::Number(n) => {
             if n.is_finite() && n.fract() == 0.0 && n.abs() < 1e16 {
