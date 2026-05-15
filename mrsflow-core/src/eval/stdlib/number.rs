@@ -635,7 +635,12 @@ fn format_number_dotnet(n: f64, fmt: &str, culture: Option<&str>) -> Result<Stri
                 'N' | 'n' => Some(format_number_grouped(n, precision.unwrap_or(2))),
                 'P' | 'p' => Some(format_percent(n, precision.unwrap_or(2))),
                 'C' | 'c' => Some(format_currency(n, precision.unwrap_or(2), culture)),
-                'D' | 'd' => Some(format_integer_padded(n, precision.unwrap_or(0))),
+                'D' | 'd' => match format_integer_padded(n, precision.unwrap_or(0)) {
+                    Some(s) => Some(s),
+                    None => return Err(MError::Other(
+                        "Number.ToText: 'D' format requires an integral value.".into()
+                    )),
+                },
                 'E' | 'e' => Some(format_exponent(n, precision.unwrap_or(6), code == 'E')),
                 'R' | 'r' => Some(n.to_string()),
                 'X' | 'x' => {
@@ -838,14 +843,20 @@ fn apply_culture_percent_space(s: String, culture: Option<&str>) -> String {
     format!("{without} %")
 }
 
-fn format_integer_padded(n: f64, width: i32) -> String {
+/// .NET "D" is only valid for integral types. With a float input PQ errors;
+/// match that by returning None for non-integer / NaN / Inf and letting the
+/// caller raise.
+fn format_integer_padded(n: f64, width: i32) -> Option<String> {
+    if !n.is_finite() || n.fract() != 0.0 {
+        return None;
+    }
     let i = n as i64;
     let neg = i < 0;
     let abs_str = i.unsigned_abs().to_string();
     let w = (width.max(0) as usize).saturating_sub(abs_str.len());
     let zeros: String = std::iter::repeat('0').take(w).collect();
     let body = format!("{zeros}{abs_str}");
-    if neg { format!("-{body}") } else { body }
+    Some(if neg { format!("-{body}") } else { body })
 }
 
 fn format_exponent(n: f64, prec: i32, upper: bool) -> String {

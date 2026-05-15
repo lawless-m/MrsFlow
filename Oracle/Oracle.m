@@ -5816,6 +5816,110 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        // q719-q725: Number.ToText "D" integer padding.
+
+        SafeSerialize("q719", () =>
+            let r = try {
+                    Number.ToText(42, "D"),
+                    Number.ToText(42, "D0"),
+                    Number.ToText(42, "D1"),
+                    Number.ToText(42, "D5"),
+                    Number.ToText(42, "D10"),
+                    Number.ToText(42, "D20"),
+                    Number.ToText(0, "D5"),
+                    Number.ToText(7, "D3")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q720", () =>
+            let r = try {
+                    Number.ToText(-42, "D"),
+                    Number.ToText(-42, "D0"),
+                    Number.ToText(-42, "D5"),
+                    Number.ToText(-42, "D10"),
+                    Number.ToText(-7, "D3"),
+                    Number.ToText(-0, "D5"),
+                    Number.ToText(-1, "D5"),
+                    Number.ToText(-99999, "D5")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q721", () =>
+            let r = try {
+                    Number.ToText(2147483647, "D"),
+                    Number.ToText(2147483647, "D15"),
+                    Number.ToText(-2147483648, "D15"),
+                    Number.ToText(9223372036854775000, "D"),
+                    Number.ToText(-9223372036854775000, "D"),
+                    Number.ToText(0, "D0"),
+                    Number.ToText(0, "D10"),
+                    Number.ToText(1000000, "D0"),
+                    Number.ToText(1000000, "D10")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q722", () =>
+            let r = try {
+                    try Number.ToText(3.7, "D") otherwise "err",
+                    try Number.ToText(3.7, "D5") otherwise "err",
+                    try Number.ToText(-3.7, "D5") otherwise "err",
+                    try Number.ToText(0.5, "D5") otherwise "err",
+                    try Number.ToText(-0.5, "D5") otherwise "err",
+                    try Number.ToText(3.0, "D5") otherwise "err",
+                    try Number.ToText(0.0, "D5") otherwise "err"
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q723", () =>
+            let r = try {
+                    try Number.ToText(Number.NaN, "D5") otherwise "err",
+                    try Number.ToText(Number.PositiveInfinity, "D5") otherwise "err",
+                    try Number.ToText(Number.NegativeInfinity, "D5") otherwise "err",
+                    try Number.ToText(null, "D5") otherwise "err",
+                    Number.ToText(42, "d"),
+                    Number.ToText(42, "d3")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q724", () =>
+            let r = try {
+                    Number.ToText(42, "D5", "en-US"),
+                    Number.ToText(42, "D5", "en-GB"),
+                    Number.ToText(42, "D5", "de-DE"),
+                    Number.ToText(42, "D5", "fr-FR"),
+                    Number.ToText(42, "D5", "ja-JP"),
+                    Number.ToText(-42, "D5", "de-DE"),
+                    Number.ToText(0, "D5", "fr-FR")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q725", () =>
+            let r = try {
+                    Number.ToText(99999, "D5"),
+                    Number.ToText(100000, "D5"),
+                    Number.ToText(100000, "D6"),
+                    Number.ToText(123456789, "D5"),
+                    Number.ToText(123456789, "D20"),
+                    Number.ToText(-99999, "D5"),
+                    Number.ToText(-100000, "D5"),
+                    Number.ToText(-100000, "D6")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
