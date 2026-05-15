@@ -567,9 +567,15 @@ fn position_of(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     } else {
         (text.to_string(), sub.to_string())
     };
-    // PQ: empty needle matches at position 0.
+    // PQ: empty needle matches at every char position in text.
+    // Non-empty text → positions 0..length. Empty text → [0] (single
+    // match at position 0, observable via First/Last; All would be
+    // empty but PQ's documented behaviour for "" + Occurrence.All is
+    // unverified — we match the First-of-[0] interpretation).
     if needle.is_empty() {
-        return Ok(occurrence_result(mode, &[0]));
+        let n = text.chars().count();
+        let positions: Vec<usize> = if n == 0 { vec![0] } else { (0..n).collect() };
+        return Ok(occurrence_result(mode, &positions));
     }
     let byte_offsets = delimiter_byte_offsets(&hay, &needle);
     let char_indices: Vec<usize> = byte_offsets

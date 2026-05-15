@@ -7046,6 +7046,86 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q820", () =>
+            let r = try {
+                    Text.PositionOf("abc", ""),
+                    Text.PositionOf("", ""),
+                    Text.PositionOf("", "a"),
+                    Text.PositionOf("abc", "", Occurrence.All),
+                    Text.PositionOf("abc", "", Occurrence.Last)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q821", () =>
+            let r = try {
+                    Text.PositionOf("abc", "abc"),
+                    Text.PositionOf("abc", "abcd"),
+                    Text.PositionOf("a", "ab"),
+                    Text.PositionOf("abc", "abc", Occurrence.All)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q822", () =>
+            let r = try {
+                    Text.PositionOf("aaaa", "aa", Occurrence.All),
+                    Text.PositionOf("aaaaa", "aa", Occurrence.All),
+                    Text.PositionOf("aaa", "aa", Occurrence.All),
+                    Text.PositionOf("ababab", "aba", Occurrence.All)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q823", () =>
+            let r = try {
+                    Text.PositionOf("Hello hello HELLO", "hello"),
+                    Text.PositionOf("Hello hello HELLO", "hello", Occurrence.First, Comparer.OrdinalIgnoreCase),
+                    Text.PositionOf("Hello hello HELLO", "hello", Occurrence.All, Comparer.OrdinalIgnoreCase),
+                    Text.PositionOf("Hello hello HELLO", "HELLO", Occurrence.All)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q824", () =>
+            let r = try {
+                    Text.PositionOfAny("hello world", {"l", "o"}),
+                    Text.PositionOfAny("hello world", {"l", "o"}, Occurrence.All),
+                    Text.PositionOfAny("hello world", {"l", "o"}, Occurrence.Last),
+                    Text.PositionOfAny("abc", {"x"}),
+                    Text.PositionOfAny("abc", {"x"}, Occurrence.All)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q825", () =>
+            let r = try {
+                    Text.PositionOfAny("abc", {"ab"})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q826", () =>
+            let r = try {
+                    Text.PositionOf(null, "a"),
+                    Text.PositionOf("abc", null),
+                    Text.PositionOfAny(null, {"a"}),
+                    Text.PositionOfAny("abc", null)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q827", () =>
+            let r = try {
+                    Text.PositionOf("abc", "z"),
+                    Text.PositionOf("abc", "z", Occurrence.All),
+                    Text.PositionOf("abc", "z", Occurrence.Last),
+                    Text.PositionOfAny("abc", {"x", "y", "z"}),
+                    Text.PositionOfAny("abc", {"x"}, Occurrence.All)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
