@@ -4328,7 +4328,63 @@ let
                 ) in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
-                        else [HasError=false, Value=r[Value]])
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q606", () =>
+            let r = try {
+                    Date.AddDays(#date(2024, 6, 15), 10),
+                    #date(2024, 6, 15) + #duration(7, 0, 0, 0),
+                    #date(2024, 6, 15) - #duration(1, 0, 0, 0)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q607", () =>
+            let r = try
+                let
+                    d = #date(2024, 6, 30) - #date(2024, 6, 15)
+                in
+                    {Duration.TotalDays(d), Duration.TotalHours(d), Duration.TotalMinutes(d), Duration.TotalSeconds(d)}
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q608", () =>
+            let r = try
+                let
+                    d = #duration(1, 2, 30, 45)
+                in
+                    {Duration.Days(d), Duration.Hours(d), Duration.Minutes(d), Duration.Seconds(d), Duration.TotalSeconds(d)}
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q609", () =>
+            let r = try
+                let
+                    negDur = #duration(-1, 0, 0, 0),
+                    dur2 = #duration(0, 25, 0, 0)
+                in
+                    {Duration.TotalDays(negDur), Duration.TotalHours(dur2), Duration.Days(dur2), Duration.Hours(dur2)}
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q610", () =>
+            let r = try
+                let
+                    dt = #datetime(2024, 6, 15, 10, 30, 0),
+                    later = dt + #duration(0, 5, 30, 0)
+                in
+                    later
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]])
     },
 
     Catalog = Table.FromRecords(cases)
