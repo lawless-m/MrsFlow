@@ -7986,6 +7986,74 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q913", () =>
+            let r = try {
+                    List.Buffer({1, 2, 3}),
+                    List.Buffer({}),
+                    List.Buffer({"a", "b"}),
+                    List.Buffer({null, 1, null}),
+                    List.Buffer({{1, 2}, {3, 4}})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q914", () =>
+            let r = try {
+                    List.Buffer({1, 2, 3}) = {1, 2, 3},
+                    List.Count(List.Buffer({1, 2, 3})) = 3,
+                    List.Sum(List.Buffer({10, 20, 30})) = 60,
+                    List.Transform(List.Buffer({1, 2, 3}), each _ * 2) = {2, 4, 6}
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q915", () =>
+            let r = try {
+                    List.Buffer(List.Generate(() => 0, (s) => s < 5, (s) => s + 1)),
+                    List.Buffer(List.Numbers(0, 5)),
+                    List.Sum(List.Buffer(List.Numbers(1, 10))) = 55
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q916", () =>
+            let r = try {
+                    List.Buffer(null),
+                    List.Buffer("abc"),
+                    List.Buffer(42)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q917", () =>
+            let xs = List.Buffer({5, 2, 8, 1, 9}) in
+            let r = try {
+                    List.Reverse(xs),
+                    List.FirstN(xs, 3),
+                    List.LastN(xs, 2),
+                    List.Sort(xs)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q918", () =>
+            let r = try {
+                    List.Buffer(List.Buffer({1, 2, 3})),
+                    List.Buffer(List.Buffer({})) = {}
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q919", () =>
+            let r = try {
+                    List.Reverse(List.Buffer({1, 2, 3, 4, 5})),
+                    List.Reverse(List.Buffer({})),
+                    List.Reverse(List.Buffer({"a"})),
+                    List.Reverse(List.Buffer({null, 1, null}))
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
