@@ -6670,6 +6670,87 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q782", () =>
+            let r = try {
+                    Text.Range("abc", 3),
+                    Text.Range("abc", 3, 0),
+                    Text.Range("abc", 4),
+                    Text.Range("abc", 4, 0),
+                    Text.Range("", 0),
+                    Text.Range("", 0, 0)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q783", () =>
+            let r = try {
+                    Text.Range("abc", 0, 0),
+                    Text.Range("abc", 1, 0),
+                    Text.Range("abc", 0, 5),
+                    Text.Range("abc", 1, 5),
+                    Text.Range("abc", 0),
+                    Text.Range("abc", 1),
+                    Text.Range("abc", 2)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q784", () =>
+            let r = try {
+                    Text.Range("abc", -1)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q785", () =>
+            let r = try {
+                    Text.Range("abc", 0, -1)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q786", () =>
+            let r = try {
+                    Text.Range("café", 0, 3),
+                    Text.Range("café", 1, 2),
+                    Text.Range("café", 3, 1),
+                    Text.Range("→→→", 0, 2),
+                    Text.Range("naïve", 2, 1)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q787", () =>
+            let r = try {
+                    Text.Range(null, 0),
+                    Text.Range("abc", null),
+                    Text.Range("abc", 0, null)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q788", () =>
+            let r = try {
+                    Text.Range("abc", 1.5),
+                    Text.Range("abc", 0, 1.5)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q789", () =>
+            let r = try {
+                    Text.Range("abc", 0, 5)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q790", () =>
+            let r = try {
+                    Text.Range("abc", 3)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
