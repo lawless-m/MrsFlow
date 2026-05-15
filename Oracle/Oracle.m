@@ -1663,7 +1663,23 @@ let
         SafeSerialize("q317", () => Number.IsEven(-7)),
         SafeSerialize("q318", () => Number.Mod(-10, 3)),
         SafeSerialize("q319", () => Number.IntegerDivide(-10, 3)),
-        SafeSerialize("q320", () => Number.Mod(10, -3))
+        SafeSerialize("q320", () => Number.Mod(10, -3)),
+
+        // q321-q325: List.Min/Max with mixed/edge types.
+
+        SafeSerialize("q321", () => List.Max({1, null, 5})),
+
+        SafeSerialize("q322", () => List.Min({null, null, null})),
+
+        SafeSerialize("q323", () => List.Max({"a", "b", "c"})),
+
+        SafeSerialize("q324", () =>
+            let r = try List.Max({1, "x"}) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q325", () => List.Max({}))
     },
 
     Catalog = Table.FromRecords(cases)
