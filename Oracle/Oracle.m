@@ -2924,7 +2924,66 @@ let
             in
                 if r[HasError]
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
-                    else [HasError=false, Value=r[Value]])
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q471", () =>
+            let r = try
+                let
+                    a = Decimal.From(0.1),
+                    b = Decimal.From(0.2),
+                    sum = a + b
+                in
+                    sum
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q472", () =>
+            let r = try {
+                    Value.Is(Decimal.From(1.5), Decimal.Type),
+                    Value.Is(Decimal.From(1.5), type number),
+                    Value.Is(1.5, Decimal.Type),
+                    Value.Is(1.5, Double.Type)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q473", () =>
+            let r = try
+                let
+                    d = Decimal.From(1.5),
+                    f = 2.0,
+                    sum = d + f
+                in
+                    Value.Is(sum, Decimal.Type)
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q474", () =>
+            let r = try {
+                    Decimal.From("123.456"),
+                    Decimal.From("0.0001"),
+                    Decimal.From(null),
+                    Decimal.From(-99.99)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q475", () =>
+            let r = try {
+                    Int64.From(123.7),
+                    Int64.From(123.4),
+                    Int64.From(-123.7),
+                    Int64.From("42")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]])
     },
 
     Catalog = Table.FromRecords(cases)
