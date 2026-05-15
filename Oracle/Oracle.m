@@ -6812,6 +6812,78 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q798", () =>
+            let r = try {
+                    Text.Trim("  abc  "),
+                    Text.Trim("#(tab)abc#(tab)"),
+                    Text.Trim("#(cr,lf)abc#(cr,lf)"),
+                    Text.Trim("#(00A0)abc#(00A0)"),
+                    Text.Trim("#(2028)abc#(2028)"),
+                    Text.Trim("abc")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q799", () =>
+            let r = try {
+                    Text.Trim("XYabcYX", {"X", "Y"}),
+                    Text.Trim("XXabcXX", {"X"}),
+                    Text.Trim("abc", {"X"}),
+                    Text.Trim("", {"X"}),
+                    Text.Trim("XYXY", {"X", "Y"})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q800", () =>
+            let r = try {
+                    Text.Trim("→abc←", {"→", "←"}),
+                    Text.Trim("→→abc←←", {"→", "←"}),
+                    Text.Trim("éabcé", {"é"}),
+                    Text.Trim("ßabcß", {"ß"})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q801", () =>
+            let r = try {
+                    Text.TrimStart("XXabcXX", "X"),
+                    Text.TrimEnd("XXabcXX", "X"),
+                    Text.Trim("XXabcXX", "X"),
+                    Text.TrimStart("  abc  "),
+                    Text.TrimEnd("  abc  ")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q802", () =>
+            let r = try {
+                    Text.Trim("ABabcBA", {"AB"}),
+                    Text.Trim("abc", {"abc"})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q803", () =>
+            let r = try {
+                    Text.Trim(null),
+                    Text.Trim("abc", null),
+                    Text.Trim("XXXX", "X"),
+                    Text.Trim("XXXX", {})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q804", () =>
+            let r = try {
+                    Text.Trim("XaXbX", "X"),
+                    Text.Trim("aXbXc", "X"),
+                    Text.TrimStart("aXbX", "X"),
+                    Text.TrimEnd("XaXb", "X")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 

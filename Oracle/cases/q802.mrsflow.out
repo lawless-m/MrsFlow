@@ -1,0 +1,1 @@
+{"HasError":true,"Reason":"Expression.Error","Message":"Text.Trim: list element must be a single character, got \"AB\""}

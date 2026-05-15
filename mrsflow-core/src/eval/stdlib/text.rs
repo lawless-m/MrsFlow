@@ -468,6 +468,9 @@ fn replace(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 
 
 fn trim(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    if matches!(args[0], Value::Null) {
+        return Ok(Value::Null);
+    }
     let text = expect_text(&args[0])?;
     match args.get(1) {
         Some(Value::Null) | None => Ok(Value::Text(text.trim().to_string())),
@@ -607,6 +610,9 @@ fn starts_with(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
 
 
 fn trim_end(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    if matches!(args[0], Value::Null) {
+        return Ok(Value::Null);
+    }
     let text = expect_text(&args[0])?;
     match args.get(1) {
         Some(Value::Null) | None => Ok(Value::Text(text.trim_end().to_string())),
@@ -618,6 +624,8 @@ fn trim_end(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 /// Helper: extract chars from a text-or-list-of-text "chars" argument.
+/// List elements must each be a single-character text — PQ rejects
+/// multi-char list elements (matching .NET's "must be single character").
 fn chars_from_arg(v: &Value, ctx: &'static str) -> Result<Vec<char>, MError> {
     match v {
         Value::Text(s) => Ok(s.chars().collect()),
@@ -625,7 +633,19 @@ fn chars_from_arg(v: &Value, ctx: &'static str) -> Result<Vec<char>, MError> {
             let mut out = Vec::new();
             for x in xs {
                 match x {
-                    Value::Text(s) => out.extend(s.chars()),
+                    Value::Text(s) => {
+                        let mut it = s.chars();
+                        let c = it.next().ok_or_else(|| MError::Other(format!(
+                            "{}: list element is empty (must be single character)", ctx
+                        )))?;
+                        if it.next().is_some() {
+                            return Err(MError::Other(format!(
+                                "{}: list element must be a single character, got {:?}",
+                                ctx, s
+                            )));
+                        }
+                        out.push(c);
+                    }
                     other => return Err(MError::Other(format!(
                         "{}: list element must be text, got {}",
                         ctx, super::super::type_name(other)
@@ -1097,24 +1117,16 @@ fn infer_number_type(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError
 
 
 fn trim_start(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    if matches!(args[0], Value::Null) {
+        return Ok(Value::Null);
+    }
     let text = expect_text(&args[0])?;
     match args.get(1) {
         Some(Value::Null) | None => Ok(Value::Text(text.trim_start().to_string())),
-        Some(Value::Text(t)) => {
-            let chars: Vec<char> = t.chars().collect();
+        Some(v) => {
+            let chars = chars_from_arg(v, "Text.TrimStart")?;
             Ok(Value::Text(text.trim_start_matches(|c| chars.contains(&c)).to_string()))
         }
-        Some(Value::List(xs)) => {
-            let mut chars: Vec<char> = Vec::new();
-            for v in xs {
-                match v {
-                    Value::Text(s) => chars.extend(s.chars()),
-                    other => return Err(type_mismatch("text (in trim list)", other)),
-                }
-            }
-            Ok(Value::Text(text.trim_start_matches(|c| chars.contains(&c)).to_string()))
-        }
-        Some(other) => Err(type_mismatch("text or list of text", other)),
     }
 }
 
