@@ -7926,6 +7926,66 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q906", () =>
+            let r = try {
+                    List.Dates(#date(2026, 1, 1), 5, #duration(1, 0, 0, 0)),
+                    List.Dates(#date(2026, 1, 1), 0, #duration(1, 0, 0, 0)),
+                    List.Dates(#date(2026, 1, 1), 1, #duration(1, 0, 0, 0)),
+                    List.Dates(#date(2026, 12, 30), 5, #duration(1, 0, 0, 0))
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q907", () =>
+            let r = try {
+                    List.Dates(#date(2026, 1, 5), 5, #duration(-1, 0, 0, 0)),
+                    List.Dates(#date(2026, 3, 1), 3, #duration(-30, 0, 0, 0))
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q908", () =>
+            let r = try {
+                    List.DateTimes(#datetime(2026, 1, 1, 0, 0, 0), 4, #duration(0, 6, 0, 0)),
+                    List.DateTimes(#datetime(2026, 1, 1, 0, 0, 0), 3, #duration(0, 0, 30, 0)),
+                    List.DateTimes(#datetime(2026, 1, 1, 23, 30, 0), 3, #duration(0, 0, 30, 0))
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q909", () =>
+            let r = try {
+                    List.Durations(#duration(0, 0, 0, 0), 5, #duration(0, 1, 0, 0)),
+                    List.Durations(#duration(0, 0, 0, 0), 3, #duration(0, 0, 15, 0)),
+                    List.Durations(#duration(1, 0, 0, 0), 4, #duration(0, 12, 0, 0))
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q910", () =>
+            let r = try {
+                    List.Dates(#date(2026, 1, 1), 0, #duration(1, 0, 0, 0)),
+                    List.Dates(#date(2026, 1, 1), -1, #duration(1, 0, 0, 0))
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q911", () =>
+            let r = try {
+                    List.Dates(#date(2026, 1, 1), 3, #duration(0, 0, 0, 0))
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q912", () =>
+            let r = try {
+                    List.Dates(#date(2024, 2, 28), 3, #duration(1, 0, 0, 0)),
+                    List.Dates(#date(2025, 2, 28), 3, #duration(1, 0, 0, 0)),
+                    List.Dates(#date(2024, 12, 30), 5, #duration(1, 0, 0, 0))
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
