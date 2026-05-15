@@ -9121,6 +9121,67 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1018", () =>
+            let r = try {
+                    Table.FromRecords({[a=1, b=2], [a=3, b=4]}),
+                    Table.FromRecords({}),
+                    Table.FromRecords({[a=1]}),
+                    Table.FromRecords({[a=1, b=2], [a=3, c=4]})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1019", () =>
+            let r = try {
+                    Table.FromRows({{1, "a"}, {2, "b"}}, {"k", "v"}),
+                    Table.FromRows({}, {"k", "v"}),
+                    Table.FromRows({{1, "a"}}, {"k", "v"})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1020", () =>
+            let r = try {
+                    Table.FromList({1, 2, 3}, null, {"v"}),
+                    Table.FromList({"a", "b"}, null, {"v"}),
+                    Table.FromList({}, null, {"v"})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1021", () =>
+            let r = try {
+                    Table.FromColumns({{1, 2, 3}, {"a", "b", "c"}}, {"k", "v"}),
+                    Table.FromColumns({{1, 2}, {"a", "b"}, {true, false}}, {"k", "v", "f"})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1022", () =>
+            let r = try {
+                    Table.FromColumns({{1, 2, 3}, {"a", "b"}}, {"k", "v"}),
+                    Table.FromColumns({{1, 2}, {"a", "b", "c"}}, {"k", "v"})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1023", () =>
+            let r = try {
+                    Table.FromRows({{1, 2}, {3}}, {"a", "b"}),
+                    Table.FromRows({{1, 2, 3}}, {"a", "b"})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1024", () =>
+            let original = Table.FromRecords({[a=1, b="x"], [a=2, b="y"]}) in
+            let rows = Table.ToRows(original) in
+            let r = try {
+                    Table.FromRows(rows, {"a", "b"}) = original
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 

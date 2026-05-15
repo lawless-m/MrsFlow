@@ -5237,7 +5237,6 @@ fn add_join_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> 
 
 fn from_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let cols = expect_list(&args[0])?;
-    // Each column is a list. Their lengths must match.
     let col_lists: Vec<&Vec<Value>> = cols
         .iter()
         .map(|v| match v {
@@ -5245,15 +5244,9 @@ fn from_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             other => Err(type_mismatch("list (column)", other)),
         })
         .collect::<Result<_, _>>()?;
-    let n_rows = col_lists.first().map(|c| c.len()).unwrap_or(0);
-    for (i, col) in col_lists.iter().enumerate() {
-        if col.len() != n_rows {
-            return Err(MError::Other(format!(
-                "Table.FromColumns: column {} length {} doesn't match column 0 length {}",
-                i, col.len(), n_rows
-            )));
-        }
-    }
+    // PQ pads short columns with null up to the longest column's length
+    // rather than refusing mismatched lengths.
+    let n_rows = col_lists.iter().map(|c| c.len()).max().unwrap_or(0);
     let names: Vec<String> = match args.get(1) {
         Some(Value::Null) | None => (1..=col_lists.len()).map(|i| format!("Column{i}")).collect(),
         Some(v) => expect_text_list(v, "Table.FromColumns: columnNames")?,
@@ -5267,7 +5260,10 @@ fn from_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     }
     let mut rows: Vec<Vec<Value>> = Vec::with_capacity(n_rows);
     for r in 0..n_rows {
-        let row: Vec<Value> = col_lists.iter().map(|c| c[r].clone()).collect();
+        let row: Vec<Value> = col_lists
+            .iter()
+            .map(|c| c.get(r).cloned().unwrap_or(Value::Null))
+            .collect();
         rows.push(row);
     }
     Ok(Value::Table(values_to_table(&names, &rows)?))
