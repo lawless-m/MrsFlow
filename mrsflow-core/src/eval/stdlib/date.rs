@@ -276,7 +276,9 @@ fn year(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     match &args[0] {
         Value::Null => Ok(Value::Null),
         Value::Date(d) => Ok(Value::Number(d.year() as f64)),
-        other => Err(type_mismatch("date", other)),
+        Value::Datetime(dt) => Ok(Value::Number(dt.year() as f64)),
+        Value::Datetimezone(dt) => Ok(Value::Number(dt.year() as f64)),
+        other => Err(type_mismatch("date/datetime/datetimezone", other)),
     }
 }
 
@@ -286,7 +288,9 @@ fn month(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     match &args[0] {
         Value::Null => Ok(Value::Null),
         Value::Date(d) => Ok(Value::Number(d.month() as f64)),
-        other => Err(type_mismatch("date", other)),
+        Value::Datetime(dt) => Ok(Value::Number(dt.month() as f64)),
+        Value::Datetimezone(dt) => Ok(Value::Number(dt.month() as f64)),
+        other => Err(type_mismatch("date/datetime/datetimezone", other)),
     }
 }
 
@@ -296,7 +300,9 @@ fn day(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     match &args[0] {
         Value::Null => Ok(Value::Null),
         Value::Date(d) => Ok(Value::Number(d.day() as f64)),
-        other => Err(type_mismatch("date", other)),
+        Value::Datetime(dt) => Ok(Value::Number(dt.day() as f64)),
+        Value::Datetimezone(dt) => Ok(Value::Number(dt.day() as f64)),
+        other => Err(type_mismatch("date/datetime/datetimezone", other)),
     }
 }
 

@@ -9607,6 +9607,79 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1067", () =>
+            let r = try {
+                    DateTime.From("2026-06-15T10:30:00"),
+                    DateTime.From(#date(2026, 6, 15)),
+                    DateTime.From(#datetime(2026, 6, 15, 10, 30, 0)),
+                    DateTime.From(null)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1068", () =>
+            let r = try {
+                    DateTime.From(45000),
+                    DateTime.From(45000.5),
+                    DateTime.From(0),
+                    DateTime.From(1)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1069", () =>
+            let dtz = #datetimezone(2026, 6, 15, 10, 30, 0, 0, 0) in
+            let r = try {
+                    DateTimeZone.ToUtc(dtz),
+                    DateTimeZone.SwitchZone(dtz, 5, 0),
+                    DateTimeZone.SwitchZone(dtz, -8, 0),
+                    DateTimeZone.RemoveZone(dtz)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1070", () =>
+            let dt = #datetime(2026, 6, 15, 10, 30, 45) in
+            let r = try {
+                    DateTime.ToText(dt, "yyyy-MM-dd HH:mm:ss"),
+                    DateTime.ToText(dt, "yyyy"),
+                    DateTime.ToText(dt, "HH:mm:ss"),
+                    DateTime.ToText(dt, "dd/MM/yyyy"),
+                    DateTime.ToText(dt, "yyyy-MM-ddTHH:mm:ss")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1071", () =>
+            let r = try {
+                    Date.FromText("15/06/2026", [Format = "dd/MM/yyyy", Culture = "en-GB"]),
+                    Date.FromText("06/15/2026", [Format = "MM/dd/yyyy", Culture = "en-US"]),
+                    Date.FromText("2026-06-15", [Format = "yyyy-MM-dd", Culture = "de-DE"])
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1072", () =>
+            let r = try {
+                    DateTime.FromText("2026-06-15"),
+                    DateTime.FromText("2026-06-15T10:30:00"),
+                    DateTime.FromText("invalid")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1073", () =>
+            let dt = #datetime(2026, 6, 15, 10, 30, 45) in
+            let r = try {
+                    DateTime.Date(dt),
+                    DateTime.Time(dt),
+                    Date.Year(dt),
+                    Date.Month(dt),
+                    Date.Day(dt)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
