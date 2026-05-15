@@ -5710,6 +5710,112 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        // q712-q718: Number.ToText "C" currency.
+
+        SafeSerialize("q712", () =>
+            let r = try {
+                    Number.ToText(1234.5, "C"),
+                    Number.ToText(1234.5, "C0"),
+                    Number.ToText(1234.5, "C2"),
+                    Number.ToText(1234.5, "C4"),
+                    Number.ToText(0, "C2"),
+                    Number.ToText(0.5, "C2"),
+                    Number.ToText(-1234.5, "C2"),
+                    Number.ToText(-0.5, "C2")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q713", () =>
+            let r = try {
+                    Number.ToText(1234.5, "C2", "en-US"),
+                    Number.ToText(1234.5, "C2", "en-GB"),
+                    Number.ToText(1234.5, "C0", "ja-JP"),
+                    Number.ToText(1234.5, "C2", "de-DE"),
+                    Number.ToText(1234.5, "C2", "fr-FR"),
+                    Number.ToText(-1234.5, "C2", "en-US"),
+                    Number.ToText(-1234.5, "C2", "de-DE"),
+                    Number.ToText(-1234.5, "C2", "fr-FR")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q714", () =>
+            let r = try {
+                    Number.ToText(1234567.89, "C0", "en-US"),
+                    Number.ToText(1234567.89, "C2", "en-US"),
+                    Number.ToText(1234567.89, "C4", "en-US"),
+                    Number.ToText(1234567.89, "C0", "en-GB"),
+                    Number.ToText(1234567.89, "C2", "en-GB"),
+                    Number.ToText(1234567.89, "C0", "ja-JP"),
+                    Number.ToText(1234567.89, "C2", "de-DE"),
+                    Number.ToText(1234567.89, "C2", "fr-FR")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q715", () =>
+            let r = try {
+                    Number.ToText(0.5, "C0"),
+                    Number.ToText(1.5, "C0"),
+                    Number.ToText(2.5, "C0"),
+                    Number.ToText(-0.5, "C0"),
+                    Number.ToText(-1.5, "C0"),
+                    Number.ToText(0.005, "C2"),
+                    Number.ToText(0.015, "C2"),
+                    Number.ToText(0.025, "C2"),
+                    Number.ToText(-0.005, "C2")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q716", () =>
+            let r = try {
+                    try Number.ToText(Number.NaN, "C2") otherwise "err",
+                    try Number.ToText(Number.PositiveInfinity, "C2") otherwise "err",
+                    try Number.ToText(Number.NegativeInfinity, "C2") otherwise "err",
+                    try Number.ToText(null, "C2") otherwise "err",
+                    Number.ToText(1234.5, "C"),
+                    Number.ToText(1234.5, "c0"),
+                    Number.ToText(1234.5, "c2")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q717", () =>
+            let r = try {
+                    Number.ToText(0, "C", "en-US"),
+                    Number.ToText(0.01, "C2", "en-US"),
+                    Number.ToText(1e-5, "C6", "en-US"),
+                    Number.ToText(1e10, "C0", "en-US"),
+                    Number.ToText(1e15, "C0", "en-US"),
+                    Number.ToText(123456789012345, "C0", "en-US"),
+                    Number.ToText(-123456789012345, "C0", "en-US")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q718", () =>
+            let r = try {
+                    Number.ToText(-100, "C2", "en-US"),
+                    Number.ToText(-100, "C2", "en-GB"),
+                    Number.ToText(-100, "C0", "ja-JP"),
+                    Number.ToText(-100, "C2", "de-DE"),
+                    Number.ToText(-100, "C2", "fr-FR"),
+                    Number.ToText(0, "C2", "en-US"),
+                    Number.ToText(0, "C2", "de-DE"),
+                    Number.ToText(0, "C2", "fr-FR")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 

@@ -634,10 +634,7 @@ fn format_number_dotnet(n: f64, fmt: &str, culture: Option<&str>) -> Result<Stri
                 'F' | 'f' => Some(format_fixed(n, precision.unwrap_or(2))),
                 'N' | 'n' => Some(format_number_grouped(n, precision.unwrap_or(2))),
                 'P' | 'p' => Some(format_percent(n, precision.unwrap_or(2))),
-                'C' | 'c' => {
-                    let symbol = currency_symbol_for(culture);
-                    Some(format!("{}{}", symbol, format_number_grouped(n, precision.unwrap_or(2))))
-                }
+                'C' | 'c' => Some(format_currency(n, precision.unwrap_or(2), culture)),
                 'D' | 'd' => Some(format_integer_padded(n, precision.unwrap_or(0))),
                 'E' | 'e' => Some(format_exponent(n, precision.unwrap_or(6), code == 'E')),
                 'R' | 'r' => Some(n.to_string()),
@@ -653,7 +650,14 @@ fn format_number_dotnet(n: f64, fmt: &str, culture: Option<&str>) -> Result<Stri
                 _ => None,
             };
             if let Some(s) = result {
-                let s = apply_culture_decimal(s, culture);
+                // format_currency handles its own culture-specific decimal
+                // and thousand separators because the symbol placement is
+                // intertwined with the swap; skip the outer pass for 'C'/'c'.
+                let s = if matches!(code, 'C' | 'c') {
+                    s
+                } else {
+                    apply_culture_decimal(s, culture)
+                };
                 let s = if matches!(code, 'P' | 'p') {
                     apply_culture_percent_space(s, culture)
                 } else { s };
@@ -880,6 +884,51 @@ fn apply_culture_decimal(s: String, culture: Option<&str>) -> String {
     let with_holder: String = s.chars().map(|c| if c == ',' { placeholder } else { c }).collect();
     let dec_swapped: String = with_holder.chars().map(|c| if c == '.' { ',' } else { c }).collect();
     dec_swapped.chars().map(|c| if c == placeholder { thousands_sep } else { c }).collect()
+}
+
+/// Format `n` as currency per .NET conventions for the given culture.
+///
+/// Conventions:
+///   en-US / ja-JP : symbol prefix, parentheses for negatives — "$1,234.50",
+///                   "($1,234.50)".
+///   en-GB         : symbol prefix, `-` outside symbol for negatives —
+///                   "£1,234.50", "-£1,234.50".
+///   de-DE         : symbol suffix with space, decimal `,`, thousands `.` —
+///                   "1.234,50 €", "-1.234,50 €".
+///   fr-FR         : symbol suffix with space, decimal `,`, thousands NBSP —
+///                   "1 234,50 €", "-1 234,50 €".
+///   Default (no culture): treat as en-GB.
+fn format_currency(n: f64, prec: i32, culture: Option<&str>) -> String {
+    // NaN/Inf get no currency symbol (matches "P" semantics).
+    if n.is_nan() { return "NaN".to_string(); }
+    if n.is_infinite() {
+        return if n > 0.0 { "∞".to_string() } else { "-∞".to_string() };
+    }
+    let symbol = currency_symbol_for(culture);
+    let lc = culture.map(str::to_ascii_lowercase);
+    // en-US uses parentheses for negatives; every other locale uses `-`.
+    let is_paren_neg = matches!(lc.as_deref(), Some(c) if c.starts_with("en-us"));
+    // de/fr/etc. put the currency symbol AFTER the number, with a space.
+    let is_suffix = matches!(lc.as_deref(),
+        Some(c) if c.starts_with("de") || c.starts_with("fr") || c.starts_with("es")
+                  || c.starts_with("it") || c.starts_with("nl") || c.starts_with("pt"));
+    let abs_body = format_number_grouped(n.abs(), prec);
+    // Apply locale decimal/thousands separator to the magnitude.
+    let abs_body = apply_culture_decimal(abs_body, culture);
+    if is_suffix {
+        // Number first, then space-symbol. Negatives prefix the magnitude with '-'.
+        if n < 0.0 {
+            format!("-{abs_body} {symbol}")
+        } else {
+            format!("{abs_body} {symbol}")
+        }
+    } else if is_paren_neg && n < 0.0 {
+        format!("({symbol}{abs_body})")
+    } else if n < 0.0 {
+        format!("-{symbol}{abs_body}")
+    } else {
+        format!("{symbol}{abs_body}")
+    }
 }
 
 fn currency_symbol_for(culture: Option<&str>) -> &'static str {
