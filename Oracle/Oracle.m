@@ -7336,6 +7336,86 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q849", () =>
+            let r = try {
+                    List.Sort({3, 1, 2}),
+                    List.Sort({"banana", "apple", "cherry"}),
+                    List.Sort({}),
+                    List.Sort({1}),
+                    List.Sort({3, 3, 1, 2, 1})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q850", () =>
+            let xs = {
+                    [k=1, tag="A"],
+                    [k=2, tag="B"],
+                    [k=1, tag="C"],
+                    [k=2, tag="D"],
+                    [k=1, tag="E"]
+                } in
+            let r = try {
+                    List.Sort(xs, (a, b) => Value.Compare(a[k], b[k])),
+                    List.Sort(xs, each _[k])
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q851", () =>
+            let r = try {
+                    List.Sort({3, 1, 2}, Order.Descending),
+                    List.Sort({"banana", "apple", "cherry"}, Order.Descending),
+                    List.Sort({1, 2, 3}, Order.Ascending),
+                    List.Sort({3, 2, 1}, Order.Ascending),
+                    List.Sort({1}, Order.Descending),
+                    List.Sort({}, Order.Descending)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q852", () =>
+            let r = try {
+                    List.Sort({"banana", "apple", "cherry", "date"}, each Text.Length(_)),
+                    List.Sort({"apple", "banana", "cherry"}, each Text.Length(_)),
+                    List.Sort({3.5, 1.2, 2.8, 4.0}, each Number.Round(_)),
+                    List.Sort({-3, -1, 2, -5, 4}, each Number.Abs(_))
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q853", () =>
+            let xs = {
+                    [name="A", grade=2],
+                    [name="B", grade=1],
+                    [name="C", grade=2],
+                    [name="D", grade=1]
+                } in
+            let r = try {
+                    List.Sort(xs, each {_[grade], _[name]})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q854", () =>
+            let r = try {
+                    List.Sort({3, 1, 2}, (a, b) => Value.Compare(a, b)),
+                    List.Sort({3, 1, 2}, (a, b) => -Value.Compare(a, b)),
+                    List.Sort({"banana", "apple"}, (a, b) => Value.Compare(Text.Lower(a), Text.Lower(b)))
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q855", () =>
+            let r = try {
+                    List.Sort({3, null, 1, null, 2}),
+                    List.Sort({"b", null, "a"}),
+                    List.Sort({null, null}),
+                    List.Sort({null})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 

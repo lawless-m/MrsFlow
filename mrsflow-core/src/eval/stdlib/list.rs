@@ -400,10 +400,11 @@ fn sum(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     }
     let mut total = 0.0;
     for v in list {
-        total += match v {
-            Value::Number(n) => *n,
+        match v {
+            Value::Null => continue, // PQ: nulls treated as 0 in Sum.
+            Value::Number(n) => total += *n,
             other => return Err(type_mismatch("number (in list)", other)),
-        };
+        }
     }
     Ok(Value::Number(total))
 }
@@ -551,42 +552,37 @@ fn numbers(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 
 
 fn min(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    let list = expect_list(&args[0])?;
-    if list.is_empty() {
-        return Ok(Value::Null);
-    }
-    let mut best: Option<f64> = None;
-    for v in list {
-        let n = match v {
-            Value::Number(n) => *n,
-            other => return Err(type_mismatch("number (in list)", other)),
-        };
-        best = Some(match best {
-            None => n,
-            Some(curr) => if n < curr { n } else { curr },
-        });
-    }
-    Ok(Value::Number(best.unwrap()))
+    list_extreme(&args[0], false)
 }
 
 
 fn max(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    let list = expect_list(&args[0])?;
-    if list.is_empty() {
-        return Ok(Value::Null);
-    }
-    let mut best: Option<f64> = None;
+    list_extreme(&args[0], true)
+}
+
+/// PQ List.Min/Max semantics:
+///   - empty list → null
+///   - nulls in list are skipped
+///   - mixed orderable types (numbers and text, dates, …) compared per
+///     compare_values; mixed across kinds errors
+fn list_extreme(arg: &Value, want_max: bool) -> Result<Value, MError> {
+    let list = expect_list(arg)?;
+    let mut best: Option<&Value> = None;
     for v in list {
-        let n = match v {
-            Value::Number(n) => *n,
-            other => return Err(type_mismatch("number (in list)", other)),
-        };
+        if matches!(v, Value::Null) { continue; }
         best = Some(match best {
-            None => n,
-            Some(curr) => if n > curr { n } else { curr },
+            None => v,
+            Some(curr) => {
+                let cmp = super::value_ops::compare_values_pub(curr, v)?;
+                if want_max {
+                    if cmp < 0 { v } else { curr }
+                } else {
+                    if cmp > 0 { v } else { curr }
+                }
+            }
         });
     }
-    Ok(Value::Number(best.unwrap()))
+    Ok(best.cloned().unwrap_or(Value::Null))
 }
 
 
@@ -625,11 +621,40 @@ fn sort(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     if let Some(v) = args.get(1) {
         match v {
             Value::Null => {}
+            // Order.Ascending (0) / Order.Descending (1) shorthand.
+            Value::Number(n) if (*n == 0.0 || *n == 1.0) => {
+                let descending = *n == 1.0;
+                let out = sort_numeric_or_text(list, "List.Sort", descending)?;
+                return Ok(Value::List(out));
+            }
             Value::Function(f) => {
-                // Use an error slot so the fallible callback can propagate
-                // out of the infallible sort_by closure.
+                // List.Sort accepts both shapes:
+                //   - 1-arg key selector:  `each _[k]` → sort by key value
+                //   - 2-arg comparer:      `(x, y) => number` → -1/0/1
+                let required = f.params.iter().filter(|p| !p.optional).count();
+                let total = f.params.len();
+                let is_key_selector = required <= 1 && total >= 1;
                 let mut out: Vec<Value> = list.clone();
                 let mut sort_err: Option<MError> = None;
+                if is_key_selector {
+                    // Compute keys once, then sort by them.
+                    let mut keyed: Vec<(Value, Value)> = Vec::with_capacity(list.len());
+                    for item in list {
+                        match invoke_builtin_callback(f, vec![item.clone()]) {
+                            Ok(k) => keyed.push((k, item.clone())),
+                            Err(e) => return Err(e),
+                        }
+                    }
+                    keyed.sort_by(|(ka, _), (kb, _)| {
+                        if sort_err.is_some() { return std::cmp::Ordering::Equal; }
+                        match super::value_ops::compare_values_pub(ka, kb) {
+                            Ok(n) => n.cmp(&0),
+                            Err(e) => { sort_err = Some(e); std::cmp::Ordering::Equal }
+                        }
+                    });
+                    if let Some(e) = sort_err { return Err(e); }
+                    return Ok(Value::List(keyed.into_iter().map(|(_, v)| v).collect()));
+                }
                 out.sort_by(|a, b| {
                     if sort_err.is_some() {
                         return std::cmp::Ordering::Equal;
@@ -670,34 +695,9 @@ fn sort(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             }
         }
     }
-    enum Kind { Empty, Num, Text }
-    let mut kind = Kind::Empty;
-    for v in list {
-        let k = match v {
-            Value::Number(_) => Kind::Num,
-            Value::Text(_) => Kind::Text,
-            other => return Err(type_mismatch("number or text (in list)", other)),
-        };
-        match (&kind, &k) {
-            (Kind::Empty, _) => kind = k,
-            (Kind::Num, Kind::Num) | (Kind::Text, Kind::Text) => {}
-            _ => return Err(MError::Other(
-                "List.Sort: mixed-type lists not supported (numbers and text together)".into(),
-            )),
-        }
-    }
-    let mut out: Vec<Value> = list.clone();
-    match kind {
-        Kind::Empty => {}
-        Kind::Num => out.sort_by(|a, b| {
-            let (Value::Number(x), Value::Number(y)) = (a, b) else { unreachable!() };
-            x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Equal)
-        }),
-        Kind::Text => out.sort_by(|a, b| {
-            let (Value::Text(x), Value::Text(y)) = (a, b) else { unreachable!() };
-            x.cmp(y)
-        }),
-    }
+    // No comparer arg → delegate to the shared numeric/text sorter,
+    // which already handles null < everything for PQ compatibility.
+    let out = sort_numeric_or_text(list, "List.Sort", false)?;
     Ok(Value::List(out))
 }
 
@@ -782,6 +782,7 @@ fn any_true(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     for v in list {
         match v {
+            Value::Null => continue, // PQ: null = unknown, tolerated permissively.
             Value::Logical(b) => {
                 if *b {
                     return Ok(Value::Logical(true));
@@ -798,6 +799,7 @@ fn all_true(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     for v in list {
         match v {
+            Value::Null => continue, // PQ: null tolerated permissively.
             Value::Logical(b) => {
                 if !*b {
                     return Ok(Value::Logical(false));
@@ -923,7 +925,28 @@ fn equation_criteria_fn<'a>(
 ) -> Result<Option<&'a Closure>, MError> {
     match args.get(idx) {
         Some(Value::Null) | None => Ok(None),
-        Some(Value::Function(c)) => Ok(Some(c)),
+        Some(Value::Function(c)) => {
+            // For some functions (List.Distinct, List.Intersect, …) PQ rejects
+            // user lambdas with "A custom comparer cannot be used in this
+            // context." For others (List.Contains, List.PositionOf, …) PQ
+            // accepts them. Match the set PQ rejects.
+            const REJECT_USER_COMPARER: &[&str] = &[
+                "List.Distinct",
+                "List.Intersect",
+                "List.Union",
+                "List.Difference",
+                "List.Mode",
+                "List.Modes",
+            ];
+            if REJECT_USER_COMPARER.contains(&fn_name)
+                && matches!(c.body, super::super::value::FnBody::M(_))
+            {
+                return Err(MError::Other(
+                    "A custom comparer cannot be used in this context.".into(),
+                ));
+            }
+            Ok(Some(c))
+        }
         Some(other) => Err(MError::Other(format!(
             "{fn_name}: equationCriteria as {} not yet supported (function only)",
             super::super::type_name(other),
@@ -1604,7 +1627,8 @@ fn mode(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         }
     }
     let max = tally.iter().map(|(_, c)| *c).max().unwrap();
-    let (v, _) = tally.into_iter().find(|(_, c)| *c == max).unwrap();
+    // PQ tie-break returns the LAST tied value (in input order).
+    let (v, _) = tally.into_iter().rfind(|(_, c)| *c == max).unwrap();
     Ok(v)
 }
 
@@ -1665,17 +1689,31 @@ fn sort_numeric_or_text(list: &[Value], ctx: &str, descending: bool) -> Result<V
             ))),
         }
     }
-    let mut out: Vec<Value> = list.iter().filter(|v| !matches!(v, Value::Null)).cloned().collect();
+    // PQ sorts null < everything (ascending) — nulls appear first in
+    // Ascending, last in Descending. Keep nulls in the output rather
+    // than dropping them.
+    let mut out: Vec<Value> = list.to_vec();
     match kind {
         Kind::Empty => {}
         Kind::Num => out.sort_by(|a, b| {
-            let (Value::Number(x), Value::Number(y)) = (a, b) else { unreachable!() };
-            let c = x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Equal);
+            let c = match (a, b) {
+                (Value::Null, Value::Null) => std::cmp::Ordering::Equal,
+                (Value::Null, _) => std::cmp::Ordering::Less,
+                (_, Value::Null) => std::cmp::Ordering::Greater,
+                (Value::Number(x), Value::Number(y)) =>
+                    x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Equal),
+                _ => unreachable!(),
+            };
             if descending { c.reverse() } else { c }
         }),
         Kind::Text => out.sort_by(|a, b| {
-            let (Value::Text(x), Value::Text(y)) = (a, b) else { unreachable!() };
-            let c = x.cmp(y);
+            let c = match (a, b) {
+                (Value::Null, Value::Null) => std::cmp::Ordering::Equal,
+                (Value::Null, _) => std::cmp::Ordering::Less,
+                (_, Value::Null) => std::cmp::Ordering::Greater,
+                (Value::Text(x), Value::Text(y)) => x.cmp(y),
+                _ => unreachable!(),
+            };
             if descending { c.reverse() } else { c }
         }),
     }
