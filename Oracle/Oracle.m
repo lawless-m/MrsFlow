@@ -2717,7 +2717,66 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
-                        else [HasError=false, Value=r[Value]])
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q451", () =>
+            let r = try {
+                    Time.Hour(#time(14, 30, 45)),
+                    Time.Minute(#time(14, 30, 45)),
+                    Time.Second(#time(14, 30, 45)),
+                    Time.Hour(#time(0, 0, 0)),
+                    Time.Hour(#time(23, 59, 59))
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q452", () =>
+            let r = try {
+                    Time.From(#time(14, 30, 45)),
+                    Time.From(#datetime(2024, 6, 15, 9, 15, 30)),
+                    Time.From(0.5),
+                    Time.From(0.75)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q453", () =>
+            let r = try {
+                    Time.ToText(#time(14, 30, 45)),
+                    Time.ToText(#time(0, 0, 0)),
+                    Time.ToText(#time(23, 59, 59))
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q454", () =>
+            let r = try
+                let
+                    t = #time(14, 30, 45),
+                    d = #duration(0, 1, 30, 0),
+                    sum = t + d
+                in
+                    sum
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q455", () =>
+            let r = try
+                let
+                    t1 = #time(14, 30, 0),
+                    t2 = #time(16, 45, 30),
+                    diff = t2 - t1
+                in
+                    Duration.TotalMinutes(diff)
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]])
     },
 
     Catalog = Table.FromRecords(cases)
