@@ -7770,6 +7770,89 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q892", () =>
+            let r = try {
+                    List.Sum({}),
+                    List.Sum({null, null, null}),
+                    List.Sum({1}),
+                    List.Sum({1, null, 2}),
+                    List.Average({}),
+                    List.Average({null, null}),
+                    List.Average({1}),
+                    List.Average({1, null, 3})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q893", () =>
+            let r = try {
+                    List.Median({}),
+                    List.Median({null, null}),
+                    List.Median({1}),
+                    List.Median({1, 2, 3}),
+                    List.Median({1, 2, 3, 4}),
+                    List.Median({null, 1, 2, null, 3})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q894", () =>
+            let r = try {
+                    List.Mode({}),
+                    List.Mode({null}),
+                    List.Mode({1, 2, 2, 3, 3, 3}),
+                    List.Mode({1, 2, 3}),
+                    List.Modes({1, 2, 2, 3, 3}),
+                    List.Modes({1, 2, 3})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q895", () =>
+            let r = try {
+                    List.StandardDeviation({}),
+                    List.StandardDeviation({1}),
+                    List.StandardDeviation({1, 1, 1}),
+                    List.StandardDeviation({1, 2, 3, 4, 5}),
+                    List.StandardDeviation({null, 1, 2, null, 3, 4, 5})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q896", () =>
+            let r = try {
+                    List.Sum({1, 2, 1/0, 3}),
+                    List.Sum({1, -1/0, 1/0}),
+                    List.Sum({1, 0/0, 2}),
+                    List.Average({1, 1/0}),
+                    List.Max({1, 1/0, 3}),
+                    List.Min({1, -1/0, 3})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q897", () =>
+            let r = try {
+                    List.Sum({1, 2, "3"}),
+                    List.Sum({1, true, 2})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q898", () =>
+            let r = try {
+                    List.Sum({1}),
+                    List.Average({1}),
+                    List.Median({5}),
+                    List.Mode({5}),
+                    List.StandardDeviation({5}),
+                    List.Sum({null}),
+                    List.Average({null}),
+                    List.Median({null})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 

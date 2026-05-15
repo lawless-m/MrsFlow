@@ -406,12 +406,17 @@ fn sum(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         return Ok(Value::Null);
     }
     let mut total = 0.0;
+    let mut seen_number = false;
     for v in list {
         match v {
-            Value::Null => continue, // PQ: nulls treated as 0 in Sum.
-            Value::Number(n) => total += *n,
+            Value::Null => continue,
+            Value::Number(n) => { total += *n; seen_number = true; }
             other => return Err(type_mismatch("number (in list)", other)),
         }
+    }
+    // PQ: all-null list yields null, not 0.
+    if !seen_number {
+        return Ok(Value::Null);
     }
     Ok(Value::Number(total))
 }
@@ -1759,8 +1764,13 @@ fn non_null_count(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 fn standard_deviation(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     let nums = numbers_only(list, "List.StandardDeviation")?;
-    if nums.len() < 2 {
+    if nums.is_empty() {
         return Ok(Value::Null);
+    }
+    // PQ: single-element StdDev = 0 (not null); two+ uses sample-variance
+    // formula with (n-1) divisor.
+    if nums.len() == 1 {
+        return Ok(Value::Number(0.0));
     }
     let mean: f64 = nums.iter().sum::<f64>() / nums.len() as f64;
     let var: f64 = nums.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / (nums.len() - 1) as f64;
