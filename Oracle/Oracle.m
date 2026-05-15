@@ -2983,7 +2983,64 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
-                        else [HasError=false, Value=r[Value]])
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q476", () =>
+            let r = try
+                let
+                    x = Number.Random()
+                in
+                    x >= 0 and x < 1
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q477", () =>
+            let r = try
+                let
+                    x = Number.RandomBetween(10, 20)
+                in
+                    x >= 10 and x <= 20
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q478", () =>
+            let r = try
+                let
+                    samples = List.Transform({1..10}, each Number.Random()),
+                    allInRange = List.AllTrue(List.Transform(samples, each _ >= 0 and _ < 1))
+                in
+                    allInRange
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q479", () =>
+            let r = try
+                let
+                    x = Number.RandomBetween(5, 5)
+                in
+                    x
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q480", () =>
+            let r = try
+                let
+                    samples = List.Transform({1..20}, each Number.RandomBetween(0, 100)),
+                    distinctCount = List.Count(List.Distinct(samples))
+                in
+                    distinctCount > 1
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]])
     },
 
     Catalog = Table.FromRecords(cases)
