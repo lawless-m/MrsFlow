@@ -3155,6 +3155,51 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q491", () =>
+            let r = try {
+                    Text.PositionOf("hello world", "l"),
+                    Text.PositionOf("hello world", "world"),
+                    Text.PositionOf("hello world", "xyz"),
+                    Text.PositionOf("hello world", "")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q492", () =>
+            let r = try Text.PositionOf("hello world", "l", Occurrence.All) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q493", () =>
+            let r = try {
+                    Text.PositionOfAny("hello world", {"l", "o"}),
+                    Text.PositionOfAny("hello world", {"z", "y"}),
+                    Text.PositionOfAny("hello world", {"o", "l"}, Occurrence.All)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q494", () =>
+            let r = try Text.PositionOf("Hello World", "world", Occurrence.First, Comparer.OrdinalIgnoreCase) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q495", () =>
+            let r = try {
+                    Text.Contains("hello world", "world"),
+                    Text.Contains("hello world", "xyz"),
+                    Text.Contains("Hello World", "world", Comparer.OrdinalIgnoreCase),
+                    Text.StartsWith("hello world", "hello"),
+                    Text.EndsWith("hello world", "world")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
