@@ -1103,12 +1103,33 @@ fn apply_binary(op: BinaryOp, lv: Value, rv: Value, host: &dyn IoHost) -> Result
             if matches!(lv, Value::Null) || matches!(rv, Value::Null) {
                 return Ok(Value::Null);
             }
+            // PQ: number * Duration (commutes) → Duration scaled.
+            match (&lv, &rv) {
+                (Value::Number(n), Value::Duration(d)) | (Value::Duration(d), Value::Number(n)) => {
+                    let micros = (d.num_microseconds().unwrap_or(0) as f64 * n).round() as i64;
+                    return Ok(Value::Duration(chrono::Duration::microseconds(micros)));
+                }
+                _ => {}
+            }
             arithmetic(lv, rv, |a, b| a * b)
         }
         BinaryOp::Divide => {
             // Null operands propagate as null.
             if matches!(lv, Value::Null) || matches!(rv, Value::Null) {
                 return Ok(Value::Null);
+            }
+            // PQ: Duration / number → Duration scaled; Duration / Duration → number.
+            match (&lv, &rv) {
+                (Value::Duration(d), Value::Number(n)) => {
+                    let micros = (d.num_microseconds().unwrap_or(0) as f64 / n).round() as i64;
+                    return Ok(Value::Duration(chrono::Duration::microseconds(micros)));
+                }
+                (Value::Duration(a), Value::Duration(b)) => {
+                    let an = a.num_microseconds().unwrap_or(0) as f64;
+                    let bn = b.num_microseconds().unwrap_or(0) as f64;
+                    return Ok(Value::Number(an / bn));
+                }
+                _ => {}
             }
             let l = expect_number(&lv)?;
             let r = expect_number(&rv)?;

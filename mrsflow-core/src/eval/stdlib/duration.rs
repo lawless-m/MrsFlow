@@ -57,17 +57,30 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
 }
 
 fn constructor(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    // PQ accepts fractional `seconds` (e.g. 0.5 → half-second precision in
+    // datetime arithmetic). Other components must be integers — fractional
+    // days/hours/minutes are refused. Internal precision is microseconds
+    // to match Duration values produced by datetime subtraction.
     let d = expect_int(&args[0], "#duration: days")?;
     let h = expect_int(&args[1], "#duration: hours")?;
     let mn = expect_int(&args[2], "#duration: minutes")?;
-    let s = expect_int(&args[3], "#duration: seconds")?;
-    let total = d
+    let s_f = match &args[3] {
+        Value::Number(n) => *n,
+        other => return Err(type_mismatch("number", other)),
+    };
+    let secs_i = s_f.trunc() as i64;
+    let micros_frac = ((s_f - s_f.trunc()) * 1_000_000.0).round() as i64;
+    let total_secs = d
         .checked_mul(86400)
         .and_then(|x| x.checked_add(h.checked_mul(3600)?))
         .and_then(|x| x.checked_add(mn.checked_mul(60)?))
-        .and_then(|x| x.checked_add(s))
+        .and_then(|x| x.checked_add(secs_i))
         .ok_or_else(|| MError::Other("#duration: overflow".into()))?;
-    Ok(Value::Duration(chrono::Duration::seconds(total)))
+    let total_micros = total_secs
+        .checked_mul(1_000_000)
+        .and_then(|x| x.checked_add(micros_frac))
+        .ok_or_else(|| MError::Other("#duration: overflow".into()))?;
+    Ok(Value::Duration(chrono::Duration::microseconds(total_micros)))
 }
 
 

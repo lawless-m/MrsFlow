@@ -1,5 +1,7 @@
 //! `Json.Document` / `Json.FromValue` — JSON read/write.
 
+use chrono::Timelike;
+
 use crate::parser::Param;
 
 use super::super::env::EnvNode;
@@ -232,9 +234,19 @@ fn value_to_json(v: &Value) -> Result<serde_json::Value, MError> {
         }
         Value::Text(s) => Ok(serde_json::Value::String(s.clone())),
         Value::Date(d) => Ok(serde_json::Value::String(d.to_string())),
-        Value::Datetime(dt) => Ok(serde_json::Value::String(
-            dt.format("%Y-%m-%dT%H:%M:%S").to_string()
-        )),
+        Value::Datetime(dt) => {
+            // PQ emits fractional seconds only when non-zero, trailing zeros
+            // trimmed (e.g. "10:30:00.5", not "10:30:00.500000").
+            let s = if dt.nanosecond() == 0 {
+                dt.format("%Y-%m-%dT%H:%M:%S").to_string()
+            } else {
+                let mut s = dt.format("%Y-%m-%dT%H:%M:%S%.f").to_string();
+                while s.ends_with('0') { s.pop(); }
+                if s.ends_with('.') { s.pop(); }
+                s
+            };
+            Ok(serde_json::Value::String(s))
+        }
         Value::Datetimezone(dt) => {
             // PQ uses "Z" for zero offset (UTC), not "+00:00". chrono's
             // to_rfc3339 emits "+00:00" — patch the trailing offset.

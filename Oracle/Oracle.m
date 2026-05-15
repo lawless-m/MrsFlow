@@ -10050,6 +10050,78 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1109", () =>
+            let r = try {
+                    #date(2026, 6, 15) + #duration(7, 0, 0, 0),
+                    #date(2026, 6, 15) - #duration(20, 0, 0, 0),
+                    #date(2026, 12, 31) + #duration(1, 0, 0, 0),
+                    #date(2026, 3, 1) - #duration(1, 0, 0, 0),
+                    #date(2024, 2, 29) + #duration(365, 0, 0, 0)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1110", () =>
+            let r = try {
+                    #date(2026, 6, 15) - #date(2026, 6, 1),
+                    #date(2027, 1, 1) - #date(2026, 1, 1),
+                    #date(2026, 1, 1) - #date(2026, 12, 31),
+                    #date(2024, 3, 1) - #date(2024, 2, 28)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1111", () =>
+            let r = try {
+                    #datetime(2026, 6, 15, 10, 30, 0) + #duration(0, 5, 0, 0),
+                    #datetime(2026, 6, 15, 23, 59, 0) + #duration(0, 0, 2, 0),
+                    #datetime(2026, 6, 15, 10, 0, 0) - #duration(0, 11, 0, 0),
+                    #datetime(2026, 6, 15, 10, 30, 0) + #duration(0, 0, 0, 0.5),
+                    #datetime(2026, 12, 31, 23, 59, 59) + #duration(0, 0, 0, 1)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1112", () =>
+            let r = try {
+                    #datetimezone(2026, 6, 15, 10, 30, 0, 1, 0) + #duration(0, 5, 0, 0),
+                    #datetimezone(2026, 6, 15, 10, 0, 0, -5, 0) - #duration(0, 0, 30, 0),
+                    #datetimezone(2026, 6, 15, 23, 30, 0, 0, 0) + #duration(0, 1, 0, 0)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1113", () =>
+            let r = try {
+                    #time(23, 0, 0) + #duration(0, 2, 0, 0),
+                    #time(1, 0, 0) - #duration(0, 2, 0, 0),
+                    #time(0, 0, 0) + #duration(0, 25, 0, 0),
+                    #time(12, 30, 0) + #duration(0, 0, 45, 0),
+                    #time(0, 0, 0) - #duration(0, 0, 0, 1)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1114", () =>
+            let r = try {
+                    #duration(1, 0, 0, 0) + #duration(0, 12, 0, 0),
+                    #duration(2, 0, 0, 0) - #duration(0, 6, 0, 0),
+                    #duration(0, 1, 30, 0) + #duration(0, 0, 45, 30),
+                    3 * #duration(1, 0, 0, 0),
+                    #duration(7, 0, 0, 0) / 2
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1115", () =>
+            let r = try {
+                    #duration(1, 0, 0, 0) + #date(2026, 6, 15),
+                    #duration(0, 5, 0, 0) + #datetime(2026, 6, 15, 10, 0, 0),
+                    #time(10, 0, 0) + #date(2026, 6, 15)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 

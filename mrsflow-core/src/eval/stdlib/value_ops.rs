@@ -335,16 +335,11 @@ pub(crate) fn value_add(a: &Value, b: &Value) -> Result<Value, MError> {
         (Value::Datetime(dt), Value::Duration(dur))
         | (Value::Duration(dur), Value::Datetime(dt)) => Ok(Value::Datetime(*dt + *dur)),
         (Value::Time(t), Value::Duration(dur)) | (Value::Duration(dur), Value::Time(t)) => {
-            let secs = dur.num_seconds().rem_euclid(86400);
-            let added = NaiveTime::from_num_seconds_from_midnight_opt(secs as u32, 0)
-                .unwrap_or(*t);
-            // Carry the seconds offset onto t.
-            let total = t.num_seconds_from_midnight() as i64 + secs;
-            let total = total.rem_euclid(86400) as u32;
-            let _ = added;
+            // Time + Duration wraps at 24h, no carry to date (matches PQ).
+            let total = t.num_seconds_from_midnight() as i64 + dur.num_seconds();
+            let wrapped = total.rem_euclid(86400) as u32;
             Ok(Value::Time(
-                NaiveTime::from_num_seconds_from_midnight_opt(total, 0)
-                    .unwrap_or(*t),
+                NaiveTime::from_num_seconds_from_midnight_opt(wrapped, 0).unwrap_or(*t),
             ))
         }
         (Value::Duration(a), Value::Duration(b)) => Ok(Value::Duration(*a + *b)),
@@ -392,6 +387,14 @@ pub(crate) fn value_subtract(a: &Value, b: &Value) -> Result<Value, MError> {
         }
         (Value::Datetime(dt), Value::Duration(dur)) => Ok(Value::Datetime(*dt - *dur)),
         (Value::Datetimezone(dt), Value::Duration(dur)) => Ok(Value::Datetimezone(*dt - *dur)),
+        (Value::Time(t), Value::Duration(dur)) => {
+            // Time - Duration wraps at 24h, no carry to date (matches PQ).
+            let total = t.num_seconds_from_midnight() as i64 - dur.num_seconds();
+            let wrapped = total.rem_euclid(86400) as u32;
+            Ok(Value::Time(
+                NaiveTime::from_num_seconds_from_midnight_opt(wrapped, 0).unwrap_or(*t),
+            ))
+        }
         (a, b) => Err(MError::Other(format!(
             "We cannot apply operator - to types {} and {}.",
             pq_type_name(a),
