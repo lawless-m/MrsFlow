@@ -653,7 +653,11 @@ fn format_number_dotnet(n: f64, fmt: &str, culture: Option<&str>) -> Result<Stri
                 _ => None,
             };
             if let Some(s) = result {
-                return Ok(apply_culture_decimal(s, culture));
+                let s = apply_culture_decimal(s, culture);
+                let s = if matches!(code, 'P' | 'p') {
+                    apply_culture_percent_space(s, culture)
+                } else { s };
+                return Ok(s);
             }
         }
     }
@@ -804,9 +808,30 @@ fn insert_thousands(s: &str) -> String {
 }
 
 fn format_percent(n: f64, prec: i32) -> String {
+    // PQ: NaN/Inf get no "%" suffix.
+    if n.is_nan() { return "NaN".to_string(); }
+    if n.is_infinite() {
+        return if n > 0.0 { "∞".to_string() } else { "-∞".to_string() };
+    }
     let scaled = n * 100.0;
     let body = format_number_grouped(scaled, prec);
     format!("{body}%")
+}
+
+/// Insert a regular space between the number and the "%" percent sign
+/// for locales that use one (de, fr, es, it, nl, pt). en-* / Invariant
+/// uses no space. PQ uses a normal space (U+0020), not NBSP, even for
+/// fr-FR — only the thousands separator there is NBSP.
+fn apply_culture_percent_space(s: String, culture: Option<&str>) -> String {
+    if !s.ends_with('%') { return s; }
+    let lc = culture.map(str::to_ascii_lowercase);
+    let needs_space = matches!(lc.as_deref(), Some(c) if {
+        c.starts_with("de") || c.starts_with("fr") || c.starts_with("es")
+            || c.starts_with("it") || c.starts_with("nl") || c.starts_with("pt")
+    });
+    if !needs_space { return s; }
+    let without = &s[..s.len() - 1];
+    format!("{without} %")
 }
 
 fn format_integer_padded(n: f64, width: i32) -> String {

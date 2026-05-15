@@ -5604,6 +5604,112 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        // q705-q711: Number.ToText "P" percentage.
+
+        SafeSerialize("q705", () =>
+            let r = try {
+                    Number.ToText(0.5, "P0"),
+                    Number.ToText(0.5, "P1"),
+                    Number.ToText(0.5, "P2"),
+                    Number.ToText(0.5, "P5"),
+                    Number.ToText(0, "P2"),
+                    Number.ToText(1, "P0"),
+                    Number.ToText(1, "P2"),
+                    Number.ToText(-0.5, "P2")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q706", () =>
+            let r = try {
+                    Number.ToText(0.125, "P0"),
+                    Number.ToText(0.125, "P1"),
+                    Number.ToText(0.125, "P2"),
+                    Number.ToText(0.001, "P0"),
+                    Number.ToText(0.001, "P2"),
+                    Number.ToText(0.0001, "P2"),
+                    Number.ToText(0.0001, "P4"),
+                    Number.ToText(0.9999, "P0"),
+                    Number.ToText(0.9999, "P2")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q707", () =>
+            let r = try {
+                    Number.ToText(0.5, "P2", "en-US"),
+                    Number.ToText(0.5, "P2", "en-GB"),
+                    Number.ToText(0.5, "P2", "de-DE"),
+                    Number.ToText(0.5, "P2", "fr-FR"),
+                    Number.ToText(0.123, "P2", "en-US"),
+                    Number.ToText(0.123, "P2", "de-DE"),
+                    Number.ToText(-0.123, "P2", "fr-FR"),
+                    Number.ToText(1234.5, "P2", "en-US")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q708", () =>
+            let r = try {
+                    Number.ToText(0.005, "P0"),
+                    Number.ToText(0.015, "P0"),
+                    Number.ToText(0.025, "P0"),
+                    Number.ToText(0.005, "P1"),
+                    Number.ToText(0.015, "P1"),
+                    Number.ToText(0.025, "P1"),
+                    Number.ToText(-0.005, "P0"),
+                    Number.ToText(-0.015, "P0")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q709", () =>
+            let r = try {
+                    Number.ToText(1e-10, "P10"),
+                    Number.ToText(1e-15, "P15"),
+                    Number.ToText(100, "P0"),
+                    Number.ToText(1000, "P0"),
+                    Number.ToText(0.000001, "P4"),
+                    Number.ToText(0.000001, "P8"),
+                    Number.ToText(1e10, "P0"),
+                    Number.ToText(-1e6, "P2")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q710", () =>
+            let r = try {
+                    try Number.ToText(Number.NaN, "P2") otherwise "err",
+                    try Number.ToText(Number.PositiveInfinity, "P2") otherwise "err",
+                    try Number.ToText(Number.NegativeInfinity, "P2") otherwise "err",
+                    try Number.ToText(null, "P2") otherwise "err",
+                    Number.ToText(0.5, "P"),
+                    Number.ToText(0.5, "p0"),
+                    Number.ToText(0.5, "p2")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q711", () =>
+            let r = try {
+                    Number.ToText(12.345, "P2"),
+                    Number.ToText(12345.6789, "P0"),
+                    Number.ToText(12345.6789, "P2"),
+                    Number.ToText(12345.6789, "P2", "de-DE"),
+                    Number.ToText(12345.6789, "P2", "fr-FR"),
+                    Number.ToText(-12345.6789, "P2"),
+                    Number.ToText(-12345.6789, "P2", "de-DE")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
