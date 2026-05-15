@@ -1782,6 +1782,43 @@ let
             in
                 if r[HasError]
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q341", () =>
+            let r = try List.Sum(List.Buffer({1, 2, 3, 4, 5})) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q342", () =>
+            let r = try List.Buffer({}) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q343", () =>
+            let r = try Table.RowCount(Table.Buffer(#table({"a"}, {{1}, {2}, {3}}))) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q344", () =>
+            let r = try
+                let
+                    buffered = List.Buffer({"x", "y", "z"}),
+                    first = buffered{0},
+                    last = buffered{2}
+                in
+                    first & "-" & last
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q345", () =>
+            let r = try Table.ColumnNames(Table.Buffer(#table({"col1", "col2"}, {{1, "a"}, {2, "b"}}))) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                     else [HasError=false, Value=r[Value]])
     },
 
