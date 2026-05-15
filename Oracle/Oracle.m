@@ -7540,6 +7540,80 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q870", () =>
+            let r = try {
+                    List.Generate(() => 0, (s) => s < 5, (s) => s + 1),
+                    List.Generate(() => 1, (s) => s < 100, (s) => s * 2),
+                    List.Generate(() => 0, (s) => s < 0, (s) => s + 1),
+                    List.Generate(() => "", (s) => Text.Length(s) < 3, (s) => s & "a")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q871", () =>
+            let r = try {
+                    List.Generate(() => 0, (s) => s < 5, (s) => s + 1, (s) => s * s),
+                    List.Generate(() => 1, (s) => s <= 10, (s) => s + 1, (s) => Text.From(s)),
+                    List.Generate(() => 0, (s) => s < 0, (s) => s + 1, (s) => s * 100)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q872", () =>
+            let r = try {
+                    List.Generate(
+                        () => [i=0, sum=0],
+                        (s) => s[i] < 5,
+                        (s) => [i=s[i]+1, sum=s[sum]+s[i]],
+                        (s) => s[sum]
+                    ),
+                    List.Generate(
+                        () => [a=1, b=1],
+                        (s) => s[a] < 100,
+                        (s) => [a=s[b], b=s[a]+s[b]],
+                        (s) => s[a]
+                    )
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q873", () =>
+            let r = try {
+                    List.Generate(() => 100, (s) => s < 5, (s) => s + 1),
+                    List.Generate(() => null, (s) => s <> null, (s) => s)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q874", () =>
+            let r = try {
+                    List.Generate(
+                        () => [n=0, found=false],
+                        (s) => s[n] < 100 and not s[found],
+                        (s) => [n=s[n]+1, found=Number.Mod(s[n]+1, 7) = 0],
+                        (s) => s[n]
+                    )
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q875", () =>
+            let r = try {
+                    List.Count(List.Generate(() => 0, (s) => s < 10, (s) => s + 1)) = 10,
+                    List.Sum(List.Generate(() => 1, (s) => s <= 5, (s) => s + 1)) = 15
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q876", () =>
+            let r = try {
+                    List.Generate(() => 0, (s) => s < 3, (s) => s + 1, (s) => [n=s, doubled=s*2]),
+                    List.Generate(() => 0, (s) => s < 3, (s) => s + 1, (s) => {s, s+1}),
+                    List.Generate(() => 0, (s) => s < 3, (s) => s + 1, (s) => null)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
