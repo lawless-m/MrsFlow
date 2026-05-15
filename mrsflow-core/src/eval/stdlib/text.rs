@@ -385,16 +385,20 @@ fn from(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         // was the catalog row that flagged this.) Non-integer floats
         // keep default Rust formatting.
         Value::Number(n) => {
-            let text = if n.is_nan() {
+            // PQ collapses negative zero to "0" (matches .NET's
+            // Double.ToString convention). Detect -0 before downstream
+            // formatting which would otherwise emit "-0".
+            let n_normalised = if *n == 0.0 { 0.0 } else { *n };
+            let text = if n_normalised.is_nan() {
                 "NaN".to_string()
-            } else if n.is_infinite() {
-                if *n > 0.0 { "∞".to_string() } else { "-∞".to_string() }
-            } else if n.fract() == 0.0 && n.abs() < 1e21 {
+            } else if n_normalised.is_infinite() {
+                if n_normalised > 0.0 { "∞".to_string() } else { "-∞".to_string() }
+            } else if n_normalised.fract() == 0.0 && n_normalised.abs() < 1e21 {
                 // Whole-valued — render as integer text without `.0`, even for
                 // values above 2^53 where f64 loses 1-digit precision.
-                format!("{:.0}", n)
+                format!("{:.0}", n_normalised)
             } else {
-                format!("{n}")
+                format!("{n_normalised}")
             };
             Ok(Value::Text(text))
         }

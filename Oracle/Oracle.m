@@ -10510,6 +10510,81 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1151", () =>
+            let r = try {
+                    Text.From(999999999999999),
+                    Text.From(1000000000000000),
+                    Text.From(9007199254740992),
+                    Text.From(10000000000000000),
+                    Text.From(-1000000000000000),
+                    Text.From(-10000000000000000)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1152", () =>
+            let r = try {
+                    Number.ToText(999999999999999),
+                    Number.ToText(1000000000000000),
+                    Number.ToText(9007199254740992),
+                    Number.ToText(9007199254740994)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1153", () =>
+            let r = try {
+                    Json.FromValue(999999999999999),
+                    Json.FromValue(1000000000000000),
+                    Json.FromValue(9007199254740992),
+                    Json.FromValue(1.5e15)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1154", () =>
+            let r = try {
+                    Text.From(999999999999999.5),
+                    Text.From(1000000000000000.5),
+                    Text.From(0.5),
+                    Text.From(1e15),
+                    Text.From(1e16)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1155", () =>
+            let original = {999999999999999, 1000000000000000, 9007199254740992} in
+            let text = Text.FromBinary(Json.FromValue(original), TextEncoding.Utf8) in
+            let parsed = Json.Document(text) in
+            let r = try {
+                    text,
+                    parsed,
+                    original = parsed
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1156", () =>
+            let r = try {
+                    Text.From(-0),
+                    Text.From(0),
+                    Text.From(-9007199254740992),
+                    Json.FromValue(-9007199254740992),
+                    Json.FromValue(-1e15)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1157", () =>
+            let t = Table.FromRecords({[v=999999999999999], [v=1000000000000000], [v=9007199254740992]}) in
+            let r = try {
+                    t,
+                    Table.AddColumn(t, "s", each Text.From([v]))
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
