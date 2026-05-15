@@ -1679,7 +1679,32 @@ let
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                     else [HasError=false, Value=r[Value]]),
 
-        SafeSerialize("q325", () => List.Max({}))
+        SafeSerialize("q325", () => List.Max({})),
+
+        // q326-q330: List.Generate early-termination patterns.
+
+        SafeSerialize("q326", () =>
+            List.Generate(
+                () => [a=0, b=1],
+                each [a] <= 100,
+                each [a=[b], b=[a]+[b]],
+                each [a])),
+
+        SafeSerialize("q327", () =>
+            List.Generate(
+                () => [n=1, done=false],
+                each not [done],
+                each [n=[n]+1, done=([n]+1) >= 5],
+                each [n])),
+
+        SafeSerialize("q328", () =>
+            List.Generate(() => 42, each _ = 42, each _ + 1)),
+
+        SafeSerialize("q329", () =>
+            List.Generate(() => 42, each false, each _ + 1)),
+
+        SafeSerialize("q330", () =>
+            List.Sum(List.Generate(() => 1, each _ <= 50, each _ + 1)))
     },
 
     Catalog = Table.FromRecords(cases)
