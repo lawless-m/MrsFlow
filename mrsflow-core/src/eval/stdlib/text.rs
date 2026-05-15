@@ -483,6 +483,9 @@ fn trim(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 
 
 fn lower(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    if matches!(args[0], Value::Null) {
+        return Ok(Value::Null);
+    }
     let text = expect_text(&args[0])?;
     let culture = culture_arg(args.get(1), "Text.Lower")?;
     Ok(Value::Text(case_map(text, culture, false)))
@@ -490,6 +493,9 @@ fn lower(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 
 
 fn upper(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    if matches!(args[0], Value::Null) {
+        return Ok(Value::Null);
+    }
     let text = expect_text(&args[0])?;
     let culture = culture_arg(args.get(1), "Text.Upper")?;
     Ok(Value::Text(case_map(text, culture, true)))
@@ -512,7 +518,10 @@ fn case_map(text: &str, culture: Option<String>, upper: bool) -> String {
     });
     if !turkish {
         // PQ uses legacy .NET case mapping where ß stays ß under ToUpper
-        // (not the Unicode 5.1+ behaviour that maps to "SS").
+        // (not the Unicode 5.1+ behaviour that maps to "SS"), and
+        // ToLower("İ") drops the combining dot to plain "i" (Rust's
+        // default Unicode mapping yields "i\u{307}" which doesn't
+        // match .NET non-Turkic ToLower).
         return text.chars().map(|c| -> String {
             if upper {
                 match c {
@@ -520,7 +529,10 @@ fn case_map(text: &str, culture: Option<String>, upper: bool) -> String {
                     _ => c.to_uppercase().collect(),
                 }
             } else {
-                c.to_lowercase().collect()
+                match c {
+                    'İ' => "i".into(),
+                    _ => c.to_lowercase().collect(),
+                }
             }
         }).collect();
     }

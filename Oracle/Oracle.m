@@ -6884,6 +6884,92 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q805", () =>
+            let r = try {
+                    Text.Upper("hello"),
+                    Text.Upper("café"),
+                    Text.Upper("straße"),
+                    Text.Upper("ß"),
+                    Text.Lower("HELLO"),
+                    Text.Lower("CAFÉ"),
+                    Text.Lower("STRASSE")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q806", () =>
+            let r = try {
+                    Text.Upper("istanbul", "tr-TR"),
+                    Text.Upper("ı", "tr-TR"),
+                    Text.Upper("i", "tr-TR"),
+                    Text.Lower("İSTANBUL", "tr-TR"),
+                    Text.Lower("İ", "tr-TR"),
+                    Text.Lower("I", "tr-TR")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q807", () =>
+            let r = try {
+                    Text.Upper("istanbul", "az-AZ"),
+                    Text.Upper("ı", "az-AZ"),
+                    Text.Lower("İSTANBUL", "az-AZ"),
+                    Text.Lower("I", "az-AZ")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q808", () =>
+            let r = try {
+                    Text.Upper("istanbul", "lt-LT"),
+                    Text.Lower("ISTANBUL", "lt-LT"),
+                    Text.Upper("ąčęėįšų", "lt-LT")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q809", () =>
+            let r = try {
+                    Text.Upper(""),
+                    Text.Lower(""),
+                    Text.Upper("abc123!@#"),
+                    Text.Lower("ABC123!@#"),
+                    Text.Upper("aBcDe"),
+                    Text.Lower("aBcDe")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q810", () =>
+            let r = try {
+                    Text.Upper(null),
+                    Text.Lower(null)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q811", () =>
+            let r = try {
+                    Text.Upper(Text.Upper("hello")) = Text.Upper("hello"),
+                    Text.Lower(Text.Lower("HELLO")) = Text.Lower("HELLO"),
+                    Text.Lower(Text.Upper("hello")) = "hello",
+                    Text.Upper("istanbul", "tr-TR") <> Text.Upper("istanbul", "en-US"),
+                    Text.Lower("İ", "tr-TR") <> Text.Lower("İ", "en-US")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q812", () =>
+            let r = try {
+                    Text.Lower("İ", "en-US"),
+                    Text.Lower("İ", "tr-TR"),
+                    Text.Lower("İ"),
+                    Text.Lower("İ", "en-US") = "i",
+                    Text.Lower("İ", "tr-TR") = "i"
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
