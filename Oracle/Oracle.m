@@ -3815,6 +3815,61 @@ let
             let r = try Number.Round(Number.Sin(Number.PI / 2), 10) in
                 if r[HasError]
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q556", () =>
+            let r = try {
+                    Number.BitwiseAnd(12, 10),
+                    Number.BitwiseAnd(255, 240),
+                    Number.BitwiseAnd(0, 0),
+                    Number.BitwiseAnd(-1, 1)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q557", () =>
+            let r = try {
+                    Number.BitwiseOr(12, 10),
+                    Number.BitwiseOr(0, 255),
+                    Number.BitwiseOr(240, 15)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q558", () =>
+            let r = try {
+                    Number.BitwiseXor(12, 10),
+                    Number.BitwiseXor(255, 255),
+                    Number.BitwiseXor(0, 255)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q559", () =>
+            let r = try {
+                    Number.BitwiseShiftLeft(1, 4),
+                    Number.BitwiseShiftLeft(3, 2),
+                    Number.BitwiseShiftRight(256, 4),
+                    Number.BitwiseShiftRight(255, 1)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q560", () =>
+            let r = try
+                let
+                    a = 12,
+                    b = 10,
+                    sum_via_bitwise = Number.BitwiseOr(Number.BitwiseAnd(a, b), Number.BitwiseXor(a, b))
+                in
+                    sum_via_bitwise
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                     else [HasError=false, Value=r[Value]])
     },
 
