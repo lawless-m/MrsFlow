@@ -10122,6 +10122,87 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1116", () =>
+            let r = try {
+                    Text.Contains("café", "café"),
+                    Text.Contains("Straße", "ass"),
+                    Text.Contains("İSTANBUL", "ist"),
+                    Text.Contains("naïve", "ai"),
+                    Text.Contains("Æther", "ae"),
+                    Text.Contains("", ""),
+                    Text.Contains("hello", "")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1117", () =>
+            let r = try {
+                    Text.Contains("CAFÉ", "café", Comparer.OrdinalIgnoreCase),
+                    Text.Contains("STRASSE", "strasse", Comparer.OrdinalIgnoreCase),
+                    Text.Contains("İstanbul", "ISTANBUL", Comparer.OrdinalIgnoreCase),
+                    Text.Contains("Hello World", "WORLD", Comparer.OrdinalIgnoreCase),
+                    Text.Contains("naïve", "NAÏVE", Comparer.OrdinalIgnoreCase)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1118", () =>
+            let r = try {
+                    Text.StartsWith("café au lait", "café"),
+                    Text.StartsWith("Straße", "STRASS", Comparer.OrdinalIgnoreCase),
+                    Text.EndsWith("résumé", "umé"),
+                    Text.EndsWith("İSTANBUL", "anbul", Comparer.OrdinalIgnoreCase),
+                    Text.StartsWith("", ""),
+                    Text.EndsWith("hello", "")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1119", () =>
+            let r = try {
+                    Comparer.Ordinal("ß", "ss"),
+                    Comparer.OrdinalIgnoreCase("ß", "ss"),
+                    Comparer.Ordinal("é", "e"),
+                    Comparer.OrdinalIgnoreCase("É", "é"),
+                    Comparer.Ordinal("İ", "i"),
+                    Comparer.OrdinalIgnoreCase("İ", "i")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1120", () =>
+            let r = try {
+                    Comparer.FromCulture("en-US")("a", "a"),
+                    Comparer.FromCulture("en-US", true)("HELLO", "hello"),
+                    Comparer.FromCulture("en-US", true)("café", "CAFÉ"),
+                    Comparer.FromCulture("en-US")("a", "b"),
+                    Comparer.FromCulture("en-US")("b", "a")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1121", () =>
+            let r = try {
+                    Text.PositionOf("café résumé", "é"),
+                    Text.PositionOf("Straße", "ß"),
+                    Text.PositionOf("CAFÉ", "é", 0, Comparer.OrdinalIgnoreCase),
+                    Text.PositionOf("İstanbul", "i", 0, Comparer.OrdinalIgnoreCase),
+                    Text.PositionOf("hello", "x")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1122", () =>
+            let r = try {
+                    List.Contains({"café", "résumé"}, "café"),
+                    List.Contains({"CAFÉ", "RÉSUMÉ"}, "café", Comparer.OrdinalIgnoreCase),
+                    List.Contains({"Straße"}, "STRASSE", Comparer.OrdinalIgnoreCase),
+                    List.Contains({"İstanbul"}, "ISTANBUL", Comparer.OrdinalIgnoreCase),
+                    List.Contains({"naïve"}, "NAÏVE", Comparer.OrdinalIgnoreCase)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 

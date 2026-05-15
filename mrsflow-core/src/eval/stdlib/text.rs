@@ -16,6 +16,7 @@ use crate::parser::Param;
 use super::super::env::{Env, EnvNode, EnvOps};
 use super::super::iohost::IoHost;
 use super::super::value::{BuiltinFn, Closure, FnBody, MError, Record, Table, Value};
+use super::comparer::upper_invariant_non_expanding;
 use super::common::{
     expect_function, expect_int, expect_list, expect_list_of_lists, expect_table,
     expect_text, expect_text_list, int_n_arg, invoke_builtin_callback,
@@ -447,7 +448,9 @@ fn contains(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     let sub = expect_text(&args[1])?;
     if comparer_is_ordinal_ignore_case(args.get(2), host)? {
-        Ok(Value::Logical(text.to_lowercase().contains(&sub.to_lowercase())))
+        Ok(Value::Logical(
+            upper_invariant_non_expanding(text).contains(&upper_invariant_non_expanding(sub))
+        ))
     } else {
         Ok(Value::Logical(text.contains(sub)))
     }
@@ -567,7 +570,13 @@ fn position_of(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let mode = parse_occurrence(args.get(2), "Text.PositionOf")?;
     let case_insensitive = comparer_is_ordinal_ignore_case(args.get(3), host)?;
     let (hay, needle): (String, String) = if case_insensitive {
-        (text.to_lowercase(), sub.to_lowercase())
+        // Match .NET OrdinalIgnoreCase: per-codepoint ToUpper without
+        // multi-char expansion (Rust folds ß → SS; .NET keeps ß).
+        // ToLower would also normalise "İ" → "i̇" which falsely matches "i".
+        (
+            upper_invariant_non_expanding(text),
+            upper_invariant_non_expanding(sub),
+        )
     } else {
         (text.to_string(), sub.to_string())
     };
@@ -613,7 +622,9 @@ fn ends_with(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     let suffix = expect_text(&args[1])?;
     if comparer_is_ordinal_ignore_case(args.get(2), host)? {
-        Ok(Value::Logical(text.to_lowercase().ends_with(&suffix.to_lowercase())))
+        Ok(Value::Logical(
+            upper_invariant_non_expanding(text).ends_with(&upper_invariant_non_expanding(suffix))
+        ))
     } else {
         Ok(Value::Logical(text.ends_with(suffix)))
     }
@@ -624,7 +635,9 @@ fn starts_with(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     let prefix = expect_text(&args[1])?;
     if comparer_is_ordinal_ignore_case(args.get(2), host)? {
-        Ok(Value::Logical(text.to_lowercase().starts_with(&prefix.to_lowercase())))
+        Ok(Value::Logical(
+            upper_invariant_non_expanding(text).starts_with(&upper_invariant_non_expanding(prefix))
+        ))
     } else {
         Ok(Value::Logical(text.starts_with(prefix)))
     }

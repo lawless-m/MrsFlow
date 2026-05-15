@@ -118,13 +118,28 @@ fn compare_ordinal(a: &Value, b: &Value) -> Result<i32, MError> {
 fn compare_ordinal_ignore_case(a: &Value, b: &Value) -> Result<i32, MError> {
     match (a, b) {
         (Value::Text(x), Value::Text(y)) => {
-            // ASCII case-fold, then byte-compare.
-            let lx = x.to_ascii_lowercase();
-            let ly = y.to_ascii_lowercase();
+            let lx = upper_invariant_non_expanding(x);
+            let ly = upper_invariant_non_expanding(y);
             Ok(sign(lx.as_bytes().cmp(ly.as_bytes())))
         }
         _ => compare_ordinal(a, b),
     }
+}
+
+/// Match .NET's OrdinalIgnoreCase per-codepoint ToUpper without the
+/// multi-char expansion paths Rust applies (e.g. Rust folds 'ß' → "SS"
+/// but .NET keeps it as 'ß'). Falls back to identity for any char whose
+/// canonical upper is multi-char.
+pub(crate) fn upper_invariant_non_expanding(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        let mut up = c.to_uppercase();
+        match (up.next(), up.next()) {
+            (Some(u), None) => out.push(u),
+            _ => out.push(c),
+        }
+    }
+    out
 }
 
 fn sign(o: std::cmp::Ordering) -> i32 {
