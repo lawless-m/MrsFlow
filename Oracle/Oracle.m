@@ -4495,6 +4495,57 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q621", () =>
+            let r = try Table.AddIndexColumn(
+                    #table({"k"}, {{"a"}, {"b"}, {"c"}}),
+                    "idx"
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q622", () =>
+            let r = try Table.AddIndexColumn(
+                    #table({"k"}, {{"a"}, {"b"}, {"c"}}),
+                    "idx",
+                    1
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q623", () =>
+            let r = try Table.AddIndexColumn(
+                    #table({"k"}, {{"a"}, {"b"}, {"c"}, {"d"}}),
+                    "idx",
+                    10,
+                    5
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q624", () =>
+            let r = try Table.AddIndexColumn(
+                    #table({"k"}, {}),
+                    "idx",
+                    0
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q625", () =>
+            let r = try Table.AddIndexColumn(
+                    #table({"k"}, {{"x"}, {"y"}, {"z"}}),
+                    "idx",
+                    5,
+                    -1
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
