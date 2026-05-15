@@ -7853,6 +7853,79 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q899", () =>
+            let xs = {3, 1, 4, 1, 5, 9, 2, 6} in
+            let r = try {
+                    List.MaxN(xs, 1),
+                    List.MaxN(xs, 3),
+                    List.MaxN(xs, 5),
+                    List.MinN(xs, 1),
+                    List.MinN(xs, 3),
+                    List.MinN(xs, 5)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q900", () =>
+            let xs = {3, 1, 4, 1, 5} in
+            let r = try {
+                    List.MaxN(xs, 0),
+                    List.MaxN(xs, 100),
+                    List.MinN(xs, 0),
+                    List.MinN(xs, 100),
+                    List.MaxN({}, 3),
+                    List.MinN({}, 3)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q901", () =>
+            let r = try {
+                    List.MaxN({1, 2, 3}, -1)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q902", () =>
+            let r = try {
+                    List.MaxN({1, 5, 5, 3, 5}, 3),
+                    List.MinN({1, 5, 5, 3, 5}, 3),
+                    List.MaxN({null, 1, null, 2, 3}, 2),
+                    List.MinN({null, 1, null, 2, 3}, 2),
+                    List.MaxN({null, null}, 1)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q903", () =>
+            let r = try {
+                    List.Numbers(1, 5),
+                    List.Numbers(0, 0),
+                    List.Numbers(5, 3),
+                    List.Numbers(1, 5, 2),
+                    List.Numbers(10, 4, -1),
+                    List.Numbers(0, 3, 0.5),
+                    List.Numbers(1, 5, -2)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q904", () =>
+            let r = try {
+                    List.Numbers(0, -1)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q905", () =>
+            let r = try {
+                    List.Numbers(0, 5) = {0, 1, 2, 3, 4},
+                    List.Sum(List.Numbers(1, 100)) = 5050,
+                    List.Numbers(1.5, 3) = {1.5, 2.5, 3.5}
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 

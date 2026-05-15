@@ -1741,8 +1741,12 @@ fn max_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
         other => return Err(type_mismatch("non-negative integer", other)),
     };
+    // PQ: MaxN/MinN drop nulls before picking top-N (an all-null list
+    // returns empty, not [null]).
     let sorted = sort_numeric_or_text(list, "List.MaxN", true)?;
-    Ok(Value::List(sorted.into_iter().take(n).collect()))
+    Ok(Value::List(
+        sorted.into_iter().filter(|v| !matches!(v, Value::Null)).take(n).collect()
+    ))
 }
 
 fn min_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
@@ -1752,7 +1756,9 @@ fn min_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         other => return Err(type_mismatch("non-negative integer", other)),
     };
     let sorted = sort_numeric_or_text(list, "List.MinN", false)?;
-    Ok(Value::List(sorted.into_iter().take(n).collect()))
+    Ok(Value::List(
+        sorted.into_iter().filter(|v| !matches!(v, Value::Null)).take(n).collect()
+    ))
 }
 
 fn non_null_count(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
