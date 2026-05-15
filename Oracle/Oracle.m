@@ -4132,6 +4132,51 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q586", () =>
+            let r = try Table.Sort(
+                    #table({"n"}, {{3}, {1}, {2}, {5}, {4}}),
+                    "n"
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q587", () =>
+            let r = try Table.Sort(
+                    #table({"n"}, {{3}, {1}, {2}, {5}, {4}}),
+                    {"n", Order.Descending}
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q588", () =>
+            let r = try Table.Sort(
+                    #table({"g", "v"}, {{"a", 3}, {"b", 1}, {"a", 1}, {"b", 2}, {"a", 2}}),
+                    {{"g", Order.Ascending}, {"v", Order.Ascending}}
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q589", () =>
+            let r = try Table.Sort(
+                    #table({"g", "v"}, {{"a", 3}, {"b", 1}, {"a", 1}, {"b", 2}, {"a", 2}}),
+                    {{"g", Order.Ascending}, {"v", Order.Descending}}
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q590", () =>
+            let r = try Table.Sort(
+                    #table({"a", "b"}, {{1, 1}, {1, 2}, {1, 1}, {2, 1}, {1, 2}}),
+                    "a"
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
