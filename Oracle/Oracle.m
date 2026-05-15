@@ -7416,6 +7416,70 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q856", () =>
+            let r = try {
+                    List.Distinct({1, 2, 1, 3, 2}),
+                    List.Distinct({"a", "b", "a", "c", "b"}),
+                    List.Distinct({}),
+                    List.Distinct({1}),
+                    List.Distinct({null, 1, null, 2})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q857", () =>
+            let r = try {
+                    List.Distinct({"Apple", "apple", "APPLE", "banana"}, Comparer.OrdinalIgnoreCase),
+                    List.Distinct({"a", "A"}, Comparer.OrdinalIgnoreCase),
+                    List.Distinct({"a", "A"}, Comparer.Ordinal),
+                    List.Distinct({"a", "A"})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q858", () =>
+            let r = try {
+                    List.Distinct({"a", "A"}, (x, y) => Text.Lower(x) = Text.Lower(y))
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q859", () =>
+            let r = try {
+                    List.Distinct({1, 1.0, 2, 2.0}),
+                    List.Distinct({"1", 1}),
+                    List.Distinct({true, false, true, true}),
+                    List.Distinct({null, null, null})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q860", () =>
+            let r = try {
+                    List.Distinct({3, 1, 2, 1, 3, 2}),
+                    List.Distinct({"c", "a", "b", "a", "c"}),
+                    List.Distinct({2, 1, 2, 3, 1})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q861", () =>
+            let r = try {
+                    List.Distinct({[a=1], [a=2], [a=1]}),
+                    List.Distinct({{1, 2}, {1, 2}, {1, 3}}),
+                    List.Distinct({[a=1, b=2], [b=2, a=1]})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q862", () =>
+            let r = try {
+                    List.Distinct(null),
+                    List.Distinct("abc")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 

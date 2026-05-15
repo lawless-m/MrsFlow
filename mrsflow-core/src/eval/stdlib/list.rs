@@ -995,7 +995,7 @@ fn eq_via_criteria(
     criteria: Option<&Closure>,
 ) -> Result<bool, MError> {
     match criteria {
-        None => values_equal_primitive(a, b),
+        None => super::value_ops::values_equal_deep(a, b),
         Some(f) => {
             let r = invoke_builtin_callback(f, vec![a.clone(), b.clone()])?;
             // Accept both shapes:
