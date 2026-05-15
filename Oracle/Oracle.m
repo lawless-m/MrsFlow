@@ -10433,6 +10433,83 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1144", () =>
+            let r = try {
+                    Record.FieldCount(#shared),
+                    Record.HasFields(#shared, "Text.From"),
+                    Record.HasFields(#shared, "List.Sum"),
+                    Record.HasFields(#shared, "Table.FromRecords"),
+                    Record.HasFields(#shared, "ThisDoesNotExist")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1145", () =>
+            let names = Record.FieldNames(#shared) in
+            let r = try {
+                    List.Contains(names, "Text.From"),
+                    List.Contains(names, "Number.From"),
+                    List.Contains(names, "List.Generate"),
+                    List.Contains(names, "Table.Group"),
+                    List.Contains(names, "Json.Document"),
+                    List.Contains(names, "Csv.Document"),
+                    List.Contains(names, "Date.AddDays")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1146", () =>
+            let names = Record.FieldNames(#shared) in
+            let r = try {
+                    List.Count(names) = List.Count(List.Distinct(names)),
+                    List.Count(names),
+                    List.Count(List.Distinct(names))
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1147", () =>
+            let names = Record.FieldNames(#shared) in
+            let countPrefix = (p) => List.Count(List.Select(names, each Text.StartsWith(_, p))) in
+            let r = try {
+                    countPrefix("Text.") > 30,
+                    countPrefix("List.") > 60,
+                    countPrefix("Table.") > 100,
+                    countPrefix("Record.") > 15,
+                    countPrefix("Number.") > 40,
+                    countPrefix("Date.") > 50
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1148", () =>
+            let r = try {
+                    Value.Is(Record.Field(#shared, "OData.Feed"), type function),
+                    Value.Is(Record.Field(#shared, "Web.Contents"), type function),
+                    Record.Field(#shared, "JoinKind.Inner") <> null
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1149", () =>
+            let t = Record.ToTable(#shared) in
+            let r = try {
+                    Table.ColumnNames(t),
+                    Table.RowCount(t) = Record.FieldCount(#shared),
+                    Table.RowCount(t) > 800
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1150", () =>
+            let r = try {
+                    Record.FieldNames(Record.SelectFields(#shared, {"Text.From", "List.Sum"})),
+                    Record.FieldCount(Record.SelectFields(#shared, {"Text.From"})),
+                    Record.FieldCount(Record.RemoveFields(#shared, {"Text.From"})) = Record.FieldCount(#shared) - 1
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
