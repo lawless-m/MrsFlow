@@ -8741,6 +8741,83 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q983", () =>
+            let a = Table.FromRecords({[k=1, v="a1"], [k=2, v="a2"], [k=3, v="a3"]}) in
+            let b = Table.FromRecords({[k=2, w="b2"], [k=3, w="b3"], [k=4, w="b4"]}) in
+            let r = try {
+                    Table.Join(a, "k", b, "k", JoinKind.Inner)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q984", () =>
+            let a = Table.FromRecords({[k=1, v="a1"], [k=2, v="a2"]}) in
+            let b = Table.FromRecords({[k=2, w="b2"], [k=3, w="b3"]}) in
+            let r = try {
+                    Table.Join(a, "k", b, "k", JoinKind.LeftOuter),
+                    Table.Join(a, "k", b, "k", JoinKind.RightOuter),
+                    Table.Join(a, "k", b, "k", JoinKind.FullOuter)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q985", () =>
+            let a = Table.FromRecords({[k=1, v="a1"], [k=2, v="a2"], [k=3, v="a3"]}) in
+            let b = Table.FromRecords({[k=2, w="b2"], [k=4, w="b4"]}) in
+            let r = try {
+                    Table.Join(a, "k", b, "k", JoinKind.LeftAnti),
+                    Table.Join(a, "k", b, "k", JoinKind.RightAnti)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q986", () =>
+            let a = Table.FromRecords({
+                    [g="g1", k=1, v="a11"],
+                    [g="g1", k=2, v="a12"],
+                    [g="g2", k=1, v="a21"]
+                }) in
+            let b = Table.FromRecords({
+                    [g="g1", k=1, w="b11"],
+                    [g="g1", k=2, w="b12"],
+                    [g="g3", k=1, w="b31"]
+                }) in
+            let r = try {
+                    Table.Join(a, {"g", "k"}, b, {"g", "k"}, JoinKind.Inner)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q987", () =>
+            let a = Table.FromRecords({[k=null, v="a-null"], [k=1, v="a1"]}) in
+            let b = Table.FromRecords({[k=null, w="b-null"], [k=1, w="b1"]}) in
+            let r = try {
+                    Table.Join(a, "k", b, "k", JoinKind.Inner),
+                    Table.Join(a, "k", b, "k", JoinKind.LeftOuter)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q988", () =>
+            let nonEmpty = Table.FromRecords({[k=1, v="a"]}) in
+            let empty = Table.FromRecords({}) in
+            let r = try {
+                    Table.Join(nonEmpty, "k", empty, "k", JoinKind.LeftOuter),
+                    Table.Join(empty, "k", nonEmpty, "k", JoinKind.LeftOuter),
+                    Table.Join(empty, "k", empty, "k", JoinKind.Inner)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q989", () =>
+            let a = Table.FromRecords({[k=1, v="a1a"], [k=1, v="a1b"]}) in
+            let b = Table.FromRecords({[k=1, w="b1a"], [k=1, w="b1b"]}) in
+            let r = try {
+                    Table.Join(a, "k", b, "k", JoinKind.Inner)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
