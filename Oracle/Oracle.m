@@ -2625,6 +2625,61 @@ let
                 ) in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q441", () =>
+            let r = try {
+                    Date.WeekOfMonth(#date(2024, 1, 1)),
+                    Date.WeekOfMonth(#date(2024, 1, 15)),
+                    Date.WeekOfMonth(#date(2024, 1, 31)),
+                    Date.WeekOfMonth(#date(2024, 12, 31))
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q442", () =>
+            let r = try {
+                    Date.WeekOfYear(#date(2024, 1, 1)),
+                    Date.WeekOfYear(#date(2024, 6, 15)),
+                    Date.WeekOfYear(#date(2024, 12, 31)),
+                    Date.WeekOfYear(#date(2024, 1, 1), Day.Monday)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q443", () =>
+            let r = try {
+                    Date.StartOfWeek(#date(2024, 6, 15)),
+                    Date.StartOfWeek(#date(2024, 6, 15), Day.Sunday),
+                    Date.StartOfWeek(#date(2024, 6, 15), Day.Monday),
+                    Date.StartOfWeek(#date(2024, 6, 17), Day.Monday)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q444", () =>
+            let r = try {
+                    Date.EndOfWeek(#date(2024, 6, 15)),
+                    Date.EndOfWeek(#date(2024, 6, 15), Day.Sunday),
+                    Date.EndOfWeek(#date(2024, 6, 15), Day.Monday),
+                    Date.EndOfWeek(#date(2024, 12, 29))
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q445", () =>
+            let r = try {
+                    Date.DayOfWeek(#date(2024, 6, 16)),
+                    Date.DayOfWeek(#date(2024, 6, 16), Day.Sunday),
+                    Date.DayOfWeek(#date(2024, 6, 16), Day.Monday),
+                    Date.DayOfWeekName(#date(2024, 6, 16))
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
