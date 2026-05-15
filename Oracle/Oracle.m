@@ -2830,7 +2830,51 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
-                        else [HasError=false, Value=r[Value]])
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q461", () =>
+            let r = try {
+                    Percentage.From("50%"),
+                    Percentage.From("100%"),
+                    Percentage.From("0%"),
+                    Percentage.From("12.5%"),
+                    Percentage.From("-25%")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q462", () =>
+            let r = try {
+                    Percentage.From(0.5),
+                    Percentage.From(1),
+                    Percentage.From(null),
+                    Percentage.From(true)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q463", () =>
+            let r = try Value.Is(0.5, Percentage.Type) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q464", () =>
+            let r = try {
+                    try Percentage.From("not a percent") otherwise "err",
+                    try Percentage.From("50") otherwise "err"
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q465", () =>
+            let r = try Percentage.From("50,5%", "fr-FR") in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]])
     },
 
     Catalog = Table.FromRecords(cases)
