@@ -3671,7 +3671,63 @@ let
                 ]), TextEncoding.Utf8) in
                 if r[HasError]
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
-                    else [HasError=false, Value=r[Value]])
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q541", () =>
+            let r = try {
+                    Number.Sign(5),
+                    Number.Sign(-3),
+                    Number.Sign(0),
+                    Number.Abs(-7.5),
+                    Number.Abs(7.5)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q542", () =>
+            let r = try {
+                    Number.Sqrt(16),
+                    Number.Sqrt(2),
+                    Number.Sqrt(0),
+                    try Number.Sqrt(-1) otherwise "err"
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q543", () =>
+            let r = try {
+                    Number.Power(2, 10),
+                    Number.Power(10, -2),
+                    Number.Power(0, 0),
+                    Number.Power(-2, 3)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q544", () =>
+            let r = try {
+                    Number.Exp(1),
+                    Number.Ln(1),
+                    Number.Ln(Number.E),
+                    Number.Log10(100),
+                    Number.Log10(1)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q545", () =>
+            let r = try {
+                    try Number.Ln(0) otherwise "err",
+                    try Number.Ln(-1) otherwise "err",
+                    try Number.Log10(0) otherwise "err"
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]])
     },
 
     Catalog = Table.FromRecords(cases)
