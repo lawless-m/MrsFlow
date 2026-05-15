@@ -2303,6 +2303,43 @@ let
             in
                 if r[HasError]
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q411", () =>
+            let r = try Record.FromList({1, 2, 3}, {"a", "b", "c"}) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q412", () =>
+            let r = try Record.ToList([a=1, b=2, c=3]) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q413", () =>
+            let r = try Record.FromTable(#table({"Name", "Value"}, {{"a", 1}, {"b", 2}, {"c", 3}})) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q414", () =>
+            let r = try Record.ToTable([a=1, b=2, c=3]) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q415", () =>
+            let r = try
+                let
+                    orig = [x=10, y=20, z=30],
+                    asList = Record.ToList(orig),
+                    roundtrip = Record.FromList(asList, Record.FieldNames(orig))
+                in
+                    Record.FieldValues(roundtrip)
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                     else [HasError=false, Value=r[Value]])
     },
 
