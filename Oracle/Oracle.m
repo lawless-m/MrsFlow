@@ -7480,6 +7480,66 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q863", () =>
+            let r = try {
+                    List.Accumulate({1, 2, 3, 4}, 0, (acc, x) => acc + x),
+                    List.Accumulate({1, 2, 3}, 1, (acc, x) => acc * x),
+                    List.Accumulate({"a", "b", "c"}, "", (acc, x) => acc & x),
+                    List.Accumulate({}, 100, (acc, x) => acc + x)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q864", () =>
+            let r = try {
+                    List.Accumulate({"a", "b", "c"}, [], (acc, x) => Record.AddField(acc, x, Text.Upper(x))),
+                    List.Accumulate({1, 2, 3}, [count=0, sum=0], (acc, x) => [count=acc[count]+1, sum=acc[sum]+x])
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q865", () =>
+            let r = try {
+                    List.Accumulate({1, 2, 3}, {}, (acc, x) => acc & {x * 10}),
+                    List.Accumulate({"a", "b"}, {"start"}, (acc, x) => acc & {x})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q866", () =>
+            let r = try {
+                    List.Accumulate({1, 2, 3}, null, (acc, x) => if acc = null then x else acc + x),
+                    List.Accumulate({}, null, (acc, x) => x)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q867", () =>
+            let r = try {
+                    List.Accumulate({1, 2}, [nested=[count=0, items={}]],
+                        (acc, x) => [nested=[count=acc[nested][count]+1, items=acc[nested][items]&{x}]])
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q868", () =>
+            let r = try {
+                    List.Accumulate({1, 2, 3}, "start", (acc, x) =>
+                        if acc = "start" then 0 else acc + x),
+                    List.Accumulate({"a", "b"}, 0, (acc, x) =>
+                        if acc = 0 then x else Text.From(acc) & x)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q869", () =>
+            let r = try {
+                    List.Accumulate(null, 0, (acc, x) => acc + x),
+                    List.Accumulate({1, 2}, 0, null)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
