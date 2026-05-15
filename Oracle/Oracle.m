@@ -4222,6 +4222,51 @@ let
                 ) in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q596", () =>
+            let r = try Table.FillDown(
+                    #table({"a", "b"}, {{"X", 1}, {null, 2}, {null, 3}, {"Y", 4}, {null, 5}}),
+                    {"a"}
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q597", () =>
+            let r = try Table.FillUp(
+                    #table({"a", "b"}, {{null, 1}, {null, 2}, {"X", 3}, {null, 4}, {"Y", 5}}),
+                    {"a"}
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q598", () =>
+            let r = try Table.FillDown(
+                    #table({"a", "b", "c"}, {{"X", null, 1}, {null, "Q", 2}, {null, null, 3}}),
+                    {"a", "b"}
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q599", () =>
+            let r = try Table.FillDown(
+                    #table({"a"}, {{null}, {null}, {"X"}, {null}}),
+                    {"a"}
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q600", () =>
+            let r = try Table.FillDown(
+                    #table({"a"}, {{"X"}, {"Y"}, {"Z"}}),
+                    {"a"}
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
