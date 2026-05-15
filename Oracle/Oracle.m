@@ -3100,7 +3100,62 @@ let
             in
                 if r[HasError]
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
-                    else [HasError=false, Value=r[Value]])
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q486", () =>
+            let r = try {
+                    Text.Insert("hello", 0, "X"),
+                    Text.Insert("hello", 5, "X"),
+                    Text.Insert("hello", 2, ""),
+                    Text.Insert("", 0, "abc")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q487", () =>
+            let r = try {
+                    Text.Remove("hello world", "l"),
+                    Text.Remove("hello world", {"l", "o"}),
+                    Text.Remove("hello", "z"),
+                    Text.Remove("", "x")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q488", () =>
+            let r = try {
+                    Text.RemoveRange("hello world", 5),
+                    Text.RemoveRange("hello world", 5, 1),
+                    Text.RemoveRange("hello", 0, 5),
+                    Text.RemoveRange("hello", 2, 0)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q489", () =>
+            let r = try {
+                    Text.Range("hello world", 6),
+                    Text.Range("hello world", 0, 5),
+                    Text.Range("hello", 0, 0),
+                    Text.Range("hello", 5)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q490", () =>
+            let r = try {
+                    try Text.Insert("hello", -1, "X") otherwise "err",
+                    try Text.Insert("hello", 10, "X") otherwise "err",
+                    try Text.Range("hello", 10) otherwise "err",
+                    try Text.Range("hello", 0, 100) otherwise "err"
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]])
     },
 
     Catalog = Table.FromRecords(cases)
