@@ -6131,6 +6131,116 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        // q740-q746: Number.FromText edge inputs.
+
+        SafeSerialize("q740", () =>
+            let r = try {
+                    Number.FromText("42"),
+                    Number.FromText(" 42"),
+                    Number.FromText("42 "),
+                    Number.FromText("  42  "),
+                    Number.FromText("#(tab)42#(tab)"),
+                    Number.FromText("3.14"),
+                    Number.FromText(" 3.14 "),
+                    try Number.FromText("") otherwise "err"
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q741", () =>
+            let r = try {
+                    Number.FromText("-42"),
+                    Number.FromText("+42"),
+                    Number.FromText("-3.14"),
+                    Number.FromText("1e5"),
+                    Number.FromText("1E5"),
+                    Number.FromText("1e+05"),
+                    Number.FromText("1e-5"),
+                    Number.FromText("-1.5e10"),
+                    Number.FromText("1.5E-10")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q742", () =>
+            let r = try {
+                    try Number.FromText("$100") otherwise "err",
+                    try Number.FromText("$100.50") otherwise "err",
+                    try Number.FromText("£100") otherwise "err",
+                    try Number.FromText("€100") otherwise "err",
+                    try Number.FromText("(100)") otherwise "err",
+                    try Number.FromText("(100.50)") otherwise "err",
+                    try Number.FromText("($100)") otherwise "err"
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q743", () =>
+            let r = try {
+                    Number.FromText("1,000"),
+                    Number.FromText("1,234,567"),
+                    Number.FromText("1,234.5"),
+                    Number.FromText("-1,234.5"),
+                    try Number.FromText("1.234.567,89") otherwise "err",
+                    Number.FromText("1.234.567,89", "de-DE"),
+                    Number.FromText("1234,5", "de-DE"),
+                    Number.FromText("1 234 567,89", "fr-FR")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q744", () =>
+            let r = try {
+                    try Number.FromText("abc") otherwise "err",
+                    try Number.FromText("12abc") otherwise "err",
+                    try Number.FromText("1..2") otherwise "err",
+                    try Number.FromText("1.2.3") otherwise "err",
+                    try Number.FromText("--1") otherwise "err",
+                    try Number.FromText("+-1") otherwise "err",
+                    try Number.FromText("1e") otherwise "err",
+                    try Number.FromText("e5") otherwise "err"
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q745", () =>
+            let r = try {
+                    try Number.FromText("Infinity") otherwise "err",
+                    try Number.FromText("-Infinity") otherwise "err",
+                    try Number.FromText("NaN") otherwise "err",
+                    try Number.FromText("inf") otherwise "err",
+                    Number.FromText("0"),
+                    Number.FromText("0.0"),
+                    Number.FromText("-0"),
+                    Number.FromText("-0.0"),
+                    try Number.FromText("null") otherwise "err",
+                    try Number.FromText(null) otherwise "err"
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q746", () =>
+            let r = try {
+                    Number.FromText("1e100"),
+                    Number.FromText("1e-100"),
+                    Number.FromText("1e308"),
+                    Number.FromText("1e-308"),
+                    Number.FromText("1.7976931348623157e308"),
+                    Number.FromText("9007199254740992"),
+                    Number.FromText("9223372036854775807"),
+                    Number.FromText("0.000000000000000000001"),
+                    Number.FromText("1234567890123456")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 

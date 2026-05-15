@@ -562,15 +562,92 @@ fn currency_from(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
 
 
 fn from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    match &args[0] {
-        Value::Null => Ok(Value::Null),
-        Value::Text(s) => s
-            .trim()
-            .parse::<f64>()
-            .map(Value::Number)
-            .map_err(|_| MError::Other(format!("Number.FromText: cannot parse {s:?}"))),
-        other => Err(type_mismatch("text", other)),
+    let s = match &args[0] {
+        Value::Null => return Ok(Value::Null),
+        Value::Text(s) => s,
+        other => return Err(type_mismatch("text", other)),
+    };
+    let culture = match args.get(1) {
+        Some(Value::Text(c)) => Some(c.clone()),
+        _ => None,
+    };
+    let trimmed = s.trim();
+    // PQ: empty / whitespace-only text → null (not an error).
+    if trimmed.is_empty() {
+        return Ok(Value::Null);
     }
+    // PQ rejects "Infinity", "inf", "NaN" as English-literal text — but
+    // Rust's f64::parse accepts them. Filter those upfront.
+    let lc = trimmed.to_ascii_lowercase();
+    if matches!(lc.as_str(), "infinity" | "-infinity" | "+infinity" | "inf" | "-inf" | "+inf") {
+        return Err(MError::Other(format!("Number.FromText: cannot parse {s:?}")));
+    }
+    if lc == "nan" {
+        return Ok(Value::Number(f64::NAN));
+    }
+    // PQ Number.FromText("null") returns null (not an error).
+    if lc == "null" {
+        return Ok(Value::Null);
+    }
+    // Parentheses-as-negative (en-US convention): "(100.50)" → -100.50,
+    // also tolerant of currency symbol inside: "($100.50)" → -100.50.
+    let (working, negate) = if trimmed.starts_with('(') && trimmed.ends_with(')') {
+        (trimmed[1..trimmed.len() - 1].trim().to_string(), true)
+    } else {
+        (trimmed.to_string(), false)
+    };
+    // Strip a single leading currency symbol if it matches the local culture.
+    // PQ Number.FromText only accepts the culture's own currency symbol —
+    // other-culture symbols (e.g. "$" under en-GB) error.
+    let stripped = strip_local_currency_symbol(&working, culture.as_deref());
+    // Locale-aware decimal separator handling.
+    let is_comma_decimal = matches!(culture.as_deref().map(str::to_ascii_lowercase).as_deref(), Some(c) if {
+        c.starts_with("de") || c.starts_with("fr") || c.starts_with("es")
+            || c.starts_with("it") || c.starts_with("nl") || c.starts_with("pt")
+    });
+    let normalised: String = if is_comma_decimal {
+        // Drop `.` (thousands) and `\u{202F}`/regular space (fr thousands),
+        // swap `,` (decimal) → `.`.
+        stripped.chars()
+            .filter(|c| !matches!(*c, '.' | ' ' | '\u{202F}' | '\u{00A0}'))
+            .map(|c| if c == ',' { '.' } else { c })
+            .collect()
+    } else {
+        // en-* invariant: drop `,` (thousands) and whitespace.
+        stripped.chars()
+            .filter(|c| !matches!(*c, ',' | ' ' | '\u{202F}' | '\u{00A0}'))
+            .collect()
+    };
+    let n: f64 = normalised
+        .parse()
+        .map_err(|_| MError::Other(format!("Number.FromText: cannot parse {s:?}")))?;
+    Ok(Value::Number(if negate { -n } else { n }))
+}
+
+fn strip_local_currency_symbol(s: &str, culture: Option<&str>) -> String {
+    // Determine the local currency symbol. Default (no culture / unrecognised)
+    // is en-GB → £, matching the rest of mrsflow's default-culture choice.
+    let symbol: char = match culture.map(str::to_ascii_lowercase).as_deref() {
+        Some(c) if c.starts_with("en-us") => '$',
+        Some(c) if c.starts_with("en-gb") => '£',
+        Some(c) if c.starts_with("ja") => '¥',
+        Some(c) if c.starts_with("de") || c.starts_with("fr") || c.starts_with("es")
+                  || c.starts_with("it") || c.starts_with("nl") || c.starts_with("pt") => '€',
+        _ => '£',
+    };
+    let trimmed = s.trim();
+    if let Some(first) = trimmed.chars().next() {
+        if first == symbol {
+            return trimmed[first.len_utf8()..].trim().to_string();
+        }
+    }
+    if let Some(last) = trimmed.chars().last() {
+        if last == symbol {
+            let cut = trimmed.len() - last.len_utf8();
+            return trimmed[..cut].trim().to_string();
+        }
+    }
+    trimmed.to_string()
 }
 
 
