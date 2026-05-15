@@ -8891,6 +8891,95 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q997", () =>
+            let t = Table.FromRecords({
+                    [k=1, v="A"],
+                    [k=2, v=null],
+                    [k=3, v=null],
+                    [k=4, v="B"],
+                    [k=5, v=null]
+                }) in
+            let r = try {
+                    Table.FillDown(t, {"v"})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q998", () =>
+            let t = Table.FromRecords({
+                    [k=1, v=null],
+                    [k=2, v=null],
+                    [k=3, v="A"],
+                    [k=4, v=null]
+                }) in
+            let r = try {
+                    Table.FillDown(t, {"v"})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q999", () =>
+            let t = Table.FromRecords({
+                    [k=1, v=null],
+                    [k=2, v=null],
+                    [k=3, v=null]
+                }) in
+            let r = try {
+                    Table.FillDown(t, {"v"})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1000", () =>
+            let t = Table.FromRecords({
+                    [k=1, v=null],
+                    [k=2, v="A"],
+                    [k=3, v=null],
+                    [k=4, v="B"],
+                    [k=5, v=null]
+                }) in
+            let r = try {
+                    Table.FillUp(t, {"v"})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1001", () =>
+            let t = Table.FromRecords({
+                    [k=1, a="A1", b="B1"],
+                    [k=2, a=null, b=null],
+                    [k=3, a=null, b="B3"],
+                    [k=4, a="A4", b=null]
+                }) in
+            let r = try {
+                    Table.FillDown(t, {"a", "b"})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1002", () =>
+            let empty = Table.FromRecords({}) in
+            let t = Table.FromRecords({[a=1]}) in
+            let r = try {
+                    Table.FillDown(empty, {"a"}),
+                    Table.FillDown(t, {"missing"})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1003", () =>
+            let t = Table.FromRecords({
+                    [v="A"],
+                    [v="B"],
+                    [v="C"]
+                }) in
+            let r = try {
+                    Table.FillDown(t, {"v"}) = t,
+                    Table.FillUp(t, {"v"}) = t
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
