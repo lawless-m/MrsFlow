@@ -9250,6 +9250,93 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1032", () =>
+            let t = Table.FromRecords({
+                    [k=1, v="A"],
+                    [k=2, v="B"],
+                    [k=1, v="A"],
+                    [k=2, v="C"]
+                }) in
+            let r = try {
+                    Table.Distinct(t)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1033", () =>
+            let t = Table.FromRecords({
+                    [k=1, v="A", w="x"],
+                    [k=2, v="B", w="y"],
+                    [k=1, v="A", w="DIFFERENT"]
+                }) in
+            let r = try {
+                    Table.Distinct(t, {"k", "v"}),
+                    Table.Distinct(t, "k")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1034", () =>
+            let t = Table.FromRecords({
+                    [k=1, v="Apple"],
+                    [k=2, v="apple"],
+                    [k=3, v="BANANA"],
+                    [k=4, v="banana"]
+                }) in
+            let r = try {
+                    Table.Distinct(t, {"v", Comparer.OrdinalIgnoreCase})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1035", () =>
+            let r = try {
+                    Table.Distinct(Table.FromRecords({})),
+                    Table.Distinct(Table.FromRecords({[k=1, v="A"]})),
+                    Table.Distinct(Table.FromRecords({
+                        [k=1, v="A"],
+                        [k=1, v="A"],
+                        [k=1, v="A"]
+                    }))
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1036", () =>
+            let t = Table.FromRecords({
+                    [k=1, v=null],
+                    [k=2, v="A"],
+                    [k=3, v=null],
+                    [k=4, v="A"]
+                }) in
+            let r = try {
+                    Table.Distinct(t, "v")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1037", () =>
+            let t = Table.FromRecords({[v="a"], [v="A"]}) in
+            let r = try {
+                    Table.Distinct(t, {"v", (x, y) => Text.Lower(x) = Text.Lower(y)})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1038", () =>
+            let t = Table.FromRecords({
+                    [k=3, v="C"],
+                    [k=1, v="A"],
+                    [k=2, v="B"],
+                    [k=1, v="A"],
+                    [k=3, v="C"]
+                }) in
+            let r = try {
+                    Table.Distinct(t)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
