@@ -29,7 +29,14 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
             three("year", "month", "day"),
             constructor,
         ),
-        ("Date.FromText", one("text"), from_text),
+        (
+            "Date.FromText",
+            vec![
+                Param { name: "text".into(),    optional: false, type_annotation: None },
+                Param { name: "options".into(), optional: true,  type_annotation: None },
+            ],
+            from_text,
+        ),
         ("Date.AddDays", two("date", "numberOfDays"), add_days),
         ("Date.AddMonths", two("date", "numberOfMonths"), add_months),
         ("Date.AddYears", two("date", "numberOfYears"), add_years),
@@ -130,8 +137,9 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         (
             "Date.ToText",
             vec![
-                Param { name: "date".into(),   optional: false, type_annotation: None },
-                Param { name: "format".into(), optional: true,  type_annotation: None },
+                Param { name: "date".into(),    optional: false, type_annotation: None },
+                Param { name: "format".into(),  optional: true,  type_annotation: None },
+                Param { name: "culture".into(), optional: true,  type_annotation: None },
             ],
             to_text,
         ),
@@ -211,9 +219,22 @@ fn to_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         Value::Date(d) => *d,
         other => return Err(type_mismatch("date", other)),
     };
+    let culture = match args.get(2) {
+        Some(Value::Text(c)) => Some(c.clone()),
+        _ => None,
+    };
     let chrono_fmt = match args.get(1) {
         Some(Value::Null) | None => "%Y-%m-%d".to_string(),
-        Some(Value::Text(s)) => translate_m_date_format(s)?,
+        Some(Value::Text(s)) => {
+            // Expand single-letter standard codes first, then try the legacy
+            // translator (errors on unknown tokens), then fall back to the
+            // wider dotnet_to_strftime that handles literal `'…'` quoting.
+            let expanded = expand_standard_date_format(s, culture.as_deref());
+            match translate_m_date_format(&expanded) {
+                Ok(v) => v,
+                Err(_) => dotnet_to_strftime(&expanded),
+            }
+        }
         Some(other) => return Err(type_mismatch("text or null", other)),
     };
     Ok(Value::Text(d.format(&chrono_fmt).to_string()))
@@ -226,7 +247,26 @@ fn from(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
         Value::Date(d) => Ok(Value::Date(*d)),
         Value::Datetime(dt) => Ok(Value::Date(dt.date())),
         Value::Text(_) => from_text(args, host),
-        other => Err(type_mismatch("date/datetime/text/null", other)),
+        Value::Number(n) => {
+            // PQ Date.From accepts a number as an OLE serial date —
+            // days since 1899-12-30 (the day before Lotus's spurious
+            // 1900 leap year). 45000 → 2023-03-15 confirms via the
+            // Excel-side oracle.
+            if !n.is_finite() {
+                return Err(MError::Other(format!(
+                    "Date.From: cannot convert non-finite number {n}"
+                )));
+            }
+            let epoch = chrono::NaiveDate::from_ymd_opt(1899, 12, 30).unwrap();
+            let days = n.trunc() as i64;
+            match epoch.checked_add_signed(chrono::Duration::days(days)) {
+                Some(d) => Ok(Value::Date(d)),
+                None => Err(MError::Other(format!(
+                    "Date.From: serial date {n} out of range"
+                ))),
+            }
+        }
+        other => Err(type_mismatch("date/datetime/text/number/null", other)),
     }
 }
 
@@ -282,7 +322,7 @@ fn day_of_week(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let d = extract_naive_date(&args[0], "Date.DayOfWeek")?;
     let first = match args.get(1) {
         Some(Value::Number(n)) if n.fract() == 0.0 && *n >= 0.0 && *n <= 6.0 => *n as u32,
-        Some(Value::Null) | None => 0, // Sunday
+        Some(Value::Null) | None => 1, // PQ default: Monday
         Some(other) => return Err(type_mismatch("integer 0..6 (Day.*)", other)),
     };
     // chrono's Weekday::num_days_from_monday returns 0..6 starting Monday=0.
@@ -383,7 +423,19 @@ fn week_of_month(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         return Ok(Value::Null);
     }
     let d = extract_naive_date(&args[0], "Date.WeekOfMonth")?;
-    Ok(Value::Number(((d.day() - 1) / 7 + 1) as f64))
+    // PQ counts weeks bounded by the first-day-of-week (default Monday). Partial
+    // week at the start of the month is week 1. Compute by aligning to the
+    // week-start of day-1 and counting whole weeks past it, then +1.
+    let first = first_day_of_week_arg(args.get(1), "Date.WeekOfMonth")?;
+    let first_of_month = chrono::NaiveDate::from_ymd_opt(d.year(), d.month(), 1).unwrap();
+    let dow = |dt: chrono::NaiveDate| -> u32 {
+        let from_mon = dt.weekday().num_days_from_monday();
+        let sunday_first = (from_mon + 1) % 7;
+        (sunday_first + 7 - first) % 7
+    };
+    let week_start_of_first = first_of_month - chrono::Duration::days(dow(first_of_month) as i64);
+    let days_since = d.signed_duration_since(week_start_of_first).num_days();
+    Ok(Value::Number((days_since / 7 + 1) as f64))
 }
 
 
@@ -393,9 +445,18 @@ fn week_of_year(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         return Ok(Value::Null);
     }
     let d = extract_naive_date(&args[0], "Date.WeekOfYear")?;
-    // PQ's WeekOfYear with default first-day-of-week is approximately ISO week.
-    // For v1, return ISO week number (1..53).
-    Ok(Value::Number(d.iso_week().week() as f64))
+    // PQ's WeekOfYear: partial week at the start of the year is week 1.
+    // Anchored to first-day-of-week (default Monday).
+    let first = first_day_of_week_arg(args.get(1), "Date.WeekOfYear")?;
+    let jan1 = chrono::NaiveDate::from_ymd_opt(d.year(), 1, 1).unwrap();
+    let dow = |dt: chrono::NaiveDate| -> u32 {
+        let from_mon = dt.weekday().num_days_from_monday();
+        let sunday_first = (from_mon + 1) % 7;
+        (sunday_first + 7 - first) % 7
+    };
+    let week_start_of_jan1 = jan1 - chrono::Duration::days(dow(jan1) as i64);
+    let days_since = d.signed_duration_since(week_start_of_jan1).num_days();
+    Ok(Value::Number((days_since / 7 + 1) as f64))
 }
 
 
@@ -508,7 +569,7 @@ fn end_of_year(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 fn first_day_of_week_arg(arg: Option<&Value>, ctx: &str) -> Result<u32, MError> {
     match arg {
         Some(Value::Number(n)) if n.fract() == 0.0 && *n >= 0.0 && *n <= 6.0 => Ok(*n as u32),
-        Some(Value::Null) | None => Ok(0), // default Sunday
+        Some(Value::Null) | None => Ok(1), // PQ default: Monday
         Some(other) => Err(MError::Other(format!(
             "{}: firstDayOfWeek must be 0..6 (got {})", ctx, super::super::type_name(other)
         ))),
@@ -562,10 +623,9 @@ fn extract_date_opt(v: &Value, ctx: &str) -> Result<Option<chrono::NaiveDate>, M
 
 fn start_of_week_naive(d: chrono::NaiveDate) -> chrono::NaiveDate {
     use chrono::Datelike;
-    // Default Sunday-start, matching Date.StartOfWeek default.
-    let from_monday = d.weekday().num_days_from_monday();
-    let dow_sunday_first = (from_monday + 1) % 7;
-    d - chrono::Duration::days(dow_sunday_first as i64)
+    // PQ default: Monday-start. chrono's num_days_from_monday is already 0=Mon..6=Sun.
+    let back = d.weekday().num_days_from_monday();
+    d - chrono::Duration::days(back as i64)
 }
 
 
@@ -952,17 +1012,193 @@ fn add_months(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 
 fn from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
-    // Power Query's Date.FromText is locale-aware. Try ISO first, then a
-    // couple of common UK/US forms. Not the full spec — just enough for the
-    // corpus.
-    for fmt in &["%Y-%m-%d", "%d-%m-%Y", "%m-%d-%Y", "%Y/%m/%d", "%d/%m/%Y"] {
-        if let Ok(d) = chrono::NaiveDate::parse_from_str(text, fmt) {
+    // Extract optional Format (.NET pattern like "dd/MM/yyyy") and Culture
+    // (e.g. "en-GB", "en-US") from the second arg. PQ accepts either a Format
+    // record `[Format=..., Culture=...]` or a culture string directly.
+    let (format, culture) = parse_date_options(args.get(1))?;
+    if let Some(fmt) = format.as_deref() {
+        let strftime = dotnet_to_strftime(fmt);
+        return chrono::NaiveDate::parse_from_str(text, &strftime)
+            .map(Value::Date)
+            .map_err(|_| MError::Raised(super::super::build_data_format_error(
+                "We couldn't parse the input provided as a Date value.".into()
+            )));
+    }
+    // No explicit format: try ISO first, then culture-appropriate locale
+    // order. Also try natural-language month names (en + de) so PQ probes
+    // like "June 15, 2024" and "15 Juni 2024" parse without a Format arg.
+    let formats: &[&str] = match culture.as_deref().map(culture_lang).unwrap_or("") {
+        "en-US" => &["%Y-%m-%d", "%m/%d/%Y", "%m-%d-%Y", "%Y/%m/%d",
+                     "%B %d, %Y", "%b %d, %Y", "%d %B %Y", "%d %b %Y"],
+        "de-DE" | "de" => &["%Y-%m-%d", "%d.%m.%Y", "%d/%m/%Y",
+                            "%d %B %Y", "%d %b %Y"],
+        "fr-FR" | "fr" => &["%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y",
+                            "%d %B %Y", "%d %b %Y"],
+        _ => &["%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%m/%d/%Y", "%m-%d-%Y",
+               "%Y/%m/%d", "%B %d, %Y", "%d %B %Y"],
+    };
+    for fmt in formats {
+        // chrono's locale parsing uses English by default. For de/fr month
+        // names, translate to English before parsing.
+        let translated = translate_month_names(text, culture.as_deref());
+        if let Ok(d) = chrono::NaiveDate::parse_from_str(&translated, fmt) {
             return Ok(Value::Date(d));
         }
     }
-    Err(MError::Other(format!(
-        "Date.FromText: cannot parse {text:?}"
+    Err(MError::Raised(super::super::build_data_format_error(
+        "We couldn't parse the input provided as a Date value.".into()
     )))
+}
+
+fn parse_date_options(arg: Option<&Value>) -> Result<(Option<String>, Option<String>), MError> {
+    match arg {
+        None | Some(Value::Null) => Ok((None, None)),
+        Some(Value::Text(s)) => Ok((None, Some(s.clone()))),
+        Some(Value::Record(r)) => {
+            let mut format = None;
+            let mut culture = None;
+            for (k, v) in &r.fields {
+                match (k.as_str(), v) {
+                    ("Format",  Value::Text(s)) => format  = Some(s.clone()),
+                    ("Culture", Value::Text(s)) => culture = Some(s.clone()),
+                    ("Format",  Value::Null) | ("Culture", Value::Null) => {}
+                    _ => {}
+                }
+            }
+            Ok((format, culture))
+        }
+        Some(other) => Err(type_mismatch("text (culture) or record (options)", other)),
+    }
+}
+
+fn translate_month_names(text: &str, culture: Option<&str>) -> String {
+    let is_de = matches!(culture, Some(c) if c.to_ascii_lowercase().starts_with("de"));
+    let is_fr = matches!(culture, Some(c) if c.to_ascii_lowercase().starts_with("fr"));
+    if !is_de && !is_fr { return text.to_string(); }
+    let pairs: &[(&str, &str)] = if is_de {
+        &[("Januar","January"),("Februar","February"),("März","March"),("April","April"),
+          ("Mai","May"),("Juni","June"),("Juli","July"),("August","August"),
+          ("September","September"),("Oktober","October"),("November","November"),
+          ("Dezember","December"),("Jan","Jan"),("Feb","Feb"),("Mrz","Mar"),("Apr","Apr"),
+          ("Jun","Jun"),("Jul","Jul"),("Aug","Aug"),("Sep","Sep"),("Okt","Oct"),
+          ("Nov","Nov"),("Dez","Dec")]
+    } else {
+        &[("janvier","January"),("février","February"),("mars","March"),("avril","April"),
+          ("mai","May"),("juin","June"),("juillet","July"),("août","August"),
+          ("septembre","September"),("octobre","October"),("novembre","November"),
+          ("décembre","December")]
+    };
+    let mut out = text.to_string();
+    for (src, dst) in pairs {
+        out = out.replace(src, dst);
+    }
+    out
+}
+
+fn culture_lang(s: &str) -> &str {
+    // Normalise to a small set of locale tags we handle directly.
+    if s.eq_ignore_ascii_case("en-US") { "en-US" }
+    else if s.eq_ignore_ascii_case("de-DE") { "de-DE" }
+    else if s.eq_ignore_ascii_case("fr-FR") { "fr-FR" }
+    else { s }
+}
+
+/// Expand .NET single-letter standard date/datetime format codes to their
+/// full custom pattern equivalents. Returns the input unchanged if it's
+/// already a custom pattern (length > 1 or unrecognised single letter).
+pub(super) fn expand_standard_date_format(fmt: &str, culture: Option<&str>) -> String {
+    if fmt.chars().count() != 1 {
+        return fmt.to_string();
+    }
+    let c = fmt.chars().next().unwrap();
+    // en-GB is the default Oracle culture. en-US has different short forms.
+    let is_en_us = matches!(culture, Some(c) if c.eq_ignore_ascii_case("en-US"));
+    let s = match c {
+        // Short date
+        'd' => if is_en_us { "M/d/yyyy" } else { "dd/MM/yyyy" },
+        // Long date
+        'D' => "dddd, MMMM d, yyyy",
+        // Full date/time (short time)
+        'f' => if is_en_us { "dddd, MMMM d, yyyy h:mm tt" } else { "dd MMMM yyyy HH:mm" },
+        // Full date/time (long time)
+        'F' => if is_en_us { "dddd, MMMM d, yyyy h:mm:ss tt" } else { "dd MMMM yyyy HH:mm:ss" },
+        // General date/time (short time)
+        'g' => if is_en_us { "M/d/yyyy h:mm tt" } else { "dd/MM/yyyy HH:mm" },
+        // General date/time (long time)
+        'G' => if is_en_us { "M/d/yyyy h:mm:ss tt" } else { "dd/MM/yyyy HH:mm:ss" },
+        // Month/day
+        'M' | 'm' => "MMMM d",
+        // Round-trip ISO 8601
+        'O' | 'o' => "yyyy-MM-ddTHH:mm:ss.fffffff",
+        // RFC 1123
+        'R' | 'r' => "ddd, dd MMM yyyy HH:mm:ss",
+        // Sortable
+        's' => "yyyy-MM-ddTHH:mm:ss",
+        // Short time
+        't' => if is_en_us { "h:mm tt" } else { "HH:mm" },
+        // Long time
+        'T' => if is_en_us { "h:mm:ss tt" } else { "HH:mm:ss" },
+        // Universal sortable
+        'u' => "yyyy-MM-dd HH:mm:ssZ",
+        // Universal full
+        'U' => "dddd, MMMM d, yyyy HH:mm:ss",
+        // Year/month
+        'Y' | 'y' => "MMMM yyyy",
+        _ => fmt,
+    };
+    s.to_string()
+}
+
+/// Translate a .NET-style date format string (yyyy/MM/dd/HH/mm/ss) into a
+/// chrono strftime pattern. Only the pieces Date.FromText / DateTime.ToText
+/// care about — extend when needed.
+pub(super) fn dotnet_to_strftime(fmt: &str) -> String {
+    let mut out = String::with_capacity(fmt.len());
+    let chars: Vec<char> = fmt.chars().collect();
+    let mut i = 0;
+    while i < chars.len() {
+        let c = chars[i];
+        // Count run length of this character.
+        let mut j = i;
+        while j < chars.len() && chars[j] == c { j += 1; }
+        let run = j - i;
+        match (c, run) {
+            ('y', 4) => out.push_str("%Y"),
+            ('y', 2) => out.push_str("%y"),
+            ('y', _) => out.push_str("%Y"),
+            ('M', 4) => out.push_str("%B"),
+            ('M', 3) => out.push_str("%b"),
+            ('M', 2) => out.push_str("%m"),
+            ('M', 1) => out.push_str("%-m"),
+            ('d', 4) => out.push_str("%A"),
+            ('d', 3) => out.push_str("%a"),
+            ('d', 2) => out.push_str("%d"),
+            ('d', 1) => out.push_str("%-d"),
+            ('H', 2) => out.push_str("%H"),
+            ('H', 1) => out.push_str("%-H"),
+            ('h', 2) => out.push_str("%I"),
+            ('h', 1) => out.push_str("%-I"),
+            ('m', 2) => out.push_str("%M"),
+            ('m', 1) => out.push_str("%-M"),
+            ('s', 2) => out.push_str("%S"),
+            ('s', 1) => out.push_str("%-S"),
+            ('f', n) => { let _ = n; out.push_str("%f"); }
+            ('t', 2) => out.push_str("%p"),
+            ('\'', _) => {
+                // Literal block: copy through to matching quote, skipping the quotes.
+                i = j;
+                while i < chars.len() && chars[i] != '\'' {
+                    out.push(chars[i]);
+                    i += 1;
+                }
+                if i < chars.len() { i += 1; }
+                continue;
+            }
+            (other, _) => for _ in 0..run { out.push(other); }
+        }
+        i = j;
+    }
+    out
 }
 
 // --- ODBC (eval-8) ---

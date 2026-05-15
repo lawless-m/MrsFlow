@@ -9534,6 +9534,79 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1060", () =>
+            let r = try {
+                    Date.AddYears(#date(2024, 2, 29), 1),
+                    Date.AddYears(#date(2024, 2, 29), 4),
+                    Date.AddYears(#date(2024, 2, 28), 1),
+                    Date.AddYears(#date(2000, 2, 29), -100)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1061", () =>
+            let r = try {
+                    Date.AddMonths(#date(2026, 1, 31), 1),
+                    Date.AddMonths(#date(2024, 1, 31), 1),
+                    Date.AddMonths(#date(2026, 3, 31), -1),
+                    Date.AddMonths(#date(2026, 12, 31), 1)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1062", () =>
+            let r = try {
+                    Date.AddDays(#date(2026, 12, 31), 1),
+                    Date.AddDays(#date(2026, 1, 1), -1),
+                    Date.AddDays(#date(2024, 2, 28), 1),
+                    Date.AddDays(#date(2024, 2, 28), 2),
+                    Date.AddDays(#date(2025, 2, 28), 1),
+                    Date.AddDays(#date(2025, 2, 28), 2)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1063", () =>
+            let r = try {
+                    Date.AddYears(#date(2026, 6, 15), -100),
+                    Date.AddYears(#date(2026, 6, 15), -1000),
+                    Date.AddYears(#date(1, 1, 1), 0),
+                    Date.AddYears(#date(9999, 12, 31), 0)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1064", () =>
+            let r = try {
+                    Date.WeekOfYear(#date(2026, 1, 1)),
+                    Date.WeekOfYear(#date(2026, 1, 1), Day.Monday),
+                    Date.WeekOfYear(#date(2026, 1, 1), Day.Sunday),
+                    Date.WeekOfYear(#date(2026, 12, 31), Day.Monday),
+                    Date.WeekOfYear(#date(2025, 12, 31), Day.Sunday)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1065", () =>
+            let r = try {
+                    Date.From("2026-06-15"),
+                    Date.From(#datetime(2026, 6, 15, 10, 30, 0)),
+                    Date.From(45000),
+                    Date.From(null)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1066", () =>
+            let r = try {
+                    #date(2026, 6, 15) - #date(2026, 6, 10),
+                    #date(2026, 6, 10) - #date(2026, 6, 15),
+                    #date(2026, 3, 1) - #date(2026, 2, 28),
+                    #date(2024, 3, 1) - #date(2024, 2, 28)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
