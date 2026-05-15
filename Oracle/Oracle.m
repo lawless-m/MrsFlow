@@ -4961,6 +4961,111 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        // q663-q669: Number.Mod sign matrix.
+
+        SafeSerialize("q663", () =>
+            let r = try {
+                    Number.Mod(7, 3),
+                    Number.Mod(-7, 3),
+                    Number.Mod(7, -3),
+                    Number.Mod(-7, -3),
+                    Number.Mod(0, 3),
+                    Number.Mod(0, -3),
+                    Number.Mod(3, 3),
+                    Number.Mod(-3, 3)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q664", () =>
+            let r = try {
+                    Number.Mod(7.5, 2),
+                    Number.Mod(-7.5, 2),
+                    Number.Mod(7.5, -2),
+                    Number.Mod(-7.5, -2),
+                    Number.Mod(2.5, 0.5),
+                    Number.Mod(-2.5, 0.5),
+                    Number.Mod(2.5, -0.5),
+                    Number.Mod(-2.5, -0.5)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q665", () =>
+            let r = try {
+                    Number.Mod(1, 5),
+                    Number.Mod(-1, 5),
+                    Number.Mod(1, -5),
+                    Number.Mod(-1, -5),
+                    Number.Mod(5, 7),
+                    Number.Mod(-5, 7),
+                    Number.Mod(5, -7),
+                    Number.Mod(-5, -7)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q666", () =>
+            let r = try {
+                    try Number.Mod(1, 0) otherwise "err",
+                    try Number.Mod(-1, 0) otherwise "err",
+                    try Number.Mod(0, 0) otherwise "err",
+                    try Number.Mod(1.5, 0) otherwise "err",
+                    try Number.Mod(null, 5) otherwise "err",
+                    try Number.Mod(5, null) otherwise "err",
+                    try Number.Mod(null, null) otherwise "err"
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q667", () =>
+            let r = try {
+                    try Number.Mod(Number.NaN, 3) otherwise "err",
+                    try Number.Mod(3, Number.NaN) otherwise "err",
+                    try Number.Mod(Number.PositiveInfinity, 3) otherwise "err",
+                    try Number.Mod(3, Number.PositiveInfinity) otherwise "err",
+                    try Number.Mod(Number.NegativeInfinity, 3) otherwise "err",
+                    try Number.Mod(3, Number.NegativeInfinity) otherwise "err",
+                    try Number.Mod(Number.PositiveInfinity, Number.PositiveInfinity) otherwise "err"
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q668", () =>
+            let r = try {
+                    Number.Mod(10, 3),
+                    Number.Mod(11, 3),
+                    Number.Mod(12, 3),
+                    Number.Mod(100, 7),
+                    Number.Mod(-100, 7),
+                    Number.Mod(100, -7),
+                    Number.Mod(-100, -7),
+                    Number.Mod(1000000, 17)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q669", () =>
+            let r = try {
+                    Number.Mod(0.1, 0.03),
+                    Number.Mod(-0.1, 0.03),
+                    Number.Mod(1.1, 1),
+                    Number.Mod(-1.1, 1),
+                    Number.Mod(1, 1.1),
+                    Number.Mod(-1, 1.1),
+                    Number.Mod(0.0001, 0.0001),
+                    Number.Mod(0.0002, 0.0001)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
