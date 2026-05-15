@@ -3200,7 +3200,56 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
-                        else [HasError=false, Value=r[Value]])
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q496", () =>
+            let r = try Text.Length(Text.NewGuid()) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q497", () =>
+            let r = try
+                let
+                    g = Text.NewGuid(),
+                    parts = Text.Split(g, "-")
+                in
+                    List.Transform(parts, each Text.Length(_))
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q498", () =>
+            let r = try
+                let
+                    samples = List.Transform({1..5}, each Text.NewGuid()),
+                    distinct = List.Distinct(samples)
+                in
+                    List.Count(distinct)
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q499", () =>
+            let r = try
+                let
+                    g = Text.NewGuid(),
+                    lower = Text.Lower(g),
+                    isHex = List.AllTrue(List.Transform(Text.ToList(Text.Replace(lower, "-", "")), each Text.Contains("0123456789abcdef", _)))
+                in
+                    isHex
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q500", () =>
+            let r = try Text.Length(Text.Replace(Text.NewGuid(), "-", "")) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]])
     },
 
     Catalog = Table.FromRecords(cases)
