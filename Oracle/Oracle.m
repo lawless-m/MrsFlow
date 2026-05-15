@@ -4546,7 +4546,56 @@ let
                 ) in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
-                        else [HasError=false, Value=r[Value]])
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q626", () =>
+            let r = try Table.PromoteHeaders(
+                    #table({"Column1", "Column2", "Column3"}, {{"a", "b", "c"}, {"1", "2", "3"}})
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q627", () =>
+            let r = try Table.DemoteHeaders(
+                    #table({"a", "b", "c"}, {{1, 2, 3}, {4, 5, 6}})
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q628", () =>
+            let r = try
+                let
+                    t1 = #table({"a", "b"}, {{"x", "y"}, {1, 2}}),
+                    demoted = Table.DemoteHeaders(t1),
+                    roundtrip = Table.PromoteHeaders(demoted)
+                in
+                    roundtrip
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q629", () =>
+            let r = try Table.PromoteHeaders(
+                    #table({"Column1"}, {})
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=Table.ColumnNames(r[Value])]),
+
+        SafeSerialize("q630", () =>
+            let r = try
+                let
+                    t = #table({"Column1", "Column2"}, {{"a", "b"}, {"c", "d"}, {"e", "f"}}),
+                    promoted = Table.PromoteHeaders(t)
+                in
+                    Table.ColumnNames(promoted)
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]])
     },
 
     Catalog = Table.FromRecords(cases)
