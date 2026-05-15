@@ -3870,7 +3870,61 @@ let
             in
                 if r[HasError]
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
-                    else [HasError=false, Value=r[Value]])
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q561", () =>
+            let r = try {
+                    Text.Proper("hello world"),
+                    Text.Proper("HELLO WORLD"),
+                    Text.Proper("hELLo wORLD"),
+                    Text.Proper("a")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q562", () =>
+            let r = try {
+                    Text.Trim("  hello  "),
+                    Text.Trim("hello"),
+                    Text.Trim("   "),
+                    Text.Trim("#(tab)hello#(lf)")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q563", () =>
+            let r = try {
+                    Text.TrimStart("  hello  "),
+                    Text.TrimEnd("  hello  "),
+                    Text.TrimStart("xxhelloxx", "x"),
+                    Text.TrimEnd("xxhelloxx", "x")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q564", () =>
+            let r = try {
+                    Text.Trim("abcxyz", {"a", "z"}),
+                    Text.TrimStart("abcabc", {"a", "b"}),
+                    Text.TrimEnd("xxyyzz", {"y", "z"})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q565", () =>
+            let r = try {
+                    Text.Trim(""),
+                    Text.Proper(""),
+                    Text.Trim("hello", "h"),
+                    Text.Trim("aaa", "a")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]])
     },
 
     Catalog = Table.FromRecords(cases)
