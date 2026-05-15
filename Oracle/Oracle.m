@@ -6464,6 +6464,72 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q761", () =>
+            let r = try {
+                    Text.Replace("Hello hello HELLO", "hello", "X", Comparer.OrdinalIgnoreCase),
+                    Text.Replace("Hello", "HELLO", "X", Comparer.OrdinalIgnoreCase),
+                    Text.Replace("Hello", "hello", "X", Comparer.Ordinal),
+                    Text.Replace("Hello", "HELLO", "X", Comparer.Ordinal)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q762", () =>
+            let r = try {
+                    Text.Replace("abc", "", "X"),
+                    Text.Replace("", "", "X"),
+                    Text.Replace("abc", "", ""),
+                    Text.Replace("", "abc", "X")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q763", () =>
+            let r = try {
+                    Text.Replace("abcabc", "b", ""),
+                    Text.Replace("aaa", "a", ""),
+                    Text.Replace("abc", "abc", ""),
+                    Text.Replace("a-b-c", "-", "")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q764", () =>
+            let r = try {
+                    Text.Replace("aaaa", "aa", "b"),
+                    Text.Replace("ababab", "ab", "X"),
+                    Text.Replace("aaa", "aa", "a"),
+                    Text.Replace("xx", "x", "xx")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q765", () =>
+            let r = try {
+                    Text.Replace("café", "é", "e"),
+                    Text.Replace("naïve", "ï", "i"),
+                    Text.Replace("→→→", "→", "->"),
+                    Text.Replace("ßß", "ß", "ss")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q766", () =>
+            let r = try {
+                    Text.Replace(null, "a", "b"),
+                    Text.Replace("abc", null, "b"),
+                    Text.Replace("abc", "a", null)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q767", () =>
+            let r = try {
+                    Text.Replace("Hello hello", "hello", "X", (a, b) => Value.Compare(Text.Lower(a), Text.Lower(b)))
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
