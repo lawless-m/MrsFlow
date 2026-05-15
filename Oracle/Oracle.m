@@ -8124,6 +8124,67 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q927", () =>
+            let r = try {
+                    List.Transform({1, 2, 3}, each _ * 2),
+                    List.Transform({}, each _ * 2),
+                    List.Transform({"a", "b"}, each Text.Upper(_))
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q928", () =>
+            let r = try {
+                    List.Transform({"a", "b", "c"}, (item, idx) => Text.From(idx) & "=" & item),
+                    List.Transform({10, 20, 30}, (v, i) => v + i),
+                    List.Transform({}, (v, i) => v + i)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q929", () =>
+            let r = try {
+                    List.Transform({100, 200, 300}, (v, i) => [pos=i, val=v]),
+                    List.Transform(List.Numbers(1, 5), (n, i) => n * 100 + i)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q930", () =>
+            let r = try {
+                    List.Transform({1, 2, 3}, () => 99),
+                    List.Transform({1, 2, 3}, (a, b, c) => a + b + c)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q931", () =>
+            let r = try {
+                    List.Transform(null, each _),
+                    List.Transform({1, 2}, null)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q932", () =>
+            let r = try {
+                    List.Select({10, 20, 30, 40}, each _ > 15),
+                    List.Select({}, each _ > 0),
+                    List.Select({10, 20, 30, 40}, (v, i) => i > 1)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q933", () =>
+            let r = try {
+                    List.RemoveItems({"a", "B", "c", "D"}, {"b", "d"}),
+                    List.RemoveItems({"a", "B", "c", "D"}, {"b", "d"}, Comparer.OrdinalIgnoreCase),
+                    List.RemoveItems({1, 2, 3, 4}, {2, 4}),
+                    List.RemoveItems({}, {1, 2})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
