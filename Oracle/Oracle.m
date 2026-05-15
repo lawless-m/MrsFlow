@@ -1923,7 +1923,37 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
-                        else [HasError=false, Value=r[Value]])
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q361", () =>
+            let r = try {Text.PadStart("42", 5), Text.PadStart("42", 5, "0"), Text.PadStart("hi", 2), Text.PadStart("", 3, "*")} in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q362", () =>
+            let r = try {Text.PadEnd("42", 5), Text.PadEnd("42", 5, "."), Text.PadEnd("hi", 2), Text.PadEnd("", 3, "x")} in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q363", () =>
+            let r = try {Text.Repeat("ab", 3), Text.Repeat("x", 0), Text.Repeat("", 5), Text.Repeat("-", 10)} in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q364", () =>
+            let r = try Text.PadStart("hi", 6, "ab") in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q365", () =>
+            let r = try Text.Repeat("ab", -1) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]])
     },
 
     Catalog = Table.FromRecords(cases)
