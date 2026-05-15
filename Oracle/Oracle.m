@@ -3627,7 +3627,51 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
-                        else [HasError=false, Value=r[Value]])
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q536", () =>
+            let r = try Text.FromBinary(Json.FromValue([a=1, b=2, c=3]), TextEncoding.Utf8) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q537", () =>
+            let r = try Text.FromBinary(Json.FromValue([
+                    name = "alpha",
+                    nested = [a=1, b=[x=10, y=20]],
+                    items = {1, 2, 3}
+                ]), TextEncoding.Utf8) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q538", () =>
+            let r = try Text.FromBinary(Json.FromValue({{1, 2}, {3, 4}, {5, 6}}), TextEncoding.Utf8) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q539", () =>
+            let r = try Text.FromBinary(Json.FromValue([
+                    empty_list = {},
+                    empty_rec = [],
+                    nullable = null,
+                    bools = {true, false, true}
+                ]), TextEncoding.Utf8) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q540", () =>
+            let r = try Text.FromBinary(Json.FromValue([
+                    quote = "he said ""hi""",
+                    backslash = "C:\path\file",
+                    tab = "a#(tab)b",
+                    newline = "line1#(lf)line2"
+                ]), TextEncoding.Utf8) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]])
     },
 
     Catalog = Table.FromRecords(cases)
