@@ -1655,7 +1655,15 @@ let
         SafeSerialize("q312", () => Date.DayOfWeek(#date(2026,3,15))),
         SafeSerialize("q313", () => Date.DayOfWeekName(#date(2026,3,15))),
         SafeSerialize("q314", () => Date.DayOfYear(#date(2026,3,15))),
-        SafeSerialize("q315", () => Date.DaysInMonth(#date(2026,3,15)))
+        SafeSerialize("q315", () => Date.DaysInMonth(#date(2026,3,15))),
+
+        // q316-q320: Number.IsOdd/IsEven/Mod/IntegerDivide sign semantics.
+
+        SafeSerialize("q316", () => Number.IsOdd(-7)),
+        SafeSerialize("q317", () => Number.IsEven(-7)),
+        SafeSerialize("q318", () => Number.Mod(-10, 3)),
+        SafeSerialize("q319", () => Number.IntegerDivide(-10, 3)),
+        SafeSerialize("q320", () => Number.Mod(10, -3))
     },
 
     Catalog = Table.FromRecords(cases)

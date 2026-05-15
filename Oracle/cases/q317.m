@@ -1,0 +1,1 @@
+Number.IsEven(-7)
