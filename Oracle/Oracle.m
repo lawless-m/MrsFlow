@@ -1596,7 +1596,24 @@ let
             let r = try Table.ColumnNames(Table.Schema(#table({"a","b"}, {{1,2}}))) in
                 if r[HasError]
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
-                    else [HasError=false, Value=r[Value]])
+                    else [HasError=false, Value=r[Value]]),
+
+        // q296-q300: Lines.* — newline conventions + roundtrips.
+
+        SafeSerialize("q296", () =>
+            Lines.FromText("a#(lf)b#(lf)c")),
+
+        SafeSerialize("q297", () =>
+            Lines.FromText("a#(cr)#(lf)b#(cr)#(lf)c")),
+
+        SafeSerialize("q298", () =>
+            Lines.FromText("a#(lf)b#(lf)")),
+
+        SafeSerialize("q299", () =>
+            Lines.FromText("")),
+
+        SafeSerialize("q300", () =>
+            Lines.ToText(Lines.FromText("a#(lf)b#(lf)c")))
     },
 
     Catalog = Table.FromRecords(cases)
