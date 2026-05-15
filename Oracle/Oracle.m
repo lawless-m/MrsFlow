@@ -4267,6 +4267,67 @@ let
                 ) in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q601", () =>
+            let r = try Table.ReplaceValue(
+                    #table({"v"}, {{"hello"}, {"world"}, {"hello"}}),
+                    "hello",
+                    "HI",
+                    Replacer.ReplaceValue,
+                    {"v"}
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q602", () =>
+            let r = try Table.ReplaceValue(
+                    #table({"v"}, {{"foo bar"}, {"bar baz"}, {"qux"}}),
+                    "bar",
+                    "X",
+                    Replacer.ReplaceText,
+                    {"v"}
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q603", () =>
+            let r = try Table.ReplaceValue(
+                    #table({"a", "b"}, {{1, 1}, {1, 2}, {2, 1}}),
+                    1,
+                    99,
+                    Replacer.ReplaceValue,
+                    {"a"}
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q604", () =>
+            let r = try Table.ReplaceValue(
+                    #table({"v"}, {{null}, {"x"}, {null}, {"y"}}),
+                    null,
+                    "MISSING",
+                    Replacer.ReplaceValue,
+                    {"v"}
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q605", () =>
+            let r = try Table.ReplaceErrorValues(
+                    Table.AddColumn(
+                        #table({"n"}, {{2}, {0}, {4}, {0}, {8}}),
+                        "inv",
+                        each if [n] = 0 then error "div by zero" else 100 / [n]
+                    ),
+                    {{"inv", -1}}
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
