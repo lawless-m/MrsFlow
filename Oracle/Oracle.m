@@ -4033,6 +4033,60 @@ let
             in
                 if r[HasError]
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q576", () =>
+            let r = try {
+                    Record.RemoveFields([a=1, b=2, c=3], "b"),
+                    Record.RemoveFields([a=1, b=2, c=3], {"a", "c"}),
+                    Record.RemoveFields([a=1, b=2, c=3], {})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q577", () =>
+            let r = try {
+                    Record.RenameFields([a=1, b=2, c=3], {{"a", "alpha"}}),
+                    Record.RenameFields([a=1, b=2, c=3], {{"a", "x"}, {"c", "z"}}),
+                    Record.RenameFields([a=1, b=2], {})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q578", () =>
+            let r = try {
+                    Record.TransformFields([a=1, b=2, c=3], {{"a", each _ * 10}}),
+                    Record.TransformFields([n=5], {{"n", Text.From}}),
+                    Record.TransformFields([a=1, b=2], {{"a", each _ + 100}, {"b", each _ - 1}})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q579", () =>
+            let r = try {
+                    try Record.RemoveFields([a=1, b=2], "z") otherwise "err",
+                    try Record.RenameFields([a=1], {{"x", "y"}}) otherwise "err",
+                    try Record.TransformFields([a=1], {{"z", each _ * 2}}) otherwise "err"
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q580", () =>
+            let r = try
+                let
+                    original = [a=1, b=2, c=3, d=4],
+                    step1 = Record.RemoveFields(original, "d"),
+                    step2 = Record.RenameFields(step1, {{"a", "alpha"}, {"c", "charlie"}}),
+                    step3 = Record.TransformFields(step2, {{"alpha", each _ * 100}})
+                in
+                    step3
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                     else [HasError=false, Value=r[Value]])
     },
 
