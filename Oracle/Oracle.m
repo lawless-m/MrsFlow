@@ -8818,6 +8818,79 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q990", () =>
+            let a = Table.FromRecords({[k=1, v="a1"], [k=2, v="a2"], [k=3, v="a3"]}) in
+            let b = Table.FromRecords({[k=2, w="b2"], [k=3, w="b3"], [k=4, w="b4"]}) in
+            let r = try {
+                    Table.NestedJoin(a, "k", b, "k", "nested", JoinKind.Inner)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q991", () =>
+            let a = Table.FromRecords({[k=1, v="a1"], [k=2, v="a2"]}) in
+            let b = Table.FromRecords({[k=2, w="b2"], [k=3, w="b3"]}) in
+            let r = try {
+                    Table.NestedJoin(a, "k", b, "k", "nested", JoinKind.LeftOuter)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q992", () =>
+            let a = Table.FromRecords({[k=1, v="a1"], [k=2, v="a2"]}) in
+            let b = Table.FromRecords({[k=2, w="b2"], [k=3, w="b3"]}) in
+            let nested = Table.NestedJoin(a, "k", b, "k", "tbl", JoinKind.Inner) in
+            let r = try {
+                    Table.ExpandTableColumn(nested, "tbl", {"w"})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q993", () =>
+            let a = Table.FromRecords({
+                    [g="x", k=1, v="a1"],
+                    [g="x", k=2, v="a2"],
+                    [g="y", k=1, v="a3"]
+                }) in
+            let b = Table.FromRecords({
+                    [g="x", k=1, w="b1"],
+                    [g="x", k=2, w="b2"]
+                }) in
+            let r = try {
+                    Table.NestedJoin(a, {"g", "k"}, b, {"g", "k"}, "nested", JoinKind.LeftOuter)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q994", () =>
+            let a = Table.FromRecords({[k=null, v="a1"], [k=1, v="a2"]}) in
+            let b = Table.FromRecords({[k=null, w="b1"], [k=1, w="b2"]}) in
+            let r = try {
+                    Table.NestedJoin(a, "k", b, "k", "nested", JoinKind.LeftOuter)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q995", () =>
+            let a = Table.FromRecords({[k=1, v="a1"], [k=2, v="a2"], [k=3, v="a3"]}) in
+            let b = Table.FromRecords({[k=2, w="b2"]}) in
+            let r = try {
+                    Table.NestedJoin(a, "k", b, "k", "nested", JoinKind.LeftAnti),
+                    Table.NestedJoin(a, "k", b, "k", "nested", JoinKind.RightAnti)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q996", () =>
+            let a = Table.FromRecords({[k=1, v="a1"], [k=2, v="a2"]}) in
+            let b = Table.FromRecords({[k=2, w="b2"], [k=3, w="b3"]}) in
+            let r = try {
+                    Table.NestedJoin(a, "k", b, "k", "nested", JoinKind.RightOuter),
+                    Table.NestedJoin(a, "k", b, "k", "nested", JoinKind.FullOuter)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 

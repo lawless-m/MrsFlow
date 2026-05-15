@@ -145,9 +145,14 @@ pub enum TypeRep {
     },
     /// `type function (n as T, optional t as U) as R` — function type.
     FunctionOf {
-        params: Vec<(TypeRep, bool /* optional */)>,
+        params: Vec<(String /* name */, TypeRep, bool /* optional */)>,
         return_type: Box<TypeRep>,
     },
+    /// Specific PQ numeric type names (Int64.Type, Int32.Type, Int16.Type,
+    /// Int8.Type, Single.Type, Double.Type, Decimal.Type, Currency.Type,
+    /// Percentage.Type). Stored as the literal type-name so Table.Schema can
+    /// report the correct TypeName.
+    NamedNumeric(&'static str),
 }
 
 /// State of a lazy thunk: pending evaluation (with the captured expression
@@ -1067,10 +1072,16 @@ fn materialise_join_view(jv: &JoinViewState) -> Result<Table, MError> {
                 out_rows.push(row);
             }
         }
-        // FullOuter: LeftOuter rows (every left row, possibly empty
-        // nested) plus one null-left row per unmatched right.
+        // FullOuter: PQ order is matched-left rows first, then
+        // unmatched-right rows (null-left), then unmatched-left rows
+        // (each with a single-null-row nested table).
         3 => {
+            let null_right_row: Vec<Value> = vec![Value::Null; right_names.len()];
+            // 1. Matched left rows.
             for (left_idx, match_indices) in jv.matches.iter().enumerate() {
+                if match_indices.is_empty() {
+                    continue;
+                }
                 let nested_rows: Vec<Vec<Value>> = match_indices
                     .iter()
                     .map(|&i| read_row(right_table, i as usize))
@@ -1080,6 +1091,7 @@ fn materialise_join_view(jv: &JoinViewState) -> Result<Table, MError> {
                 row.push(Value::Table(nested_table));
                 out_rows.push(row);
             }
+            // 2. Unmatched right rows.
             for &right_idx in &jv.unmatched_right {
                 let mut row = null_left_row.clone();
                 let nested_table = Table::from_rows(
@@ -1089,16 +1101,33 @@ fn materialise_join_view(jv: &JoinViewState) -> Result<Table, MError> {
                 row.push(Value::Table(nested_table));
                 out_rows.push(row);
             }
-        }
-        // LeftAnti: emit only left rows with NO match. Nested column
-        // is always an empty Table.
-        4 => {
+            // 3. Unmatched left rows.
             for (left_idx, match_indices) in jv.matches.iter().enumerate() {
                 if !match_indices.is_empty() {
                     continue;
                 }
-                let nested_table =
-                    Table::from_rows(right_names.clone(), Vec::new());
+                let nested_table = Table::from_rows(
+                    right_names.clone(),
+                    vec![null_right_row.clone()],
+                );
+                let mut row = read_row(left_table, left_idx)?;
+                row.push(Value::Table(nested_table));
+                out_rows.push(row);
+            }
+        }
+        // LeftAnti: emit only left rows with NO match. PQ puts a
+        // single all-null row in the nested column (not an empty
+        // Table).
+        4 => {
+            let null_right_row: Vec<Value> = vec![Value::Null; right_names.len()];
+            for (left_idx, match_indices) in jv.matches.iter().enumerate() {
+                if !match_indices.is_empty() {
+                    continue;
+                }
+                let nested_table = Table::from_rows(
+                    right_names.clone(),
+                    vec![null_right_row.clone()],
+                );
                 let mut row = read_row(left_table, left_idx)?;
                 row.push(Value::Table(nested_table));
                 out_rows.push(row);
