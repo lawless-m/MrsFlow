@@ -214,11 +214,15 @@ fn table_schema(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 fn function_parameters(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     match expect_type(&args[0])? {
         TypeRep::FunctionOf { params, .. } => {
-            // Power Query convention: anonymous param positions named Parameter1, ...
+            // Preserve declared param names; fall back to ParameterN only when
+            // the slot was constructed without a name (e.g. via Type.ForFunction).
             let fields: Vec<(String, Value)> = params
                 .iter()
                 .enumerate()
-                .map(|(i, (t, _opt))| (format!("Parameter{}", i + 1), Value::Type(t.clone())))
+                .map(|(i, (n, t, _opt))| {
+                    let name = if n.is_empty() { format!("Parameter{}", i + 1) } else { n.clone() };
+                    (name, Value::Type(t.clone()))
+                })
                 .collect();
             Ok(Value::Record(Record {
                 fields,
@@ -234,7 +238,7 @@ fn function_parameters(args: &[Value], _host: &dyn IoHost) -> Result<Value, MErr
 fn function_required_parameters(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     match expect_type(&args[0])? {
         TypeRep::FunctionOf { params, .. } => {
-            let n = params.iter().filter(|(_, opt)| !*opt).count();
+            let n = params.iter().filter(|(_, _, opt)| !*opt).count();
             Ok(Value::Number(n as f64))
         }
         other => Err(MError::Other(format!(
@@ -263,7 +267,7 @@ fn for_function(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         other => return Err(type_mismatch("number", other)),
     };
     let mut return_type = TypeRep::Any;
-    let mut param_types: Vec<TypeRep> = Vec::new();
+    let mut named_params: Vec<(String, TypeRep)> = Vec::new();
     for (name, raw) in &sig.fields {
         let v = super::super::force(raw.clone(), &mut |e, env| {
             super::super::evaluate(e, env, &super::super::NoIoHost)
@@ -280,12 +284,12 @@ fn for_function(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
                     Value::Record(r) => r,
                     other => return Err(type_mismatch("record (Parameters)", &other)),
                 };
-                for (_, pv) in &inner.fields {
+                for (pn, pv) in &inner.fields {
                     let pv = super::super::force(pv.clone(), &mut |e, env| {
                         super::super::evaluate(e, env, &super::super::NoIoHost)
                     })?;
                     match pv {
-                        Value::Type(t) => param_types.push(t),
+                        Value::Type(t) => named_params.push((pn.clone(), t)),
                         other => return Err(type_mismatch("type (parameter)", &other)),
                     }
                 }
@@ -293,10 +297,10 @@ fn for_function(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             _ => {}
         }
     }
-    let params = param_types
+    let params = named_params
         .into_iter()
         .enumerate()
-        .map(|(i, t)| (t, i >= req_count))
+        .map(|(i, (n, t))| (n, t, i >= req_count))
         .collect();
     Ok(Value::Type(TypeRep::FunctionOf {
         params,

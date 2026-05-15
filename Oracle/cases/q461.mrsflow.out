@@ -1,1 +1,1 @@
-{"HasError":true,"Reason":"Expression.Error","Message":"Number.From: cannot parse \"50%\""}
+{"HasError":false,"Value":[0.5,1,0,0.125,-0.25]}

@@ -98,18 +98,20 @@ fn ordinal_ignore_case_impl(args: &[Value], _host: &dyn IoHost) -> Result<Value,
 }
 
 fn compare_ordinal(a: &Value, b: &Value) -> Result<i32, MError> {
+    // PQ Comparer.Ordinal is documented as a text comparer, but used as a
+    // generic equality comparer when passed by reference to List.Union /
+    // List.Intersect / etc. (numbers work fine; null errors). Mirror that:
+    // accept comparable types, reject null.
     match (a, b) {
         (Value::Text(x), Value::Text(y)) => Ok(sign(x.as_bytes().cmp(y.as_bytes()))),
         (Value::Number(x), Value::Number(y)) => Ok(sign(
-            x.partial_cmp(y)
-                .ok_or_else(|| MError::Other("Comparer.Ordinal: NaN".into()))?,
+            x.partial_cmp(y).ok_or_else(|| MError::Other("Comparer.Ordinal: NaN".into()))?
         )),
         (Value::Logical(x), Value::Logical(y)) => Ok(sign(x.cmp(y))),
-        (Value::Null, Value::Null) => Ok(0),
-        // Null sorts before non-null per Power Query.
-        (Value::Null, _) => Ok(-1),
-        (_, Value::Null) => Ok(1),
-        (other, _) => Err(type_mismatch("comparable value", other)),
+        (Value::Null, _) | (_, Value::Null) => Err(MError::Other(
+            "We cannot convert the value null to type Text.".into()
+        )),
+        (other, _) => Err(type_mismatch("text", other)),
     }
 }
 

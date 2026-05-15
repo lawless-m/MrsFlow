@@ -1,1 +1,1 @@
-["a","b","c"]
+ERROR: A custom comparer cannot be used in this context.

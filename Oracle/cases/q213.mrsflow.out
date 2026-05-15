@@ -1,1 +1,1 @@
-{"HasError":true,"Reason":"Expression.Error","Message":"expected two numbers, texts, or temporal values of the same kind, found number"}
+{"HasError":true,"Reason":"Expression.Error","Message":"We cannot apply operator < to types Text and Number."}

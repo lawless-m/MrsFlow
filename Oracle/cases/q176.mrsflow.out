@@ -1,1 +1,1 @@
-{"HasError":true,"Reason":"Expression.Error","Message":"Number.ToText: format string \"F0\" not yet supported (only G \/ no-format)"}
+{"HasError":false,"Value":"4"}

@@ -1,1 +1,1 @@
-{"HasError":true,"Reason":"Expression.Error","Message":"not implemented: Table.Fuzzy*: fuzzy-match functions require similarity infra not built in v1"}
+{"HasError":true,"Reason":"Expression.Error","Message":"'SimilarityThreshold' isn't a valid Table.FuzzyJoin option. Valid options are:\u000d\u000aConcurrentRequests, Culture, IgnoreCase, IgnoreSpace, NumberOfMatches, SimilarityColumnName, Threshold, TransformationTable"}

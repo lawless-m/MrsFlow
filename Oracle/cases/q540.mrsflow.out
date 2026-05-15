@@ -1,1 +1,1 @@
-{"HasError":false,"Value":"{\"quote\":\"he said \\\"hi\\\"\",\"backslash\":\"C:\\\\path\\\\file\",\"tab\":\"a\\tb\",\"newline\":\"line1\\nline2\"}"}
+{"HasError":false,"Value":"{\"quote\":\"he said \\\"hi\\\"\",\"backslash\":\"C:\\\\path\\\\file\",\"tab\":\"a\\u0009b\",\"newline\":\"line1\\u000aline2\"}"}

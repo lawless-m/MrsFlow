@@ -1,1 +1,1 @@
-{"HasError":true,"Reason":"Expression.Error","Message":"the name '#time' wasn't recognized"}
+{"HasError":false,"Value":["14:30","00:00","23:59"]}

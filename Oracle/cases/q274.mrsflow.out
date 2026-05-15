@@ -1,1 +1,1 @@
-{"HasError":true,"Reason":"Expression.Error","Message":"expected text\/number\/logical\/null, found list"}
+{"HasError":true,"Reason":"Expression.Error","Message":"We cannot convert a value of type List to type Text."}

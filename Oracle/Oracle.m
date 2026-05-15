@@ -9975,6 +9975,81 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1102", () =>
+            let r = try {
+                    null + 1,
+                    1 + null,
+                    null * 2,
+                    null - 3,
+                    null / 4,
+                    null + null
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1103", () =>
+            let r = try {
+                    null = null,
+                    null = 0,
+                    null < 1,
+                    null > 1,
+                    1 < null,
+                    null <> 1
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1104", () =>
+            let r = try {
+                    null and true,
+                    null and false,
+                    true and null,
+                    false and null,
+                    null or true,
+                    null or false,
+                    not null
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1105", () =>
+            let r = try {
+                    #date(2026, 6, 15) - #date(2026, 6, 1),
+                    #datetime(2026, 6, 15, 10, 0, 0) - #duration(0, 5, 0, 0)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1106", () =>
+            let r = try {
+                    #date(2026, 6, 15) + #date(2026, 6, 1)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1107", () =>
+            let r = try {
+                    "hello" & " world",
+                    "a" & "b" & "c",
+                    {1, 2} & {3, 4},
+                    [a=1] & [b=2],
+                    [a=1] & [a=2]
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1108", () =>
+            let r = try {
+                    "ß" < "ss",
+                    "ß" = "ß",
+                    "ı" < "i",
+                    "I" < "ı",
+                    "é" < "e",
+                    "café" = "café"
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 

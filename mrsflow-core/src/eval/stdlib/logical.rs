@@ -53,6 +53,9 @@ fn from(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
 
 fn from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
+    if text.is_empty() {
+        return Ok(Value::Null); // PQ: empty text → null.
+    }
     match text.to_ascii_lowercase().as_str() {
         "true" => Ok(Value::Logical(true)),
         "false" => Ok(Value::Logical(false)),

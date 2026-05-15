@@ -1,1 +1,1 @@
-{"HasError":true,"Reason":"Expression.Error","Message":"not implemented: Table.Join: only Inner (0) and LeftOuter (1) join kinds supported"}
+{"HasError":false,"Value":[{"k":"a","v":1,"kr":"a","w":10},{"k":"b","v":2,"kr":"b","w":20},{"k":null,"v":null,"kr":"d","w":40}]}

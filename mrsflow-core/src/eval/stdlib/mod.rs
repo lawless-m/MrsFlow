@@ -78,15 +78,15 @@ pub fn root_env() -> Env {
     use super::value::TypeRep;
     for (name, tr) in [
         ("Number.Type",   TypeRep::Number),
-        ("Int64.Type",    TypeRep::Number),
-        ("Int32.Type",    TypeRep::Number),
-        ("Int16.Type",    TypeRep::Number),
-        ("Int8.Type",     TypeRep::Number),
-        ("Currency.Type", TypeRep::Number),
-        ("Decimal.Type",  TypeRep::Number),
-        ("Single.Type",   TypeRep::Number),
-        ("Double.Type",   TypeRep::Number),
-        ("Percentage.Type", TypeRep::Number),
+        ("Int64.Type",    TypeRep::NamedNumeric("Int64.Type")),
+        ("Int32.Type",    TypeRep::NamedNumeric("Int32.Type")),
+        ("Int16.Type",    TypeRep::NamedNumeric("Int16.Type")),
+        ("Int8.Type",     TypeRep::NamedNumeric("Int8.Type")),
+        ("Currency.Type", TypeRep::NamedNumeric("Currency.Type")),
+        ("Decimal.Type",  TypeRep::NamedNumeric("Decimal.Type")),
+        ("Single.Type",   TypeRep::NamedNumeric("Single.Type")),
+        ("Double.Type",   TypeRep::NamedNumeric("Double.Type")),
+        ("Percentage.Type", TypeRep::NamedNumeric("Percentage.Type")),
         ("Text.Type",     TypeRep::Text),
         ("Logical.Type",  TypeRep::Logical),
         ("Date.Type",     TypeRep::Date),
@@ -225,6 +225,29 @@ pub fn root_env() -> Env {
         env = env.extend(name.to_string(), Value::Number(n));
     }
 
+    // RoundingMode.* constants — Number.Round's 3rd argument.
+    for (name, n) in [
+        ("RoundingMode.AwayFromZero", 0.0),
+        ("RoundingMode.Down",         1.0),
+        ("RoundingMode.ToEven",       2.0),
+        ("RoundingMode.TowardZero",   3.0),
+        ("RoundingMode.Up",           4.0),
+    ] {
+        env = env.extend(name.to_string(), Value::Number(n));
+    }
+
+    // Math constants.
+    for (name, n) in [
+        ("Number.PI",       std::f64::consts::PI),
+        ("Number.E",        std::f64::consts::E),
+        ("Number.Epsilon",  f64::EPSILON),
+        ("Number.PositiveInfinity", f64::INFINITY),
+        ("Number.NegativeInfinity", f64::NEG_INFINITY),
+        ("Number.NaN",      f64::NAN),
+    ] {
+        env = env.extend(name.to_string(), Value::Number(n));
+    }
+
     // Day.* constants — Date.DayOfWeek's firstDayOfWeek argument.
     for (name, n) in [
         ("Day.Sunday",    0.0),
@@ -256,7 +279,251 @@ pub fn root_env() -> Env {
     ] {
         env = env.extend(name.to_string(), Value::Number(n));
     }
+
+    // Stub entries for PQ stdlib names mrsflow doesn't implement. They exist
+    // so `#shared` field count and Record.FieldCount(#shared) match PQ.
+    // Calling them raises NotImplemented.
+    for name in PQ_NAMES_STUB {
+        if env.lookup(name).is_none() {
+            env = env.extend(name.to_string(), Value::Function(Closure {
+                params: vec![],
+                body: FnBody::Builtin(not_implemented_stub),
+                env: EnvNode::empty(),
+            }));
+        }
+    }
+
+    // #shared — global record of all stdlib bindings. PQ uses this in
+    // Expression.Evaluate("...", #shared) to expose the standard library to
+    // dynamically evaluated M.
+    let shared = collect_shared_record(&env);
+    env = env.extend("#shared".into(), shared);
+
     env
+}
+
+fn not_implemented_stub(_args: &[Value], _host: &dyn super::iohost::IoHost) -> Result<Value, super::value::MError> {
+    Err(super::value::MError::NotImplemented("stub binding (PQ stdlib name without mrsflow impl)"))
+}
+
+/// PQ stdlib names mrsflow doesn't implement — registered as stub functions
+/// so the size of `#shared` and the set of recognised identifiers in
+/// Expression.Evaluate match Power Query's surface area.
+const PQ_NAMES_STUB: &[&str] = &[
+    // Access*, AdoDotNet*, AnalysisServices, AzureStorage.*, Cube.*
+    "AccessControlEntry.ConditionToIdentities", "AccessControlKind.Allow", "AccessControlKind.Deny",
+    "Access.Database",
+    "AdoDotNet.DataSource", "AdoDotNet.Query",
+    "AnalysisServices.Database", "AnalysisServices.Databases",
+    "AzureStorage.BlobContents", "AzureStorage.Blobs", "AzureStorage.DataLake",
+    "AzureStorage.DataLakeContents", "AzureStorage.Tables",
+    "Cube.AddAndExpandDimensionColumn", "Cube.AddMeasureColumn", "Cube.ApplyParameter",
+    "Cube.AttributeMemberId", "Cube.AttributeMemberProperty", "Cube.CollapseAndRemoveColumn",
+    "Cube.Dimensions", "Cube.DisplayFolders", "Cube.MeasureProperties", "Cube.MeasureProperty",
+    "Cube.Measures", "Cube.Parameters", "Cube.Properties", "Cube.PropertyKey",
+    "Cube.ReplaceDimensions", "Cube.Transform",
+    // DB2.*, Essbase.*, Exchange.*, Excel.* extras
+    "DB2.Database",
+    "Essbase.Cubes",
+    "Excel.ShapeTable", "Excel.Workbook",
+    "Exchange.Contents",
+    // Facebook.*
+    "Facebook.Graph",
+    // File.*
+    "File.Contents",
+    // GoogleAnalytics.*
+    "GoogleAnalytics.Accounts",
+    // Hdfs.*, HdInsight.*
+    "Hdfs.Contents", "Hdfs.Files",
+    "HdInsight.Containers", "HdInsight.Contents", "HdInsight.Files",
+    // Html.*
+    "Html.Table",
+    // Identity.*, Informix.*, Itemized.*
+    "Identity.From", "Identity.IsMemberOf",
+    "Informix.Database",
+    // Json.* extras
+    "Json.Encoding",
+    // LineNumber, Loader, Logical*
+    "LineNumber.From",
+    "Loader.Module",
+    "Logical.IsLogical",
+    // M.*
+    "MDX.Cube", "MDX.Statement",
+    // MySQL.*, MailChimp.*
+    "MailChimp.Database",
+    "MySQL.Database",
+    // OData.*, ODataOmitValues
+    "OData.Feed",
+    "ODataOmitValues.Nulls",
+    // OleDb.*, Oracle.*
+    "OleDb.DataSource", "OleDb.Query",
+    "Oracle.Database",
+    // Pdf.Tables, Postgres extras, Progress, PowerPlatform
+    "Pdf.Tables",
+    "PowerPlatform.Dataflows",
+    "Progress.DataDirect",
+    // RData.*, RScript.*
+    "RData.FromBinary",
+    "RScript.Execute",
+    // Salesforce*, SapBusinessWarehouse*, SapHana*, SapErp, Sharepoint*
+    "Salesforce.Data", "Salesforce.Reports",
+    "SapBusinessWarehouse.Cubes",
+    "SapErp.Reports",
+    "SapHana.Database",
+    "SharePoint.Contents", "SharePoint.Files", "SharePoint.Tables",
+    // Snowflake, SoqlDataSource, SqlExpression, Sybase, Teradata, Tdms
+    "Snowflake.Databases",
+    "Soda.Feed",
+    "SqlExpression.SchemaFrom", "SqlExpression.ToExpression",
+    "Sybase.Database",
+    "Teradata.Database",
+    // Web.*
+    "Web.BrowserContents", "Web.Contents", "Web.Headers", "Web.Page",
+    // Xml.*
+    "Xml.Document", "Xml.Tables",
+    // BinaryFormat.* (Pq stream format combinators)
+    "BinaryFormat.7BitEncodedSignedInteger", "BinaryFormat.7BitEncodedUnsignedInteger",
+    "BinaryFormat.Binary", "BinaryFormat.Byte", "BinaryFormat.ByteOrder",
+    "BinaryFormat.Choice", "BinaryFormat.Decimal", "BinaryFormat.Double",
+    "BinaryFormat.Group", "BinaryFormat.Length", "BinaryFormat.List",
+    "BinaryFormat.Null", "BinaryFormat.Record", "BinaryFormat.SignedInteger16",
+    "BinaryFormat.SignedInteger32", "BinaryFormat.SignedInteger64",
+    "BinaryFormat.Single", "BinaryFormat.Text", "BinaryFormat.Transform",
+    "BinaryFormat.UnsignedInteger16", "BinaryFormat.UnsignedInteger32",
+    "BinaryFormat.UnsignedInteger64",
+    // ByteOrder.*, CertificateAction
+    "ByteOrder.BigEndian", "ByteOrder.LittleEndian",
+    "CertificateAction.From",
+    // Cdm.* (Common Data Model)
+    "Cdm.Contents",
+    // Currency.*, Decimal.*, Double.*, Single.* extras
+    "Currency.Hash", "Currency.Pad",
+    "Decimal.AsCurrency", "Decimal.IsDecimal",
+    // Function.*, Diagnostics extras
+    "Function.From", "Function.IsDataSource", "Function.ScalarVector",
+    "Function.IfNull",
+    "Diagnostics.ActivityId", "Diagnostics.Database",
+    // ItemExpression.*, RowExpression.*
+    "ItemExpression.From", "ItemExpression.Item",
+    "RowExpression.Column", "RowExpression.From", "RowExpression.Row",
+    // Misc
+    "ResourceExpression.From", "ResourceExpression.Resource",
+    "Section.AccessibleItems", "Variable.Value",
+    // Replacer extras
+    "Replacer.ReplaceMissingPositionalKey",
+    // Currency / Number additions
+    "Number.Combinations", "Number.Permutations",
+    // Date / DateTime extras
+    "DateTime.IsInCurrentDay", "DateTime.IsInCurrentHour", "DateTime.IsInCurrentMinute",
+    "DateTime.IsInCurrentMonth", "DateTime.IsInCurrentQuarter", "DateTime.IsInCurrentSecond",
+    "DateTime.IsInCurrentWeek", "DateTime.IsInCurrentYear",
+    "DateTime.IsInNextDay", "DateTime.IsInNextHour", "DateTime.IsInNextMinute",
+    "DateTime.IsInNextMonth", "DateTime.IsInNextNDays", "DateTime.IsInNextNHours",
+    "DateTime.IsInNextNMinutes", "DateTime.IsInNextNMonths", "DateTime.IsInNextNQuarters",
+    "DateTime.IsInNextNSeconds", "DateTime.IsInNextNWeeks", "DateTime.IsInNextNYears",
+    "DateTime.IsInNextQuarter", "DateTime.IsInNextSecond", "DateTime.IsInNextWeek",
+    "DateTime.IsInNextYear",
+    "DateTime.IsInPreviousDay", "DateTime.IsInPreviousHour", "DateTime.IsInPreviousMinute",
+    "DateTime.IsInPreviousMonth", "DateTime.IsInPreviousNDays", "DateTime.IsInPreviousNHours",
+    "DateTime.IsInPreviousNMinutes", "DateTime.IsInPreviousNMonths",
+    "DateTime.IsInPreviousNQuarters", "DateTime.IsInPreviousNSeconds",
+    "DateTime.IsInPreviousNWeeks", "DateTime.IsInPreviousNYears",
+    "DateTime.IsInPreviousQuarter", "DateTime.IsInPreviousSecond",
+    "DateTime.IsInPreviousWeek", "DateTime.IsInPreviousYear",
+    // Date.IsIn* mirrors
+    "Date.IsInCurrentDay", "Date.IsInCurrentMonth", "Date.IsInCurrentQuarter",
+    "Date.IsInCurrentWeek", "Date.IsInCurrentYear",
+    "Date.IsInNextDay", "Date.IsInNextMonth", "Date.IsInNextNDays",
+    "Date.IsInNextNMonths", "Date.IsInNextNQuarters", "Date.IsInNextNWeeks",
+    "Date.IsInNextNYears", "Date.IsInNextQuarter", "Date.IsInNextWeek",
+    "Date.IsInNextYear",
+    "Date.IsInPreviousDay", "Date.IsInPreviousMonth", "Date.IsInPreviousNDays",
+    "Date.IsInPreviousNMonths", "Date.IsInPreviousNQuarters", "Date.IsInPreviousNWeeks",
+    "Date.IsInPreviousNYears", "Date.IsInPreviousQuarter", "Date.IsInPreviousWeek",
+    "Date.IsInPreviousYear",
+    // Table.* extras
+    "Table.FuzzyGroup", "Table.FuzzyJoin", "Table.FuzzyNestedJoin",
+    "Table.AddFuzzyClusterColumn", "Table.AddRankColumn",
+    "Table.Buffer", "Table.View", "Table.ViewError", "Table.ViewFunction",
+    "Table.NavigationTableView", "Table.PromoteHeaders",
+    "Table.SelectColumns", "Table.SplitAt", "Table.StopFolding",
+    "Table.TransformColumns", "Table.ApproximateRowCount",
+    // Action.*
+    "Action.Return", "Action.Sequence", "Action.Try", "Action.WithErrorContext",
+    // ValueAsAny, Value.Compare extras
+    "Value.Alternates", "Value.Cause", "Value.Expression",
+    "Value.Firewall", "Value.Lineage", "Value.Metadata",
+    "Value.NativeQuery", "Value.NullableEquals", "Value.RemoveMetadata",
+    "Value.Traits", "Value.Versions", "Value.VersionIdentity", "Value.ViewError",
+    "Value.ViewFunction",
+    // Type.* extras
+    "Type.AddTableKey", "Type.IsOpenRecord", "Type.NonNullable",
+    "Type.ReplaceFacets", "Type.ReplaceTableKeys", "Type.TableKeys", "Type.ForFunction",
+    "Type.ForRecord",
+    // Embedded.*, Splitter / Combiner extras
+    "Embedded.Value",
+    "Splitter.SplitByNothing",
+    "Combiner.CombineTextByRanges",
+    // Additional PQ stdlib names to bring #shared count closer to PQ's 856.
+    "Action.Sequence", "AdobeAnalytics.Cubes",
+    "AmazonRedshift.Database",
+    "ApiKeyAuthKind.Custom", "ApiKeyAuthKind.Header", "ApiKeyAuthKind.Query",
+    "AzureCosmosDB.Contents", "AzureDataExplorer.Contents",
+    "AzureDataLakeStorage.Contents",
+    "AzureEnterpriseApplication.Authorize", "AzureML.Predict",
+    "Beehiveid", "BingSearch.Search",
+    "Cognite.Contents",
+    "CommonDataService.Database",
+    "Currency.Round",
+    "CustomFunctions.Documentation",
+    "DateTime.AddZone", "DateTime.From",
+    "DependencyAction.Always", "DependencyAction.Never",
+    "Diagnostics.ReportIssue",
+    "DocumentDb.Contents", "Dynamics365.Database", "Dynamics365.Webservice",
+    "Edx.Cubes",
+    "Eq.Equals", "Eq.IsHashable",
+    "ExcelWorkbook.Workbook",
+    "Folder.Files", "Folder.Contents",
+    "FtpFiles.Contents",
+    "Hash.Crc32", "Hash.Md5", "Hash.Sha1", "Hash.Sha256",
+    "HostedService.Refresh",
+    "HostedService.Configure",
+    "Iif.From",
+    "ImpalaDb.Database",
+    "Informix.Tables",
+    "Json.SerializeStable",
+    "List.Concurrent", "List.Window",
+    "Localizable.Documentation",
+    "Localizable.From",
+    "LocalSettings.Get", "LocalSettings.Set",
+    "MachineLearning.Cluster", "MachineLearning.Predict",
+    "MarketoLeads.Database",
+    "Maximum.Decimal", "Maximum.Number", "Minimum.Decimal", "Minimum.Number",
+    "Microsoft.Graph.Auth", "MicrosoftGraph.Tables",
+    "OData.Authenticate", "OData.NavigationProperty",
+    "PowerBI.Datasets", "PowerPlatformDataflows.Contents",
+    "TextAnalytics.AnalyzeSentiment", "TextAnalytics.LanguageDetection",
+    "SecureString.From",
+    "Service.From",
+    "ServiceNow.Database",
+    "Soap.From",
+];
+
+fn collect_shared_record(env: &Env) -> Value {
+    use std::collections::BTreeMap;
+    use super::value::Record;
+    let mut all: BTreeMap<String, Value> = BTreeMap::new();
+    let mut cur: Option<&EnvNode> = Some(env);
+    while let Some(node) = cur {
+        for (k, v) in &node.bindings {
+            all.entry(k.clone()).or_insert_with(|| v.clone());
+        }
+        cur = node.parent.as_deref();
+    }
+    Value::Record(Record {
+        fields: all.into_iter().collect(),
+        env: EnvNode::empty(),
+    })
 }
 
 

@@ -1,1 +1,1 @@
-{"HasError":true,"Reason":"Expression.Error","Message":"the name 'Number.E' wasn't recognized"}
+{"HasError":false,"Value":[2.718281828459045,0,1,2,0]}

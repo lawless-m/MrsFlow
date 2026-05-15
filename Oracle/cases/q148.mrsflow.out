@@ -1,1 +1,1 @@
-{"HasError":true,"Reason":"Expression.Error","Message":"Table.Sort: criterion pair must have 2 elements, got 3"}
+{"HasError":true,"Reason":"Expression.Error","Message":"The specified sort criteria is invalid."}

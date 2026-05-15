@@ -226,14 +226,21 @@ fn write_type(out: &mut String, t: &TypeRep) {
             }
             out.push_str("))");
         }
+        TypeRep::NamedNumeric(name) => {
+            out.push_str("(named-numeric \"");
+            out.push_str(name);
+            out.push_str("\")");
+        }
         TypeRep::FunctionOf { params, return_type } => {
             out.push_str("(function-of (");
-            for (i, (t, opt)) in params.iter().enumerate() {
+            for (i, (n, t, opt)) in params.iter().enumerate() {
                 if i > 0 {
                     out.push(' ');
                 }
                 out.push('(');
                 out.push_str(if *opt { "opt" } else { "req" });
+                out.push(' ');
+                out.push_str(n);
                 out.push(' ');
                 write_type(out, t);
                 out.push(')');

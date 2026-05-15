@@ -1,1 +1,1 @@
-{"HasError":false,"Value":[{"k":"a","v":1},{"k":"b","v":3}]}
+{"HasError":true,"Reason":"Expression.Error","Message":"The specified distinct criteria is invalid."}

@@ -1,1 +1,1 @@
-{"HasError":true,"Reason":"Expression.Error","Message":"expected number (in list), found null"}
+{"HasError":false,"Value":[15,null,7,4]}

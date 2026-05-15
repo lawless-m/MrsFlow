@@ -1,1 +1,1 @@
-{"HasError":true,"Reason":"Expression.Error","Message":"DateTime.ToText: format string \"yyyy-MM-dd'T'HH:mm:ss\" not yet supported (only G \/ no-format)"}
+{"HasError":false,"Value":["2024-06-15T14:30:45","20240615","2024-DDD"]}

@@ -28,8 +28,15 @@ if ($matches.Count -eq 0) {
 foreach ($m in $matches) {
     $q = $m.Groups[1].Value
     $raw = $m.Groups[2].Value
-    # Unescape s-expression string: \" -> "  \\ -> \
-    $decoded = $raw -replace '\\"', '"' -replace '\\\\', '\'
+    # Unescape s-expression string. Order matters: handle \\ as a placeholder
+    # first so the other escapes don't double-process its trailing char.
+    $placeholder = [char]0x1
+    $decoded = $raw.Replace('\\', [string]$placeholder)
+    $decoded = $decoded -replace '\\"', '"'
+    $decoded = $decoded -replace '\\r', "`r"
+    $decoded = $decoded -replace '\\n', "`n"
+    $decoded = $decoded -replace '\\t', "`t"
+    $decoded = $decoded.Replace([string]$placeholder, '\')
     $outFile = Join-Path $casesDir ($q + '.mrsflow.out')
     [System.IO.File]::WriteAllText($outFile, $decoded, [System.Text.UTF8Encoding]::new($false))
     Write-Output ("{0,-5} {1}" -f $q, $decoded.Substring(0, [Math]::Min(80, $decoded.Length)))

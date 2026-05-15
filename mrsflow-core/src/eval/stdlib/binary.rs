@@ -23,6 +23,11 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
             from_text,
         ),
         (
+            "#binary",
+            one("source"),
+            from_literal,
+        ),
+        (
             "Binary.ToText",
             vec![
                 Param { name: "binary".into(),   optional: false, type_annotation: None },
@@ -123,6 +128,28 @@ fn from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         Encoding::Base64 => base64_decode(text)?,
         Encoding::Hex => hex_decode(text)?,
     }))
+}
+
+/// `#binary({0xEF, 0xBB, 0xBF})` — list of byte ints → Binary.
+/// Also accepts text (interpreted as base64).
+fn from_literal(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    match &args[0] {
+        Value::List(xs) => {
+            let mut out = Vec::with_capacity(xs.len());
+            for v in xs {
+                match v {
+                    Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 && *n <= 255.0 => {
+                        out.push(*n as u8);
+                    }
+                    other => return Err(type_mismatch("byte (0..255) (in list)", other)),
+                }
+            }
+            Ok(Value::Binary(out))
+        }
+        Value::Text(s) => base64_decode(s).map(Value::Binary),
+        Value::Binary(b) => Ok(Value::Binary(b.clone())),
+        other => Err(type_mismatch("list of bytes or text", other)),
+    }
 }
 
 fn to_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
@@ -260,7 +287,7 @@ fn base64_decode(s: &str) -> Result<Vec<u8>, MError> {
 }
 
 fn hex_encode(bytes: &[u8]) -> String {
-    const HEX: &[u8; 16] = b"0123456789ABCDEF";
+    const HEX: &[u8; 16] = b"0123456789abcdef";
     let mut out = String::with_capacity(bytes.len() * 2);
     for b in bytes {
         out.push(HEX[(b >> 4) as usize] as char);

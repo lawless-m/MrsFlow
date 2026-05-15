@@ -1,1 +1,1 @@
-{"HasError":true,"Reason":"Expression.Error","Message":"Table.PromoteHeaders: table has no header row"}
+{"HasError":false,"Value":["Column1"]}

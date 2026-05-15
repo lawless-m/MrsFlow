@@ -1,1 +1,1 @@
-{"HasError":true,"Reason":"Expression.Error","Message":"Json.FromValue: cannot serialise a function"}
+{"HasError":true,"Reason":"Expression.Error","Message":"We can't convert values of this type to JSON."}

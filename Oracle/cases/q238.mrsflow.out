@@ -1,1 +1,1 @@
-{"HasError":true,"Reason":"Expression.Error","Message":"Csv.Document: Encoding=1252 not supported (only 65001\/UTF-8)"}
+{"HasError":false,"Value":[{"Column1":"a","Column2":"b"},{"Column1":"1","Column2":"2"}]}

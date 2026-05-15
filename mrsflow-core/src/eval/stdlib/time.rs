@@ -24,6 +24,15 @@ use super::common::{
 
 pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
     vec![
+        (
+            "#time",
+            vec![
+                Param { name: "hour".into(),   optional: false, type_annotation: None },
+                Param { name: "minute".into(), optional: false, type_annotation: None },
+                Param { name: "second".into(), optional: false, type_annotation: None },
+            ],
+            constructor,
+        ),
         ("Time.Hour", one("time"), hour),
         ("Time.Minute", one("time"), minute),
         ("Time.Second", one("time"), second),
@@ -49,6 +58,29 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ("Time.StartOfHour", one("time"), start_of_hour),
         ("Time.EndOfHour", one("time"), end_of_hour),
     ]
+}
+
+fn constructor(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let h = expect_int(&args[0], "#time: hour")?;
+    let m = expect_int(&args[1], "#time: minute")?;
+    let s_raw = &args[2];
+    let (sec, nano) = match s_raw {
+        Value::Number(n) => {
+            if !(0.0..60.0).contains(n) {
+                return Err(MError::Other(format!("#time: second out of range: {n}")));
+            }
+            let whole = n.trunc() as u32;
+            let frac_nano = ((n - n.trunc()) * 1_000_000_000.0).round() as u32;
+            (whole, frac_nano)
+        }
+        other => return Err(type_mismatch("number (second)", other)),
+    };
+    if !(0..24).contains(&h) || !(0..60).contains(&m) {
+        return Err(MError::Other(format!("#time: out of range h={h} m={m}")));
+    }
+    let t = chrono::NaiveTime::from_hms_nano_opt(h as u32, m as u32, sec, nano)
+        .ok_or_else(|| MError::Other("#time: invalid time".into()))?;
+    Ok(Value::Time(t))
 }
 
 fn extract_time(v: &Value, ctx: &str) -> Result<chrono::NaiveTime, MError> {
@@ -90,7 +122,17 @@ fn from(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
         Value::Time(t) => Ok(Value::Time(*t)),
         Value::Datetime(dt) => Ok(Value::Time(dt.time())),
         Value::Text(_) => from_text(args, host),
-        other => Err(type_mismatch("text/time/datetime/null", other)),
+        Value::Number(n) => {
+            // PQ: fractional day → time (0.5 = 12:00:00, 0.75 = 18:00:00).
+            let frac = n.rem_euclid(1.0);
+            let total_nanos = (frac * 86_400.0 * 1_000_000_000.0).round() as u64;
+            let secs = (total_nanos / 1_000_000_000) as u32;
+            let nanos = (total_nanos % 1_000_000_000) as u32;
+            let t = chrono::NaiveTime::from_num_seconds_from_midnight_opt(secs, nanos)
+                .ok_or_else(|| MError::Other("Time.From: invalid fraction".into()))?;
+            Ok(Value::Time(t))
+        }
+        other => Err(type_mismatch("text/time/datetime/number/null", other)),
     }
 }
 
@@ -109,22 +151,27 @@ fn from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 fn to_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     if matches!(args[0], Value::Null) { return Ok(Value::Null); }
     let t = extract_time(&args[0], "Time.ToText")?;
-    let general = match args.get(1) {
-        None | Some(Value::Null) => true,
-        Some(Value::Text(fmt)) => {
-            let trimmed = fmt.trim();
-            matches!(trimmed, "G" | "g") || trimmed.is_empty()
+    let fmt = match args.get(1) {
+        None | Some(Value::Null) => None,
+        Some(Value::Text(s)) => {
+            let trimmed = s.trim();
+            if trimmed.is_empty() { None } else { Some(s.clone()) }
         }
         Some(other) => return Err(type_mismatch("text (format)", other)),
     };
-    if !general {
-        let Some(Value::Text(fmt)) = args.get(1) else { unreachable!() };
-        return Err(MError::Other(format!(
-            "Time.ToText: format string {fmt:?} not yet supported (only G / no-format)"
-        )));
-    }
-    let _ = args.get(2);
-    Ok(Value::Text(t.format("%H:%M:%S").to_string()))
+    let culture = match args.get(2) {
+        Some(Value::Text(c)) => Some(c.clone()),
+        _ => None,
+    };
+    let pattern = match fmt {
+        // PQ Time.ToText default omits seconds — "14:30:45" → "14:30".
+        None => return Ok(Value::Text(t.format("%H:%M").to_string())),
+        Some(f) => {
+            let expanded = super::date::expand_standard_date_format(&f, culture.as_deref());
+            super::date::dotnet_to_strftime(&expanded)
+        }
+    };
+    Ok(Value::Text(t.format(&pattern).to_string()))
 }
 
 

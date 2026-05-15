@@ -1,1 +1,1 @@
-{"HasError":false,"Value":true}
+{"HasError":true,"Reason":"Expression.Error","Message":"We cannot convert a value of type Function to type Number."}

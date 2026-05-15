@@ -1,1 +1,1 @@
-{"HasError":true,"Reason":"Expression.Error","Message":"DateTime.ToText: format string \"tt\" not yet supported (only G \/ no-format)"}
+{"HasError":false,"Value":["PM","9:30 AM","11:59 PM","12:00 AM"]}

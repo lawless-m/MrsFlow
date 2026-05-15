@@ -1,1 +1,1 @@
-{"HasError":true,"Reason":"Expression.Error","Message":"DateTime.ToText: format string \"O\" not yet supported (only G \/ no-format)"}
+{"HasError":false,"Value":"2026-06-15T14:30:45.000000000"}

@@ -1,1 +1,1 @@
-{"HasError":true,"Reason":"Expression.Error","Message":"Value.Subtract: cannot subtract null from null"}
+{"HasError":false,"Value":null}

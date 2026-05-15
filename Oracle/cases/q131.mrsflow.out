@@ -1,1 +1,1 @@
-{"HasError":false,"Value":["A","B"]}
+{"HasError":true,"Reason":"Expression.Error","Message":"A custom comparer cannot be used in this context."}

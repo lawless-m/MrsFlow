@@ -1,1 +1,1 @@
-{"HasError":false,"Value":["Name","TypeName"]}
+{"HasError":false,"Value":["Name","Position","TypeName","Kind","IsNullable","NumericPrecisionBase","NumericPrecision","NumericScale","IsSigned","DateTimePrecision","MaxLength","IsVariableLength","NativeTypeName","NativeDefaultExpression","NativeExpression","Description","IsWritable","FieldCaption"]}

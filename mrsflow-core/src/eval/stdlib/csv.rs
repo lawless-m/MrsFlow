@@ -35,20 +35,33 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
 struct Options {
     delimiter: Option<u8>,
     quoting: bool,
+    encoding: u32,
 }
 
 fn document(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
-    let bytes: Vec<u8> = match &args[0] {
+    let mut bytes: Vec<u8> = match &args[0] {
         Value::Binary(b) => b.clone(),
         Value::Text(t) => t.as_bytes().to_vec(),
         other => return Err(type_mismatch("binary or text", other)),
     };
 
     let opts = match args.get(1) {
-        None | Some(Value::Null) => Options { delimiter: None, quoting: true },
+        None | Some(Value::Null) => Options { delimiter: None, quoting: true, encoding: 65001 },
         Some(Value::Record(r)) => parse_options(r, host)?,
         Some(other) => return Err(type_mismatch("record or null", other)),
     };
+
+    // CP-1252 decode: map each byte through Windows-1252 to its Unicode
+    // code point, then re-encode as UTF-8. Bytes 0x00..0x7F are ASCII;
+    // 0xA0..0xFF map to Latin-1 (same code point); 0x80..0x9F have a
+    // few special mappings.
+    if opts.encoding == 1252 {
+        bytes = cp1252_to_utf8(&bytes);
+    }
+    // Skip UTF-8 BOM if present.
+    if bytes.starts_with(&[0xEF, 0xBB, 0xBF]) {
+        bytes.drain(0..3);
+    }
 
     let mut builder = ::csv::ReaderBuilder::new();
     builder.has_headers(false); // PQ leaves headers as row 0; promotion is separate
@@ -92,7 +105,7 @@ fn document(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 fn parse_options(r: &Record, host: &dyn IoHost) -> Result<Options, MError> {
-    let mut out = Options { delimiter: None, quoting: true };
+    let mut out = Options { delimiter: None, quoting: true, encoding: 65001 };
     for (k, v) in &r.fields {
         let v = force_value(v.clone(), host)?;
         match k.as_str() {
@@ -122,13 +135,12 @@ fn parse_options(r: &Record, host: &dyn IoHost) -> Result<Options, MError> {
                 other => return Err(type_mismatch("number", &other)),
             },
             "Encoding" => match v {
-                // 65001 is UTF-8 (our only supported code page). Reject
-                // others rather than silently mis-decode.
-                Value::Number(n) if n == 65001.0 => {}
+                Value::Number(n) if n == 65001.0 => out.encoding = 65001,
+                Value::Number(n) if n == 1252.0  => out.encoding = 1252,
                 Value::Null => {}
                 Value::Number(n) => {
                     return Err(MError::Other(format!(
-                        "Csv.Document: Encoding={n} not supported (only 65001/UTF-8)"
+                        "Csv.Document: Encoding={n} not supported (65001/UTF-8 or 1252/CP1252)"
                     )));
                 }
                 other => return Err(type_mismatch("number", &other)),
@@ -141,4 +153,29 @@ fn parse_options(r: &Record, host: &dyn IoHost) -> Result<Options, MError> {
 
 fn force_value(v: Value, host: &dyn IoHost) -> Result<Value, MError> {
     super::super::force(v, &mut |e, env| super::super::evaluate(e, env, host))
+}
+
+/// Decode CP-1252 bytes into a UTF-8 byte vector. 0x00..0x7F passes through
+/// (ASCII); 0xA0..0xFF maps directly to Latin-1 Unicode code points; the
+/// 0x80..0x9F range has Windows-specific mappings (€, …).
+fn cp1252_to_utf8(input: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(input.len());
+    for &b in input {
+        let cp: u32 = match b {
+            0x80 => 0x20AC, 0x82 => 0x201A, 0x83 => 0x0192, 0x84 => 0x201E,
+            0x85 => 0x2026, 0x86 => 0x2020, 0x87 => 0x2021, 0x88 => 0x02C6,
+            0x89 => 0x2030, 0x8A => 0x0160, 0x8B => 0x2039, 0x8C => 0x0152,
+            0x8E => 0x017D, 0x91 => 0x2018, 0x92 => 0x2019, 0x93 => 0x201C,
+            0x94 => 0x201D, 0x95 => 0x2022, 0x96 => 0x2013, 0x97 => 0x2014,
+            0x98 => 0x02DC, 0x99 => 0x2122, 0x9A => 0x0161, 0x9B => 0x203A,
+            0x9C => 0x0153, 0x9E => 0x017E, 0x9F => 0x0178,
+            0x81 | 0x8D | 0x8F | 0x90 | 0x9D => b as u32, // undefined — pass through
+            _ => b as u32,                                 // 0x00..0x7F + 0xA0..0xFF
+        };
+        if let Some(c) = char::from_u32(cp) {
+            let mut buf = [0u8; 4];
+            out.extend_from_slice(c.encode_utf8(&mut buf).as_bytes());
+        }
+    }
+    out
 }

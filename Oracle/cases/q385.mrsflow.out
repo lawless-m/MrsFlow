@@ -1,1 +1,1 @@
-{"HasError":false,"Value":[-1,0,1,-1]}
+{"HasError":true,"Reason":"Expression.Error","Message":"We cannot convert the value null to type Text."}

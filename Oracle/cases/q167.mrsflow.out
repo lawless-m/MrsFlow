@@ -1,1 +1,1 @@
-ERROR: callback: arity mismatch: expected 0, got 3
+[{"s":"FOO bar"},{"s":"baz FOO"}]

@@ -24,6 +24,20 @@ use super::common::{
 
 pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
     vec![
+        (
+            "#datetimezone",
+            vec![
+                Param { name: "year".into(),         optional: false, type_annotation: None },
+                Param { name: "month".into(),        optional: false, type_annotation: None },
+                Param { name: "day".into(),          optional: false, type_annotation: None },
+                Param { name: "hour".into(),         optional: false, type_annotation: None },
+                Param { name: "minute".into(),       optional: false, type_annotation: None },
+                Param { name: "second".into(),       optional: false, type_annotation: None },
+                Param { name: "offsetHours".into(),  optional: false, type_annotation: None },
+                Param { name: "offsetMinutes".into(), optional: false, type_annotation: None },
+            ],
+            constructor,
+        ),
         ("DateTimeZone.FixedLocalNow", vec![], local_now),
         ("DateTimeZone.FixedUtcNow", vec![], utc_now),
         ("DateTimeZone.LocalNow", vec![], local_now),
@@ -63,6 +77,35 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ("DateTimeZone.ZoneHours", one("dtz"), zone_hours),
         ("DateTimeZone.ZoneMinutes", one("dtz"), zone_minutes),
     ]
+}
+
+fn constructor(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    use super::common::expect_int;
+    let y = expect_int(&args[0], "#datetimezone: year")?;
+    let mo = expect_int(&args[1], "#datetimezone: month")?;
+    let d = expect_int(&args[2], "#datetimezone: day")?;
+    let h = expect_int(&args[3], "#datetimezone: hour")?;
+    let mn = expect_int(&args[4], "#datetimezone: minute")?;
+    // Seconds may be fractional.
+    let (sec, nano) = match &args[5] {
+        Value::Number(n) => {
+            let whole = n.trunc() as u32;
+            let frac = ((n - n.trunc()) * 1_000_000_000.0).round() as u32;
+            (whole, frac)
+        }
+        other => return Err(type_mismatch("number (second)", other)),
+    };
+    let oh = expect_int(&args[6], "#datetimezone: offsetHours")?;
+    let om = expect_int(&args[7], "#datetimezone: offsetMinutes")?;
+    let date = chrono::NaiveDate::from_ymd_opt(y as i32, mo as u32, d as u32)
+        .ok_or_else(|| MError::Other(format!("#datetimezone: invalid date {y}-{mo}-{d}")))?;
+    let time = chrono::NaiveTime::from_hms_nano_opt(h as u32, mn as u32, sec, nano)
+        .ok_or_else(|| MError::Other(format!("#datetimezone: invalid time {h}:{mn}:{sec}")))?;
+    let naive = date.and_time(time);
+    let total_offset_secs = (oh * 3600 + om.signum() * (om.abs() * 60)) as i32;
+    let offset = chrono::FixedOffset::east_opt(total_offset_secs)
+        .ok_or_else(|| MError::Other(format!("#datetimezone: invalid offset {oh}:{om}")))?;
+    Ok(Value::Datetimezone(naive.and_local_timezone(offset).unwrap()))
 }
 
 fn local_now(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
@@ -222,22 +265,37 @@ fn to_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         Value::Datetimezone(dt) => *dt,
         other => return Err(type_mismatch("datetimezone", other)),
     };
-    let general = match args.get(1) {
-        None | Some(Value::Null) => true,
-        Some(Value::Text(fmt)) => {
-            let trimmed = fmt.trim();
-            matches!(trimmed, "G" | "g") || trimmed.is_empty()
+    let fmt = match args.get(1) {
+        None | Some(Value::Null) => None,
+        Some(Value::Text(s)) => {
+            let t = s.trim();
+            if t.is_empty() { None } else { Some(s.clone()) }
         }
         Some(other) => return Err(type_mismatch("text (format)", other)),
     };
-    if !general {
-        let Some(Value::Text(fmt)) = args.get(1) else { unreachable!() };
-        return Err(MError::Other(format!(
-            "DateTimeZone.ToText: format string {fmt:?} not yet supported (only G / no-format)"
-        )));
-    }
-    let _ = args.get(2);
-    Ok(Value::Text(dt.to_rfc3339()))
+    let culture = match args.get(2) {
+        Some(Value::Text(c)) => Some(c.clone()),
+        _ => None,
+    };
+    let pattern = match fmt {
+        None => return Ok(Value::Text(dt.to_rfc3339())),
+        Some(f) => {
+            let trimmed = f.trim();
+            // PQ rejects standalone "K" (kind specifier) format with this exact
+            // message — covers q185's expectation.
+            if trimmed == "K" {
+                return Err(MError::Other(
+                    "The output DateTimeZone format specified isn't supported.".into()
+                ));
+            }
+            if matches!(trimmed, "G" | "g") {
+                return Ok(Value::Text(dt.to_rfc3339()));
+            }
+            let expanded = super::date::expand_standard_date_format(&f, culture.as_deref());
+            super::date::dotnet_to_strftime(&expanded)
+        }
+    };
+    Ok(Value::Text(dt.format(&pattern).to_string()))
 }
 
 

@@ -1,1 +1,1 @@
-{"HasError":true,"Reason":"Expression.Error","Message":"DateTime.ToText: format string \"f\" not yet supported (only G \/ no-format)"}
+{"HasError":false,"Value":"15 June 2026 14:30"}

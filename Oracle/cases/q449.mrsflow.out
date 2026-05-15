@@ -1,1 +1,1 @@
-{"HasError":true,"Reason":"Expression.Error","Message":"Date.FromText: cannot parse \"not a date\""}
+{"HasError":true,"Reason":"DataFormat.Error","Message":"We couldn't parse the input provided as a Date value."}

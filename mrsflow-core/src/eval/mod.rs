@@ -70,6 +70,10 @@ pub fn evaluate(ast: &Expr, env: &Env, host: &dyn IoHost) -> Result<Value, MErro
         }
 
         // --- Binary: short-circuit logical first, then everything else ---
+        // PQ's `and` / `or` use 3-valued (Kleene) logic with null as
+        // "unknown". `false and X` short-circuits to false even when X
+        // is null (because false dominates regardless); `true and null`
+        // is null because the result depends on X. Symmetric for or.
         Expr::Binary(BinaryOp::And, l, r) => {
             let lv = evaluate(l, env, host)?;
             match lv {
@@ -78,6 +82,18 @@ pub fn evaluate(ast: &Expr, env: &Env, host: &dyn IoHost) -> Result<Value, MErro
                     let rv = evaluate(r, env, host)?;
                     match rv {
                         Value::Logical(b) => Ok(Value::Logical(b)),
+                        Value::Null => Ok(Value::Null),
+                        other => Err(MError::TypeMismatch {
+                            expected: "logical",
+                            found: type_name(&other),
+                        }),
+                    }
+                }
+                Value::Null => {
+                    let rv = evaluate(r, env, host)?;
+                    match rv {
+                        Value::Logical(false) => Ok(Value::Logical(false)),
+                        Value::Logical(true) | Value::Null => Ok(Value::Null),
                         other => Err(MError::TypeMismatch {
                             expected: "logical",
                             found: type_name(&other),
@@ -98,6 +114,18 @@ pub fn evaluate(ast: &Expr, env: &Env, host: &dyn IoHost) -> Result<Value, MErro
                     let rv = evaluate(r, env, host)?;
                     match rv {
                         Value::Logical(b) => Ok(Value::Logical(b)),
+                        Value::Null => Ok(Value::Null),
+                        other => Err(MError::TypeMismatch {
+                            expected: "logical",
+                            found: type_name(&other),
+                        }),
+                    }
+                }
+                Value::Null => {
+                    let rv = evaluate(r, env, host)?;
+                    match rv {
+                        Value::Logical(true) => Ok(Value::Logical(true)),
+                        Value::Logical(false) | Value::Null => Ok(Value::Null),
                         other => Err(MError::TypeMismatch {
                             expected: "logical",
                             found: type_name(&other),
@@ -134,7 +162,7 @@ pub fn evaluate(ast: &Expr, env: &Env, host: &dyn IoHost) -> Result<Value, MErro
         Expr::Binary(op, l, r) => {
             let lv = evaluate(l, env, host)?;
             let rv = evaluate(r, env, host)?;
-            apply_binary(*op, lv, rv)
+            apply_binary(*op, lv, rv, host)
         }
 
         // --- Conditional ---
@@ -1053,6 +1081,8 @@ fn apply_unary(op: UnaryOp, v: Value) -> Result<Value, MError> {
         },
         UnaryOp::Not => match v {
             Value::Logical(b) => Ok(Value::Logical(!b)),
+            // Kleene 3-valued logic: `not null` is null.
+            Value::Null => Ok(Value::Null),
             other => Err(MError::TypeMismatch {
                 expected: "logical",
                 found: type_name(&other),
@@ -1067,7 +1097,7 @@ fn apply_unary(op: UnaryOp, v: Value) -> Result<Value, MError> {
     }
 }
 
-fn apply_binary(op: BinaryOp, lv: Value, rv: Value) -> Result<Value, MError> {
+fn apply_binary(op: BinaryOp, lv: Value, rv: Value, host: &dyn IoHost) -> Result<Value, MError> {
     match op {
         BinaryOp::Multiply => {
             if matches!(lv, Value::Null) || matches!(rv, Value::Null) {
@@ -1100,6 +1130,32 @@ fn apply_binary(op: BinaryOp, lv: Value, rv: Value) -> Result<Value, MError> {
                     let mut out = l;
                     out.extend(r);
                     Ok(Value::List(out))
+                }
+                // PQ `&` on records merges fields; on key collision the RHS
+                // value wins. Order: LHS fields in original order, then any
+                // RHS-only fields appended (insertion order of RHS).
+                //
+                // Field values may be thunks tied to each record's own env.
+                // We can't carry both envs through a merged record, so force
+                // each field through its source env up front. (Shallow force
+                // is enough — deep traversal still happens during serialize.)
+                (Value::Record(mut l), Value::Record(r)) => {
+                    for slot in l.fields.iter_mut() {
+                        let v = std::mem::replace(&mut slot.1, Value::Null);
+                        slot.1 = force(v, &mut |e, env| evaluate(e, env, host))?;
+                    }
+                    let mut rhs_forced: Vec<(String, Value)> = Vec::with_capacity(r.fields.len());
+                    for (k, v) in r.fields {
+                        rhs_forced.push((k, force(v, &mut |e, env| evaluate(e, env, host))?));
+                    }
+                    for (k, v) in rhs_forced {
+                        if let Some(slot) = l.fields.iter_mut().find(|(ek, _)| ek == &k) {
+                            slot.1 = v;
+                        } else {
+                            l.fields.push((k, v));
+                        }
+                    }
+                    Ok(Value::Record(l))
                 }
                 (l, r) => Err(MError::Other(format!(
                     "We cannot apply operator & to types {} and {}.",

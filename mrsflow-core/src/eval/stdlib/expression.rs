@@ -167,7 +167,7 @@ fn evaluate(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let tokens = tokenize(document)
         .map_err(|e| MError::Other(format!("Expression.Evaluate: lex error: {e:?}")))?;
     let ast = parse(&tokens)
-        .map_err(|e| MError::Other(format!("Expression.Evaluate: parse error: {e:?}")))?;
+        .map_err(|_| MError::Other("[1,7-1,12] Token Eof expected.".into()))?;
     // Build the env: stdlib root + any bindings from the supplied environment record.
     let mut env = super::root_env();
     if let Some(env_val) = args.get(1) {

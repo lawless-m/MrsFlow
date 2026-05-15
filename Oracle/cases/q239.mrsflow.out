@@ -1,1 +1,1 @@
-{"HasError":true,"Reason":"Expression.Error","Message":"the name '#binary' wasn't recognized"}
+{"HasError":false,"Value":[{"Column1":"a","Column2":"b"},{"Column1":"1","Column2":"2"}]}
