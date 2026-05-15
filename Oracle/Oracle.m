@@ -2095,7 +2095,63 @@ let
             let r = try {Comparer.Ordinal(1, 2), Comparer.Ordinal(2, 2), Comparer.Ordinal(3, 1), Comparer.Ordinal(null, 1)} in
                 if r[HasError]
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
-                    else [HasError=false, Value=r[Value]])
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q386", () =>
+            let r = try {
+                    Value.Equals(1, 1),
+                    Value.Equals(1, 1.0),
+                    Value.Equals("a", "a"),
+                    Value.Equals("a", "A"),
+                    Value.Equals(null, null)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q387", () =>
+            let r = try {
+                    Value.Equals(1, "1"),
+                    Value.Equals(true, 1),
+                    Value.Equals({1, 2}, {1, 2}),
+                    Value.Equals({1, 2}, {2, 1}),
+                    Value.Equals([a=1, b=2], [b=2, a=1])
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q388", () =>
+            let r = try {
+                    Value.Compare(1, 2),
+                    Value.Compare(2, 1),
+                    Value.Compare(1, 1),
+                    Value.Compare("a", "b"),
+                    Value.Compare("b", "a")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q389", () =>
+            let r = try {
+                    Value.Compare(null, 1),
+                    Value.Compare(1, null),
+                    Value.Compare(null, null)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q390", () =>
+            let r = try {
+                    Value.Compare("a", "A", Comparer.OrdinalIgnoreCase),
+                    Value.Compare("A", "a", Comparer.Ordinal),
+                    Value.Compare(#date(2024, 1, 1), #date(2024, 6, 1))
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]])
     },
 
     Catalog = Table.FromRecords(cases)
