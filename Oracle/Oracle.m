@@ -3363,7 +3363,55 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
-                        else [HasError=false, Value=r[Value]])
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q511", () =>
+            let r = try {
+                    List.Repeat({1, 2, 3}, 3),
+                    List.Repeat({1, 2, 3}, 0),
+                    List.Repeat({}, 5),
+                    List.Repeat({"x"}, 5)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q512", () =>
+            let r = try {
+                    try List.Repeat({1}, -1) otherwise "err",
+                    List.Repeat({"a", "b"}, 1)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q513", () =>
+            let r = try List.Generate(() => 0, each _ < 5, each _ + 1) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q514", () =>
+            let r = try {
+                    List.Numbers(1, 5),
+                    List.Numbers(0, 10, 2),
+                    List.Numbers(10, 5, -1),
+                    List.Numbers(1, 0)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q515", () =>
+            let r = try
+                let
+                    dates = List.Dates(#date(2024, 6, 15), 5, #duration(1, 0, 0, 0))
+                in
+                    dates
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]])
     },
 
     Catalog = Table.FromRecords(cases)
