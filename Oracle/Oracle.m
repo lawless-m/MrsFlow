@@ -10278,6 +10278,75 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1130", () =>
+            let r = try {
+                    Replacer.ReplaceValue(5, 5, "five"),
+                    Replacer.ReplaceValue(5, 4, "five"),
+                    Replacer.ReplaceValue("a", "a", "b"),
+                    Replacer.ReplaceValue("hello", "hello", null),
+                    Replacer.ReplaceValue(null, null, 0),
+                    Replacer.ReplaceValue(null, 0, "x")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1131", () =>
+            let r = try {
+                    Replacer.ReplaceText("hello world", "world", "M"),
+                    Replacer.ReplaceText("aaa", "a", "bb"),
+                    Replacer.ReplaceText("hello", "", "x"),
+                    Replacer.ReplaceText("", "a", "b"),
+                    Replacer.ReplaceText("résumé", "é", "e")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1132", () =>
+            let t = Table.FromRecords({[a=1, b="x"], [a=2, b="y"], [a=1, b="z"]}) in
+            let r = try {
+                    Table.ReplaceValue(t, 1, 99, Replacer.ReplaceValue, {"a"}),
+                    Table.ReplaceValue(t, "x", "X", Replacer.ReplaceValue, {"b"}),
+                    Table.ReplaceValue(t, null, 0, Replacer.ReplaceValue, {"a"})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1133", () =>
+            let t = Table.FromRecords({[a=1, b="hello world"], [a=2, b="goodbye world"], [a=3, b="other"]}) in
+            let r = try {
+                    Table.ReplaceValue(t, "world", "M", Replacer.ReplaceText, {"b"}),
+                    Table.ReplaceValue(t, "o", "0", Replacer.ReplaceText, {"b"})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1134", () =>
+            let t = Table.FromRecords({[a=1], [a=null], [a=2], [a=null]}) in
+            let r = try {
+                    Table.ReplaceValue(t, null, 0, Replacer.ReplaceValue, {"a"}),
+                    Table.ReplaceValue(t, 1, null, Replacer.ReplaceValue, {"a"})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1135", () =>
+            let r = try {
+                    Text.Replace("hello world", "world", "M"),
+                    Replacer.ReplaceText("hello world world", "world", "M")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1136", () =>
+            let t = Table.FromRecords({[a=1, b=1], [a=2, b=2]}) in
+            let t2 = Table.AddColumn(t, "c", each if [a] = 2 then error "boom" else [a] * 10) in
+            let r = try {
+                    Table.ReplaceErrorValues(t2, {{"c", -1}}),
+                    Table.RemoveRowsWithErrors(t2, {"c"})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
