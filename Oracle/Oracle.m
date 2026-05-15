@@ -8657,6 +8657,90 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q976", () =>
+            let t = Table.FromRecords({
+                    [k="A", attr="x", val=1],
+                    [k="A", attr="y", val=2],
+                    [k="B", attr="x", val=3],
+                    [k="B", attr="y", val=4]
+                }) in
+            let r = try {
+                    Table.Pivot(t, {"x", "y"}, "attr", "val")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q977", () =>
+            let t = Table.FromRecords({
+                    [k="A", attr="x", val=1],
+                    [k="A", attr="x", val=10],
+                    [k="B", attr="x", val=3]
+                }) in
+            let r = try {
+                    Table.Pivot(t, {"x"}, "attr", "val"),
+                    Table.Pivot(t, {"x"}, "attr", "val", List.Sum)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q978", () =>
+            let t = Table.FromRecords({
+                    [k="A", attr=null, val=1],
+                    [k="A", attr="x", val=2],
+                    [k="B", attr=null, val=3]
+                }) in
+            let r = try {
+                    Table.Pivot(t, {"x"}, "attr", "val")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q979", () =>
+            let t = Table.FromRecords({
+                    [k="A", x=1, y=2],
+                    [k="B", x=3, y=4]
+                }) in
+            let r = try {
+                    Table.Unpivot(t, {"x", "y"}, "attr", "val"),
+                    Table.Unpivot(t, {"x"}, "attr", "val")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q980", () =>
+            let t = Table.FromRecords({
+                    [k="A", x=1, y=null],
+                    [k="B", x=null, y=4]
+                }) in
+            let r = try {
+                    Table.Unpivot(t, {"x", "y"}, "attr", "val")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q981", () =>
+            let t = Table.FromRecords({
+                    [k="A", x=1, y=2, z=3],
+                    [k="B", x=4, y=5, z=6]
+                }) in
+            let r = try {
+                    Table.UnpivotOtherColumns(t, {"k"}, "attr", "val")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q982", () =>
+            let t = Table.FromRecords({
+                    [k="A", x=1, y=2],
+                    [k="B", x=3, y=4]
+                }) in
+            let unp = Table.Unpivot(t, {"x", "y"}, "attr", "val") in
+            let r = try {
+                    Table.Pivot(unp, {"x", "y"}, "attr", "val")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 

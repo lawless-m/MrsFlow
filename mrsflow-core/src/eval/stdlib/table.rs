@@ -2793,6 +2793,10 @@ fn do_unpivot(
     for row in &rows {
         let kept: Vec<Value> = keep_indices.iter().map(|&i| row[i].clone()).collect();
         for &p_idx in &pivot_indices {
+            // PQ drops rows where the pivoted cell value is null.
+            if matches!(row[p_idx], Value::Null) {
+                continue;
+            }
             let mut new_row = kept.clone();
             new_row.push(Value::Text(names[p_idx].clone()));
             new_row.push(row[p_idx].clone());
