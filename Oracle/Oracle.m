@@ -9891,6 +9891,90 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1095", () =>
+            let r = try {
+                    Value.Is(42, type number),
+                    Value.Is("hello", type text),
+                    Value.Is(true, type logical),
+                    Value.Is(null, type null),
+                    Value.Is(#date(2026, 1, 1), type date),
+                    Value.Is({1, 2}, type list),
+                    Value.Is([a=1], type record)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1096", () =>
+            let r = try {
+                    Value.Is(42, type text),
+                    Value.Is("hello", type number),
+                    Value.Is(null, type number),
+                    Value.Is(true, type number),
+                    Value.Is({1, 2}, type record)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1097", () =>
+            let r = try {
+                    Value.Is(null, type nullable number),
+                    Value.Is(42, type nullable number),
+                    Value.Is("text", type nullable number),
+                    Value.Is(null, type number)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1098", () =>
+            let r = try {
+                    Value.Compare(1, 2),
+                    Value.Compare(2, 1),
+                    Value.Compare(1, 1),
+                    Value.Compare("a", "b"),
+                    Value.Compare("b", "a"),
+                    Value.Compare("a", "a"),
+                    Value.Compare(true, false),
+                    Value.Compare(false, true)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1099", () =>
+            let r = try {
+                    Value.Compare(null, null),
+                    Value.Compare(null, 1),
+                    Value.Compare(1, null),
+                    Value.Compare(null, "a"),
+                    Value.Compare("a", null)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1100", () =>
+            let r = try {
+                    Value.Is(42, Value.Type(42)),
+                    Value.Is("hello", Value.Type("hello")),
+                    Value.Is(true, Value.Type(true)),
+                    Value.Is(null, Value.Type(null)),
+                    Value.Is({1, 2}, Value.Type({1, 2})),
+                    Value.Is([a=1], Value.Type([a=1]))
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1101", () =>
+            let r = try {
+                    42 is number,
+                    "hello" is text,
+                    true is logical,
+                    null is null,
+                    42 is text,
+                    null is number,
+                    null is nullable number
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
