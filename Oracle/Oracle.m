@@ -3924,6 +3924,61 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q566", () =>
+            let r = try {
+                    Text.Lower("HELLO WORLD"),
+                    Text.Lower("Hello World"),
+                    Text.Lower(""),
+                    Text.Upper("hello world"),
+                    Text.Upper("aBcDeF")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q567", () =>
+            let r = try {
+                    try Text.Lower("IZMIR", "tr-TR") otherwise "err",
+                    try Text.Lower("HELLO", "en-US") otherwise "err",
+                    try Text.Upper("istanbul", "tr-TR") otherwise "err"
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q568", () =>
+            let r = try {
+                    Text.Lower("ÄÖÜß"),
+                    Text.Upper("äöüß"),
+                    Text.Lower("ÉÈÊË"),
+                    Text.Upper("éèêë")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q569", () =>
+            let r = try {
+                    Text.Length(Text.Lower("HELLO")),
+                    Text.Length(Text.Upper("hello")),
+                    Text.Lower("hello") = "hello",
+                    Text.Upper("HELLO") = "HELLO"
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q570", () =>
+            let r = try {
+                    Text.Length("ÄÖÜß"),
+                    Text.Length("hello"),
+                    Character.ToNumber("Ä"),
+                    Character.ToNumber("ß")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
