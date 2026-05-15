@@ -4693,6 +4693,61 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q641", () =>
+            let r = try {
+                    List.Sum({1, 2, 3, 4, 5}),
+                    List.Sum({}),
+                    List.Sum({1.5, 2.5, 3.0}),
+                    List.Sum({1, null, 3})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q642", () =>
+            let r = try {
+                    List.Average({1, 2, 3, 4, 5}),
+                    List.Average({10, 20, 30}),
+                    List.Average({}),
+                    List.Average({1, null, 3})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q643", () =>
+            let r = try {
+                    List.Median({1, 2, 3, 4, 5}),
+                    List.Median({1, 2, 3, 4}),
+                    List.Median({5, 1, 4, 2, 3}),
+                    List.Median({1})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q644", () =>
+            let r = try {
+                    List.Mode({1, 2, 2, 3, 3, 3, 4}),
+                    List.Mode({"a", "b", "a", "c", "a"}),
+                    try List.Mode({1, 2, 3}) otherwise "err"
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q645", () =>
+            let r = try {
+                    Number.Round(List.StandardDeviation({2, 4, 4, 4, 5, 5, 7, 9}), 6),
+                    List.Min({3, 1, 4, 1, 5, 9}),
+                    List.Max({3, 1, 4, 1, 5, 9}),
+                    List.Count({1, 2, 3, 4, 5}),
+                    List.Count({})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
