@@ -3249,6 +3249,68 @@ let
             let r = try Text.Length(Text.Replace(Text.NewGuid(), "-", "")) in
                 if r[HasError]
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q501", () =>
+            let r = try {
+                    List.MatchesAll({1, 2, 3}, each _ > 0),
+                    List.MatchesAll({1, -2, 3}, each _ > 0),
+                    List.MatchesAll({}, each _ > 0),
+                    List.MatchesAll({1, 1, 1}, each _ = 1)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q502", () =>
+            let r = try {
+                    List.MatchesAny({1, 2, 3}, each _ > 2),
+                    List.MatchesAny({1, 2, 3}, each _ > 10),
+                    List.MatchesAny({}, each _ > 0),
+                    List.MatchesAny({"a", "b", "c"}, each _ = "b")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q503", () =>
+            let r = try {
+                    List.IsEmpty({}),
+                    List.IsEmpty({1}),
+                    List.IsEmpty({null}),
+                    List.IsEmpty({""})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q504", () =>
+            let r = try
+                let
+                    lst = {1, 2, 3, 4, 5},
+                    allEven = List.MatchesAll(lst, each Number.Mod(_, 2) = 0),
+                    anyEven = List.MatchesAny(lst, each Number.Mod(_, 2) = 0)
+                in
+                    {allEven, anyEven}
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q505", () =>
+            let r = try
+                let
+                    nullList = {null, null, null},
+                    mixedList = {1, null, 3}
+                in
+                    {
+                        List.MatchesAll(nullList, each _ = null),
+                        List.MatchesAny(mixedList, each _ = null),
+                        List.MatchesAll(mixedList, each _ = null)
+                    }
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                     else [HasError=false, Value=r[Value]])
     },
 
