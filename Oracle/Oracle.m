@@ -7192,6 +7192,76 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q835", () =>
+            let r = try {
+                    Text.Combine({}),
+                    Text.Combine({"a"}),
+                    Text.Combine({"a", "b"}),
+                    Text.Combine({"a", "b", "c"}),
+                    Text.Combine({"a", "b"}, ", "),
+                    Text.Combine({"a"}, ", "),
+                    Text.Combine({}, ", ")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q836", () =>
+            let r = try {
+                    Text.Combine({"a", null, "b"}),
+                    Text.Combine({null, null}),
+                    Text.Combine({null}),
+                    Text.Combine({"a", null, "b"}, ","),
+                    Text.Combine({null, "a", null}, "-")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q837", () =>
+            let r = try {
+                    Text.Combine({"", ""}, ","),
+                    Text.Combine({"a", ""}, ","),
+                    Text.Combine({"", "a"}, ","),
+                    Text.Combine({"", "", ""}, "-"),
+                    Text.Combine({""}, ",")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q838", () =>
+            let r = try {
+                    Text.Combine({"a", "b"}, ""),
+                    Text.Combine({"a", "b"}, " - "),
+                    Text.Combine({"a", "b"}, "→"),
+                    Text.Combine({"a", "b"}, null),
+                    Text.Combine({"a", "b"}, "#(cr,lf)")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q839", () =>
+            let r = try {
+                    Text.Combine({"a", 42, "b"})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q840", () =>
+            let r = try {
+                    Text.Combine(null),
+                    Text.Combine("abc")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q841", () =>
+            let r = try {
+                    Text.Combine(Text.Split("a,b,c", ","), ",") = "a,b,c",
+                    Text.Combine(Text.Split("a-b-c", "-"), "-") = "a-b-c",
+                    Text.Combine({"a"}, "anything") = "a"
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 

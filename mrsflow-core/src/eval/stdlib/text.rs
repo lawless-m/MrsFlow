@@ -1176,16 +1176,24 @@ fn proper(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 
 fn combine(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let texts = expect_list(&args[0])?;
-    let sep = match args.get(1) {
-        Some(Value::Text(s)) => s.as_str(),
-        Some(Value::Null) | None => "",
+    let (sep, sep_present) = match args.get(1) {
+        Some(Value::Text(s)) => (s.as_str(), true),
+        Some(Value::Null) | None => ("", false),
         Some(other) => return Err(type_mismatch("text or null", other)),
     };
+    // PQ:
+    // - With separator: null elements are SKIPPED entirely (no duplicated
+    //   separator from a null slot).
+    // - Without separator: null elements stringify to "" (the join is
+    //   indistinguishable from skipping when sep is empty, but the
+    //   skip-vs-empty branching keeps the intent explicit).
     let parts: Result<Vec<&str>, MError> = texts
         .iter()
-        .map(|v| match v {
-            Value::Text(s) => Ok(s.as_str()),
-            other => Err(type_mismatch("text (in list)", other)),
+        .filter_map(|v| match v {
+            Value::Text(s) => Some(Ok(s.as_str())),
+            Value::Null if sep_present => None,
+            Value::Null => Some(Ok("")),
+            other => Some(Err(type_mismatch("text (in list)", other))),
         })
         .collect();
     Ok(Value::Text(parts?.join(sep)))
