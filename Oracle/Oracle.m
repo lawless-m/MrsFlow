@@ -8980,6 +8980,82 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1004", () =>
+            let t = Table.FromRecords({
+                    [k=1, v="A"],
+                    [k=2, v="B"],
+                    [k=3, v="A"]
+                }) in
+            let r = try {
+                    Table.ReplaceValue(t, "A", "X", Replacer.ReplaceValue, {"v"})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1005", () =>
+            let t = Table.FromRecords({
+                    [a="A", b="A"],
+                    [a="B", b="A"],
+                    [a="A", b="C"]
+                }) in
+            let r = try {
+                    Table.ReplaceValue(t, "A", "X", Replacer.ReplaceValue, {"a", "b"})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1006", () =>
+            let t = Table.FromRecords({
+                    [v="hello world"],
+                    [v="say hello"],
+                    [v="no match"]
+                }) in
+            let r = try {
+                    Table.ReplaceValue(t, "hello", "HI", Replacer.ReplaceText, {"v"})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1007", () =>
+            let t = Table.FromRecords({
+                    [v="A"],
+                    [v=null],
+                    [v="B"],
+                    [v=null]
+                }) in
+            let r = try {
+                    Table.ReplaceValue(t, null, "X", Replacer.ReplaceValue, {"v"})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1008", () =>
+            let t = Table.FromRecords({[a=1], [a=0], [a=2]}) in
+            let withErrs = Table.AddColumn(t, "div", each Number.IntegerDivide(1, [a])) in
+            let r = try {
+                    Table.ReplaceErrorValues(withErrs, {{"div", -1}})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1009", () =>
+            let t = Table.FromRecords({[a=0], [a=0], [a=0]}) in
+            let withErrs = Table.AddColumn(t, "div", each Number.IntegerDivide(1, [a])) in
+            let r = try {
+                    Table.ReplaceErrorValues(withErrs, {{"div", "ZERO"}})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1010", () =>
+            let t = Table.FromRecords({[v="A"], [v="B"]}) in
+            let r = try {
+                    Table.ReplaceValue(t, "Z", "X", Replacer.ReplaceValue, {"v"}) = t,
+                    Table.ReplaceValue(t, "A", "A", Replacer.ReplaceValue, {"v"}) = t
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
