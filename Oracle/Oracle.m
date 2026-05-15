@@ -8512,6 +8512,71 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q962", () =>
+            let t = Table.FromRecords({[v=10], [v=20], [v=30]}) in
+            let r = try {
+                    Table.AddIndexColumn(t, "Index"),
+                    Table.AddIndexColumn(t, "Idx", 1),
+                    Table.AddIndexColumn(t, "Idx", 100, 10)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q963", () =>
+            let t = Table.FromRecords({[v=10], [v=20], [v=30]}) in
+            let r = try {
+                    Table.AddIndexColumn(t, "Index", -1, 1),
+                    Table.AddIndexColumn(t, "Index", -10, 5)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q964", () =>
+            let t = Table.FromRecords({[v=10], [v=20], [v=30]}) in
+            let r = try {
+                    Table.AddIndexColumn(t, "Index", 0, -1),
+                    Table.AddIndexColumn(t, "Index", 100, -10)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q965", () =>
+            let t = Table.FromRecords({[v=10], [v=20], [v=30]}) in
+            let r = try {
+                    Table.AddIndexColumn(t, "Index", 0, 0.5),
+                    Table.AddIndexColumn(t, "Index", 0.5, 1)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q966", () =>
+            let t = Table.FromRecords({[v=10], [v=20], [v=30]}) in
+            let r = try {
+                    Table.AddIndexColumn(t, "Index", 5, 0)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q967", () =>
+            let empty = Table.FromRecords({}) in
+            let t = Table.FromRecords({[Index=99]}) in
+            let r = try {
+                    Table.AddIndexColumn(empty, "Index"),
+                    Table.AddIndexColumn(t, "Index")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q968", () =>
+            let t = Table.FromRecords({[v=1]}) in
+            let r = try {
+                    Table.AddIndexColumn(t, "Index", null, null),
+                    Table.AddIndexColumn(t, "Index", null, 2),
+                    Table.AddIndexColumn(t, "Index", 5, null)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
