@@ -1,0 +1,1 @@
+{"HasError":true,"Reason":"Expression.Error","Message":"not implemented: Table.Join: only Inner (0) and LeftOuter (1) join kinds supported"}

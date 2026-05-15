@@ -2456,7 +2456,75 @@ let
                 ) in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
-                        else [HasError=false, Value=r[Value]])
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q426", () =>
+            let r = try Table.Join(
+                    #table({"k", "v"}, {{"a", 1}, {"b", 2}, {"c", 3}}),
+                    "k",
+                    #table({"kr", "w"}, {{"a", 10}, {"b", 20}, {"d", 40}}),
+                    "kr",
+                    JoinKind.RightOuter
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q427", () =>
+            let r = try Table.Join(
+                    #table({"k", "v"}, {{"a", 1}, {"b", 2}, {"c", 3}}),
+                    "k",
+                    #table({"kr", "w"}, {{"a", 10}, {"b", 20}, {"d", 40}}),
+                    "kr",
+                    JoinKind.LeftAnti
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q428", () =>
+            let r = try Table.Join(
+                    #table({"k", "v"}, {{"a", 1}, {"b", 2}, {"c", 3}}),
+                    "k",
+                    #table({"kr", "w"}, {{"a", 10}, {"b", 20}, {"d", 40}}),
+                    "kr",
+                    JoinKind.RightAnti
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q429", () =>
+            let r = try Table.NestedJoin(
+                    #table({"k", "v"}, {{"a", 1}, {"b", 2}, {"c", 3}}),
+                    "k",
+                    #table({"k", "w"}, {{"a", 10}, {"b", 20}, {"d", 40}}),
+                    "k",
+                    "Sub",
+                    JoinKind.Inner
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=Table.ColumnNames(r[Value])]),
+
+        SafeSerialize("q430", () =>
+            let r = try
+                let
+                    joined = Table.NestedJoin(
+                        #table({"k"}, {{"a"}, {"b"}, {"c"}}),
+                        "k",
+                        #table({"k", "w"}, {{"a", 10}, {"a", 20}, {"b", 30}, {"d", 40}}),
+                        "k",
+                        "Sub",
+                        JoinKind.LeftOuter
+                    ),
+                    rowCounts = Table.AddColumn(joined, "n", each Table.RowCount([Sub]))
+                in
+                    Table.SelectColumns(rowCounts, {"k", "n"})
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]])
     },
 
     Catalog = Table.FromRecords(cases)
