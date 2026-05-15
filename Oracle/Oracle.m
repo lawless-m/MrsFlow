@@ -1704,7 +1704,24 @@ let
             List.Generate(() => 42, each false, each _ + 1)),
 
         SafeSerialize("q330", () =>
-            List.Sum(List.Generate(() => 1, each _ <= 50, each _ + 1)))
+            List.Sum(List.Generate(() => 1, each _ <= 50, each _ + 1))),
+
+        // q331-q335: Record.*Fields with empty list args.
+
+        SafeSerialize("q331", () =>
+            Record.SelectFields([a=1, b=2], {})),
+
+        SafeSerialize("q332", () =>
+            Record.SelectFields([], {})),
+
+        SafeSerialize("q333", () =>
+            Record.RemoveFields([a=1, b=2], {})),
+
+        SafeSerialize("q334", () =>
+            Record.RenameFields([a=1, b=2], {})),
+
+        SafeSerialize("q335", () =>
+            Record.ReorderFields([a=1, b=2], {}))
     },
 
     Catalog = Table.FromRecords(cases)
