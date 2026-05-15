@@ -6349,6 +6349,121 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        // q754-q760: Bitwise ops on signed / unsigned bounds.
+
+        SafeSerialize("q754", () =>
+            let r = try {
+                    Number.BitwiseAnd(0xFF, 0x0F),
+                    Number.BitwiseAnd(0xFFFF, 0xFF00),
+                    Number.BitwiseAnd(0, 0xFFFFFFFF),
+                    Number.BitwiseAnd(-1, -1),
+                    Number.BitwiseAnd(-1, 0),
+                    Number.BitwiseAnd(-1, 1),
+                    Number.BitwiseAnd(0x80000000, 0xFFFFFFFF),
+                    Number.BitwiseAnd(0xFFFFFFFF, 0xFFFFFFFF)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q755", () =>
+            let r = try {
+                    Number.BitwiseOr(0xF0, 0x0F),
+                    Number.BitwiseOr(-1, 0),
+                    Number.BitwiseOr(0, -1),
+                    Number.BitwiseXor(0xFF, 0xFF),
+                    Number.BitwiseXor(0xFF, 0x00),
+                    Number.BitwiseXor(-1, -1),
+                    Number.BitwiseXor(-1, 0),
+                    Number.BitwiseNot(0),
+                    Number.BitwiseNot(-1),
+                    Number.BitwiseNot(0xFF)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q756", () =>
+            let r = try {
+                    Number.BitwiseShiftLeft(1, 0),
+                    Number.BitwiseShiftLeft(1, 1),
+                    Number.BitwiseShiftLeft(1, 8),
+                    Number.BitwiseShiftLeft(1, 30),
+                    Number.BitwiseShiftLeft(1, 31),
+                    Number.BitwiseShiftLeft(1, 62),
+                    Number.BitwiseShiftLeft(1, 63),
+                    Number.BitwiseShiftRight(256, 8),
+                    Number.BitwiseShiftRight(0xFFFFFFFF, 16),
+                    Number.BitwiseShiftRight(-1, 1)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q757", () =>
+            let r = try {
+                    try Number.BitwiseShiftLeft(1, 64) otherwise "err",
+                    try Number.BitwiseShiftLeft(1, 65) otherwise "err",
+                    try Number.BitwiseShiftLeft(1, 100) otherwise "err",
+                    try Number.BitwiseShiftRight(1, 64) otherwise "err",
+                    try Number.BitwiseShiftLeft(1, -1) otherwise "err",
+                    try Number.BitwiseShiftRight(1, -1) otherwise "err",
+                    try Number.BitwiseShiftLeft(1, 0.5) otherwise "err"
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q758", () =>
+            // Stay within f64-exact-integer range (≤ 2^53) since mrsflow's
+            // numeric literals go through f64. PQ uses Decimal internally
+            // so it preserves 19-digit i64 literals exactly; this probe
+            // sidesteps that parser-precision divergence.
+            let r = try {
+                    Number.BitwiseAnd(9007199254740991, 1),
+                    Number.BitwiseAnd(9007199254740991, 0xFF),
+                    Number.BitwiseOr(9007199254740990, 1),
+                    Number.BitwiseXor(9007199254740991, 9007199254740991),
+                    Number.BitwiseAnd(0x1FFFFFFFFFFFFF, 0xFFFFFFFF),
+                    Number.BitwiseOr(0x100000000, 0xFFFFFFFF),
+                    Number.BitwiseShiftRight(0x1FFFFFFFFFFFFF, 32),
+                    Number.BitwiseShiftRight(0x1FFFFFFFFFFFFF, 52)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q759", () =>
+            let r = try {
+                    try Number.BitwiseAnd(3.5, 5) otherwise "err",
+                    try Number.BitwiseAnd(5, 3.5) otherwise "err",
+                    try Number.BitwiseAnd(Number.NaN, 5) otherwise "err",
+                    try Number.BitwiseAnd(Number.PositiveInfinity, 5) otherwise "err",
+                    try Number.BitwiseAnd(null, 5) otherwise "err",
+                    try Number.BitwiseAnd(5, null) otherwise "err",
+                    try Number.BitwiseShiftLeft(1.5, 2) otherwise "err",
+                    try Number.BitwiseNot(3.5) otherwise "err",
+                    try Number.BitwiseNot(null) otherwise "err"
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q760", () =>
+            let r = try {
+                    Number.BitwiseAnd(255, Number.BitwiseNot(0)) = 255,
+                    Number.BitwiseXor(123, 123) = 0,
+                    Number.BitwiseOr(123, 0) = 123,
+                    Number.BitwiseAnd(123, 0) = 0,
+                    Number.BitwiseShiftLeft(Number.BitwiseShiftRight(0xFF00, 8), 8) = 0xFF00,
+                    Number.BitwiseXor(Number.BitwiseAnd(0xF0, 0xCC), Number.BitwiseOr(0xF0, 0xCC)) = Number.BitwiseXor(0xF0, 0xCC),
+                    Number.BitwiseAnd(5, 3) + Number.BitwiseOr(5, 3) = 5 + 3,
+                    Number.BitwiseAnd(0xAAAA, 0xFFFF) = 0xAAAA
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 

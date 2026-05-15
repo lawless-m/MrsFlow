@@ -258,35 +258,55 @@ fn int_arg(v: &Value, ctx: &str) -> Result<i64, MError> {
     }
 }
 
+/// Like int_arg but returns Ok(None) for null. Lets bitwise ops propagate
+/// null per PQ semantics.
+fn int_arg_nullable(v: &Value, ctx: &str) -> Result<Option<i64>, MError> {
+    match v {
+        Value::Null => Ok(None),
+        _ => int_arg(v, ctx).map(Some),
+    }
+}
+
 
 fn bitwise_and(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    Ok(Value::Number((int_arg(&args[0], "Number.BitwiseAnd")?
-        & int_arg(&args[1], "Number.BitwiseAnd")?) as f64))
+    let (Some(a), Some(b)) = (int_arg_nullable(&args[0], "Number.BitwiseAnd")?,
+                               int_arg_nullable(&args[1], "Number.BitwiseAnd")?)
+    else { return Ok(Value::Null); };
+    Ok(Value::Number((a & b) as f64))
 }
 
 fn bitwise_or(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    Ok(Value::Number((int_arg(&args[0], "Number.BitwiseOr")?
-        | int_arg(&args[1], "Number.BitwiseOr")?) as f64))
+    let (Some(a), Some(b)) = (int_arg_nullable(&args[0], "Number.BitwiseOr")?,
+                               int_arg_nullable(&args[1], "Number.BitwiseOr")?)
+    else { return Ok(Value::Null); };
+    Ok(Value::Number((a | b) as f64))
 }
 
 fn bitwise_xor(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    Ok(Value::Number((int_arg(&args[0], "Number.BitwiseXor")?
-        ^ int_arg(&args[1], "Number.BitwiseXor")?) as f64))
+    let (Some(a), Some(b)) = (int_arg_nullable(&args[0], "Number.BitwiseXor")?,
+                               int_arg_nullable(&args[1], "Number.BitwiseXor")?)
+    else { return Ok(Value::Null); };
+    Ok(Value::Number((a ^ b) as f64))
 }
 
 fn bitwise_not(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    Ok(Value::Number((!int_arg(&args[0], "Number.BitwiseNot")?) as f64))
+    let Some(a) = int_arg_nullable(&args[0], "Number.BitwiseNot")? else {
+        return Ok(Value::Null);
+    };
+    Ok(Value::Number((!a) as f64))
 }
 
 fn bitwise_shift_left(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    let a = int_arg(&args[0], "Number.BitwiseShiftLeft")?;
-    let n = int_arg(&args[1], "Number.BitwiseShiftLeft")?;
+    let (Some(a), Some(n)) = (int_arg_nullable(&args[0], "Number.BitwiseShiftLeft")?,
+                               int_arg_nullable(&args[1], "Number.BitwiseShiftLeft")?)
+    else { return Ok(Value::Null); };
     Ok(Value::Number((a.wrapping_shl(n as u32)) as f64))
 }
 
 fn bitwise_shift_right(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    let a = int_arg(&args[0], "Number.BitwiseShiftRight")?;
-    let n = int_arg(&args[1], "Number.BitwiseShiftRight")?;
+    let (Some(a), Some(n)) = (int_arg_nullable(&args[0], "Number.BitwiseShiftRight")?,
+                               int_arg_nullable(&args[1], "Number.BitwiseShiftRight")?)
+    else { return Ok(Value::Null); };
     Ok(Value::Number((a.wrapping_shr(n as u32)) as f64))
 }
 
