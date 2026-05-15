@@ -2390,6 +2390,72 @@ let
                 ) in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q421", () =>
+            let r = try Table.Join(
+                    #table({"k", "v"}, {{"a", 1}, {"b", 2}, {"c", 3}}),
+                    "k",
+                    #table({"kr", "w"}, {{"a", 10}, {"b", 20}, {"d", 40}}),
+                    "kr",
+                    JoinKind.Inner
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q422", () =>
+            let r = try Table.Join(
+                    #table({"k", "v"}, {{"a", 1}, {"b", 2}, {"c", 3}}),
+                    "k",
+                    #table({"kr", "w"}, {{"a", 10}, {"b", 20}, {"d", 40}}),
+                    "kr",
+                    JoinKind.LeftOuter
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q423", () =>
+            let r = try Table.Join(
+                    #table({"k", "v"}, {{"a", 1}, {"b", 2}, {"c", 3}}),
+                    "k",
+                    #table({"kr", "w"}, {{"a", 10}, {"b", 20}, {"d", 40}}),
+                    "kr",
+                    JoinKind.FullOuter
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q424", () =>
+            let r = try
+                let
+                    joined = Table.NestedJoin(
+                        #table({"k", "v"}, {{"a", 1}, {"b", 2}}),
+                        "k",
+                        #table({"k", "w"}, {{"a", 10}, {"a", 20}, {"b", 30}}),
+                        "k",
+                        "Sub",
+                        JoinKind.LeftOuter
+                    )
+                in
+                    Table.ColumnNames(joined)
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q425", () =>
+            let r = try Table.Join(
+                    #table({"k1", "k2", "v"}, {{"a", 1, "X"}, {"a", 2, "Y"}, {"b", 1, "Z"}}),
+                    {"k1", "k2"},
+                    #table({"kr1", "kr2", "w"}, {{"a", 1, 100}, {"a", 2, 200}, {"c", 1, 300}}),
+                    {"kr1", "kr2"},
+                    JoinKind.Inner
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
