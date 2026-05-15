@@ -1849,6 +1849,44 @@ let
             let r = try Binary.ToText(Text.ToBinary("Hello", TextEncoding.Utf8), BinaryEncoding.Hex) in
                 if r[HasError]
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q351", () =>
+            let r = try Binary.ToText(Binary.FromList({0, 15, 16, 255}), BinaryEncoding.Hex) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q352", () =>
+            let r = try Binary.ToText(Binary.FromList({0, 0, 0, 0}), BinaryEncoding.Hex) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q353", () =>
+            let r = try Binary.ToText(Binary.FromList({}), BinaryEncoding.Hex) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q354", () =>
+            let r = try
+                let
+                    orig = Binary.FromList({170, 187, 204, 221}),
+                    hex = Binary.ToText(orig, BinaryEncoding.Hex),
+                    roundtrip = Binary.FromText(hex, BinaryEncoding.Hex),
+                    equal = Binary.ToText(roundtrip, BinaryEncoding.Base64) = Binary.ToText(orig, BinaryEncoding.Base64)
+                in
+                    equal
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q355", () =>
+            let r = try Binary.ToText(Binary.FromList({1}), BinaryEncoding.Hex) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                     else [HasError=false, Value=r[Value]])
     },
 
