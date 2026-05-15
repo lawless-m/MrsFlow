@@ -5282,6 +5282,118 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        // q684-q690: Number.Sqrt/Log/Ln/Exp boundaries.
+
+        SafeSerialize("q684", () =>
+            let r = try {
+                    Number.Sqrt(0),
+                    Number.Sqrt(1),
+                    Number.Sqrt(4),
+                    Number.Sqrt(2),
+                    Number.Sqrt(0.25),
+                    Number.Sqrt(1e100),
+                    Number.Sqrt(1e-100),
+                    try Number.Sqrt(-1) otherwise "err",
+                    try Number.Sqrt(-0.0001) otherwise "err"
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q685", () =>
+            let r = try {
+                    try Number.Sqrt(Number.PositiveInfinity) otherwise "err",
+                    try Number.Sqrt(Number.NegativeInfinity) otherwise "err",
+                    try Number.Sqrt(Number.NaN) otherwise "err",
+                    try Number.Sqrt(null) otherwise "err",
+                    try Number.Sqrt(-0.0) otherwise "err",
+                    Number.Sqrt(0.0)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q686", () =>
+            let r = try {
+                    Number.Ln(1),
+                    try Number.Ln(0) otherwise "err",
+                    try Number.Ln(-1) otherwise "err",
+                    try Number.Ln(-0.0001) otherwise "err",
+                    Number.Ln(2.718281828459045),
+                    Number.Ln(10),
+                    Number.Ln(0.5),
+                    Number.Ln(1e100),
+                    Number.Ln(1e-100)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q687", () =>
+            let r = try {
+                    try Number.Ln(Number.PositiveInfinity) otherwise "err",
+                    try Number.Ln(Number.NegativeInfinity) otherwise "err",
+                    try Number.Ln(Number.NaN) otherwise "err",
+                    try Number.Ln(null) otherwise "err",
+                    Number.Log10(1),
+                    Number.Log10(10),
+                    Number.Log10(100),
+                    Number.Log10(0.1),
+                    try Number.Log10(0) otherwise "err",
+                    try Number.Log10(-1) otherwise "err"
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q688", () =>
+            let r = try {
+                    Number.Log(8, 2),
+                    Number.Log(100, 10),
+                    Number.Log(1, 10),
+                    Number.Log(2, 2),
+                    Number.Log(0.5, 2),
+                    try Number.Log(0, 2) otherwise "err",
+                    try Number.Log(-1, 2) otherwise "err",
+                    try Number.Log(8, 1) otherwise "err",
+                    try Number.Log(8, 0) otherwise "err",
+                    try Number.Log(8, -2) otherwise "err"
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q689", () =>
+            let r = try {
+                    Number.Exp(0),
+                    Number.Exp(1),
+                    Number.Exp(-1),
+                    Number.Exp(10),
+                    Number.Exp(-10),
+                    Number.Exp(100),
+                    Number.Exp(-100),
+                    Number.Exp(1000),
+                    Number.Exp(-1000)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q690", () =>
+            let r = try {
+                    try Number.Exp(Number.PositiveInfinity) otherwise "err",
+                    try Number.Exp(Number.NegativeInfinity) otherwise "err",
+                    try Number.Exp(Number.NaN) otherwise "err",
+                    try Number.Exp(null) otherwise "err",
+                    Number.Ln(Number.Exp(2)),
+                    Number.Exp(Number.Ln(2)),
+                    Number.Sqrt(Number.Power(2, 4)),
+                    Number.Power(Number.Sqrt(2), 2)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 

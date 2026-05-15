@@ -309,6 +309,13 @@ fn log(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         Some(Value::Null) | None => std::f64::consts::E,
         Some(other) => return Err(type_mismatch("number (base)", other)),
     };
+    // PQ: undefined inputs → null. Non-positive operand, non-positive or
+    // 1 base, or any NaN.
+    if !n.is_finite() || !base.is_finite() || n.is_nan() || base.is_nan()
+        || n <= 0.0 || base <= 0.0 || base == 1.0
+    {
+        return Ok(Value::Null);
+    }
     Ok(Value::Number(n.log(base)))
 }
 
