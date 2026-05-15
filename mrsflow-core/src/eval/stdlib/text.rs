@@ -551,9 +551,13 @@ fn case_map(text: &str, culture: Option<String>, upper: bool) -> String {
 
 
 fn length(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    if matches!(args[0], Value::Null) {
+        return Ok(Value::Null);
+    }
     let text = expect_text(&args[0])?;
-    // M counts characters, not bytes — use char count.
-    Ok(Value::Number(text.chars().count() as f64))
+    // PQ counts UTF-16 code units (.NET String.Length), not codepoints.
+    // Surrogate pairs count as 2; combining marks count as 1 each.
+    Ok(Value::Number(text.encode_utf16().count() as f64))
 }
 
 
@@ -1150,8 +1154,18 @@ fn trim_start(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 
 
 fn reverse(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    if matches!(args[0], Value::Null) {
+        return Ok(Value::Null);
+    }
     let text = expect_text(&args[0])?;
-    Ok(Value::Text(text.chars().rev().collect()))
+    // PQ reverses by UTF-16 code unit (.NET's string indexing model),
+    // not by codepoint. Surrogate pairs get split — this matches
+    // .NET's `new string(str.Reverse().ToArray())` and PQ's observed
+    // behaviour on supplementary-plane chars.
+    let utf16: Vec<u16> = text.encode_utf16().collect();
+    let reversed: Vec<u16> = utf16.into_iter().rev().collect();
+    let result = String::from_utf16_lossy(&reversed);
+    Ok(Value::Text(result))
 }
 
 

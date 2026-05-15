@@ -7262,6 +7262,80 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q842", () =>
+            let r = try {
+                    Text.Reverse(""),
+                    Text.Reverse("a"),
+                    Text.Reverse("ab"),
+                    Text.Reverse("abc"),
+                    Text.Reverse("hello"),
+                    Text.Reverse("aba"),
+                    Text.Reverse("racecar")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q843", () =>
+            let r = try {
+                    Text.Reverse("café"),
+                    Text.Reverse("→←"),
+                    Text.Reverse("hello world"),
+                    Text.Reverse("naïve"),
+                    Text.Reverse("ß")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q844", () =>
+            let r = try {
+                    Text.Reverse("cafe#(0301)"),
+                    Text.Length("cafe#(0301)"),
+                    Text.Reverse("a#(0301)b#(0301)"),
+                    Text.Reverse("a#(0301)")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q845", () =>
+            let r = try {
+                    Text.Reverse("a#(0001F600)b"),
+                    Text.Length("a#(0001F600)b"),
+                    Text.Reverse("#(0001F600)#(0001F601)")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q846", () =>
+            let r = try {
+                    Text.Reverse(Text.Reverse("hello")) = "hello",
+                    Text.Reverse(Text.Reverse("café")) = "café",
+                    Text.Reverse(Text.Reverse("")) = "",
+                    Text.Length(Text.Reverse("hello world")) = Text.Length("hello world")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q847", () =>
+            let r = try {
+                    Text.Reverse(null)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q848", () =>
+            let r = try {
+                    Text.Length(""),
+                    Text.Length("a"),
+                    Text.Length("café"),
+                    Text.Length("cafe#(0301)"),
+                    Text.Length("#(0001F600)"),
+                    Text.Length("a#(0001F600)b"),
+                    Text.Length("#(0001F600)#(0001F601)"),
+                    Text.Length("a#(0301)")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
