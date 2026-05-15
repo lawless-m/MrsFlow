@@ -4438,6 +4438,63 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q616", () =>
+            let r = try {
+                    Date.AddDays(#date(2024, 12, 31), 1),
+                    Date.AddDays(#date(2024, 12, 31), 365),
+                    Date.AddDays(#date(2025, 1, 1), -1),
+                    Date.AddDays(#date(2024, 1, 1), -1)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q617", () =>
+            let r = try {
+                    Date.AddYears(#date(2024, 2, 29), 1),
+                    Date.AddYears(#date(2024, 2, 29), 4),
+                    Date.AddYears(#date(2020, 2, 29), -100),
+                    Date.AddMonths(#date(2024, 1, 31), 1)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q618", () =>
+            let r = try {
+                    Date.IsLeapYear(#date(2024, 1, 1)),
+                    Date.IsLeapYear(#date(2023, 1, 1)),
+                    Date.IsLeapYear(#date(2000, 1, 1)),
+                    Date.IsLeapYear(#date(1900, 1, 1)),
+                    Date.IsLeapYear(#date(2100, 1, 1))
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q619", () =>
+            let r = try {
+                    Date.DaysInMonth(#date(2024, 2, 1)),
+                    Date.DaysInMonth(#date(2023, 2, 1)),
+                    Date.DaysInMonth(#date(2024, 1, 1)),
+                    Date.DaysInMonth(#date(2024, 4, 1))
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q620", () =>
+            let r = try {
+                    Date.AddQuarters(#date(2024, 11, 15), 1),
+                    Date.AddQuarters(#date(2024, 11, 15), 2),
+                    Date.AddWeeks(#date(2024, 12, 25), 2),
+                    Date.DayOfYear(#date(2024, 12, 31)),
+                    Date.DayOfYear(#date(2023, 12, 31))
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
