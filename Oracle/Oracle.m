@@ -2340,7 +2340,57 @@ let
             in
                 if r[HasError]
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
-                    else [HasError=false, Value=r[Value]])
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q416", () =>
+            let r = try Table.Group(
+                    #table({"k", "v"}, {{"a", 1}, {"a", 2}, {"b", 3}, {"b", 4}, {"a", 5}}),
+                    {"k"},
+                    {{"Sum", each List.Sum([v]), Int64.Type}}
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q417", () =>
+            let r = try Table.Group(
+                    #table({"k", "v"}, {{"a", 1}, {"a", 2}, {"b", 3}}),
+                    {"k"},
+                    {{"Count", each Table.RowCount(_), Int64.Type}}
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q418", () =>
+            let r = try Table.Group(
+                    #table({"k", "v"}, {{"a", 1}, {"a", 2}, {"b", 3}}),
+                    {"k"},
+                    {{"Values", each [v], type list}}
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q419", () =>
+            let r = try Table.Group(
+                    #table({"k", "v"}, {}),
+                    {"k"},
+                    {{"Count", each Table.RowCount(_), Int64.Type}}
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q420", () =>
+            let r = try Table.Group(
+                    #table({"region", "category", "sales"}, {{"N", "X", 10}, {"N", "Y", 20}, {"S", "X", 30}, {"N", "X", 40}}),
+                    {"region", "category"},
+                    {{"Total", each List.Sum([sales]), Int64.Type}}
+                ) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]])
     },
 
     Catalog = Table.FromRecords(cases)
