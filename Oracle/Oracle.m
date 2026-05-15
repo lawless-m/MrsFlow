@@ -8577,6 +8577,86 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q969", () =>
+            let t = Table.FromRecords({
+                    [k=1, r=[a=10, b=20]],
+                    [k=2, r=[a=30, b=40]]
+                }) in
+            let r = try {
+                    Table.ExpandRecordColumn(t, "r", {"a", "b"}),
+                    Table.ExpandRecordColumn(t, "r", {"a"}),
+                    Table.ExpandRecordColumn(t, "r", {"a", "b"}, {"a2", "b2"})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q970", () =>
+            let t = Table.FromRecords({
+                    [k=1, r=[a=10, b=20]],
+                    [k=2, r=null],
+                    [k=3, r=[a=30]]
+                }) in
+            let r = try {
+                    Table.ExpandRecordColumn(t, "r", {"a", "b"})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q971", () =>
+            let t = Table.FromRecords({
+                    [k=1, lst={10, 20}],
+                    [k=2, lst={30}],
+                    [k=3, lst={}]
+                }) in
+            let r = try {
+                    Table.ExpandListColumn(t, "lst")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q972", () =>
+            let t = Table.FromRecords({
+                    [k=1, lst={10, 20}],
+                    [k=2, lst=null]
+                }) in
+            let r = try {
+                    Table.ExpandListColumn(t, "lst")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q973", () =>
+            let inner1 = Table.FromRecords({[x=1, y=2], [x=3, y=4]}) in
+            let inner2 = Table.FromRecords({[x=5, y=6]}) in
+            let t = Table.FromRecords({
+                    [k=1, tbl=inner1],
+                    [k=2, tbl=inner2]
+                }) in
+            let r = try {
+                    Table.ExpandTableColumn(t, "tbl", {"x", "y"})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q974", () =>
+            let t = Table.FromRecords({[k=1, r=[a=10]]}) in
+            let r = try {
+                    Table.ExpandRecordColumn(t, "missing", {"a"})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q975", () =>
+            let t = Table.FromRecords({
+                    [k=1, r=[a=[x=1, y=2]]],
+                    [k=2, r=[a=[x=3, y=4]]]
+                }) in
+            let r = try {
+                    Table.ExpandRecordColumn(t, "r", {"a"})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 

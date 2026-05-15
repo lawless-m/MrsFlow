@@ -1003,6 +1003,20 @@ pub fn deep_force(value: Value, host: &dyn IoHost) -> Result<Value, MError> {
                 env: record.env,
             }))
         }
+        Value::Table(t) => {
+            // Force the table to materialised Rows, then deep-force each
+            // cell — cells can contain records / lists whose internal
+            // values are still thunks.
+            let materialised = t.force()?;
+            let (names, rows) = stdlib::table::table_to_rows(&materialised)?;
+            let forced_rows: Result<Vec<Vec<Value>>, MError> = rows
+                .into_iter()
+                .map(|row| row.into_iter().map(|v| deep_force(v, host)).collect())
+                .collect();
+            let forced_rows = forced_rows?;
+            let table = crate::eval::value::Table::from_rows(names, forced_rows);
+            Ok(Value::Table(table))
+        }
         other => Ok(other),
     }
 }
@@ -2701,15 +2715,16 @@ mod tests {
     }
 
     #[test]
-    fn table_expand_list_column_empty_drops_row() {
+    fn table_expand_list_column_empty_emits_null_row() {
         let src = r#"
             let t = #table({"id", "xs"}, {{1, {10, 20}}, {2, {}}, {3, {30}}})
             in Table.ExpandListColumn(t, "xs")
         "#;
         match eval_str(src).unwrap() {
             Value::Table(t) => {
-                // Row 2 (empty list) drops; result has 3 rows total (10,20,30).
-                assert_eq!(t.num_rows(), 3);
+                // Row 2 (empty list) emits a single row with null (matches PQ),
+                // not a dropped row. Result has 4 rows: 10, 20, null, 30.
+                assert_eq!(t.num_rows(), 4);
             }
             other => panic!("expected table, got {other:?}"),
         }

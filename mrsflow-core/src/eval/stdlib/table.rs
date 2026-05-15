@@ -2554,11 +2554,18 @@ fn expand_list_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MErro
     for row in &rows {
         match &row[col_idx] {
             Value::List(items) => {
-                // One output row per list item; empty list drops the input row.
-                for item in items {
+                if items.is_empty() {
+                    // PQ: empty list emits a single output row with null
+                    // in the target column (not a dropped row).
                     let mut new_row = row.clone();
-                    new_row[col_idx] = item.clone();
+                    new_row[col_idx] = Value::Null;
                     out_rows.push(new_row);
+                } else {
+                    for item in items {
+                        let mut new_row = row.clone();
+                        new_row[col_idx] = item.clone();
+                        out_rows.push(new_row);
+                    }
                 }
             }
             Value::Null => {
