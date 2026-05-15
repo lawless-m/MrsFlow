@@ -9404,6 +9404,72 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1046", () =>
+            let r = try {
+                    Record.AddField([a=1, b=2], "c", 3),
+                    Record.AddField([], "x", 100),
+                    Record.AddField([a=1], "b", null)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1047", () =>
+            let r = try {
+                    Record.AddField([a=1], "b", 99, true),
+                    Record.AddField([a=1], "b", 99, false),
+                    Record.AddField([a=1], "b", 99, true)[b]
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1048", () =>
+            let r = try {
+                    Record.AddField([a=1], "a", 99)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1049", () =>
+            let r = try {
+                    Record.Combine({[a=1], [b=2]}),
+                    Record.Combine({[a=1, b=2], [b=20, c=30]}),
+                    Record.Combine({[]}),
+                    Record.Combine({})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1050", () =>
+            let r = try {
+                    Record.RenameFields([a=1, b=2], {{"a", "x"}}),
+                    Record.RenameFields([a=1, b=2], {{"a", "x"}, {"b", "y"}}),
+                    Record.RenameFields([a=1, b=2], {{"a", "b"}})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1051", () =>
+            let r = try {
+                    Record.SelectFields([a=1, b=2, c=3], {"a", "c"}),
+                    Record.SelectFields([a=1], {"a", "missing"}, MissingField.UseNull),
+                    Record.SelectFields([a=1], {"a", "missing"}, MissingField.Ignore),
+                    Record.SelectFields([a=1], {"a", "missing"}, MissingField.Error)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1052", () =>
+            let r = try {
+                    Record.FieldOrDefault([a=1], "a"),
+                    Record.FieldOrDefault([a=1], "missing"),
+                    Record.FieldOrDefault([a=1], "missing", 99),
+                    Record.FieldOrDefault([a=1], "a", 99),
+                    Record.FieldOrDefault([a=null], "a"),
+                    Record.FieldOrDefault([a=null], "a", "fallback")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
