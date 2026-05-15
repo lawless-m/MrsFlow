@@ -670,8 +670,9 @@ fn format_number_dotnet(n: f64, fmt: &str, culture: Option<&str>) -> Result<Stri
             }
         }
     }
-    // Custom pattern fallback — handles `0.00`, `#,##0.00`, `0.00%`, `#.##E+0`.
-    Ok(format_custom_pattern(n, f))
+    // Custom pattern fallback — handles `0.00`, `#,##0.00`, `0.00%`, `#.##E+0`,
+    // multi-section "pos;neg;zero".
+    Ok(apply_culture_decimal(format_custom_pattern(n, f), culture))
 }
 
 fn round_half_even(x: f64) -> f64 {
@@ -978,16 +979,57 @@ fn currency_symbol_for(culture: Option<&str>) -> &'static str {
 ///   `%`     multiply by 100, append `%`
 ///   `E+0`   exponent
 fn format_custom_pattern(n: f64, pat: &str) -> String {
-    let has_percent = pat.contains('%');
+    // NaN/Inf: just the special-value text (matches F/N/P/C/E).
+    if n.is_nan() { return "NaN".to_string(); }
+    if n.is_infinite() {
+        return if n > 0.0 { "∞".to_string() } else { "-∞".to_string() };
+    }
+    // Multi-section pattern: "pos;neg;zero" or "pos;neg". Pick the right
+    // section, then format positive magnitude (the negative section is the
+    // template for negatives, so we don't add a sign — the pattern itself
+    // describes how negatives look).
+    if pat.contains(';') {
+        let sections: Vec<&str> = pat.splitn(3, ';').collect();
+        if n > 0.0 {
+            return format_single_section(n, sections[0]);
+        } else if n < 0.0 && sections.len() >= 2 {
+            return format_single_section(n.abs(), sections[1]);
+        } else if n == 0.0 && sections.len() >= 3 {
+            // Zero section: literal text (e.g. "zero").
+            return sections[2].to_string();
+        } else if n == 0.0 {
+            return format_single_section(0.0, sections[0]);
+        } else if n < 0.0 {
+            // No neg section but n is negative — fall through to single
+            // section with explicit minus.
+            let body = format_single_section(n.abs(), sections[0]);
+            return format!("-{body}");
+        }
+    }
+    format_single_section(n, pat)
+}
+
+fn format_single_section(n: f64, pat: &str) -> String {
+    // Strip literal prefix/suffix (any chars that aren't 0/#/,/./%/E/e).
+    // The "core" pattern in the middle drives the digit rendering; the
+    // literal chars surround the result. Multi-section "-0.00" → prefix="-",
+    // core="0.00", suffix="" → produces "-1.50" for input 1.5.
+    let is_digit_pat = |c: char| matches!(c, '0' | '#' | ',' | '.' | '%' | 'E' | 'e');
+    // Find first digit-pat char.
+    let first = pat.find(is_digit_pat);
+    let last = pat.rfind(is_digit_pat);
+    let (prefix, core, suffix) = match (first, last) {
+        (Some(f), Some(l)) => (&pat[..f], &pat[f..=l], &pat[l + pat[l..].chars().next().unwrap().len_utf8()..]),
+        _ => return pat.to_string(), // pattern is all-literal
+    };
+    let has_percent = core.contains('%');
     let value = if has_percent { n * 100.0 } else { n };
-    let has_exp = pat.to_ascii_uppercase().contains('E');
-    if has_exp {
-        // Find E+0 or E+00 etc.
-        let upper_idx = pat.find(|c: char| c == 'E' || c == 'e');
+    let has_exp = core.to_ascii_uppercase().contains('E');
+    let body: String = if has_exp {
+        let upper_idx = core.find(|c: char| c == 'E' || c == 'e');
         if let Some(idx) = upper_idx {
-            let mantissa_pat = &pat[..idx];
-            let exp_pat = &pat[idx..]; // includes E
-            // Figure out exponent digit width.
+            let mantissa_pat = &core[..idx];
+            let exp_pat = &core[idx..];
             let exp_digits = exp_pat.chars().filter(|c| *c == '0').count().max(1);
             let raw = format!("{value:E}");
             let (m, e) = raw.split_once('E').unwrap_or((raw.as_str(), "0"));
@@ -996,11 +1038,15 @@ fn format_custom_pattern(n: f64, pat: &str) -> String {
             let m_rendered = render_digit_pattern(m_f, mantissa_pat);
             let e_char = if exp_pat.starts_with('E') { 'E' } else { 'e' };
             let sign = if e_n < 0 { '-' } else { '+' };
-            return format!("{m_rendered}{e_char}{sign}{:0width$}", e_n.abs(), width = exp_digits);
+            format!("{m_rendered}{e_char}{sign}{:0width$}", e_n.abs(), width = exp_digits)
+        } else {
+            render_digit_pattern(value, core.trim_end_matches('%'))
         }
-    }
-    let body = render_digit_pattern(value, pat.trim_end_matches('%'));
-    if has_percent { format!("{body}%") } else { body }
+    } else {
+        let r = render_digit_pattern(value, core.trim_end_matches('%'));
+        if has_percent { format!("{r}%") } else { r }
+    };
+    format!("{prefix}{body}{suffix}")
 }
 
 fn render_digit_pattern(n: f64, pat: &str) -> String {
@@ -1016,22 +1062,40 @@ fn render_digit_pattern(n: f64, pat: &str) -> String {
     } else {
         fixed
     };
-    // The pattern's int part may demand a minimum number of digits (`0`s).
-    // For simplicity, leave `grouped` as-is when no zero-pad is needed.
-    let min_int_digits = int_pat.chars().filter(|c| *c == '0').count();
-    if min_int_digits == 0 {
-        return grouped;
-    }
     let (sign, rest) = if let Some(r) = grouped.strip_prefix('-') { ("-", r) } else { ("", grouped.as_str()) };
-    let (int_part, frac_part) = match rest.find('.') {
-        Some(i) => (&rest[..i], Some(&rest[i..])),
+    let (int_part, frac_part_str) = match rest.find('.') {
+        Some(i) => (&rest[..i], Some(rest[i + 1..].to_string())),
         None => (rest, None),
     };
+    // Int part: pad with zeros up to `0`-count from the pattern (`min_int_digits`);
+    // beyond that drop any leading "0" if the pattern uses `#` (it can shrink
+    // below 1 to nothing, e.g. "#.##" on 0.5 → ".5").
+    let min_int_digits = int_pat.chars().filter(|c| *c == '0').count();
     let bare_digit_count = int_part.chars().filter(char::is_ascii_digit).count();
-    let pad = min_int_digits.saturating_sub(bare_digit_count);
-    let zeros: String = std::iter::repeat('0').take(pad).collect();
-    let mut out = format!("{sign}{zeros}{int_part}");
-    if let Some(f) = frac_part { out.push_str(f); }
+    let int_out: String = if min_int_digits == 0 && int_part == "0" {
+        // No `0` in pattern int-part: drop a sole leading zero.
+        String::new()
+    } else {
+        let pad = min_int_digits.saturating_sub(bare_digit_count);
+        let zeros: String = std::iter::repeat('0').take(pad).collect();
+        format!("{zeros}{int_part}")
+    };
+    // Frac part: trim trailing zeros down to the count of `0`s in the
+    // pattern's frac part (the `#`s allow drop, `0`s force).
+    let frac_out: Option<String> = match (frac_part_str, frac_pat) {
+        (Some(s), Some(p)) => {
+            let min_frac_digits = p.chars().filter(|c| *c == '0').count();
+            let bytes: Vec<char> = s.chars().collect();
+            let mut end = bytes.len();
+            while end > min_frac_digits && bytes[end - 1] == '0' { end -= 1; }
+            if end == 0 { None } else { Some(bytes[..end].iter().collect::<String>()) }
+        }
+        (s, _) => s,
+    };
+    let mut out = format!("{sign}{int_out}");
+    if let Some(f) = frac_out {
+        if !f.is_empty() { out.push('.'); out.push_str(&f); }
+    }
     out
 }
 
