@@ -10203,6 +10203,81 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1123", () =>
+            let r = try {
+                    {1, {2, 3}} & {{4}, 5},
+                    {} & {1, 2},
+                    {1, 2} & {},
+                    {} & {},
+                    {{1}} & {{2}},
+                    {null, 1} & {2, null}
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1124", () =>
+            let r = try {
+                    List.Combine({{1, 2}, {3, 4}}),
+                    List.Combine({{1, {2}}, {3}}),
+                    List.Combine({}),
+                    List.Combine({{}, {}}),
+                    List.Combine({{1}, {}, {2, 3}}),
+                    List.Combine({{null, 1}, {2, null}})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1125", () =>
+            let r = try {
+                    {1, 2} & {3} & {4, 5},
+                    {1} & null,
+                    null & {2},
+                    {1, "a", true} & {null, {2}}
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1126", () =>
+            let r = try {
+                    {[a=1]} & {[b=2]},
+                    {[a=1], [a=2]} & {[a=3]},
+                    {{1, 2}} & {{1, 2}},
+                    {1} & {1.0},
+                    {true, false} & {true}
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1127", () =>
+            let r = try {
+                    ({1, 2} & {3, 4}) = List.Combine({{1, 2}, {3, 4}}),
+                    ({} & {1}) = List.Combine({{}, {1}}),
+                    ({{1}, 2} & {3}) = List.Combine({{{1}, 2}, {3}}),
+                    List.Count({1, 2, 3} & {4, 5}),
+                    List.Sum({1, 2} & {3, 4})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1128", () =>
+            let r = try {
+                    {{{1}}} & {{{2}}},
+                    {{{{1, 2}}}, 3} & {4},
+                    List.Count({{{1}}} & {{{2}}}),
+                    {{{1}}} & {{{2}}} & {{{3}}}
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1129", () =>
+            let r = try {
+                    List.Combine({1, 2, 3}),
+                    List.Combine({{1}, 2, {3}}),
+                    List.Combine({{1}, null, {3}})
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
