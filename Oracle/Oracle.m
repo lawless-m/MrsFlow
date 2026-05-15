@@ -2057,6 +2057,44 @@ let
             let r = try Combiner.CombineTextByPositions({0, 5, 10})({"abc", "defg", "hi"}) in
                 if r[HasError]
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q381", () =>
+            let r = try {Comparer.Ordinal("a", "b"), Comparer.Ordinal("b", "a"), Comparer.Ordinal("a", "a"), Comparer.Ordinal("A", "a")} in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q382", () =>
+            let r = try {
+                    Comparer.OrdinalIgnoreCase("a", "A"),
+                    Comparer.OrdinalIgnoreCase("a", "B"),
+                    Comparer.OrdinalIgnoreCase("B", "a"),
+                    Comparer.OrdinalIgnoreCase("Hello", "HELLO")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q383", () =>
+            let r = try List.Sort({"banana", "Apple", "cherry", "apple"}, Comparer.OrdinalIgnoreCase) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q384", () =>
+            let r = try
+                let c = Comparer.FromCulture("en-US", true) in
+                    {c("a", "A"), c("a", "B"), c("z", "a")}
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q385", () =>
+            let r = try {Comparer.Ordinal(1, 2), Comparer.Ordinal(2, 2), Comparer.Ordinal(3, 1), Comparer.Ordinal(null, 1)} in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                     else [HasError=false, Value=r[Value]])
     },
 
