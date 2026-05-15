@@ -1721,7 +1721,68 @@ let
             Record.RenameFields([a=1, b=2], {})),
 
         SafeSerialize("q335", () =>
-            Record.ReorderFields([a=1, b=2], {}))
+            Record.ReorderFields([a=1, b=2], {})),
+
+        // q336-q340: Table.Fuzzy* family (likely unsupported in mrsflow).
+
+        SafeSerialize("q336", () =>
+            let r = try Table.FuzzyJoin(
+                #table({"k"}, {{"apple"},{"banana"}}),
+                "k",
+                #table({"kr"}, {{"appel"},{"bananna"}}),
+                "kr")
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q337", () =>
+            let r = try Table.FuzzyNestedJoin(
+                #table({"k"}, {{"apple"}}),
+                {"k"},
+                #table({"kr"}, {{"appel"}}),
+                {"kr"},
+                "right")
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q338", () =>
+            let r = try Table.FuzzyGroup(
+                #table({"k"}, {{"apple"},{"appel"},{"banana"}}),
+                "k",
+                {{"items", each _}})
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q339", () =>
+            let r = try Table.FuzzyJoin(
+                #table({"k"}, {{"apple"},{"banana"}}),
+                "k",
+                #table({"kr"}, {{"appel"}}),
+                "kr",
+                JoinKind.Inner,
+                [SimilarityThreshold=0.8])
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q340", () =>
+            let r = try Table.FuzzyJoin(
+                #table({"k"}, {{"apple"}}),
+                "k",
+                #table({"kr"}, {{"apple"}}),
+                "kr",
+                JoinKind.Inner,
+                [SimilarityThreshold=1.0])
+            in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]])
     },
 
     Catalog = Table.FromRecords(cases)
