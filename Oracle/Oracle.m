@@ -1887,7 +1887,43 @@ let
             let r = try Binary.ToText(Binary.FromList({1}), BinaryEncoding.Hex) in
                 if r[HasError]
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
-                    else [HasError=false, Value=r[Value]])
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q356", () =>
+            let r = try {Number.Round(0.5), Number.Round(1.5), Number.Round(2.5), Number.Round(-0.5), Number.Round(-1.5)} in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q357", () =>
+            let r = try {Number.Round(3.14159, 2), Number.Round(3.14159, 3), Number.Round(3.14159, 0), Number.Round(123.456, -1)} in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q358", () =>
+            let r = try {Number.RoundUp(2.1), Number.RoundUp(-2.1), Number.RoundUp(2.9), Number.RoundUp(-2.9), Number.RoundUp(0)} in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q359", () =>
+            let r = try {Number.RoundDown(2.9), Number.RoundDown(-2.9), Number.RoundDown(2.1), Number.RoundDown(-2.1), Number.RoundDown(0)} in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q360", () =>
+            let r = try {
+                    Number.Round(0.5, 0, RoundingMode.AwayFromZero),
+                    Number.Round(0.5, 0, RoundingMode.ToEven),
+                    Number.Round(1.5, 0, RoundingMode.ToEven),
+                    Number.Round(-0.5, 0, RoundingMode.AwayFromZero),
+                    Number.Round(2.5, 0, RoundingMode.ToEven)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]])
     },
 
     Catalog = Table.FromRecords(cases)
