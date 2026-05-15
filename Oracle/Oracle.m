@@ -2680,6 +2680,43 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q446", () =>
+            let r = try {
+                    Date.FromText("2024-06-15"),
+                    Date.FromText("2024-12-31"),
+                    Date.FromText("2024-02-29")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q447", () =>
+            let r = try Date.FromText("15/06/2024", [Format="dd/MM/yyyy", Culture="en-GB"]) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q448", () =>
+            let r = try Date.FromText("06/15/2024", [Format="MM/dd/yyyy", Culture="en-US"]) in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q449", () =>
+            let r = try Date.FromText("not a date") in
+                if r[HasError]
+                    then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=r[Value]]),
+
+        SafeSerialize("q450", () =>
+            let r = try {
+                    Date.FromText("June 15, 2024", "en-US"),
+                    Date.FromText("15 Juni 2024", "de-DE")
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
