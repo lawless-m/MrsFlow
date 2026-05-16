@@ -153,7 +153,6 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ),
         ("Table.FirstN", two("table", "countOrCondition"), first_n),
         ("Table.LastN", two("table", "countOrCondition"), last_n),
-        ("Table.Reverse", one("table"), reverse),
         ("Table.FromRecords", one("records"), from_records),
         ("Table.ToRecords", one("table"), to_records),
         (
@@ -1759,14 +1758,6 @@ fn last_n(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
         other => Err(type_mismatch("number or function", other)),
     }
 }
-
-fn reverse(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    let table = expect_table(&args[0])?;
-    let (names, mut rows) = table_to_rows(&table)?;
-    rows.reverse();
-    Ok(Value::Table(values_to_table(&names, &rows)?))
-}
-
 
 fn column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;

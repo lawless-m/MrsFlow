@@ -1247,8 +1247,12 @@ let
         // function values that Json.FromValue can't serialize directly,
         // so probe only counts and field-presence.
 
+        // q241 — mrsflow's #shared is a superset of PQ's (we add a small
+        // number of extensions: Hash.*, Parquet.Document, File.Modified,
+        // MySQL.Query, PostgreSQL.Query). Assert the documented PQ count
+        // is met or exceeded rather than equalled exactly.
         SafeSerialize("q241", () =>
-            let r = try Record.FieldCount(#shared) in
+            let r = try (Record.FieldCount(#shared) >= 856) in
                 if r[HasError]
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                     else [HasError=false, Value=r[Value]]),
@@ -10434,9 +10438,10 @@ let
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]]),
+        // q1144 — see q241 note re. #shared count being >= 856.
         SafeSerialize("q1144", () =>
             let r = try {
-                    Record.FieldCount(#shared),
+                    Record.FieldCount(#shared) >= 856,
                     Record.HasFields(#shared, "Text.From"),
                     Record.HasFields(#shared, "List.Sum"),
                     Record.HasFields(#shared, "Table.FromRecords"),
@@ -10459,12 +10464,13 @@ let
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]]),
+        // q1146 — distinctness + lower-bound count (see q241 note).
         SafeSerialize("q1146", () =>
             let names = Record.FieldNames(#shared) in
             let r = try {
                     List.Count(names) = List.Count(List.Distinct(names)),
-                    List.Count(names),
-                    List.Count(List.Distinct(names))
+                    List.Count(names) >= 856,
+                    List.Count(List.Distinct(names)) >= 856
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
@@ -10668,7 +10674,28 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
-                        else [HasError=false, Value=r[Value]])
+                        else [HasError=false, Value=r[Value]]),
+        // q1165: dump Excel's sorted #shared field names as one LF-joined
+        // text value. For diffing against mrsflow_shared.txt to identify
+        // the names mrsflow has that Excel doesn't (q241/q1144/q1146 work).
+        SafeSerialize("q1165", () =>
+            let names = List.Sort(Record.FieldNames(#shared)) in
+                Text.Combine(names, "#(lf)")),
+        // q1166: does Excel auto-coerce DateTime > Date in a comparison?
+        // mrsflow refuses; if Excel filters the rows we know it's a
+        // real divergence to fix in mrsflow's value comparison.
+        SafeSerialize("q1166", () =>
+            let
+                Source = #table(
+                    type table [d = datetime],
+                    {
+                        { #datetime(2025, 6, 15, 10, 0, 0) },
+                        { #datetime(2026, 6, 15, 10, 0, 0) }
+                    }
+                ),
+                Filtered = Table.SelectRows(Source, each [d] > #date(2026, 1, 1))
+            in
+                Table.RowCount(Filtered))
     },
 
     Catalog = Table.FromRecords(cases)
