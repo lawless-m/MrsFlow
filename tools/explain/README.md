@@ -77,7 +77,15 @@ token level — divergence between them would be a bug in one of them.
 
 ## Status
 
-- 1 rule (`semicolon_in_let`). Proof-of-life. The plumbing works.
+- 13 rules. 7 source-keyed (fire from M shape alone), 6 error-keyed
+  (require the user to also paste the PQ error string). Seeded from
+  cheat-sheet pages that already collate real user reports.
+- Regression suite under `test_cases/` (one `.m` per rule, plus
+  matching `.err` for error-keyed rules). Run `run_tests.sh` before
+  deploying — 13/13 pass today.
+- Real-corpus false-positive check via `pump_corpus.sh`: 0/19
+  legitimate Power Query files in `examples/powerqueries/` trigger
+  any rule, so the patterns are tight enough to leave real M alone.
 - Live at <https://dw.ramsden-international.com/m-explain.html>.
 - API: `POST /m-explain` with either plain M source or JSON
   `{source, error}`. Plain text returns plain text; JSON returns the

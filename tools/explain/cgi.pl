@@ -16,6 +16,7 @@
 :- use_module(library(format)).
 :- use_module(library(iso_ext)).
 :- use_module(library(lists)).
+:- use_module(library(os)).
 :- use_module(library(pio)).
 
 cgi_main :-
