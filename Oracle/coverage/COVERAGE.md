@@ -29,7 +29,7 @@ Source: q1167.mrsflow.out.
 | AzureStorage | 5 | 5 | 0 | 0 | 5 | 0 | 0 | 0 |
 | Binary | 18 | 18 | 18 | 18 | 0 | 0 | 6 | 0 |
 | BinaryEncoding | 3 | 3 | 3 | 3 | 0 | 0 | 0 | 0 |
-| BinaryFormat | 22 | 22 | 14 | 14 | 8 | 0 | 0 | 0 |
+| BinaryFormat | 22 | 22 | 16 | 16 | 6 | 0 | 0 | 0 |
 | BinaryOccurrence | 4 | 4 | 4 | 4 | 0 | 0 | 0 | 0 |
 | BufferMode | 3 | 3 | 3 | 3 | 0 | 0 | 0 | 0 |
 | Byte | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
@@ -155,7 +155,7 @@ Source: q1167.mrsflow.out.
 | WebAction | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | WebMethod | 7 | 7 | 7 | 7 | 0 | 0 | 0 | 0 |
 | Xml | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| **TOTAL** | 860 | 856 | 712 | 708 | 148 | 4 | 301 | 5 |
+| **TOTAL** | 860 | 856 | 714 | 710 | 146 | 4 | 301 | 5 |
 
 ## Per-name detail
 
@@ -205,8 +205,8 @@ Source: q1167.mrsflow.out.
 | `BinaryEncoding.Base64` | Y | Y | constant |  |  |
 | `BinaryEncoding.Hex` | Y | Y | constant |  |  |
 | `BinaryEncoding.Type` | Y | Y | constant |  |  |
-| `BinaryFormat.7BitEncodedSignedInteger` | Y |  | missing |  |  |
-| `BinaryFormat.7BitEncodedUnsignedInteger` | Y |  | missing |  |  |
+| `BinaryFormat.7BitEncodedSignedInteger` | Y | Y | function |  |  |
+| `BinaryFormat.7BitEncodedUnsignedInteger` | Y | Y | function |  |  |
 | `BinaryFormat.Binary` | Y | Y | function |  |  |
 | `BinaryFormat.Byte` | Y | Y | function |  |  |
 | `BinaryFormat.ByteOrder` | Y | Y | function |  |  |

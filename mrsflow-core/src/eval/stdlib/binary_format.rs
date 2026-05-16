@@ -47,6 +47,11 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         // (Used as a no-op terminator by Choice / List.)
         ("BinaryFormat.Null",              one_binary(), parse_null),
 
+        // 7-bit-encoded varints (.NET BinaryReader / BinaryWriter format).
+        // Each byte: low 7 bits are payload, MSB = continuation flag.
+        ("BinaryFormat.7BitEncodedUnsignedInteger", one_binary(), parse_varint_u),
+        ("BinaryFormat.7BitEncodedSignedInteger",   one_binary(), parse_varint_s),
+
         // Combinator factories (slice 2) — return a new (binary) => value
         // combinator. Implemented as factories that wrap an internal
         // impl_fn closure that gets the captured parameters via env.
@@ -177,6 +182,53 @@ fn parse_f64_le(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 fn parse_null(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     // Doesn't even look at the binary — the atom consumes nothing.
     Ok(Value::Null)
+}
+
+// --- 7-bit-encoded varints (.NET BinaryReader compat) ---
+//
+// .NET's Read7BitEncodedInt[64] reads up to 5 (resp. 10) bytes:
+//   - each byte's low 7 bits are payload, accumulated little-endian
+//   - the high bit (0x80) is the continuation flag (1 = more bytes)
+//   - signed values use the same bit pattern as unsigned via two's
+//     complement (so -1 == 0xFFFFFFFFFFFFFFFF takes 10 bytes)
+//
+// We always read up to 10 bytes — that covers both 32-bit and 64-bit
+// since the encoding is forward-compatible (a 32-bit value just
+// terminates earlier). The output is widened to f64; values above
+// 2^53 lose precision, same caveat as the slice-1 64-bit reads.
+
+fn read_varint(bytes: &[u8], ctx: &str) -> Result<u64, MError> {
+    let mut result: u64 = 0;
+    let mut shift: u32 = 0;
+    for (i, &byte) in bytes.iter().enumerate() {
+        if i >= 10 {
+            return Err(MError::Other(format!(
+                "{ctx}: varint exceeds 10 bytes (malformed)"
+            )));
+        }
+        result |= ((byte & 0x7F) as u64) << shift;
+        if byte & 0x80 == 0 {
+            return Ok(result);
+        }
+        shift += 7;
+    }
+    Err(MError::Other(format!(
+        "{ctx}: varint truncated (no terminator byte found)"
+    )))
+}
+
+fn parse_varint_u(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let b = expect_bytes(&args[0], "BinaryFormat.7BitEncodedUnsignedInteger")?;
+    let n = read_varint(b, "BinaryFormat.7BitEncodedUnsignedInteger")?;
+    Ok(Value::Number(n as f64))
+}
+
+fn parse_varint_s(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let b = expect_bytes(&args[0], "BinaryFormat.7BitEncodedSignedInteger")?;
+    let n = read_varint(b, "BinaryFormat.7BitEncodedSignedInteger")?;
+    // Same bits as the unsigned form; signed interpretation = two's
+    // complement reading of the 64-bit unsigned result.
+    Ok(Value::Number(n as i64 as f64))
 }
 
 // --- factory helper: build a closure that captures named values and

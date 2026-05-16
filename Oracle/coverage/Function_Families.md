@@ -25,7 +25,7 @@ Counts come from `COVERAGE.md`; refresh both via `render.ps1`.
 | AzureStorage | Untouched | 0 / 5 | Azure Blob / Table / Data Lake storage connector. |
 | Binary | Tested | 18 / 18 | Binary value operations (length, slice, encode, base64, compression). |
 | BinaryEncoding | Implemented | 3 / 3 | Base64 / Hex encoding constants for Binary.FromText / ToText. |
-| BinaryFormat | Partial | 14 / 22 | Declarative parser-combinator framework for binary streams ("Wireshark in M" — describe a wire format, get a typed parser). |
+| BinaryFormat | Partial | 16 / 22 | Declarative parser-combinator framework for binary streams ("Wireshark in M" — describe a wire format, get a typed parser). |
 | BinaryOccurrence | Implemented | 4 / 4 | Occurrence constants (optional / repeating / required) used by BinaryFormat. |
 | BufferMode | Implemented | 3 / 3 | Buffer eagerness mode (Eager / Delayed) for *.Buffer. |
 | Byte | Implemented | 2 / 2 | Byte-typed numeric (0–255) conversion + type companion. |

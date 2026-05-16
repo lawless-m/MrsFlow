@@ -21,6 +21,8 @@ Binary.ViewFunction
 BinaryEncoding.Base64
 BinaryEncoding.Hex
 BinaryEncoding.Type
+BinaryFormat.7BitEncodedSignedInteger
+BinaryFormat.7BitEncodedUnsignedInteger
 BinaryFormat.Binary
 BinaryFormat.Byte
 BinaryFormat.ByteOrder

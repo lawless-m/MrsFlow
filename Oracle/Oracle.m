@@ -10817,6 +10817,22 @@ let
                 r = try { leFmt(bs), beFmt(bs) } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        // q1177: 7-bit-encoded varints. .NET BinaryReader / BinaryWriter
+        // format. 0x05 = 5 (single byte). 0xAC 0x02 = (0x2C | (2 << 7))
+        // = 300. 0x80 0x01 = 128. The signed form is two's complement
+        // of the same bits.
+        SafeSerialize("q1177", () =>
+            let
+                r = try {
+                    BinaryFormat.7BitEncodedUnsignedInteger(#binary({5})),
+                    BinaryFormat.7BitEncodedUnsignedInteger(#binary({172, 2})),
+                    BinaryFormat.7BitEncodedUnsignedInteger(#binary({128, 1})),
+                    BinaryFormat.7BitEncodedSignedInteger(#binary({5})),
+                    BinaryFormat.7BitEncodedSignedInteger(#binary({172, 2}))
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
