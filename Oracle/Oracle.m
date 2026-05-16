@@ -10695,7 +10695,23 @@ let
                 ),
                 Filtered = Table.SelectRows(Source, each [d] > #date(2026, 1, 1))
             in
-                Table.RowCount(Filtered))
+                Table.RowCount(Filtered)),
+        // q1167: coverage dashboard. Body lives in coverage/coverage.m so
+        // the catalog file isn't 200 lines longer. Both engines load it
+        // via File.Contents + Expression.Evaluate; the dashboard reads
+        // the two #shared captures plus the pre-generated coverage TSVs
+        // and emits a per-name coverage table.
+        //
+        // Refresh order:
+        //   pwsh Oracle/coverage/gen_status.ps1   # regenerate the TSVs
+        //   pwsh Oracle/QueryOracle.ps1           # PQ side
+        //   pwsh Oracle/capture_mrsflow.ps1       # mrsflow side
+        //   pwsh Oracle/coverage/render.ps1       # write COVERAGE.md
+        SafeSerialize("q1167", () =>
+            let
+                body = Text.FromBinary(File.Contents("coverage/coverage.m"), TextEncoding.Utf8)
+            in
+                Expression.Evaluate(body, #shared))
     },
 
     Catalog = Table.FromRecords(cases)

@@ -1,0 +1,189 @@
+# render.ps1 — read the captured q1167 output, join in OracleCases/Status
+# from the pre-generated TSVs, write COVERAGE.md.
+#
+# The M dashboard query (coverage.m) emits only (Name, InPQ, InMrsflow,
+# Kind). Per-name Oracle-case lookup is done here in PowerShell against
+# coverage/case_names.tsv and coverage/cases_status.tsv — keeping the M
+# side simple.
+
+param(
+    [string]$Source = 'mrsflow',
+    [string]$Out    = ''
+)
+
+$ErrorActionPreference = 'Stop'
+
+$root      = Split-Path -Parent $MyInvocation.MyCommand.Path  # Oracle/coverage
+$oracleDir = Split-Path -Parent $root                          # Oracle
+$casesDir  = Join-Path $oracleDir 'cases'
+
+$inPath = Join-Path $casesDir ("q1167.$Source.out")
+if (-not (Test-Path $inPath)) {
+    Write-Error "q1167.$Source.out not found at $inPath. Run QueryOracle.ps1 / capture_mrsflow.ps1 first."
+    exit 1
+}
+
+if (-not $Out) {
+    $Out = Join-Path $root 'COVERAGE.md'
+}
+
+$raw = [System.IO.File]::ReadAllText($inPath)
+$rows = $raw | ConvertFrom-Json
+
+if (-not $rows) {
+    Write-Error "no rows parsed from q1167 output"
+    exit 1
+}
+
+function Load-Tsv {
+    param([string]$Path)
+    if (-not (Test-Path $Path)) { return $null }
+    $lines = [System.IO.File]::ReadAllLines($Path)
+    if ($lines.Count -lt 2) { return @() }
+    $headers = $lines[0] -split "`t"
+    $out = New-Object 'System.Collections.Generic.List[psobject]'
+    for ($i = 1; $i -lt $lines.Count; $i++) {
+        $vals = $lines[$i] -split "`t"
+        $rec = [ordered]@{}
+        for ($j = 0; $j -lt $headers.Count; $j++) {
+            $rec[$headers[$j]] = if ($j -lt $vals.Count) { $vals[$j] } else { '' }
+        }
+        $out.Add([PSCustomObject]$rec)
+    }
+    return $out
+}
+
+$caseNames  = Load-Tsv (Join-Path $root 'case_names.tsv')
+$caseStatus = Load-Tsv (Join-Path $root 'cases_status.tsv')
+
+# Invert case_names.tsv into Name -> List[qN].
+$nameToCases = @{}
+foreach ($cn in $caseNames) {
+    if (-not $cn.Names) { continue }
+    foreach ($n in ($cn.Names -split ' ')) {
+        if (-not $n) { continue }
+        if (-not $nameToCases.ContainsKey($n)) {
+            $nameToCases[$n] = New-Object 'System.Collections.Generic.List[string]'
+        }
+        $nameToCases[$n].Add($cn.Q)
+    }
+}
+
+$statusByQ = @{}
+foreach ($cs in $caseStatus) { $statusByQ[$cs.Q] = $cs.Status }
+
+$decorated = foreach ($r in $rows) {
+    $cases = if ($nameToCases.ContainsKey($r.Name)) {
+        ($nameToCases[$r.Name] | Sort-Object { [int]($_ -replace '^q','') }) -join ' '
+    } else { '' }
+    $status = ''
+    if ($cases) {
+        $stats = $cases -split ' ' | ForEach-Object { $statusByQ[$_] }
+        $hasMatch = $stats -contains 'MATCH'
+        $hasDiff  = $stats -contains 'DIFF'
+        $status = if ($hasMatch -and $hasDiff) { 'MIXED' }
+                  elseif ($hasDiff)            { 'DIFF' }
+                  elseif ($hasMatch)           { 'MATCH' }
+                  else                         { '' }
+    }
+    [PSCustomObject]@{
+        Name         = $r.Name
+        InPQ         = $r.InPQ
+        InMrsflow    = $r.InMrsflow
+        Kind         = $r.Kind
+        OracleCases  = $cases
+        OracleStatus = $status
+    }
+}
+
+# --- Family summary --------------------------------------------------------
+
+$families = @{}
+foreach ($r in $decorated) {
+    $fam = if ($r.Name -match '^([A-Za-z0-9_]+)\.') { $Matches[1] } else { '(top-level)' }
+    if (-not $families.ContainsKey($fam)) {
+        $families[$fam] = [PSCustomObject]@{
+            Family    = $fam
+            Total     = 0
+            InPQ      = 0
+            InMrsflow = 0
+            BothImpl  = 0
+            PQOnly    = 0
+            OurExtra  = 0
+            Tested    = 0
+            DiffOrMix = 0
+        }
+    }
+    $f = $families[$fam]
+    $f.Total++
+    if ($r.InPQ)      { $f.InPQ++ }
+    if ($r.InMrsflow) { $f.InMrsflow++ }
+    if ($r.InPQ -and $r.InMrsflow) { $f.BothImpl++ }
+    if ($r.InPQ -and -not $r.InMrsflow) { $f.PQOnly++ }
+    if ($r.InMrsflow -and -not $r.InPQ) { $f.OurExtra++ }
+    if ($r.OracleCases) { $f.Tested++ }
+    if ($r.OracleStatus -in @('DIFF','MIXED')) { $f.DiffOrMix++ }
+}
+
+$famSorted = $families.Values | Sort-Object Family
+
+$totalRow = [PSCustomObject]@{
+    Family    = '**TOTAL**'
+    Total     = ($famSorted | Measure-Object Total -Sum).Sum
+    InPQ      = ($famSorted | Measure-Object InPQ -Sum).Sum
+    InMrsflow = ($famSorted | Measure-Object InMrsflow -Sum).Sum
+    BothImpl  = ($famSorted | Measure-Object BothImpl -Sum).Sum
+    PQOnly    = ($famSorted | Measure-Object PQOnly -Sum).Sum
+    OurExtra  = ($famSorted | Measure-Object OurExtra -Sum).Sum
+    Tested    = ($famSorted | Measure-Object Tested -Sum).Sum
+    DiffOrMix = ($famSorted | Measure-Object DiffOrMix -Sum).Sum
+}
+
+# --- Render markdown -------------------------------------------------------
+
+$sb = [System.Text.StringBuilder]::new()
+[void]$sb.AppendLine('# mrsflow vs Power Query coverage')
+[void]$sb.AppendLine()
+[void]$sb.AppendLine('Auto-generated by `Oracle/coverage/render.ps1`. Refresh:')
+[void]$sb.AppendLine()
+[void]$sb.AppendLine('```')
+[void]$sb.AppendLine('pwsh Oracle/coverage/gen_status.ps1')
+[void]$sb.AppendLine('pwsh Oracle/QueryOracle.ps1')
+[void]$sb.AppendLine('pwsh Oracle/capture_mrsflow.ps1')
+[void]$sb.AppendLine('pwsh Oracle/coverage/render.ps1')
+[void]$sb.AppendLine('```')
+[void]$sb.AppendLine()
+[void]$sb.AppendLine("Source: `q1167.$Source.out`.")
+[void]$sb.AppendLine()
+[void]$sb.AppendLine('## Summary by family')
+[void]$sb.AppendLine()
+[void]$sb.AppendLine('| Family | Total | In PQ | In mrsflow | Both | PQ only | Ours only | Tested | DIFF/MIXED |')
+[void]$sb.AppendLine('|---|---:|---:|---:|---:|---:|---:|---:|---:|')
+
+foreach ($f in @($famSorted) + @($totalRow)) {
+    [void]$sb.AppendLine(("| {0} | {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8} |" -f
+        $f.Family, $f.Total, $f.InPQ, $f.InMrsflow, $f.BothImpl,
+        $f.PQOnly, $f.OurExtra, $f.Tested, $f.DiffOrMix))
+}
+
+[void]$sb.AppendLine()
+[void]$sb.AppendLine('## Per-name detail')
+[void]$sb.AppendLine()
+[void]$sb.AppendLine('| Name | In PQ | In mrsflow | Kind | Oracle cases | Status |')
+[void]$sb.AppendLine('|---|:---:|:---:|---|---|---|')
+
+$rowsSorted = $decorated | Sort-Object Name
+foreach ($r in $rowsSorted) {
+    [void]$sb.AppendLine(("| ``{0}`` | {1} | {2} | {3} | {4} | {5} |" -f
+        $r.Name,
+        $(if ($r.InPQ) { 'Y' } else { '' }),
+        $(if ($r.InMrsflow) { 'Y' } else { '' }),
+        $r.Kind,
+        $r.OracleCases,
+        $r.OracleStatus))
+}
+
+[System.IO.File]::WriteAllText($Out, $sb.ToString(),
+    [System.Text.UTF8Encoding]::new($false))
+
+Write-Output ("wrote {0} ({1} families, {2} names)" -f $Out, $famSorted.Count, $rows.Count)

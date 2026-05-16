@@ -1,0 +1,1165 @@
+Q	Names
+q1	
+q2	
+q3	Date.ToText
+q4	Date.ToText
+q5	Date.ToText
+q6	Date.ToText
+q7	Table.PromoteHeaders
+q8	Text.FromBinary Text.ToBinary
+q9	Binary.ToText Text.ToBinary
+q10	Csv.Document Text.ToBinary
+q11	Folder.Contents
+q12	Excel.CurrentWorkbook
+q13	Odbc.DataSource Table.SelectColumns
+q14	Odbc.DataSource Table.SelectRows
+q15	Odbc.DataSource Table.SelectColumns Table.SelectRows
+q16	Table.RenameColumns
+q17	Table.RemoveColumns
+q18	Table.TransformColumnTypes
+q19	Table.AddColumn
+q20	Text.Replace
+q21	List.Transform
+q22	Table.ColumnNames
+q23	Json.Document
+q24	Table.FromRows
+q25	Text.Contains
+q26	Table.TransformColumns
+q27	Text.From
+q28	Table.ExpandTableColumn Table.NestedJoin
+q29	Table.Combine
+q30	Text.Length
+q31	Text.Upper
+q32	Text.Lower
+q33	Text.Start
+q34	Text.End
+q35	Text.Range
+q36	Text.Combine
+q37	Text.Split
+q38	Text.Trim
+q39	Text.PadStart
+q40	Text.PadEnd
+q41	Text.Reverse
+q42	Text.Repeat
+q43	Number.From
+q44	Number.ToText
+q45	Number.Abs
+q46	Number.Round
+q47	Number.RoundDown
+q48	Number.RoundUp
+q49	Number.IntegerDivide
+q50	Number.Mod
+q51	Number.Power
+q52	Number.Sign
+q53	List.Count
+q54	List.Sum
+q55	List.Average
+q56	List.Max
+q57	List.Min
+q58	List.First
+q59	List.Last
+q60	List.Reverse
+q61	List.Sort
+q62	List.Distinct
+q63	List.Skip
+q64	List.Range
+q65	List.Repeat
+q66	Record.FieldNames
+q67	Record.FieldValues
+q68	Record.HasFields
+q69	Record.RemoveFields
+q70	Table.RowCount
+q71	Table.ColumnCount
+q72	Table.FirstN
+q73	Table.Distinct
+q74	Table.ReverseRows
+q75	Date.Year
+q76	Date.Month
+q77	Date.Day
+q78	Date.AddDays
+q79	Duration.Days
+q80	List.Contains Text.Lower
+q81	List.Distinct Text.Lower
+q82	List.Sort Value.Compare
+q83	List.Intersect Text.Lower
+q84	List.PositionOf Occurrence.First Text.Lower
+q85	Table.Distinct Text.Lower
+q86	Table.Contains Text.Lower
+q87	Text.Lower Value.Equals
+q88	List.Difference Text.Lower
+q89	GroupKind.Global List.Sum Table.Group Text.Lower Value.Compare
+q90	List.FirstN
+q91	List.LastN
+q92	List.Skip
+q93	Table.FirstN
+q94	Table.Skip
+q95	Splitter.SplitTextByDelimiter
+q96	Splitter.SplitTextByAnyDelimiter
+q97	Splitter.SplitTextByEachDelimiter
+q98	QuoteStyle.None Splitter.SplitTextByEachDelimiter
+q99	Splitter.SplitTextByLengths
+q100	Splitter.SplitTextByWhitespace
+q101	Combiner.CombineTextByDelimiter
+q102	Combiner.CombineTextByDelimiter
+q103	Record.SelectFields
+q104	Record.SelectFields
+q105	Record.RemoveFields
+q106	Record.RenameFields
+q107	Record.TransformFields
+q108	List.PositionOf
+q109	List.PositionOf
+q110	List.PositionOfAny
+q111	Table.PositionOf
+q112	Text.PositionOfAny
+q113	Table.AddRankColumn
+q114	Table.AddRankColumn
+q115	List.Sum Table.Group
+q116	Table.Join
+q117	Table.FromValue
+q118	List.Count List.Random
+q119	Type.Is
+q120	List.Sum Table.Profile Type.Is
+q121	List.Distinct
+q122	List.Contains
+q123	List.PositionOf Occurrence.First
+q124	Comparer.Ordinal
+q125	Comparer.OrdinalIgnoreCase
+q126	Comparer.Equals Comparer.OrdinalIgnoreCase
+q127	Comparer.FromCulture List.Distinct
+q128	List.Distinct Text.Lower
+q129	List.Distinct Text.Lower Value.Compare
+q130	List.Distinct
+q131	List.Intersect Text.Lower
+q132	List.Intersect Text.Lower Value.Compare
+q133	List.Intersect
+q134	List.Difference Text.Lower
+q135	List.Difference Text.Lower Value.Compare
+q136	List.Difference
+q137	Table.Distinct Text.Lower
+q138	Table.Distinct Text.Lower Value.Compare
+q139	Table.Distinct
+q140	Table.Distinct
+q141	Text.Lower Value.Equals
+q142	Text.Lower Value.Compare Value.Equals
+q143	Value.Equals
+q144	Value.Equals
+q145	Table.Sort Text.Lower Value.Compare
+q146	Table.Sort
+q147	Table.Sort
+q148	Order.Ascending Table.Sort
+q149	List.Sort Value.Compare
+q150	Table.Distinct
+q151	Table.Distinct
+q152	Table.Distinct
+q153	Table.Distinct
+q154	Number.ToText
+q155	Number.ToText
+q156	Number.ToText
+q157	Number.ToText
+q158	Number.ToText
+q159	Number.ToText
+q160	DateTime.ToText
+q161	DateTime.ToText
+q162	Time.ToText
+q163	List.Accumulate
+q164	List.Accumulate
+q165	List.Accumulate
+q166	Replacer.ReplaceValue Table.ReplaceValue
+q167	Replacer.ReplaceText Table.ReplaceValue
+q168	Replacer.ReplaceValue Table.ReplaceValue
+q169	
+q170	
+q171	
+q172	
+q173	
+q174	Splitter.SplitTextByCharacterTransition
+q175	Splitter.SplitTextByRepeatedLengths
+q176	Number.ToText
+q177	Number.ToText
+q178	Number.ToText
+q179	Number.ToText
+q180	Number.ToText
+q181	Date.ToText
+q182	Date.ToText
+q183	DateTime.ToText
+q184	DateTime.ToText
+q185	DateTimeZone.ToText
+q186	Replacer.ReplaceValue
+q187	Replacer.ReplaceText
+q188	Text.Replace
+q189	Text.Replace
+q190	Replacer.ReplaceValue Table.ReplaceValue
+q191	Text.Format
+q192	Text.Format
+q193	Text.Format
+q194	Text.Format
+q195	Text.Format
+q196	List.Accumulate
+q197	List.Accumulate
+q198	List.Accumulate
+q199	List.Accumulate
+q200	List.Accumulate
+q201	
+q202	
+q203	
+q204	
+q205	
+q206	
+q207	
+q208	
+q209	Error.Record
+q210	
+q211	
+q212	
+q213	
+q214	
+q215	
+q216	Duration.ToText
+q217	Duration.FromText
+q218	Duration.From
+q219	Duration.TotalSeconds
+q220	
+q221	Date.AddMonths
+q222	Date.AddYears
+q223	Date.AddYears
+q224	Date.AddDays
+q225	Date.AddQuarters
+q226	Table.AddColumn
+q227	Table.AddColumn
+q228	Table.AddColumn Text.From
+q229	Date.AddDays Table.AddColumn
+q230	Table.AddColumn
+q231	Record.AddField
+q232	Record.AddField Record.FieldNames
+q233	Record.AddField Value.Is
+q234	Record.AddField Record.FieldNames
+q235	Record.AddField Value.Is
+q236	Csv.Document Text.ToBinary
+q237	Csv.Document Text.ToBinary
+q238	Csv.Document Text.ToBinary
+q239	Binary.Combine Csv.Document Text.ToBinary
+q240	Csv.Document Text.ToBinary
+q241	Record.FieldCount
+q242	Record.HasFields
+q243	Record.HasFields
+q244	Value.Is
+q245	
+q246	Splitter.SplitTextByCharacterTransition
+q247	Splitter.SplitTextByCharacterTransition
+q248	Splitter.SplitTextByCharacterTransition
+q249	Splitter.SplitTextByCharacterTransition
+q250	Splitter.SplitTextByCharacterTransition
+q251	Json.Document
+q252	Json.Document
+q253	Json.Document
+q254	Json.Document
+q255	Json.Document
+q256	List.Sort
+q257	List.Sort
+q258	Table.Sort
+q259	List.Sort
+q260	List.Sort
+q261	Table.Unpivot
+q262	Table.UnpivotOtherColumns
+q263	Table.Pivot
+q264	Table.Pivot
+q265	Table.Pivot Table.UnpivotOtherColumns
+q266	Json.FromValue Text.FromBinary
+q267	Json.FromValue Text.FromBinary
+q268	Json.FromValue Text.FromBinary
+q269	Json.FromValue Text.FromBinary
+q270	Json.FromValue Text.FromBinary
+q271	Text.From
+q272	Text.From
+q273	Text.From
+q274	Text.From
+q275	Text.From
+q276	
+q277	Decimal.From
+q278	Number.IsNaN
+q279	Number.IsOdd
+q280	Decimal.From
+q281	List.Generate
+q282	List.Generate
+q283	List.Generate
+q284	List.Generate
+q285	List.Generate
+q286	Record.Combine
+q287	Record.Combine
+q288	Record.Combine
+q289	Record.Combine
+q290	Record.Combine Record.Field
+q291	Table.Schema Table.TransformColumnTypes
+q292	Table.RowCount Table.Schema Table.TransformColumnTypes
+q293	Table.ColumnsOfType Table.TransformColumnTypes
+q294	Table.ColumnsOfType Table.TransformColumnTypes
+q295	Table.ColumnNames Table.Schema
+q296	Lines.FromText
+q297	Lines.FromText
+q298	Lines.FromText
+q299	Lines.FromText
+q300	Lines.FromText Lines.ToText
+q301	Text.Combine Text.Split
+q302	Text.Combine Text.Split
+q303	Text.Split
+q304	Text.SplitAny
+q305	Text.Combine Text.Split
+q306	List.Combine
+q307	List.Zip
+q308	List.Zip
+q309	List.RemoveItems
+q310	List.Combine
+q311	Date.Day
+q312	Date.DayOfWeek
+q313	Date.DayOfWeekName
+q314	Date.DayOfYear
+q315	Date.DaysInMonth
+q316	Number.IsOdd
+q317	Number.IsEven
+q318	Number.Mod
+q319	Number.IntegerDivide
+q320	Number.Mod
+q321	List.Max
+q322	List.Min
+q323	List.Max
+q324	List.Max
+q325	List.Max
+q326	List.Generate
+q327	List.Generate
+q328	List.Generate
+q329	List.Generate
+q330	List.Generate List.Sum
+q331	Record.SelectFields
+q332	Record.SelectFields
+q333	Record.RemoveFields
+q334	Record.RenameFields
+q335	Record.ReorderFields
+q336	Table.FuzzyJoin
+q337	Table.FuzzyNestedJoin
+q338	Table.FuzzyGroup
+q339	JoinKind.Inner Table.FuzzyJoin
+q340	JoinKind.Inner Table.FuzzyJoin
+q341	List.Buffer List.Sum
+q342	List.Buffer
+q343	Table.Buffer Table.RowCount
+q344	List.Buffer
+q345	Table.Buffer Table.ColumnNames
+q346	Binary.FromText Binary.Length
+q347	Binary.FromText Binary.ToText
+q348	Binary.FromText Binary.Range Binary.ToText
+q349	Binary.FromText Binary.Length
+q350	Binary.ToText Text.ToBinary
+q351	Binary.FromList Binary.ToText
+q352	Binary.FromList Binary.ToText
+q353	Binary.FromList Binary.ToText
+q354	Binary.FromList Binary.FromText Binary.ToText
+q355	Binary.FromList Binary.ToText
+q356	Number.Round
+q357	Number.Round
+q358	Number.RoundUp
+q359	Number.RoundDown
+q360	Number.Round
+q361	Text.PadStart
+q362	Text.PadEnd
+q363	Text.Repeat
+q364	Text.PadStart
+q365	Text.Repeat
+q366	List.PositionOf
+q367	List.PositionOf
+q368	List.PositionOfAny
+q369	List.Contains
+q370	List.PositionOf Occurrence.First
+q371	Splitter.SplitByNothing
+q372	Splitter.SplitTextByDelimiter
+q373	Splitter.SplitTextByDelimiter
+q374	Splitter.SplitTextByEachDelimiter
+q375	Splitter.SplitTextByLengths
+q376	Combiner.CombineTextByDelimiter
+q377	Combiner.CombineTextByDelimiter
+q378	Combiner.CombineTextByEachDelimiter
+q379	Combiner.CombineTextByLengths
+q380	Combiner.CombineTextByPositions
+q381	Comparer.Ordinal
+q382	Comparer.OrdinalIgnoreCase
+q383	List.Sort
+q384	Comparer.FromCulture
+q385	Comparer.Ordinal
+q386	Value.Equals
+q387	Value.Equals
+q388	Value.Compare
+q389	Value.Compare
+q390	Value.Compare
+q391	Function.Invoke
+q392	Function.Invoke Text.Upper
+q393	Function.Invoke List.Sum
+q394	Function.Invoke Text.Combine
+q395	Function.Invoke
+q396	Type.Is
+q397	Record.FieldNames Type.RecordFields
+q398	Record.FieldNames Type.FunctionParameters
+q399	Value.Is
+q400	Value.Is
+q401	Expression.Evaluate
+q402	Expression.Evaluate Text.Upper
+q403	Expression.Evaluate
+q404	Expression.Evaluate
+q405	Expression.Evaluate
+q406	Record.AddField Record.FieldNames
+q407	Record.AddField Record.FieldNames
+q408	Record.AddField Record.Field Value.Is
+q409	Record.AddField Record.Field Value.Is
+q410	Record.AddField Record.Field Value.Is
+q411	Record.FromList
+q412	Record.ToList
+q413	Record.FromTable
+q414	Record.ToTable
+q415	Record.FieldNames Record.FieldValues Record.FromList Record.ToList
+q416	List.Sum Table.Group
+q417	Table.Group Table.RowCount
+q418	Table.Group
+q419	Table.Group Table.RowCount
+q420	List.Sum Table.Group
+q421	Table.Join
+q422	Table.Join
+q423	Table.Join
+q424	Table.ColumnNames Table.NestedJoin
+q425	Table.Join
+q426	Table.Join
+q427	Table.Join
+q428	Table.Join
+q429	Table.ColumnNames Table.NestedJoin
+q430	Table.AddColumn Table.NestedJoin Table.RowCount Table.SelectColumns
+q431	Table.TransformColumnTypes
+q432	Table.TransformColumnTypes
+q433	Table.TransformColumnTypes
+q434	Table.TransformColumnTypes
+q435	Table.TransformColumnTypes
+q436	Splitter.SplitTextByDelimiter Table.SplitColumn
+q437	Splitter.SplitTextByDelimiter Table.SplitColumn
+q438	Combiner.CombineTextByDelimiter Table.CombineColumns
+q439	Splitter.SplitTextByDelimiter Table.SplitColumn
+q440	Splitter.SplitTextByLengths Table.SplitColumn
+q441	Date.WeekOfMonth
+q442	Date.WeekOfYear
+q443	Date.StartOfWeek
+q444	Date.EndOfWeek
+q445	Date.DayOfWeek Date.DayOfWeekName
+q446	Date.FromText
+q447	Date.FromText
+q448	Date.FromText
+q449	Date.FromText
+q450	Date.FromText
+q451	Time.Hour Time.Minute Time.Second
+q452	Time.From
+q453	Time.ToText
+q454	
+q455	Duration.TotalMinutes
+q456	Logical.From
+q457	Logical.FromText
+q458	Logical.FromText
+q459	Logical.ToText
+q460	Logical.From
+q461	Percentage.From
+q462	Percentage.From
+q463	Value.Is
+q464	Percentage.From
+q465	Percentage.From
+q466	Currency.From
+q467	Currency.From
+q468	Value.Is
+q469	Currency.From
+q470	Currency.From
+q471	Decimal.From
+q472	Decimal.From Value.Is
+q473	Decimal.From Value.Is
+q474	Decimal.From
+q475	Int64.From
+q476	Number.Random
+q477	Number.RandomBetween
+q478	List.AllTrue List.Transform Number.Random
+q479	Number.RandomBetween
+q480	List.Count List.Distinct List.Transform Number.RandomBetween
+q481	Number.IntegerDivide Number.Mod
+q482	Number.Mod
+q483	Number.IntegerDivide
+q484	Number.IntegerDivide Number.Mod
+q485	Number.IntegerDivide Number.Mod Number.NaN
+q486	Text.Insert
+q487	Text.Remove
+q488	Text.RemoveRange
+q489	Text.Range
+q490	Text.Insert Text.Range
+q491	Text.PositionOf
+q492	Text.PositionOf
+q493	Text.PositionOfAny
+q494	Occurrence.First Text.PositionOf
+q495	Text.Contains Text.EndsWith Text.StartsWith
+q496	Text.Length Text.NewGuid
+q497	List.Transform Text.Length Text.NewGuid Text.Split
+q498	List.Count List.Distinct List.Transform Text.NewGuid
+q499	List.AllTrue List.Transform Text.Contains Text.Lower Text.NewGuid Text.Replace Text.ToList
+q500	Text.Length Text.NewGuid Text.Replace
+q501	List.MatchesAll
+q502	List.MatchesAny
+q503	List.IsEmpty
+q504	List.MatchesAll List.MatchesAny Number.Mod
+q505	List.MatchesAll List.MatchesAny
+q506	List.FirstN
+q507	List.LastN
+q508	List.RemoveFirstN List.RemoveLastN
+q509	List.FirstN List.RemoveFirstN
+q510	List.FirstN List.LastN
+q511	List.Repeat
+q512	List.Repeat
+q513	List.Generate
+q514	List.Numbers
+q515	List.Dates
+q516	List.AllTrue
+q517	List.AnyTrue
+q518	List.AllTrue List.AnyTrue
+q519	List.AllTrue List.Transform
+q520	List.AllTrue List.AnyTrue
+q521	List.Distinct
+q522	List.Union
+q523	List.Intersect
+q524	List.Difference
+q525	List.Union
+q526	List.Skip
+q527	List.Skip
+q528	List.Range
+q529	List.Range
+q530	List.Range
+q531	Character.FromNumber
+q532	Character.ToNumber
+q533	Character.FromNumber Character.ToNumber
+q534	Character.FromNumber Character.ToNumber
+q535	Character.FromNumber Character.ToNumber
+q536	Json.FromValue Text.FromBinary
+q537	Json.FromValue Text.FromBinary
+q538	Json.FromValue Text.FromBinary
+q539	Json.FromValue Text.FromBinary
+q540	Json.FromValue Text.FromBinary
+q541	Number.Abs Number.Sign
+q542	Number.Sqrt
+q543	Number.Power
+q544	Number.Exp Number.Ln Number.Log10
+q545	Number.Ln Number.Log10
+q546	Number.Cos Number.Sin Number.Tan
+q547	Number.Acos Number.Asin Number.Atan
+q548	Number.Atan2
+q549	Number.Acos Number.Asin Number.Tan
+q550	Number.Abs Number.Cos Number.Power Number.Sin
+q551	Number.PI Number.Round
+q552	Number.PI Number.Round
+q553	Number.Round
+q554	
+q555	Number.Round Number.Sin
+q556	Number.BitwiseAnd
+q557	Number.BitwiseOr
+q558	Number.BitwiseXor
+q559	Number.BitwiseShiftLeft Number.BitwiseShiftRight
+q560	Number.BitwiseAnd Number.BitwiseOr Number.BitwiseXor
+q561	Text.Proper
+q562	Text.Trim
+q563	Text.TrimEnd Text.TrimStart
+q564	Text.Trim Text.TrimEnd Text.TrimStart
+q565	Text.Proper Text.Trim
+q566	Text.Lower Text.Upper
+q567	Text.Lower Text.Upper
+q568	Text.Lower Text.Upper
+q569	Text.Length Text.Lower Text.Upper
+q570	Character.ToNumber Text.Length
+q571	List.Transform
+q572	List.Transform
+q573	List.Transform
+q574	List.Transform
+q575	List.Transform
+q576	Record.RemoveFields
+q577	Record.RenameFields
+q578	Record.TransformFields
+q579	Record.RemoveFields Record.RenameFields Record.TransformFields
+q580	Record.RemoveFields Record.RenameFields Record.TransformFields
+q581	Table.Distinct
+q582	Table.Distinct
+q583	Table.Distinct
+q584	Table.Distinct
+q585	Table.Distinct Table.RowCount
+q586	Table.Sort
+q587	Table.Sort
+q588	Table.Sort
+q589	Table.Sort
+q590	Table.Sort
+q591	Table.SelectRows
+q592	Table.SelectRows
+q593	Table.SelectRows Text.StartsWith
+q594	Table.SelectRows
+q595	Number.Mod Table.SelectRows
+q596	Table.FillDown
+q597	Table.FillUp
+q598	Table.FillDown
+q599	Table.FillDown
+q600	Table.FillDown
+q601	Replacer.ReplaceValue Table.ReplaceValue
+q602	Replacer.ReplaceText Table.ReplaceValue
+q603	Replacer.ReplaceValue Table.ReplaceValue
+q604	Replacer.ReplaceValue Table.ReplaceValue
+q605	Table.AddColumn Table.ReplaceErrorValues
+q606	Date.AddDays
+q607	Duration.TotalDays Duration.TotalHours Duration.TotalMinutes Duration.TotalSeconds
+q608	Duration.Days Duration.Hours Duration.Minutes Duration.Seconds Duration.TotalSeconds
+q609	Duration.Days Duration.Hours Duration.TotalDays Duration.TotalHours
+q610	
+q611	DateTime.ToText
+q612	DateTime.ToText
+q613	DateTime.ToText
+q614	DateTime.ToText
+q615	DateTime.ToText
+q616	Date.AddDays
+q617	Date.AddMonths Date.AddYears
+q618	Date.IsLeapYear
+q619	Date.DaysInMonth
+q620	Date.AddQuarters Date.AddWeeks Date.DayOfYear
+q621	Table.AddIndexColumn
+q622	Table.AddIndexColumn
+q623	Table.AddIndexColumn
+q624	Table.AddIndexColumn
+q625	Table.AddIndexColumn
+q626	Table.PromoteHeaders
+q627	Table.DemoteHeaders
+q628	Table.DemoteHeaders Table.PromoteHeaders
+q629	Table.ColumnNames Table.PromoteHeaders
+q630	Table.ColumnNames Table.PromoteHeaders
+q631	Table.ReorderColumns
+q632	Table.RemoveColumns
+q633	Table.Column
+q634	Table.SelectColumns
+q635	Table.Column Table.RemoveColumns Table.SelectColumns
+q636	Table.ColumnCount Table.RowCount
+q637	Table.First Table.Last
+q638	Table.Max Table.Min
+q639	Table.ColumnCount Table.RowCount
+q640	Table.IsEmpty
+q641	List.Sum
+q642	List.Average
+q643	List.Median
+q644	List.Mode
+q645	List.Count List.Max List.Min List.StandardDeviation Number.Round
+q646	List.RemoveItems
+q647	List.RemoveMatchingItems
+q648	List.RemoveNulls
+q649	List.Reverse
+q650	List.Sort
+q651	Text.Length
+q652	Text.Start
+q653	Text.End
+q654	Text.Middle
+q655	Text.At
+q656	Number.Round
+q657	Number.Round
+q658	Number.Round
+q659	Number.Round
+q660	Number.Round
+q661	Number.NaN Number.NegativeInfinity Number.PositiveInfinity Number.Round
+q662	Number.Round
+q663	Number.Mod
+q664	Number.Mod
+q665	Number.Mod
+q666	Number.Mod
+q667	Number.Mod Number.NaN Number.NegativeInfinity Number.PositiveInfinity
+q668	Number.Mod
+q669	Number.Mod
+q670	Number.IntegerDivide
+q671	Number.IntegerDivide
+q672	Number.IntegerDivide
+q673	Number.IntegerDivide Number.NaN Number.NegativeInfinity Number.PositiveInfinity
+q674	Number.IntegerDivide
+q675	Number.IntegerDivide
+q676	Number.IntegerDivide Number.Mod
+q677	Number.Power
+q678	Number.Power
+q679	Number.Power
+q680	Number.NaN Number.NegativeInfinity Number.PositiveInfinity Number.Power
+q681	Number.Power
+q682	Number.Power
+q683	Number.Power
+q684	Number.Sqrt
+q685	Number.Sqrt
+q686	Number.Ln
+q687	Number.Ln Number.Log10
+q688	Number.Log
+q689	Number.Exp
+q690	Number.Exp Number.Ln Number.Power Number.Sqrt
+q691	Number.ToText
+q692	Number.ToText
+q693	Number.ToText
+q694	Number.ToText
+q695	Number.ToText
+q696	Number.NaN Number.NegativeInfinity Number.PositiveInfinity Number.ToText
+q697	Number.ToText
+q698	Number.ToText
+q699	Number.ToText
+q700	Number.ToText
+q701	Number.ToText
+q702	Number.ToText
+q703	Number.NaN Number.NegativeInfinity Number.PositiveInfinity Number.ToText
+q704	Number.ToText
+q705	Number.ToText
+q706	Number.ToText
+q707	Number.ToText
+q708	Number.ToText
+q709	Number.ToText
+q710	Number.NaN Number.NegativeInfinity Number.PositiveInfinity Number.ToText
+q711	Number.ToText
+q712	Number.ToText
+q713	Number.ToText
+q714	Number.ToText
+q715	Number.ToText
+q716	Number.NaN Number.NegativeInfinity Number.PositiveInfinity Number.ToText
+q717	Number.ToText
+q718	Number.ToText
+q719	Number.ToText
+q720	Number.ToText
+q721	Number.ToText
+q722	Number.ToText
+q723	Number.NaN Number.NegativeInfinity Number.PositiveInfinity Number.ToText
+q724	Number.ToText
+q725	Number.ToText
+q726	Number.ToText
+q727	Number.ToText
+q728	Number.ToText
+q729	Number.ToText
+q730	Number.NaN Number.NegativeInfinity Number.PositiveInfinity Number.ToText
+q731	Number.ToText
+q732	Number.ToText
+q733	Number.ToText
+q734	Number.ToText
+q735	Number.ToText
+q736	Number.ToText
+q737	Number.ToText
+q738	Number.ToText
+q739	Number.NaN Number.PositiveInfinity Number.ToText
+q740	Number.FromText
+q741	Number.FromText
+q742	Number.FromText
+q743	Number.FromText
+q744	Number.FromText
+q745	Number.FromText
+q746	Number.FromText
+q747	Number.Sign
+q748	Number.Sign
+q749	Number.Abs
+q750	Number.Abs
+q751	Number.Abs Number.Sign
+q752	Number.Abs Number.Sign
+q753	Number.Abs Number.Mod Number.Power Number.Round Number.Sign Number.Sqrt
+q754	Number.BitwiseAnd
+q755	Number.BitwiseNot Number.BitwiseOr Number.BitwiseXor
+q756	Number.BitwiseShiftLeft Number.BitwiseShiftRight
+q757	Number.BitwiseShiftLeft Number.BitwiseShiftRight
+q758	Number.BitwiseAnd Number.BitwiseOr Number.BitwiseShiftRight Number.BitwiseXor
+q759	Number.BitwiseAnd Number.BitwiseNot Number.BitwiseShiftLeft Number.NaN Number.PositiveInfinity
+q760	Number.BitwiseAnd Number.BitwiseNot Number.BitwiseOr Number.BitwiseShiftLeft Number.BitwiseShiftRight Number.BitwiseXor
+q761	Text.Replace
+q762	Text.Replace
+q763	Text.Replace
+q764	Text.Replace
+q765	Text.Replace
+q766	Text.Replace
+q767	Text.Lower Text.Replace Value.Compare
+q768	Text.Split
+q769	Text.Split
+q770	Text.Split
+q771	Text.SplitAny
+q772	Text.Split
+q773	Text.SplitAny
+q774	Text.Split
+q775	Text.PadStart
+q776	Text.PadEnd
+q777	Text.PadStart
+q778	Text.PadStart
+q779	Text.PadEnd
+q780	Text.PadEnd Text.PadStart
+q781	Text.PadEnd Text.PadStart
+q782	Text.Range
+q783	Text.Range
+q784	Text.Range
+q785	Text.Range
+q786	Text.Range
+q787	Text.Range
+q788	Text.Range
+q789	Text.Range
+q790	Text.Range
+q791	Text.Insert
+q792	Text.Insert
+q793	Text.Insert
+q794	Text.Insert
+q795	Text.Insert
+q796	Text.Insert
+q797	Text.Insert
+q798	Text.Trim
+q799	Text.Trim
+q800	Text.Trim
+q801	Text.Trim Text.TrimEnd Text.TrimStart
+q802	Text.Trim
+q803	Text.Trim
+q804	Text.Trim Text.TrimEnd Text.TrimStart
+q805	Text.Lower Text.Upper
+q806	Text.Lower Text.Upper
+q807	Text.Lower Text.Upper
+q808	Text.Lower Text.Upper
+q809	Text.Lower Text.Upper
+q810	Text.Lower Text.Upper
+q811	Text.Lower Text.Upper
+q812	Text.Lower
+q813	Text.Length Text.NewGuid Text.PositionOf Text.Range Text.Replace
+q814	Text.Length Text.NewGuid
+q815	List.Contains Text.Lower Text.NewGuid Text.Range Text.Upper
+q816	List.AllTrue List.Contains List.Transform Text.NewGuid Text.ToList
+q817	List.Count List.Distinct List.Generate Text.NewGuid
+q818	Text.NewGuid
+q819	List.Count Text.Length Text.NewGuid Text.Split
+q820	Text.PositionOf
+q821	Text.PositionOf
+q822	Text.PositionOf
+q823	Occurrence.All Occurrence.First Text.PositionOf
+q824	Text.PositionOfAny
+q825	Text.PositionOfAny
+q826	Text.PositionOf Text.PositionOfAny
+q827	Text.PositionOf Text.PositionOfAny
+q828	Text.Format
+q829	Text.Format
+q830	Text.Format
+q831	Text.Format
+q832	Text.Format
+q833	Text.Format
+q834	Text.Format
+q835	Text.Combine
+q836	Text.Combine
+q837	Text.Combine
+q838	Text.Combine
+q839	Text.Combine
+q840	Text.Combine
+q841	Text.Combine Text.Split
+q842	Text.Reverse
+q843	Text.Reverse
+q844	Text.Length Text.Reverse
+q845	Text.Length Text.Reverse
+q846	Text.Length Text.Reverse
+q847	Text.Reverse
+q848	Text.Length
+q849	List.Sort
+q850	List.Sort Value.Compare
+q851	List.Sort Order.Descending
+q852	List.Sort Number.Abs Number.Round Text.Length
+q853	List.Sort
+q854	List.Sort Text.Lower Value.Compare
+q855	List.Sort
+q856	List.Distinct
+q857	Comparer.OrdinalIgnoreCase List.Distinct
+q858	List.Distinct Text.Lower
+q859	List.Distinct
+q860	List.Distinct
+q861	List.Distinct
+q862	List.Distinct
+q863	List.Accumulate
+q864	List.Accumulate Record.AddField Text.Upper
+q865	List.Accumulate
+q866	List.Accumulate
+q867	List.Accumulate
+q868	List.Accumulate Text.From
+q869	List.Accumulate
+q870	List.Generate Text.Length
+q871	List.Generate Text.From
+q872	List.Generate
+q873	List.Generate
+q874	List.Generate Number.Mod
+q875	List.Count List.Generate List.Sum
+q876	List.Generate
+q877	List.Range
+q878	List.Range
+q879	List.Range
+q880	List.Skip
+q881	List.Skip
+q882	List.FirstN List.LastN
+q883	List.FirstN List.LastN
+q884	List.FirstN List.LastN
+q885	List.Zip
+q886	List.Zip
+q887	List.Zip
+q888	List.Zip
+q889	List.Count List.Zip
+q890	List.Combine
+q891	List.Combine
+q892	List.Average List.Sum
+q893	List.Median
+q894	List.Mode List.Modes
+q895	List.StandardDeviation
+q896	List.Average List.Max List.Min List.Sum
+q897	List.Sum
+q898	List.Average List.Median List.Mode List.StandardDeviation List.Sum
+q899	List.MaxN List.MinN
+q900	List.MaxN List.MinN
+q901	List.MaxN
+q902	List.MaxN List.MinN
+q903	List.Numbers
+q904	List.Numbers
+q905	List.Numbers List.Sum
+q906	List.Dates
+q907	List.Dates
+q908	List.DateTimes
+q909	List.Durations
+q910	List.Dates
+q911	List.Dates
+q912	List.Dates
+q913	List.Buffer
+q914	List.Buffer List.Count List.Sum List.Transform
+q915	List.Buffer List.Generate List.Numbers List.Sum
+q916	List.Buffer
+q917	List.Buffer List.FirstN List.LastN List.Reverse List.Sort
+q918	List.Buffer
+q919	List.Buffer List.Reverse
+q920	Number.Random
+q921	Number.RandomBetween
+q922	List.Count List.Random
+q923	List.Average List.Count List.Distinct List.Max List.Min List.Numbers List.Transform Number.RandomBetween
+q924	Number.RandomBetween
+q925	List.Random Number.RandomBetween
+q926	Number.Random Number.RandomBetween
+q927	List.Transform Text.Upper
+q928	List.Transform Text.From
+q929	List.Numbers List.Transform
+q930	List.Transform
+q931	List.Transform
+q932	List.Select
+q933	List.RemoveItems
+q934	List.Sum Table.FromRecords Table.Group Table.RowCount
+q935	List.Sum Table.FromRecords Table.Group
+q936	List.Sum Table.FromRecords Table.Group
+q937	List.Average List.Sum Table.FromRecords Table.Group Table.RowCount
+q938	Table.FromRecords Table.Group
+q939	List.Sum Table.FromRecords Table.Group
+q940	List.Sum Table.FromRecords Table.Group
+q941	Table.FromRecords Table.Sort
+q942	Order.Descending Table.FromRecords Table.Sort
+q943	Table.FromRecords Table.Sort
+q944	Table.FromRecords Table.Sort
+q945	Table.FromRecords Table.Sort
+q946	Table.FromRecords Table.Sort Text.Lower Value.Compare
+q947	Table.FromRecords Table.Sort
+q948	Table.FromRecords Table.SelectRows
+q949	Table.FromRecords Table.SelectRows
+q950	Table.FromRecords Table.SelectRows
+q951	Table.FromRecords Table.SelectRows
+q952	Table.FromRecords Table.SelectRows
+q953	Table.FromRecords Table.SelectRows
+q954	Table.FromRecords Table.SelectRows
+q955	Table.AddColumn Table.FromRecords Text.From
+q956	Number.Mod Table.AddColumn Table.FromRecords Text.From
+q957	Table.AddColumn Table.FromRecords
+q958	Table.AddColumn Table.FromRecords
+q959	Table.AddColumn Table.FromRecords
+q960	Table.AddColumn Table.FromRecords
+q961	Table.AddColumn Table.FromRecords
+q962	Table.AddIndexColumn Table.FromRecords
+q963	Table.AddIndexColumn Table.FromRecords
+q964	Table.AddIndexColumn Table.FromRecords
+q965	Table.AddIndexColumn Table.FromRecords
+q966	Table.AddIndexColumn Table.FromRecords
+q967	Table.AddIndexColumn Table.FromRecords
+q968	Table.AddIndexColumn Table.FromRecords
+q969	Table.ExpandRecordColumn Table.FromRecords
+q970	Table.ExpandRecordColumn Table.FromRecords
+q971	Table.ExpandListColumn Table.FromRecords
+q972	Table.ExpandListColumn Table.FromRecords
+q973	Table.ExpandTableColumn Table.FromRecords
+q974	Table.ExpandRecordColumn Table.FromRecords
+q975	Table.ExpandRecordColumn Table.FromRecords
+q976	Table.FromRecords Table.Pivot
+q977	Table.FromRecords Table.Pivot
+q978	Table.FromRecords Table.Pivot
+q979	Table.FromRecords Table.Unpivot
+q980	Table.FromRecords Table.Unpivot
+q981	Table.FromRecords Table.UnpivotOtherColumns
+q982	Table.FromRecords Table.Pivot Table.Unpivot
+q983	Table.FromRecords Table.Join
+q984	Table.FromRecords Table.Join
+q985	Table.FromRecords Table.Join
+q986	Table.FromRecords Table.Join
+q987	Table.FromRecords Table.Join
+q988	Table.FromRecords Table.Join
+q989	Table.FromRecords Table.Join
+q990	Table.FromRecords Table.NestedJoin
+q991	Table.FromRecords Table.NestedJoin
+q992	Table.ExpandTableColumn Table.FromRecords Table.NestedJoin
+q993	Table.FromRecords Table.NestedJoin
+q994	Table.FromRecords Table.NestedJoin
+q995	Table.FromRecords Table.NestedJoin
+q996	Table.FromRecords Table.NestedJoin
+q997	Table.FillDown Table.FromRecords
+q998	Table.FillDown Table.FromRecords
+q999	Table.FillDown Table.FromRecords
+q1000	Table.FillUp Table.FromRecords
+q1001	Table.FillDown Table.FromRecords
+q1002	Table.FillDown Table.FromRecords
+q1003	Table.FillDown Table.FillUp Table.FromRecords
+q1004	Replacer.ReplaceValue Table.FromRecords Table.ReplaceValue
+q1005	Replacer.ReplaceValue Table.FromRecords Table.ReplaceValue
+q1006	Replacer.ReplaceText Table.FromRecords Table.ReplaceValue
+q1007	Replacer.ReplaceValue Table.FromRecords Table.ReplaceValue
+q1008	Number.IntegerDivide Table.AddColumn Table.FromRecords Table.ReplaceErrorValues
+q1009	Number.IntegerDivide Table.AddColumn Table.FromRecords Table.ReplaceErrorValues
+q1010	Replacer.ReplaceValue Table.FromRecords Table.ReplaceValue
+q1011	Table.FromRecords Table.TransformColumnTypes
+q1012	Table.FromRecords Table.TransformColumnTypes
+q1013	Table.FromRecords Table.TransformColumnTypes
+q1014	Table.FromRecords Table.TransformColumnTypes
+q1015	Table.FromRecords Table.TransformColumnTypes
+q1016	Table.FromRecords Table.TransformColumnTypes
+q1017	Table.FromRecords Table.TransformColumnTypes
+q1018	Table.FromRecords
+q1019	Table.FromRows
+q1020	Table.FromList
+q1021	Table.FromColumns
+q1022	Table.FromColumns
+q1023	Table.FromRows
+q1024	Table.FromRecords Table.FromRows Table.ToRows
+q1025	Table.FromRecords Table.RemoveRowsWithErrors
+q1026	Table.AddColumn Table.FromRecords Table.RemoveRowsWithErrors
+q1027	Table.FromRecords Table.RemoveRowsWithErrors
+q1028	Table.AddColumn Table.FromRecords Table.RemoveRowsWithErrors
+q1029	Table.AddColumn Table.FromRecords Table.RemoveRowsWithErrors
+q1030	Table.RemoveRowsWithErrors
+q1031	Table.AddColumn Table.FromRecords Table.RemoveRowsWithErrors Table.RowCount
+q1032	Table.Distinct Table.FromRecords
+q1033	Table.Distinct Table.FromRecords
+q1034	Table.Distinct Table.FromRecords
+q1035	Table.Distinct Table.FromRecords
+q1036	Table.Distinct Table.FromRecords
+q1037	Table.Distinct Table.FromRecords Text.Lower
+q1038	Table.Distinct Table.FromRecords
+q1039	Table.Combine Table.FromRecords
+q1040	Table.Combine Table.FromRecords
+q1041	Table.Combine Table.FromRecords
+q1042	Table.Combine Table.FromRecords
+q1043	Table.Combine Table.FromRecords
+q1044	Table.Combine Table.FromRecords
+q1045	Table.Combine Table.FromRecords
+q1046	Record.AddField
+q1047	Record.AddField
+q1048	Record.AddField
+q1049	Record.Combine
+q1050	Record.RenameFields
+q1051	Record.SelectFields
+q1052	Record.FieldOrDefault
+q1053	Record.TransformFields Text.From
+q1054	Record.TransformFields Text.Upper
+q1055	MissingField.Ignore Record.TransformFields
+q1056	Record.FromList
+q1057	Record.FromList
+q1058	Record.RemoveFields
+q1059	Record.Field Record.HasFields
+q1060	Date.AddYears
+q1061	Date.AddMonths
+q1062	Date.AddDays
+q1063	Date.AddYears
+q1064	Date.WeekOfYear
+q1065	Date.From
+q1066	
+q1067	DateTime.From
+q1068	DateTime.From
+q1069	DateTimeZone.RemoveZone DateTimeZone.SwitchZone DateTimeZone.ToUtc
+q1070	DateTime.ToText
+q1071	Date.FromText
+q1072	DateTime.FromText
+q1073	Date.Day Date.Month Date.Year DateTime.Date DateTime.Time
+q1074	Duration.From
+q1075	
+q1076	
+q1077	Time.From
+q1078	Duration.Days Duration.Hours Duration.Minutes Duration.TotalDays Duration.TotalHours Duration.TotalMinutes
+q1079	
+q1080	
+q1081	Json.Document
+q1082	Json.Document
+q1083	Json.Document
+q1084	Json.Document
+q1085	Json.Document Json.FromValue
+q1086	Json.Document
+q1087	Json.FromValue
+q1088	Csv.Document Text.ToBinary
+q1089	Csv.Document Text.ToBinary
+q1090	Csv.Document Text.ToBinary
+q1091	Csv.Document Text.ToBinary
+q1092	Csv.Document Text.ToBinary
+q1093	Lines.FromText
+q1094	Lines.ToText
+q1095	Value.Is
+q1096	Value.Is
+q1097	Value.Is
+q1098	Value.Compare
+q1099	Value.Compare
+q1100	Value.Is Value.Type
+q1101	
+q1102	
+q1103	
+q1104	
+q1105	
+q1106	
+q1107	
+q1108	
+q1109	
+q1110	
+q1111	
+q1112	
+q1113	
+q1114	
+q1115	
+q1116	Text.Contains
+q1117	Text.Contains
+q1118	Text.EndsWith Text.StartsWith
+q1119	Comparer.Ordinal Comparer.OrdinalIgnoreCase
+q1120	Comparer.FromCulture
+q1121	Text.PositionOf
+q1122	List.Contains
+q1123	
+q1124	List.Combine
+q1125	
+q1126	
+q1127	List.Combine List.Count List.Sum
+q1128	List.Count
+q1129	List.Combine
+q1130	Replacer.ReplaceValue
+q1131	Replacer.ReplaceText
+q1132	Replacer.ReplaceValue Table.FromRecords Table.ReplaceValue
+q1133	Replacer.ReplaceText Table.FromRecords Table.ReplaceValue
+q1134	Replacer.ReplaceValue Table.FromRecords Table.ReplaceValue
+q1135	Replacer.ReplaceText Text.Replace
+q1136	Table.AddColumn Table.FromRecords Table.RemoveRowsWithErrors Table.ReplaceErrorValues
+q1137	Table.AddColumn Table.ColumnNames Table.ExpandRecordColumn Table.FromRecords Table.ReplaceErrorValues
+q1138	List.Sum Table.AddColumn Table.FromRecords Table.Group Table.ReplaceErrorValues
+q1139	Table.AddColumn Table.ExpandTableColumn Table.FromRecords Table.NestedJoin Table.ReplaceErrorValues
+q1140	Table.AddColumn Table.FillDown Table.FromRecords Table.ReplaceErrorValues
+q1141	Number.Mod Table.AddColumn Table.FromRecords Table.ReplaceErrorValues Table.RowCount Table.SelectRows
+q1142	Replacer.ReplaceValue Table.AddColumn Table.FromRecords Table.ReplaceErrorValues Table.ReplaceValue
+q1143	Table.AddColumn Table.ExpandListColumn Table.FromRecords Table.ReplaceErrorValues Table.RowCount
+q1144	Record.FieldCount Record.HasFields
+q1145	List.Contains Record.FieldNames
+q1146	List.Count List.Distinct Record.FieldNames
+q1147	List.Count List.Select Record.FieldNames Text.StartsWith
+q1148	Record.Field Value.Is
+q1149	Record.FieldCount Record.ToTable Table.ColumnNames Table.RowCount
+q1150	Record.FieldCount Record.FieldNames Record.RemoveFields Record.SelectFields
+q1151	Text.From
+q1152	Number.ToText
+q1153	Json.FromValue
+q1154	Text.From
+q1155	Json.Document Json.FromValue Text.FromBinary
+q1156	Json.FromValue Text.From
+q1157	Json.FromValue Table.AddColumn Table.FromRecords Text.From
+q1158	DateTimeZone.ToText
+q1159	DateTimeZone.ToText
+q1160	DateTimeZone.ToText
+q1161	DateTimeZone.ToText
+q1162	DateTimeZone.ToText
+q1163	DateTimeZone.FromText DateTimeZone.ToText
+q1164	DateTimeZone.ToText
