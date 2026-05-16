@@ -10781,6 +10781,42 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        // q1173: BinaryFormat.Null — atom that consumes 0 bytes, returns null.
+        SafeSerialize("q1173", () =>
+            let
+                r = try BinaryFormat.Null(#binary({1, 2, 3})) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        // q1174: BinaryFormat.Binary(n) — combinator factory.
+        SafeSerialize("q1174", () =>
+            let
+                fmt = BinaryFormat.Binary(3),
+                r = try Binary.ToText(fmt(#binary({1, 2, 3, 4, 5})), BinaryEncoding.Hex) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        // q1175: BinaryFormat.Text(n) — read N bytes as UTF-8 text.
+        // "Hello" = {72, 101, 108, 108, 111}.
+        SafeSerialize("q1175", () =>
+            let
+                fmt = BinaryFormat.Text(5),
+                r = try fmt(#binary({72, 101, 108, 108, 111})) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        // q1176: BinaryFormat.ByteOrder — wraps a fixed-width combinator
+        // and reverses input bytes before parsing. 4 bytes 00 00 00 01
+        // give 16777216 little-endian, 1 big-endian.
+        SafeSerialize("q1176", () =>
+            let
+                leFmt = BinaryFormat.UnsignedInteger32,
+                beFmt = BinaryFormat.ByteOrder(BinaryFormat.UnsignedInteger32, ByteOrder.BigEndian),
+                bs = #binary({0, 0, 0, 1}),
+                r = try { leFmt(bs), beFmt(bs) } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
