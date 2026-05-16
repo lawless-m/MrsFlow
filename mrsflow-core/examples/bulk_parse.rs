@@ -67,14 +67,16 @@ fn main() {
                 continue;
             }
         };
-        let body = match strip_shared(&src) {
-            Some(b) => b.trim_end_matches(';').trim().to_string(),
-            None => {
-                if src.trim_start().starts_with("section ") {
-                    skip += 1;
-                    continue;
-                }
-                src.trim().to_string()
+        // `section …;` files parse via the top-level section dispatch;
+        // `shared X = …` files are section members which we still wrap by
+        // stripping the prefix (the corpus extractor emits one member per
+        // file, not a full section).
+        let body = if src.trim_start().starts_with("section ") {
+            src.trim().to_string()
+        } else {
+            match strip_shared(&src) {
+                Some(b) => b.trim_end_matches(';').trim().to_string(),
+                None => src.trim().to_string(),
             }
         };
 

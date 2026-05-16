@@ -591,6 +591,12 @@ pub fn evaluate(ast: &Expr, env: &Env, host: &dyn IoHost) -> Result<Value, MErro
         | Expr::FunctionType { .. } => Err(MError::NotImplemented(
             "expression form deferred to a later eval slice",
         )),
+
+        // Sections parse but don't yet evaluate; emit a clear error so
+        // callers know the parse succeeded but no value is produced.
+        Expr::Section { .. } => Err(MError::NotImplemented(
+            "section evaluation is not yet implemented",
+        )),
     }
 }
 

@@ -5,7 +5,7 @@
 
 mod ast;
 
-pub use ast::{BinaryOp, Expr, ListItem, Param, RecordTypeField, UnaryOp};
+pub use ast::{BinaryOp, Expr, ListItem, Param, RecordTypeField, SectionMember, UnaryOp};
 
 use crate::lexer::{Token, TokenKind};
 
@@ -23,7 +23,11 @@ pub enum ParseError {
 
 pub fn parse(tokens: &[Token]) -> Result<Expr, ParseError> {
     let mut p = Parser::new(tokens);
-    let expr = p.parse_expression()?;
+    let expr = if matches!(p.peek_kind(), Some(TokenKind::Section)) {
+        p.parse_section()?
+    } else {
+        p.parse_expression()?
+    };
     if let Some(t) = p.peek() {
         return Err(ParseError::Unexpected {
             pos: t.span.start,
@@ -134,6 +138,69 @@ impl<'a> Parser<'a> {
                 expected,
             }),
         }
+    }
+
+    /// `section ident; (member;)*` where each member is `[shared]? ident = expression;`.
+    /// The corpus's `whole_section.m` files are almost all the minimal
+    /// `section Section1;` form (no members), so the inner loop also has
+    /// to terminate cleanly at EOF without consuming anything spurious.
+    fn parse_section(&mut self) -> Result<Expr, ParseError> {
+        self.advance(); // `section`
+        let name = match self.peek_kind() {
+            Some(TokenKind::Identifier(n)) => {
+                let n = n.clone();
+                self.advance();
+                n
+            }
+            Some(TokenKind::QuotedIdentifier(n)) => {
+                let n = n.clone();
+                self.advance();
+                n
+            }
+            _ => {
+                return Err(ParseError::Unexpected {
+                    pos: self.peek().map(|t| t.span.start).unwrap_or(0),
+                    found: self.peek_kind().cloned().unwrap_or(TokenKind::Equals),
+                    expected: "section name",
+                });
+            }
+        };
+        self.expect(TokenKind::Semicolon, "`;`")?;
+        let mut members = Vec::new();
+        while self.peek().is_some() {
+            let shared = matches!(self.peek_kind(), Some(TokenKind::Shared));
+            if shared {
+                self.advance();
+            }
+            let member_name = match self.peek_kind() {
+                Some(TokenKind::Identifier(n)) => {
+                    let n = n.clone();
+                    self.advance();
+                    n
+                }
+                Some(TokenKind::QuotedIdentifier(n)) => {
+                    let n = n.clone();
+                    self.advance();
+                    n
+                }
+                _ => {
+                    return Err(ParseError::Unexpected {
+                        pos: self.peek().map(|t| t.span.start).unwrap_or(0),
+                        found: self.peek_kind().cloned().unwrap_or(TokenKind::Equals),
+                        expected: "section member name",
+                    });
+                }
+            };
+            self.expect(TokenKind::Equals, "`=`")?;
+            let value = self.parse_expression()?;
+            self.expect(TokenKind::Semicolon, "`;`")?;
+            members.push(SectionMember {
+                shared,
+                name: member_name,
+                value,
+            });
+        }
+        Ok(Expr::Section { name, members })
     }
 
     // --- Top-level expression dispatch ---

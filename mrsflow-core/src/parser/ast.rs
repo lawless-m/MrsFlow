@@ -85,6 +85,16 @@ pub enum Expr {
     /// `error message` — raises an error value at evaluation time.
     Error(Box<Expr>),
 
+    /// `section <name>; <member>; <member>; …` — top-level section document.
+    /// Per spec, sections appear only at the root and bundle named bindings
+    /// for later reference. mrsflow currently parses them but does not yet
+    /// evaluate; the variant is here so the corpus's `whole_section.m`
+    /// files round-trip through the parser.
+    Section {
+        name: String,
+        members: Vec<SectionMember>,
+    },
+
     // --- Compound type expressions (only inside `type X` per spec) ---
     //
     // The parser produces these when parsing inside type context. They are
@@ -112,6 +122,15 @@ pub enum Expr {
         params: Vec<Param>,
         return_type: Box<Expr>,
     },
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct SectionMember {
+    /// True when prefixed with `shared` — visibility marker; ignored at
+    /// parse time, may matter for evaluator name resolution later.
+    pub shared: bool,
+    pub name: String,
+    pub value: Expr,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -376,6 +395,24 @@ fn write_sexpr(out: &mut String, e: &Expr) {
             out.push_str("(error ");
             write_sexpr(out, message);
             out.push(')');
+        }
+        Expr::Section { name, members } => {
+            out.push_str("(section ");
+            write_quoted(out, name);
+            out.push_str(" (");
+            for (i, m) in members.iter().enumerate() {
+                if i > 0 {
+                    out.push(' ');
+                }
+                out.push_str("(member ");
+                out.push_str(if m.shared { "shared" } else { "private" });
+                out.push(' ');
+                write_quoted(out, &m.name);
+                out.push(' ');
+                write_sexpr(out, &m.value);
+                out.push(')');
+            }
+            out.push_str("))");
         }
         Expr::ListType(item) => {
             out.push_str("(list-type ");

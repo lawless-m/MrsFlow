@@ -23,7 +23,39 @@
 :- discontiguous(print_sexpr/1).
 
 parse(Tokens, Ast) :-
-    phrase(expression(Ast), Tokens).
+    phrase(document(Ast), Tokens).
+
+% Top-level: a section declaration (corpus has `section Section1;` files)
+% or a bare expression (everything else).
+document(Ast) -->
+    [keyword(section)],
+    !,
+    section_body(Ast).
+document(Ast) --> expression(Ast).
+
+section_body(section(Name, Members)) -->
+    section_name(Name),
+    [op(semicolon)],
+    section_members(Members).
+
+section_name(N) --> [ident(N)], !.
+section_name(N) --> [quoted_ident(N)].
+
+section_members([M | Ms]) -->
+    section_member(M),
+    !,
+    section_members(Ms).
+section_members([]) --> [].
+
+section_member(member(Shared, Name, Value)) -->
+    shared_marker(Shared),
+    section_name(Name),
+    [op(equals)],
+    expression(Value),
+    [op(semicolon)].
+
+shared_marker(shared) --> [keyword(shared)], !.
+shared_marker(private) --> [].
 
 % --- Top-level expression dispatch ---
 
@@ -523,6 +555,26 @@ print_sexpr(try(Body, some(Otherwise))) :-
 print_sexpr(error(Msg)) :-
     format("(error ", []),
     print_sexpr(Msg),
+    format(")", []).
+print_sexpr(section(Name, Members)) :-
+    format("(section ", []),
+    print_quoted(Name),
+    format(" (", []),
+    print_section_members(Members),
+    format("))", []).
+
+print_section_members([]).
+print_section_members([M]) :- print_section_member(M).
+print_section_members([M1, M2 | Rest]) :-
+    print_section_member(M1),
+    format(" ", []),
+    print_section_members([M2 | Rest]).
+
+print_section_member(member(Shared, Name, Value)) :-
+    format("(member ~a ", [Shared]),
+    print_quoted(Name),
+    format(" ", []),
+    print_sexpr(Value),
     format(")", []).
 print_sexpr(list_type(T)) :-
     format("(list-type ", []),
