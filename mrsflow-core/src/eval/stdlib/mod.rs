@@ -113,7 +113,9 @@ pub fn root_env() -> Env {
         ("Day.Type",                TypeRep::Number),
         ("ExtraValues.Type",        TypeRep::Number),
         ("GroupKind.Type",          TypeRep::Number),
+        ("JoinAlgorithm.Type",      TypeRep::Number),
         ("JoinKind.Type",           TypeRep::Number),
+        ("JoinSide.Type",           TypeRep::Number),
         ("LimitClauseKind.Type",    TypeRep::Number),
         ("Precision.Type",          TypeRep::Number),
         ("QuoteStyle.Type",         TypeRep::Number),
@@ -132,6 +134,12 @@ pub fn root_env() -> Env {
         ("JoinKind.FullOuter",  3.0),
         ("JoinKind.LeftAnti",   4.0),
         ("JoinKind.RightAnti",  5.0),
+        // Semi-joins: return only the rows from one side that have at
+        // least one match on the other (no columns from the other side,
+        // no row duplication on multi-match). Used as a fast "filter by
+        // existence in another table" idiom.
+        ("JoinKind.LeftSemi",   6.0),
+        ("JoinKind.RightSemi",  7.0),
     ] {
         env = env.extend(name.to_string(), Value::Number(n));
     }
@@ -260,6 +268,30 @@ pub fn root_env() -> Env {
         ("RoundingMode.ToEven",       2.0),
         ("RoundingMode.TowardZero",   3.0),
         ("RoundingMode.Up",           4.0),
+    ] {
+        env = env.extend(name.to_string(), Value::Number(n));
+    }
+
+    // JoinAlgorithm.* — Table.Join / Table.NestedJoin algorithm hint.
+    // mrsflow has a single working join algorithm and ignores the hint;
+    // the constants are registered for PQ parity so source compiles.
+    for (name, n) in [
+        ("JoinAlgorithm.Dynamic",       0.0),
+        ("JoinAlgorithm.LeftHash",      1.0),
+        ("JoinAlgorithm.LeftIndex",     2.0),
+        ("JoinAlgorithm.PairwiseHash",  3.0),
+        ("JoinAlgorithm.RightHash",     4.0),
+        ("JoinAlgorithm.RightIndex",    5.0),
+        ("JoinAlgorithm.SortMerge",     6.0),
+    ] {
+        env = env.extend(name.to_string(), Value::Number(n));
+    }
+
+    // JoinSide.* — used by Table.FuzzyJoin / Table.FuzzyNestedJoin to
+    // indicate which side's nulls to retain.
+    for (name, n) in [
+        ("JoinSide.Left",  0.0),
+        ("JoinSide.Right", 1.0),
     ] {
         env = env.extend(name.to_string(), Value::Number(n));
     }

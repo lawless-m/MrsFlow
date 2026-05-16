@@ -10717,7 +10717,34 @@ let
             let
                 body = Text.FromBinary(File.Contents("coverage/coverage.m"), TextEncoding.Utf8)
             in
-                Expression.Evaluate(body, #shared))
+                Expression.Evaluate(body, #shared)),
+        // q1168: Table.Join semi-joins. LeftSemi returns left rows that
+        // have a match in right; RightSemi returns right rows that have
+        // a match in left. Neither duplicates rows nor adds the other
+        // side's columns.
+        SafeSerialize("q1168", () =>
+            let
+                L = Table.FromRecords({[id=1,name="a"],[id=2,name="b"],[id=3,name="c"]}),
+                R = Table.FromRecords({[id=1,v=10],[id=1,v=11],[id=3,v=30]}),
+                r = try {
+                    Table.Join(L, "id", R, "id", JoinKind.LeftSemi),
+                    Table.Join(L, "id", R, "id", JoinKind.RightSemi)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        // q1169: JoinAlgorithm constants — just check they exist and are
+        // accepted in their canonical caller position.
+        SafeSerialize("q1169", () =>
+            let
+                r = try {
+                    Value.Is(JoinAlgorithm.SortMerge, type number),
+                    Value.Is(JoinAlgorithm.Dynamic, type number),
+                    Value.Is(JoinAlgorithm.PairwiseHash, type number)
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]])
     },
 
     Catalog = Table.FromRecords(cases)

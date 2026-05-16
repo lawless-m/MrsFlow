@@ -84,9 +84,9 @@ Source: q1167.mrsflow.out.
 | Int64 | 2 | 2 | 2 | 2 | 0 | 0 | 1 | 0 |
 | Int8 | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
 | ItemExpression | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
-| JoinAlgorithm | 8 | 8 | 0 | 0 | 8 | 0 | 0 | 0 |
-| JoinKind | 9 | 9 | 7 | 7 | 2 | 0 | 1 | 0 |
-| JoinSide | 3 | 3 | 0 | 0 | 3 | 0 | 0 | 0 |
+| JoinAlgorithm | 8 | 8 | 8 | 8 | 0 | 0 | 0 | 0 |
+| JoinKind | 9 | 9 | 9 | 9 | 0 | 0 | 1 | 0 |
+| JoinSide | 3 | 3 | 3 | 3 | 0 | 0 | 0 | 0 |
 | Json | 2 | 2 | 2 | 2 | 0 | 0 | 2 | 0 |
 | Kusto | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
 | Lakehouse | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
@@ -155,7 +155,7 @@ Source: q1167.mrsflow.out.
 | WebAction | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | WebMethod | 7 | 7 | 7 | 7 | 0 | 0 | 0 | 0 |
 | Xml | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| **TOTAL** | 860 | 856 | 685 | 681 | 175 | 4 | 301 | 5 |
+| **TOTAL** | 860 | 856 | 698 | 694 | 162 | 4 | 301 | 5 |
 
 ## Per-name detail
 
@@ -478,26 +478,26 @@ Source: q1167.mrsflow.out.
 | `Invoked FunctionEvalFile` | Y |  | missing |  |  |
 | `ItemExpression.From` | Y |  | missing |  |  |
 | `ItemExpression.Item` | Y |  | missing |  |  |
-| `JoinAlgorithm.Dynamic` | Y |  | missing |  |  |
-| `JoinAlgorithm.LeftHash` | Y |  | missing |  |  |
-| `JoinAlgorithm.LeftIndex` | Y |  | missing |  |  |
-| `JoinAlgorithm.PairwiseHash` | Y |  | missing |  |  |
-| `JoinAlgorithm.RightHash` | Y |  | missing |  |  |
-| `JoinAlgorithm.RightIndex` | Y |  | missing |  |  |
-| `JoinAlgorithm.SortMerge` | Y |  | missing |  |  |
-| `JoinAlgorithm.Type` | Y |  | missing |  |  |
+| `JoinAlgorithm.Dynamic` | Y | Y | constant |  |  |
+| `JoinAlgorithm.LeftHash` | Y | Y | constant |  |  |
+| `JoinAlgorithm.LeftIndex` | Y | Y | constant |  |  |
+| `JoinAlgorithm.PairwiseHash` | Y | Y | constant |  |  |
+| `JoinAlgorithm.RightHash` | Y | Y | constant |  |  |
+| `JoinAlgorithm.RightIndex` | Y | Y | constant |  |  |
+| `JoinAlgorithm.SortMerge` | Y | Y | constant |  |  |
+| `JoinAlgorithm.Type` | Y | Y | constant |  |  |
 | `JoinKind.FullOuter` | Y | Y | constant |  |  |
 | `JoinKind.Inner` | Y | Y | constant | q339 q340 | MATCH |
 | `JoinKind.LeftAnti` | Y | Y | constant |  |  |
 | `JoinKind.LeftOuter` | Y | Y | constant |  |  |
-| `JoinKind.LeftSemi` | Y |  | missing |  |  |
+| `JoinKind.LeftSemi` | Y | Y | constant |  |  |
 | `JoinKind.RightAnti` | Y | Y | constant |  |  |
 | `JoinKind.RightOuter` | Y | Y | constant |  |  |
-| `JoinKind.RightSemi` | Y |  | missing |  |  |
+| `JoinKind.RightSemi` | Y | Y | constant |  |  |
 | `JoinKind.Type` | Y | Y | constant |  |  |
-| `JoinSide.Left` | Y |  | missing |  |  |
-| `JoinSide.Right` | Y |  | missing |  |  |
-| `JoinSide.Type` | Y |  | missing |  |  |
+| `JoinSide.Left` | Y | Y | constant |  |  |
+| `JoinSide.Right` | Y | Y | constant |  |  |
+| `JoinSide.Type` | Y | Y | constant |  |  |
 | `Json.Document` | Y | Y | function | q23 q251 q252 q253 q254 q255 q1081 q1082 q1083 q1084 q1085 q1086 q1155 | MATCH |
 | `Json.FromValue` | Y | Y | function | q266 q267 q268 q269 q270 q536 q537 q538 q539 q540 q1085 q1087 q1153 q1155 q1156 q1157 | MATCH |
 | `Kusto.Contents` | Y |  | missing |  |  |

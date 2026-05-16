@@ -2925,9 +2925,9 @@ fn join(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         Some(Value::Null) | None => 0,
         Some(other) => return Err(type_mismatch("number (JoinKind)", other)),
     };
-    if !(0..=5).contains(&join_kind) {
+    if !(0..=7).contains(&join_kind) {
         return Err(MError::Other(format!(
-            "Table.Join: unknown JoinKind {join_kind} (expected 0..5)"
+            "Table.Join: unknown JoinKind {join_kind} (expected 0..7)"
         )));
     }
 
@@ -2952,13 +2952,25 @@ fn join(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         .collect::<Result<_, _>>()?;
     let right_keep: Vec<usize> = (0..right_names.len()).collect();
 
-    let mut out_names: Vec<String> = left_names.clone();
-    // PQ Table.Join always keeps both sides' columns — anti joins null the
-    // opposite side rather than dropping its columns.
     let is_left_anti  = join_kind == 4;
     let is_right_anti = join_kind == 5;
-    for &i in &right_keep {
-        out_names.push(right_names[i].clone());
+    let is_left_semi  = join_kind == 6;
+    let is_right_semi = join_kind == 7;
+
+    // Semi-joins output only one side's columns (no row duplication on
+    // multi-match). All other kinds keep both sides' columns.
+    let mut out_names: Vec<String> = if is_left_semi {
+        left_names.clone()
+    } else if is_right_semi {
+        right_names.clone()
+    } else {
+        left_names.clone()
+    };
+    // Non-semi kinds append right columns; semis emit only one side.
+    if !is_left_semi && !is_right_semi {
+        for &i in &right_keep {
+            out_names.push(right_names[i].clone());
+        }
     }
 
     let row_matches = |left_row: &[Value], right_row: &[Value]| -> Result<bool, MError> {
@@ -2991,8 +3003,22 @@ fn join(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
                 }
             }
         }
+        // LeftSemi: emit each left row once if it had any match. No row
+        // duplication on multi-match, no right columns.
+        if is_left_semi && any_match {
+            out_rows.push(left_row.clone());
+        }
         if !any_match {
             left_unmatched.push(left_row);
+        }
+    }
+    // RightSemi: emit each right row that was matched at least once.
+    // Order = right input order; no left columns.
+    if is_right_semi {
+        for (ri, matched) in right_matched.iter().enumerate() {
+            if *matched {
+                out_rows.push(right_rows[ri].clone());
+            }
         }
     }
     // LeftOuter (1): null-pad unmatched-left rows after the matches.
@@ -3139,16 +3165,27 @@ fn nested_join(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         )));
     }
     let new_column_name = expect_text(&args[4])?.to_string();
-    // joinKind: 0=Inner, 1=LeftOuter, 2=RightOuter, 3=FullOuter, 4=LeftAnti, 5=RightAnti
+    // joinKind: 0=Inner, 1=LeftOuter, 2=RightOuter, 3=FullOuter,
+    //           4=LeftAnti, 5=RightAnti, 6=LeftSemi, 7=RightSemi
     let join_kind = match args.get(5) {
         Some(Value::Number(n)) if n.fract() == 0.0 => *n as i32,
         Some(Value::Null) | None => 1, // default: LeftOuter
         Some(other) => return Err(type_mismatch("number (JoinKind)", other)),
     };
-    if !(0..=5).contains(&join_kind) {
+    if !(0..=7).contains(&join_kind) {
         return Err(MError::Other(format!(
-            "Table.NestedJoin: invalid joinKind {join_kind} (expected 0–5)"
+            "Table.NestedJoin: invalid joinKind {join_kind} (expected 0–7)"
         )));
+    }
+    // Semi-joins don't have a meaningful nested-table shape: by spec a
+    // semi-join emits no columns from the other side, which collapses the
+    // nested-cell payload. PQ's Table.NestedJoin refuses LeftSemi/RightSemi
+    // — mirror that. Users wanting semi-join behaviour should use Table.Join.
+    if join_kind == 6 || join_kind == 7 {
+        return Err(MError::Other(
+            "Table.NestedJoin: JoinKind.LeftSemi/RightSemi not supported; \
+             use Table.Join for semi-joins.".into()
+        ));
     }
 
     let left_names = table1.column_names();

@@ -80,9 +80,9 @@ Counts come from `COVERAGE.md`; refresh both via `render.ps1`.
 | Int64 | Tested | 2 / 2 | 64-bit signed integer numeric type. |
 | Int8 | Implemented | 2 / 2 | 8-bit signed integer numeric type. |
 | ItemExpression | Untouched | 0 / 2 | Query-folding helper for per-item expressions inside List.* projections. |
-| JoinAlgorithm | Untouched | 0 / 8 | Table.NestedJoin algorithm hint (Hash / SortMerge / etc.). |
-| JoinKind | Partial | 7 / 9 | Table.Join / NestedJoin kind (Inner / LeftOuter / FullOuter / etc.). |
-| JoinSide | Untouched | 0 / 3 | Join-side enum for asymmetric joins. |
+| JoinAlgorithm | Implemented | 8 / 8 | Table.NestedJoin algorithm hint (Hash / SortMerge / etc.). |
+| JoinKind | Tested | 9 / 9 | Table.Join / NestedJoin kind (Inner / LeftOuter / FullOuter / etc.). |
+| JoinSide | Implemented | 3 / 3 | Join-side enum for asymmetric joins. |
 | Json | Tested | 2 / 2 | JSON parser / serialiser (Json.Document, Json.FromValue). |
 | Kusto | Untouched | 0 / 2 | Azure Data Explorer (KQL) connector. |
 | Lakehouse | Untouched | 0 / 1 | Microsoft Fabric Lakehouse connector. |
