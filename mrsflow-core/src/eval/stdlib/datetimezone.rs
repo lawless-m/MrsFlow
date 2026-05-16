@@ -42,6 +42,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ("DateTimeZone.FixedUtcNow", vec![], utc_now),
         ("DateTimeZone.LocalNow", vec![], local_now),
         ("DateTimeZone.UtcNow", vec![], utc_now),
+        ("TimeZone.Current", vec![], timezone_current),
         ("DateTimeZone.From", one("value"), from),
         (
             "DateTimeZone.FromText",
@@ -117,6 +118,13 @@ fn utc_now(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(Value::Datetimezone(
         chrono::Utc::now().with_timezone(&chrono::FixedOffset::east_opt(0).unwrap())
     ))
+}
+
+/// PQ's `TimeZone.Current` returns the host's current timezone offset
+/// as a `duration` value (positive east of UTC, negative west).
+fn timezone_current(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let offset_secs = chrono::Local::now().offset().local_minus_utc() as i64;
+    Ok(Value::Duration(chrono::Duration::seconds(offset_secs)))
 }
 
 

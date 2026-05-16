@@ -30,18 +30,18 @@ Source: q1167.mrsflow.out.
 | Binary | 18 | 18 | 18 | 18 | 0 | 0 | 6 | 0 |
 | BinaryEncoding | 3 | 3 | 3 | 3 | 0 | 0 | 0 | 0 |
 | BinaryFormat | 22 | 22 | 0 | 0 | 22 | 0 | 0 | 0 |
-| BinaryOccurrence | 4 | 4 | 0 | 0 | 4 | 0 | 0 | 0 |
-| BufferMode | 3 | 3 | 0 | 0 | 3 | 0 | 0 | 0 |
+| BinaryOccurrence | 4 | 4 | 4 | 4 | 0 | 0 | 0 | 0 |
+| BufferMode | 3 | 3 | 3 | 3 | 0 | 0 | 0 | 0 |
 | Byte | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| ByteOrder | 3 | 3 | 0 | 0 | 3 | 0 | 0 | 0 |
+| ByteOrder | 3 | 3 | 3 | 3 | 0 | 0 | 0 | 0 |
 | Certificate | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Character | 3 | 3 | 3 | 3 | 0 | 0 | 2 | 0 |
 | Combiner | 5 | 5 | 5 | 5 | 0 | 0 | 4 | 0 |
 | CommonDataService | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Comparer | 4 | 4 | 4 | 4 | 0 | 0 | 4 | 0 |
-| Compression | 8 | 8 | 4 | 4 | 4 | 0 | 0 | 0 |
+| Compression | 8 | 8 | 8 | 8 | 0 | 0 | 0 | 0 |
 | Csv | 1 | 1 | 1 | 1 | 0 | 0 | 1 | 0 |
-| CsvStyle | 3 | 3 | 0 | 0 | 3 | 0 | 0 | 0 |
+| CsvStyle | 3 | 3 | 3 | 3 | 0 | 0 | 0 | 0 |
 | Cube | 16 | 16 | 0 | 0 | 16 | 0 | 0 | 0 |
 | Culture | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Currency | 2 | 2 | 2 | 2 | 0 | 0 | 1 | 0 |
@@ -90,7 +90,7 @@ Source: q1167.mrsflow.out.
 | Json | 2 | 2 | 2 | 2 | 0 | 0 | 2 | 0 |
 | Kusto | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
 | Lakehouse | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
-| LimitClauseKind | 6 | 6 | 0 | 0 | 6 | 0 | 0 | 0 |
+| LimitClauseKind | 6 | 6 | 6 | 6 | 0 | 0 | 0 | 0 |
 | Lines | 4 | 4 | 4 | 4 | 0 | 0 | 2 | 0 |
 | List | 72 | 72 | 71 | 71 | 1 | 0 | 49 | 2 |
 | Logical | 4 | 4 | 4 | 4 | 0 | 0 | 3 | 0 |
@@ -115,7 +115,7 @@ Source: q1167.mrsflow.out.
 | PercentileMode | 5 | 5 | 4 | 4 | 1 | 0 | 0 | 0 |
 | PostgreSQL | 2 | 1 | 2 | 1 | 0 | 1 | 0 | 0 |
 | PowerPlatform | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
-| Precision | 3 | 3 | 0 | 0 | 3 | 0 | 0 | 0 |
+| Precision | 3 | 3 | 3 | 3 | 0 | 0 | 0 | 0 |
 | Progress | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | QuoteStyle | 3 | 3 | 3 | 3 | 0 | 0 | 1 | 0 |
 | RankKind | 4 | 4 | 3 | 3 | 1 | 0 | 0 | 0 |
@@ -145,17 +145,17 @@ Source: q1167.mrsflow.out.
 | Text | 42 | 42 | 42 | 42 | 0 | 0 | 34 | 0 |
 | TextEncoding | 7 | 7 | 6 | 6 | 1 | 0 | 0 | 0 |
 | Time | 10 | 10 | 10 | 10 | 0 | 0 | 5 | 0 |
-| TimeZone | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
+| TimeZone | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | TraceLevel | 6 | 6 | 5 | 5 | 1 | 0 | 0 | 0 |
 | Type | 25 | 25 | 24 | 24 | 1 | 0 | 3 | 0 |
 | Uri | 5 | 5 | 5 | 5 | 0 | 0 | 0 | 0 |
 | Value | 27 | 27 | 26 | 26 | 1 | 0 | 4 | 0 |
 | Variable | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
 | Web | 4 | 4 | 4 | 4 | 0 | 0 | 0 | 0 |
-| WebAction | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
-| WebMethod | 7 | 7 | 0 | 0 | 7 | 0 | 0 | 0 |
+| WebAction | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
+| WebMethod | 7 | 7 | 7 | 7 | 0 | 0 | 0 | 0 |
 | Xml | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| **TOTAL** | 860 | 856 | 650 | 646 | 210 | 4 | 301 | 5 |
+| **TOTAL** | 860 | 856 | 685 | 681 | 175 | 4 | 301 | 5 |
 
 ## Per-name detail
 
@@ -227,18 +227,18 @@ Source: q1167.mrsflow.out.
 | `BinaryFormat.UnsignedInteger16` | Y |  | missing |  |  |
 | `BinaryFormat.UnsignedInteger32` | Y |  | missing |  |  |
 | `BinaryFormat.UnsignedInteger64` | Y |  | missing |  |  |
-| `BinaryOccurrence.Optional` | Y |  | missing |  |  |
-| `BinaryOccurrence.Repeating` | Y |  | missing |  |  |
-| `BinaryOccurrence.Required` | Y |  | missing |  |  |
-| `BinaryOccurrence.Type` | Y |  | missing |  |  |
-| `BufferMode.Delayed` | Y |  | missing |  |  |
-| `BufferMode.Eager` | Y |  | missing |  |  |
-| `BufferMode.Type` | Y |  | missing |  |  |
+| `BinaryOccurrence.Optional` | Y | Y | constant |  |  |
+| `BinaryOccurrence.Repeating` | Y | Y | constant |  |  |
+| `BinaryOccurrence.Required` | Y | Y | constant |  |  |
+| `BinaryOccurrence.Type` | Y | Y | constant |  |  |
+| `BufferMode.Delayed` | Y | Y | constant |  |  |
+| `BufferMode.Eager` | Y | Y | constant |  |  |
+| `BufferMode.Type` | Y | Y | constant |  |  |
 | `Byte.From` | Y | Y | function |  |  |
 | `Byte.Type` | Y | Y | constant |  |  |
-| `ByteOrder.BigEndian` | Y |  | missing |  |  |
-| `ByteOrder.LittleEndian` | Y |  | missing |  |  |
-| `ByteOrder.Type` | Y |  | missing |  |  |
+| `ByteOrder.BigEndian` | Y | Y | constant |  |  |
+| `ByteOrder.LittleEndian` | Y | Y | constant |  |  |
+| `ByteOrder.Type` | Y | Y | constant |  |  |
 | `Certificate.Type` | Y |  | missing |  |  |
 | `Character.FromNumber` | Y | Y | function | q531 q533 q534 q535 | MATCH |
 | `Character.ToNumber` | Y | Y | function | q532 q533 q534 q535 q570 | MATCH |
@@ -256,15 +256,15 @@ Source: q1167.mrsflow.out.
 | `Compression.Brotli` | Y | Y | constant |  |  |
 | `Compression.Deflate` | Y | Y | constant |  |  |
 | `Compression.GZip` | Y | Y | constant |  |  |
-| `Compression.LZ4` | Y |  | missing |  |  |
+| `Compression.LZ4` | Y | Y | constant |  |  |
 | `Compression.None` | Y | Y | constant |  |  |
-| `Compression.Snappy` | Y |  | missing |  |  |
-| `Compression.Type` | Y |  | missing |  |  |
-| `Compression.Zstandard` | Y |  | missing |  |  |
+| `Compression.Snappy` | Y | Y | constant |  |  |
+| `Compression.Type` | Y | Y | constant |  |  |
+| `Compression.Zstandard` | Y | Y | constant |  |  |
 | `Csv.Document` | Y | Y | function | q10 q236 q237 q238 q239 q240 q1088 q1089 q1090 q1091 q1092 | MATCH |
-| `CsvStyle.QuoteAfterDelimiter` | Y |  | missing |  |  |
-| `CsvStyle.QuoteAlways` | Y |  | missing |  |  |
-| `CsvStyle.Type` | Y |  | missing |  |  |
+| `CsvStyle.QuoteAfterDelimiter` | Y | Y | constant |  |  |
+| `CsvStyle.QuoteAlways` | Y | Y | constant |  |  |
+| `CsvStyle.Type` | Y | Y | constant |  |  |
 | `Cube.AddAndExpandDimensionColumn` | Y |  | missing |  |  |
 | `Cube.AddMeasureColumn` | Y |  | missing |  |  |
 | `Cube.ApplyParameter` | Y |  | missing |  |  |
@@ -503,12 +503,12 @@ Source: q1167.mrsflow.out.
 | `Kusto.Contents` | Y |  | missing |  |  |
 | `Kusto.Databases` | Y |  | missing |  |  |
 | `Lakehouse.Contents` | Y |  | missing |  |  |
-| `LimitClauseKind.AnsiSql2008` | Y |  | missing |  |  |
-| `LimitClauseKind.Limit` | Y |  | missing |  |  |
-| `LimitClauseKind.LimitOffset` | Y |  | missing |  |  |
-| `LimitClauseKind.None` | Y |  | missing |  |  |
-| `LimitClauseKind.Top` | Y |  | missing |  |  |
-| `LimitClauseKind.Type` | Y |  | missing |  |  |
+| `LimitClauseKind.AnsiSql2008` | Y | Y | constant |  |  |
+| `LimitClauseKind.Limit` | Y | Y | constant |  |  |
+| `LimitClauseKind.LimitOffset` | Y | Y | constant |  |  |
+| `LimitClauseKind.None` | Y | Y | constant |  |  |
+| `LimitClauseKind.Top` | Y | Y | constant |  |  |
+| `LimitClauseKind.Type` | Y | Y | constant |  |  |
 | `Lines.FromBinary` | Y | Y | function |  |  |
 | `Lines.FromText` | Y | Y | function | q296 q297 q298 q299 q300 q1093 | MATCH |
 | `Lines.ToBinary` | Y | Y | function |  |  |
@@ -680,9 +680,9 @@ Source: q1167.mrsflow.out.
 | `PostgreSQL.Database` | Y | Y | function |  |  |
 | `PostgreSQL.Query` |  | Y | function |  |  |
 | `PowerPlatform.Dataflows` | Y |  | missing |  |  |
-| `Precision.Decimal` | Y |  | missing |  |  |
-| `Precision.Double` | Y |  | missing |  |  |
-| `Precision.Type` | Y |  | missing |  |  |
+| `Precision.Decimal` | Y | Y | constant |  |  |
+| `Precision.Double` | Y | Y | constant |  |  |
+| `Precision.Type` | Y | Y | constant |  |  |
 | `Progress.DataSourceProgress` | Y |  | missing |  |  |
 | `QuoteStyle.Csv` | Y | Y | constant |  |  |
 | `QuoteStyle.None` | Y | Y | constant | q98 | MATCH |
@@ -941,7 +941,7 @@ Source: q1167.mrsflow.out.
 | `Time.ToRecord` | Y | Y | function |  |  |
 | `Time.ToText` | Y | Y | function | q162 q453 | MATCH |
 | `Time.Type` | Y | Y | constant |  |  |
-| `TimeZone.Current` | Y |  | missing |  |  |
+| `TimeZone.Current` | Y | Y | function |  |  |
 | `TraceLevel.Critical` | Y | Y | constant |  |  |
 | `TraceLevel.Error` | Y | Y | constant |  |  |
 | `TraceLevel.Information` | Y | Y | constant |  |  |
@@ -1011,13 +1011,13 @@ Source: q1167.mrsflow.out.
 | `Web.Contents` | Y | Y | function |  |  |
 | `Web.Headers` | Y | Y | function |  |  |
 | `Web.Page` | Y | Y | function |  |  |
-| `WebAction.Request` | Y |  | missing |  |  |
-| `WebMethod.Delete` | Y |  | missing |  |  |
-| `WebMethod.Get` | Y |  | missing |  |  |
-| `WebMethod.Head` | Y |  | missing |  |  |
-| `WebMethod.Patch` | Y |  | missing |  |  |
-| `WebMethod.Post` | Y |  | missing |  |  |
-| `WebMethod.Put` | Y |  | missing |  |  |
-| `WebMethod.Type` | Y |  | missing |  |  |
+| `WebAction.Request` | Y | Y | constant |  |  |
+| `WebMethod.Delete` | Y | Y | constant |  |  |
+| `WebMethod.Get` | Y | Y | constant |  |  |
+| `WebMethod.Head` | Y | Y | constant |  |  |
+| `WebMethod.Patch` | Y | Y | constant |  |  |
+| `WebMethod.Post` | Y | Y | constant |  |  |
+| `WebMethod.Put` | Y | Y | constant |  |  |
+| `WebMethod.Type` | Y | Y | constant |  |  |
 | `Xml.Document` | Y | Y | function |  |  |
 | `Xml.Tables` | Y | Y | function |  |  |

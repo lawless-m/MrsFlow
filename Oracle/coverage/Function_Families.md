@@ -26,18 +26,18 @@ Counts come from `COVERAGE.md`; refresh both via `render.ps1`.
 | Binary | Tested | 18 / 18 | Binary value operations (length, slice, encode, base64, compression). |
 | BinaryEncoding | Implemented | 3 / 3 | Base64 / Hex encoding constants for Binary.FromText / ToText. |
 | BinaryFormat | Untouched | 0 / 22 | Declarative parser-combinator framework for binary streams ("Wireshark in M" — describe a wire format, get a typed parser). |
-| BinaryOccurrence | Untouched | 0 / 4 | Occurrence constants (optional / repeating / required) used by BinaryFormat. |
-| BufferMode | Untouched | 0 / 3 | Buffer eagerness mode (Eager / Delayed) for *.Buffer. |
+| BinaryOccurrence | Implemented | 4 / 4 | Occurrence constants (optional / repeating / required) used by BinaryFormat. |
+| BufferMode | Implemented | 3 / 3 | Buffer eagerness mode (Eager / Delayed) for *.Buffer. |
 | Byte | Implemented | 2 / 2 | Byte-typed numeric (0–255) conversion + type companion. |
-| ByteOrder | Untouched | 0 / 3 | Big / little endian constants used by BinaryFormat. |
+| ByteOrder | Implemented | 3 / 3 | Big / little endian constants used by BinaryFormat. |
 | Certificate | Untouched | 0 / 1 | Certificate type-record companion. |
 | Character | Tested | 3 / 3 | Character-codepoint conversion (FromNumber / ToNumber). |
 | Combiner | Tested | 5 / 5 | Text-combine combinators (delimiter, lengths, positions). Symmetric with Splitter. |
 | CommonDataService | Untouched | 0 / 1 | Microsoft Dataverse / Common Data Service connector. |
 | Comparer | Tested | 4 / 4 | Sort / equality comparer constants and factories (Ordinal, OrdinalIgnoreCase, FromCulture). |
-| Compression | Partial | 4 / 8 | Compression algorithm constants for Binary.Compress / Decompress (GZip, Deflate, etc.). |
+| Compression | Implemented | 8 / 8 | Compression algorithm constants for Binary.Compress / Decompress (GZip, Deflate, etc.). |
 | Csv | Tested | 1 / 1 | CSV document parser (Csv.Document). |
-| CsvStyle | Untouched | 0 / 3 | Csv.Document quote-style options. |
+| CsvStyle | Implemented | 3 / 3 | Csv.Document quote-style options. |
 | Cube | Untouched | 0 / 16 | OLAP cube operations (Analysis Services / SAP BW / Essbase). Niche enterprise OLAP. |
 | Culture | Untouched | 0 / 1 | Current-thread culture probe. |
 | Currency | Tested | 2 / 2 | Currency-typed decimal value support. |
@@ -86,7 +86,7 @@ Counts come from `COVERAGE.md`; refresh both via `render.ps1`.
 | Json | Tested | 2 / 2 | JSON parser / serialiser (Json.Document, Json.FromValue). |
 | Kusto | Untouched | 0 / 2 | Azure Data Explorer (KQL) connector. |
 | Lakehouse | Untouched | 0 / 1 | Microsoft Fabric Lakehouse connector. |
-| LimitClauseKind | Untouched | 0 / 6 | Folded-SQL LIMIT/TOP/OFFSET dialect enum. |
+| LimitClauseKind | Implemented | 6 / 6 | Folded-SQL LIMIT/TOP/OFFSET dialect enum. |
 | Lines | Tested | 4 / 4 | Line-oriented text helpers (FromText / ToText / FromBinary / ToBinary). |
 | List | Partial | 71 / 72 | List operations — the broadest family. Filter, map, reduce, sort, generate, statistical. |
 | Logical | Tested | 4 / 4 | Boolean conversion + type companion. |
@@ -111,7 +111,7 @@ Counts come from `COVERAGE.md`; refresh both via `render.ps1`.
 | PercentileMode | Partial | 4 / 5 | List.Percentile mode (ExcelInc / ExcelExc / SqlCont / SqlDisc). |
 | PostgreSQL | Implemented | 2 / 1 | PostgreSQL database connector. mrsflow extension `PostgreSQL.Query` for raw SQL. |
 | PowerPlatform | Untouched | 0 / 1 | Power Platform dataflows connector. |
-| Precision | Untouched | 0 / 3 | Decimal / Double precision enum for numeric typing. |
+| Precision | Implemented | 3 / 3 | Decimal / Double precision enum for numeric typing. |
 | Progress | Untouched | 0 / 1 | Progress / DataDirect connector. |
 | QuoteStyle | Tested | 3 / 3 | Csv.Document quote-style enum (Csv / None). |
 | RankKind | Partial | 3 / 4 | Table.AddRankColumn tie-handling (Competition / Ordinal / Dense). |
@@ -141,13 +141,13 @@ Counts come from `COVERAGE.md`; refresh both via `render.ps1`.
 | Text | Tested | 42 / 42 | Text (string) operations: split, replace, format, length, encoding-conversion. UTF-16 code-unit semantics matching .NET. |
 | TextEncoding | Partial | 6 / 7 | Encoding constants for Text.FromBinary / ToBinary (UTF-8 the only one decoded). |
 | Time | Tested | 10 / 10 | Time-of-day operations. |
-| TimeZone | Untouched | 0 / 1 | TimeZone.Current — host timezone probe. |
+| TimeZone | Implemented | 1 / 1 | TimeZone.Current — host timezone probe. |
 | TraceLevel | Partial | 5 / 6 | Diagnostics.Trace level enum. |
 | Type | Partial | 24 / 25 | Type-value construction and introspection (Type.Is, RecordFields, TableSchema, etc.). |
 | Uri | Implemented | 5 / 5 | URI parsing / building. |
 | Value | Partial | 26 / 27 | Generic value introspection (Compare, Equals, Is, NativeQuery, Metadata). |
 | Variable | Implemented | 2 / 2 | Variable.Value / .ValueOrDefault — env probe. |
 | Web | Implemented | 4 / 4 | HTTP-fetching connector (Web.Contents, Web.Headers, Web.Page). |
-| WebAction | Untouched | 0 / 1 | Web.Contents action-request constants. |
-| WebMethod | Untouched | 0 / 7 | HTTP verb constants (Get / Post / Put / Delete / Patch / Head). |
+| WebAction | Implemented | 1 / 1 | Web.Contents action-request constants. |
+| WebMethod | Implemented | 7 / 7 | HTTP verb constants (Get / Post / Put / Delete / Patch / Head). |
 | Xml | Implemented | 2 / 2 | XML document / table parser. |

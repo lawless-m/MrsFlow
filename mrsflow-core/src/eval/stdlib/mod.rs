@@ -102,16 +102,24 @@ pub fn root_env() -> Env {
         // as the type-value for its underlying representation (most are
         // numeric; Character.Type is text, Uri.Type is text). They appear
         // in Type.Is / Type.IsNullable probes and as type annotations.
-        ("BinaryEncoding.Type", TypeRep::Number),
-        ("Byte.Type",           TypeRep::NamedNumeric("Byte.Type")),
-        ("Character.Type",      TypeRep::Text),
-        ("Day.Type",            TypeRep::Number),
-        ("ExtraValues.Type",    TypeRep::Number),
-        ("GroupKind.Type",      TypeRep::Number),
-        ("JoinKind.Type",       TypeRep::Number),
-        ("QuoteStyle.Type",     TypeRep::Number),
-        ("RoundingMode.Type",   TypeRep::Number),
-        ("Uri.Type",            TypeRep::Text),
+        ("BinaryEncoding.Type",     TypeRep::Number),
+        ("BinaryOccurrence.Type",   TypeRep::Number),
+        ("BufferMode.Type",         TypeRep::Number),
+        ("Byte.Type",               TypeRep::NamedNumeric("Byte.Type")),
+        ("ByteOrder.Type",          TypeRep::Number),
+        ("Character.Type",          TypeRep::Text),
+        ("Compression.Type",        TypeRep::Number),
+        ("CsvStyle.Type",           TypeRep::Number),
+        ("Day.Type",                TypeRep::Number),
+        ("ExtraValues.Type",        TypeRep::Number),
+        ("GroupKind.Type",          TypeRep::Number),
+        ("JoinKind.Type",           TypeRep::Number),
+        ("LimitClauseKind.Type",    TypeRep::Number),
+        ("Precision.Type",          TypeRep::Number),
+        ("QuoteStyle.Type",         TypeRep::Number),
+        ("RoundingMode.Type",       TypeRep::Number),
+        ("Uri.Type",                TypeRep::Text),
+        ("WebMethod.Type",          TypeRep::Number),
     ] {
         env = env.extend(name.to_string(), Value::Type(tr));
     }
@@ -222,11 +230,17 @@ pub fn root_env() -> Env {
     }
 
     // Compression.* constants — Binary.Compress/Decompress compressionType arg.
+    // The first four are real (Binary.Compress dispatches on these); LZ4 /
+    // Snappy / Zstandard are registered for PQ-parity, with Binary.Compress
+    // erroring out clearly if asked to actually use one.
     for (name, n) in [
-        ("Compression.None",    0.0),
-        ("Compression.GZip",    1.0),
-        ("Compression.Deflate", 2.0),
-        ("Compression.Brotli",  3.0),
+        ("Compression.None",       0.0),
+        ("Compression.GZip",       1.0),
+        ("Compression.Deflate",    2.0),
+        ("Compression.Brotli",     3.0),
+        ("Compression.LZ4",        4.0),
+        ("Compression.Snappy",     5.0),
+        ("Compression.Zstandard",  6.0),
     ] {
         env = env.extend(name.to_string(), Value::Number(n));
     }
@@ -249,6 +263,82 @@ pub fn root_env() -> Env {
     ] {
         env = env.extend(name.to_string(), Value::Number(n));
     }
+
+    // BinaryOccurrence.* — BinaryFormat.Choice / BinaryFormat.List
+    // occurrence enum (no real implementation yet — BinaryFormat itself
+    // is a future slice — but the constants are exposed for PQ parity).
+    for (name, n) in [
+        ("BinaryOccurrence.Optional",  0.0),
+        ("BinaryOccurrence.Repeating", 1.0),
+        ("BinaryOccurrence.Required",  2.0),
+    ] {
+        env = env.extend(name.to_string(), Value::Number(n));
+    }
+
+    // BufferMode.* — *.Buffer mode (Eager / Delayed). mrsflow doesn't
+    // change buffering behaviour based on this hint; the constants exist
+    // so source compiles.
+    for (name, n) in [
+        ("BufferMode.Delayed", 0.0),
+        ("BufferMode.Eager",   1.0),
+    ] {
+        env = env.extend(name.to_string(), Value::Number(n));
+    }
+
+    // ByteOrder.* — BinaryFormat byte-order enum.
+    for (name, n) in [
+        ("ByteOrder.BigEndian",    0.0),
+        ("ByteOrder.LittleEndian", 1.0),
+    ] {
+        env = env.extend(name.to_string(), Value::Number(n));
+    }
+
+    // CsvStyle.* — Csv.Document quote-style option.
+    // QuoteAfterDelimiter and QuoteAlways are accepted as constants;
+    // the underlying Csv.Document still uses the default quote handling.
+    for (name, n) in [
+        ("CsvStyle.QuoteAfterDelimiter", 0.0),
+        ("CsvStyle.QuoteAlways",         1.0),
+    ] {
+        env = env.extend(name.to_string(), Value::Number(n));
+    }
+
+    // LimitClauseKind.* — SQL-folding LIMIT/TOP dialect enum. Only
+    // meaningful inside connector folding code; registered as constants
+    // for PQ parity.
+    for (name, n) in [
+        ("LimitClauseKind.AnsiSql2008", 0.0),
+        ("LimitClauseKind.Limit",       1.0),
+        ("LimitClauseKind.LimitOffset", 2.0),
+        ("LimitClauseKind.None",        3.0),
+        ("LimitClauseKind.Top",         4.0),
+    ] {
+        env = env.extend(name.to_string(), Value::Number(n));
+    }
+
+    // Precision.* — Decimal / Double precision hint for numeric typing.
+    for (name, n) in [
+        ("Precision.Decimal", 0.0),
+        ("Precision.Double",  1.0),
+    ] {
+        env = env.extend(name.to_string(), Value::Number(n));
+    }
+
+    // WebMethod.* — HTTP verb constants. Web.Contents itself is out of
+    // scope for mrsflow, but the verb constants are pure values.
+    for (name, n) in [
+        ("WebMethod.Delete", 0.0),
+        ("WebMethod.Get",    1.0),
+        ("WebMethod.Head",   2.0),
+        ("WebMethod.Patch",  3.0),
+        ("WebMethod.Post",   4.0),
+        ("WebMethod.Put",    5.0),
+    ] {
+        env = env.extend(name.to_string(), Value::Number(n));
+    }
+
+    // WebAction.Request — single-value sentinel for Web action requests.
+    env = env.extend("WebAction.Request".into(), Value::Number(0.0));
 
     // Math constants.
     for (name, n) in [
