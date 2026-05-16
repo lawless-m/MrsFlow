@@ -20,6 +20,16 @@
 <h1>mrsflow — browser demo</h1>
 <p>Three parquets joined and expanded by an M query, evaluated entirely in the browser via WASM.</p>
 
+<label>Dataset</label>
+<div id="dataset-toggle">
+  <label style="font-weight: normal; display: inline-block; margin-right: 1rem;">
+    <input type="radio" name="dataset" value="mini" checked> mini (~9 MB total)
+  </label>
+  <label style="font-weight: normal; display: inline-block;">
+    <input type="radio" name="dataset" value="FULL"> FULL (~305 MB total — first switch fetches and caches)
+  </label>
+</div>
+
 <label>Status</label>
 <pre id="status"></pre>
 
@@ -59,26 +69,61 @@ async function fetchText(url) {
 }
 
 let inputs = null;
+let activeVariant = null;
+// Per-variant cache: variant -> [analysis, customer, product] once fetched.
+const datasetCache = {};
+
+// M source binds to these names regardless of which underlying parquet
+// is loaded — the toggle swaps the bytes, not the binding identifiers.
+const BINDINGS = ['analysis-mini', 'customer-mini', 'product-mini'];
+const VARIANT_PATHS = {
+  mini: ['/parqs/analysis-mini.parquet', '/parqs/customer-mini.parquet', '/parqs/product-mini.parquet'],
+  FULL: ['/parqs/analysis-mini-FULL.parquet', '/parqs/customer-mini-FULL.parquet', '/parqs/product-mini-FULL.parquet'],
+};
+
+async function loadVariant(variant) {
+  if (datasetCache[variant]) {
+    log(`switching to ${variant} (cached)`);
+    return datasetCache[variant];
+  }
+  log(`fetching ${variant} parquets…`);
+  const t0 = performance.now();
+  const [a, c, p] = await Promise.all(VARIANT_PATHS[variant].map(fetchBytes));
+  const dt = (performance.now() - t0).toFixed(1);
+  log(`${variant} fetched in ${dt} ms — analysis ${a.length} B, customer ${c.length} B, product ${p.length} B`);
+  const bytes = [a, c, p];
+  datasetCache[variant] = bytes;
+  return bytes;
+}
+
+async function activateVariant(variant) {
+  runBtn.disabled = true;
+  try {
+    const [a, c, p] = await loadVariant(variant);
+    inputs = { [BINDINGS[0]]: a, [BINDINGS[1]]: c, [BINDINGS[2]]: p };
+    activeVariant = variant;
+    log(`active dataset: ${variant}`);
+  } catch (e) {
+    log(`failed to load ${variant}: ${e.message ?? e}`);
+    // Snap the radio back to whatever's actually active.
+    if (activeVariant) {
+      document.querySelector(`input[name=dataset][value=${activeVariant}]`).checked = true;
+    }
+  } finally {
+    runBtn.disabled = inputs === null;
+  }
+}
+
+document.querySelectorAll('input[name=dataset]').forEach(el => {
+  el.addEventListener('change', e => { if (e.target.checked) activateVariant(e.target.value); });
+});
 
 (async () => {
   log('loading wasm…');
   await init();
   log(`wasm loaded — mrsflow-wasm v${version()}`);
 
-  log('fetching parquets…');
-  const t0 = performance.now();
-  const [analysis, customer, product] = await Promise.all([
-    fetchBytes('/parqs/analysis-mini.parquet'),
-    fetchBytes('/parqs/customer-mini.parquet'),
-    fetchBytes('/parqs/product-mini.parquet'),
-  ]);
-  const dt = (performance.now() - t0).toFixed(1);
-  inputs = {
-    'analysis-mini': analysis,
-    'customer-mini': customer,
-    'product-mini': product,
-  };
-  log(`parquets fetched in ${dt} ms — analysis ${analysis.length} B, customer ${customer.length} B, product ${product.length} B`);
+  await activateVariant('mini');
 
   log('fetching M source…');
   sourceEl.value = await fetchText('/parqs/mini-wasm.m');

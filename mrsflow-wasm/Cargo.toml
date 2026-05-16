@@ -28,3 +28,7 @@ bytes = "1"
 # Needed only to spell the return type of `IoHost::file_modified` in the
 # trait impl signature; the WASM shell doesn't actually call into chrono.
 chrono = { version = "0.4", default-features = false }
+# Activate getrandom's `wasm_js` backend so ahash (pulled in transitively
+# via arrow-select) compiles for wasm32-unknown-unknown. Required since
+# getrandom 0.3 split JS browser support behind an opt-in feature.
+getrandom = { version = "0.3", features = ["wasm_js"] }
