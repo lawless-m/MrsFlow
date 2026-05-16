@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Explain my Power Query error</title>
+<style>
+  :root {
+    --fg: #1a1a1a;
+    --muted: #666;
+    --bg: #fafaf7;
+    --panel: #fff;
+    --border: #d8d4cc;
+    --accent: #4a3aa0;
+    --code-bg: #f4f2ec;
+  }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    line-height: 1.5;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
+  h1 { font-size: 1.5rem; margin: 0 0 0.25rem; }
+  .sub { color: var(--muted); margin: 0 0 1.5rem; }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+  label { display: block; font-weight: 600; margin-bottom: 0.4rem; }
+  label .hint { font-weight: 400; color: var(--muted); margin-left: 0.5rem; font-size: 0.85rem; }
+  textarea {
+    width: 100%;
+    min-height: 9em;
+    box-sizing: border-box;
+    font-family: ui-monospace, "Consolas", "SFMono-Regular", monospace;
+    font-size: 0.9rem;
+    padding: 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--code-bg);
+    resize: vertical;
+  }
+  textarea:focus { outline: 2px solid var(--accent); outline-offset: -2px; }
+  button {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    padding: 0.6rem 1.2rem;
+    font-size: 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  button:hover { background: #3a2c80; }
+  button:disabled { background: #999; cursor: wait; }
+  #result {
+    white-space: pre-wrap;
+    font-family: ui-monospace, "Consolas", "SFMono-Regular", monospace;
+    font-size: 0.9rem;
+    min-height: 4em;
+  }
+  #result.empty { color: var(--muted); font-style: italic; }
+  .meta {
+    color: var(--muted);
+    font-size: 0.8rem;
+    margin-top: 2rem;
+    border-top: 1px solid var(--border);
+    padding-top: 1rem;
+  }
+  .meta a { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Explain my Power Query error</h1>
+  <p class="sub">Paste broken M source. Get a plain-English diagnosis if we
+  recognise the mistake.</p>
+
+  <div class="panel">
+    <label for="src">M source <span class="hint">(the query that's failing)</span></label>
+    <textarea id="src" placeholder="let x = 1; in x">let x = 1; in x</textarea>
+  </div>
+
+  <div class="panel">
+    <label for="err">Power Query error message <span class="hint">(optional, paste what PQ said)</span></label>
+    <textarea id="err" placeholder="Expression.SyntaxError: Token Identifier expected." style="min-height:4em"></textarea>
+  </div>
+
+  <button id="go">Explain</button>
+
+  <div class="panel" style="margin-top:1rem">
+    <label>Diagnosis</label>
+    <div id="result" class="empty">(no diagnosis yet — click Explain)</div>
+  </div>
+
+  <p class="meta">
+    Source is sent to a Prolog-based analyser running on this server. Nothing
+    is stored or logged. This tool recognises a small (and growing) catalogue
+    of common M mistakes; if it doesn't recognise yours, it says so — it
+    won't guess.
+    &nbsp;·&nbsp;
+    <a href="https://github.com/lawless-m/MrsFlow/tree/main/tools/explain">source &amp; rule catalogue</a>
+  </p>
+
+</div>
+
+<script>
+const btn = document.getElementById('go');
+const src = document.getElementById('src');
+const err = document.getElementById('err');
+const out = document.getElementById('result');
+
+async function explain() {
+  if (!src.value.trim()) {
+    out.className = '';
+    out.textContent = 'Paste some M source first.';
+    return;
+  }
+  btn.disabled = true;
+  out.className = '';
+  out.textContent = 'Analysing...';
+  try {
+    const resp = await fetch('/m-explain', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source: src.value, error: err.value }),
+    });
+    const text = await resp.text();
+    out.textContent = text || '(empty response)';
+  } catch (e) {
+    out.textContent = 'Error contacting the analyser: ' + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+btn.addEventListener('click', explain);
+src.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') explain();
+});
+</script>
+</body>
+</html>
