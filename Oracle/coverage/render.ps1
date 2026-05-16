@@ -187,3 +187,57 @@ foreach ($r in $rowsSorted) {
     [System.Text.UTF8Encoding]::new($false))
 
 Write-Output ("wrote {0} ({1} families, {2} names)" -f $Out, $famSorted.Count, $rows.Count)
+
+# --- Function_Families.md: one row per family, prose description + status -
+
+# Load family descriptions. Missing rows render with blank description.
+$descByFamily = @{}
+$familiesTsv = Join-Path $root 'families.tsv'
+if (Test-Path $familiesTsv) {
+    $lines = [System.IO.File]::ReadAllLines($familiesTsv)
+    for ($i = 1; $i -lt $lines.Count; $i++) {
+        $parts = $lines[$i] -split "`t", 2
+        if ($parts.Count -eq 2) { $descByFamily[$parts[0]] = $parts[1] }
+    }
+}
+
+function Get-FamilyStatus {
+    param($f)
+    if ($f.InMrsflow -eq 0)        { return 'Untouched' }
+    if ($f.InMrsflow -lt $f.InPQ)  { return 'Partial' }
+    if ($f.Tested -gt 0)           { return 'Tested' }
+    return 'Implemented'
+}
+
+$famPath = Join-Path $root 'Function_Families.md'
+$fb = [System.Text.StringBuilder]::new()
+[void]$fb.AppendLine('# PQ stdlib families — what mrsflow does')
+[void]$fb.AppendLine()
+[void]$fb.AppendLine('One row per top-level family in PQ''s `#shared`. Status labels:')
+[void]$fb.AppendLine()
+[void]$fb.AppendLine('- **Tested** — full implementation, Oracle has at least one passing case.')
+[void]$fb.AppendLine('- **Implemented** — every name in the family has a binding, no Oracle case yet.')
+[void]$fb.AppendLine('- **Partial** — mrsflow has some names in the family, not all.')
+[void]$fb.AppendLine('- **Untouched** — none of the family is implemented (typically a connector we''ve scoped out).')
+[void]$fb.AppendLine()
+[void]$fb.AppendLine('Counts come from `COVERAGE.md`; refresh both via `render.ps1`.')
+[void]$fb.AppendLine()
+[void]$fb.AppendLine('| Family | Status | mrsflow / PQ | Description |')
+[void]$fb.AppendLine('|---|---|---:|---|')
+
+foreach ($f in $famSorted) {
+    $status = Get-FamilyStatus $f
+    $desc = if ($descByFamily.ContainsKey($f.Family)) { $descByFamily[$f.Family] } else { '' }
+    [void]$fb.AppendLine(("| {0} | {1} | {2} / {3} | {4} |" -f
+        $f.Family, $status, $f.InMrsflow, $f.InPQ, $desc))
+}
+
+$famMdPath = Join-Path $root 'Function_Families.md'
+[System.IO.File]::WriteAllText($famMdPath, $fb.ToString(),
+    [System.Text.UTF8Encoding]::new($false))
+
+# Status summary on stdout — useful at a glance.
+$statusCounts = $famSorted | Group-Object -Property { Get-FamilyStatus $_ } |
+    ForEach-Object { '{0}={1}' -f $_.Name, $_.Count }
+Write-Output ("wrote {0} ({1} families)" -f $famMdPath, $famSorted.Count)
+Write-Output ("status: " + ($statusCounts -join '  '))
