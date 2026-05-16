@@ -435,7 +435,12 @@ impl<'src> Lexer<'src> {
                 break;
             }
         }
-        // Dotted continuations: `.X` where X is identifier-start.
+        // Dotted continuations: `.X` where X is identifier-start OR a
+        // digit. The digit case (e.g. `Attribute.1`) is a PQ leniency
+        // beyond the published M spec — Excel's column-splitter generates
+        // names like `Attribute.1`, `Attribute.2` and they appear in
+        // corpus workbooks. The corresponding field-selector position
+        // also accepts the generalised identifier these produce.
         loop {
             let mut lookahead = self.chars.clone();
             let Some(&(dot_pos, '.')) = lookahead.peek() else {
@@ -445,7 +450,7 @@ impl<'src> Lexer<'src> {
             let Some(&(_, next)) = lookahead.peek() else {
                 break;
             };
-            if !is_identifier_start(next) {
+            if !is_identifier_start(next) && !next.is_ascii_digit() {
                 break;
             }
             self.chars.next(); // '.'

@@ -123,10 +123,15 @@ primary_type(unop(nullable, E)) -->
     [ident([n,u,l,l,a,b,l,e])],
     !,
     primary_type(E).
+% `table T` (composite table-type with row-type) vs bare `table` (primitive).
+% The cut moves AFTER primary_type so Prolog can backtrack to the fallback
+% `primary_type(E) --> primary(E).` clause when no inner type follows
+% (e.g. `Value.Is(x, type table)`). Mirrors how `function`/`nullable` are
+% handled — both require a body, but `table` alone is a valid primitive.
 primary_type(table_type(E)) -->
     [ident([t,a,b,l,e])],
-    !,
-    primary_type(E).
+    primary_type(E),
+    !.
 primary_type(E) -->
     [ident([f,u,n,c,t,i,o,n])],
     !,

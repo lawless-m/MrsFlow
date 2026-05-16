@@ -282,14 +282,20 @@ ident_rest([C | Cs]) -->
     ident_rest(Cs).
 ident_rest([]) --> [].
 
-% Dotted continuation: `.X` where X is an identifier-start char extends the token.
+% Dotted continuation: `.X` where X is an identifier-start char OR an
+% ASCII digit extends the token. The digit case (e.g. `Attribute.1`) is
+% a PQ leniency beyond the published M spec — Excel's column-splitter
+% generates names like `Attribute.1`, `Attribute.2` and they appear in
+% corpus workbooks inside field-selector positions.
 dotted_continuation(Acc, Full) -->
-    ['.'], [C], { ident_start(C) },
+    ['.'], [C], { ident_start(C) ; ascii_digit(C) },
     !,
     ident_rest(Rest),
     { append(Acc, ['.', C | Rest], Acc1) },
     dotted_continuation(Acc1, Full).
 dotted_continuation(Acc, Acc) --> [].
+
+ascii_digit(C) :- char_code(C, Code), Code >= 0'0, Code =< 0'9.
 
 % --- Operators / punctuators ---
 %
