@@ -91,24 +91,12 @@ function Compare-Pair {
     # for the same refusal). Applied AFTER the generic Normalise step.
     if (-not $Raw) {
         switch ($q) {
-            'q1165' {
-                # #shared dump. mrsflow exposes Excel's 856 names plus a
-                # small number of deliberate extensions (Hash.*, Parquet.*,
-                # File.Modified, MySQL.Query, PostgreSQL.Query). Strip the
-                # known extensions from the mrsflow side so the catalogue
-                # comparison passes; if a new extension appears here later,
-                # add it to this list — that's a deliberate design choice,
-                # not a phantom name.
-                $extensions = @(
-                    'File.Modified',
-                    'MySQL.Query',
-                    'Parquet.Document',
-                    'PostgreSQL.Query'
-                )
-                foreach ($ext in $extensions) {
-                    $m = $m -replace ("(?m)^" + [regex]::Escape($ext) + "(\r?\n)?"), ''
-                }
-            }
+            # q1165 (#shared dump): NOT normalised. mrsflow exposes only
+            # the names it actually implements; Excel exposes PQ's full
+            # ~856 surface. The divergence is the real picture and the
+            # coverage dashboard (Oracle/coverage/COVERAGE.md) is the
+            # honest accounting. q1165 will appear as a permanent DIFF;
+            # that's correct, not a bug.
             'q1166' {
                 # Date > DateTime: both engines refuse the comparison, just
                 # with different wording (Excel says "We cannot apply

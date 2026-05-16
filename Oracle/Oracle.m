@@ -1247,12 +1247,14 @@ let
         // function values that Json.FromValue can't serialize directly,
         // so probe only counts and field-presence.
 
-        // q241 — mrsflow's #shared is a superset of PQ's (we add a small
-        // number of extensions: Hash.*, Parquet.Document, File.Modified,
-        // MySQL.Query, PostgreSQL.Query). Assert the documented PQ count
-        // is met or exceeded rather than equalled exactly.
+        // q241 — #shared sanity check. Was originally an equals-856 test,
+        // then loosened to >=856 when we padded with stubs. Now (post
+        // stub-cull) we don't claim coverage parity at all: just assert
+        // that some core function is exposed. The honest size comparison
+        // lives in the coverage dashboard (q1167) which can show
+        // "mrsflow exposes N, PQ exposes M" without lying about either.
         SafeSerialize("q241", () =>
-            let r = try (Record.FieldCount(#shared) >= 856) in
+            let r = try Record.HasFields(#shared, "List.Sum") in
                 if r[HasError]
                     then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                     else [HasError=false, Value=r[Value]]),
@@ -10438,10 +10440,9 @@ let
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]]),
-        // q1144 — see q241 note re. #shared count being >= 856.
+        // q1144 — #shared spot-check, no count claim (see q241 note).
         SafeSerialize("q1144", () =>
             let r = try {
-                    Record.FieldCount(#shared) >= 856,
                     Record.HasFields(#shared, "Text.From"),
                     Record.HasFields(#shared, "List.Sum"),
                     Record.HasFields(#shared, "Table.FromRecords"),
@@ -10464,13 +10465,12 @@ let
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]]),
-        // q1146 — distinctness + lower-bound count (see q241 note).
+        // q1146 — #shared distinctness only (no count claim per q241 note).
         SafeSerialize("q1146", () =>
             let names = Record.FieldNames(#shared) in
             let r = try {
                     List.Count(names) = List.Count(List.Distinct(names)),
-                    List.Count(names) >= 856,
-                    List.Count(List.Distinct(names)) >= 856
+                    List.Count(names) > 0
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
@@ -10489,21 +10489,27 @@ let
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]]),
+        // q1148 — probe a few real functions / constants are accessible
+        // via Record.Field. Previously this checked OData.Feed/Web.Contents
+        // which were stub-only and have been removed post stub-cull.
         SafeSerialize("q1148", () =>
             let r = try {
-                    Value.Is(Record.Field(#shared, "OData.Feed"), type function),
-                    Value.Is(Record.Field(#shared, "Web.Contents"), type function),
+                    Value.Is(Record.Field(#shared, "Text.From"), type function),
+                    Value.Is(Record.Field(#shared, "List.Sum"), type function),
                     Record.Field(#shared, "JoinKind.Inner") <> null
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]]),
+        // q1149 — Record.ToTable(#shared) shape check. Dropped the "> 800"
+        // assertion (was an artefact of the stub-padded era); kept the
+        // round-trip-count check which holds at any size.
         SafeSerialize("q1149", () =>
             let t = Record.ToTable(#shared) in
             let r = try {
                     Table.ColumnNames(t),
                     Table.RowCount(t) = Record.FieldCount(#shared),
-                    Table.RowCount(t) > 800
+                    Table.RowCount(t) > 0
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
