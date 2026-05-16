@@ -143,6 +143,34 @@ pub trait IoHost {
         let _ = (server, database, sql, options);
         Err(IoError::NotSupported)
     }
+    /// Connect to SQL Server and return a navigation table — backs
+    /// `Sql.Database`. `options` is the optional record passed as the
+    /// third arg (UserName, Password, Encrypt, CommandTimeout, etc.).
+    /// Returns a navigation table with columns `Name, Data, ItemKind,
+    /// ItemName, IsLeaf` — same shape as `MySQL.Database`. Hosts with no
+    /// SQL Server support (WASM, default builds) return
+    /// `IoError::NotSupported`.
+    fn sql_database(
+        &self,
+        server: &str,
+        database: &str,
+        options: Option<&Value>,
+    ) -> Result<Value, IoError> {
+        let _ = (server, database, options);
+        Err(IoError::NotSupported)
+    }
+    /// Enumerate databases on a SQL Server — backs `Sql.Databases`.
+    /// Returns a navigation table with the same column shape as
+    /// `sql_database`, where each row's `Data` is a thunk that, on
+    /// force, re-enters `sql_database(server, name, options)`.
+    fn sql_databases(
+        &self,
+        server: &str,
+        options: Option<&Value>,
+    ) -> Result<Value, IoError> {
+        let _ = (server, options);
+        Err(IoError::NotSupported)
+    }
     /// Caller-injected workbook parameters — backs `Excel.CurrentWorkbook`.
     /// Returns a Table with columns `Name, Content` where each Content
     /// cell is a 1-row Table `[Value=…]`. The shell (`mrsflow-cli`) builds

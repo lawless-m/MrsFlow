@@ -360,6 +360,48 @@ impl IoHost for CliIoHost {
         postgres_database_impl(server, database, options)
     }
 
+    #[cfg(not(feature = "sql"))]
+    fn sql_database(
+        &self,
+        _server: &str,
+        _database: &str,
+        _options: Option<&Value>,
+    ) -> Result<Value, IoError> {
+        Err(IoError::Other(
+            "Sql.Database: built without SQL Server support — recompile mrsflow-cli with --features sql".into(),
+        ))
+    }
+
+    #[cfg(feature = "sql")]
+    fn sql_database(
+        &self,
+        server: &str,
+        database: &str,
+        options: Option<&Value>,
+    ) -> Result<Value, IoError> {
+        sql_database_impl(server, database, options)
+    }
+
+    #[cfg(not(feature = "sql"))]
+    fn sql_databases(
+        &self,
+        _server: &str,
+        _options: Option<&Value>,
+    ) -> Result<Value, IoError> {
+        Err(IoError::Other(
+            "Sql.Databases: built without SQL Server support — recompile mrsflow-cli with --features sql".into(),
+        ))
+    }
+
+    #[cfg(feature = "sql")]
+    fn sql_databases(
+        &self,
+        server: &str,
+        options: Option<&Value>,
+    ) -> Result<Value, IoError> {
+        sql_databases_impl(server, options)
+    }
+
     #[cfg(not(feature = "postgresql"))]
     fn postgres_query(
         &self,
@@ -2409,4 +2451,393 @@ fn build_lazy_odbc_table(_: &str, _: &str) -> Result<Value, mrsflow_core::eval::
     Err(mrsflow_core::eval::MError::Other(
         "Odbc.DataSource: built without ODBC support".into(),
     ))
+}
+
+// ============================================================================
+// Sql.Database / Sql.Databases — native SQL Server TDS client (tiberius +
+// tokio + rustls). Mirrors the postgres path: per-call current_thread
+// runtime, eager schema listing, Data thunks reopen on force. Credentials
+// come from the M options record (UserName/Password) or, when absent,
+// env vars MRSFLOW_SQL_USER / MRSFLOW_SQL_PASS (matches PQ's credential
+// store fallback — corpus queries like Sql.Databases("10.80.42.21") have
+// no creds in the M code, PQ pulls them from its store at refresh time).
+// ============================================================================
+
+#[cfg(feature = "sql")]
+#[derive(Clone)]
+struct SqlConn {
+    host: String,
+    port: u16,
+    instance: Option<String>,
+    database: Option<String>,
+    user: Option<String>,
+    password: Option<String>,
+    trust_cert: bool,
+    // Parsed from options but not yet forwarded to tiberius — needs
+    // tokio's `time` feature plus a wrap_timeout call. Accepted+stored
+    // so the option-parser stays parallel to the postgres path.
+    #[allow(dead_code)]
+    connection_timeout_s: Option<u64>,
+}
+
+#[cfg(feature = "sql")]
+fn sql_runtime() -> tokio::runtime::Runtime {
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("tokio current_thread runtime")
+}
+
+#[cfg(feature = "sql")]
+fn parse_sql_conn(
+    server: &str,
+    database: Option<&str>,
+    options: Option<&Value>,
+) -> Result<SqlConn, IoError> {
+    // server is one of: "host", "host:port", "host\\instance", "host,port".
+    // SQL Server / SSMS convention: backslash = named instance, comma = port.
+    let (host_part, port_from_server, instance) = if let Some((h, inst)) = server.split_once('\\') {
+        (h.to_string(), None, Some(inst.to_string()))
+    } else if let Some((h, p)) = server.rsplit_once(',') {
+        match p.parse::<u16>() {
+            Ok(n) => (h.to_string(), Some(n), None),
+            Err(_) => (server.to_string(), None, None),
+        }
+    } else if let Some((h, p)) = server.rsplit_once(':') {
+        match p.parse::<u16>() {
+            Ok(n) => (h.to_string(), Some(n), None),
+            Err(_) => (server.to_string(), None, None),
+        }
+    } else {
+        (server.to_string(), None, None)
+    };
+
+    let mut user: Option<String> = None;
+    let mut password: Option<String> = None;
+    let mut port_from_opts: Option<u16> = None;
+    let mut trust_cert = true; // matches PQ TrustServerCertificate=true default on intranet
+    let mut connection_timeout_s: Option<u64> = None;
+
+    if let Some(Value::Record(r)) = options {
+        for (k, v) in &r.fields {
+            match (k.as_str(), v) {
+                ("UserName", Value::Text(s)) => user = Some(s.clone()),
+                ("UserName", Value::Null) => {}
+                ("Password", Value::Text(s)) => password = Some(s.clone()),
+                ("Password", Value::Null) => {}
+                ("Port", Value::Number(n)) if n.is_finite() && *n >= 0.0 && *n <= 65535.0 => {
+                    port_from_opts = Some(*n as u16);
+                }
+                ("Port", Value::Null) => {}
+                ("Encrypt", Value::Logical(b)) => {
+                    // Encrypt=true means use TLS; trust_cert stays as-is.
+                    // tiberius's Encryption::Required is the v1 default, so
+                    // we accept the flag but don't currently downgrade.
+                    let _ = b;
+                }
+                ("TrustServerCertificate", Value::Logical(b)) => trust_cert = *b,
+                ("ConnectionTimeout", Value::Duration(d)) => {
+                    connection_timeout_s = Some(d.num_seconds().max(0) as u64);
+                }
+                ("ConnectionTimeout", Value::Number(n)) => {
+                    connection_timeout_s = Some(n.max(0.0) as u64);
+                }
+                ("ConnectionTimeout", Value::Null) => {}
+                ("CommandTimeout", _) => {} // accepted, not forwarded
+                ("MultiSubnetFailover", _) => {} // ignored
+                ("CreateNavigationProperties", _) => {}
+                ("HierarchicalNavigation", _) => {}
+                ("MaxDegreeOfParallelism", _) => {}
+                ("Query", _) => {} // accepted but ignored — Sql.Database with [Query=...] not in v1
+                _ => {} // unknown fields silently ignored
+            }
+        }
+    }
+
+    // Env-var fallback for creds. Power Query refreshes via its own credential
+    // store; corpus queries don't embed creds in M source. mrsflow needs *some*
+    // way to authenticate when the M code is silent — env vars are the obvious
+    // CLI convention (cf. PGUSER/PGPASSWORD).
+    if user.is_none() {
+        user = std::env::var("MRSFLOW_SQL_USER").ok().filter(|s| !s.is_empty());
+    }
+    if password.is_none() {
+        password = std::env::var("MRSFLOW_SQL_PASS").ok().filter(|s| !s.is_empty());
+    }
+
+    Ok(SqlConn {
+        host: host_part,
+        port: port_from_opts.or(port_from_server).unwrap_or(1433),
+        instance,
+        database: database.map(|s| s.to_string()),
+        user,
+        password,
+        trust_cert,
+        connection_timeout_s,
+    })
+}
+
+#[cfg(feature = "sql")]
+async fn sql_open_async(
+    conn: &SqlConn,
+) -> Result<tiberius::Client<tokio_util::compat::Compat<tokio::net::TcpStream>>, tiberius::error::Error> {
+    use tiberius::{AuthMethod, Client, Config, EncryptionLevel};
+    use tokio::net::TcpStream;
+    use tokio_util::compat::TokioAsyncWriteCompatExt;
+
+    let mut cfg = Config::new();
+    cfg.host(&conn.host);
+    cfg.port(conn.port);
+    if let Some(inst) = &conn.instance {
+        // Instance-name resolution uses SQL Browser (UDP 1434). If that's
+        // firewalled and the named instance listens on a static port, the
+        // caller should set Port in the options record instead.
+        cfg.instance_name(inst);
+    }
+    if let Some(db) = &conn.database {
+        cfg.database(db);
+    }
+    cfg.encryption(if conn.trust_cert {
+        EncryptionLevel::Required
+    } else {
+        EncryptionLevel::Required
+    });
+    if conn.trust_cert {
+        cfg.trust_cert();
+    }
+    match (&conn.user, &conn.password) {
+        (Some(u), Some(p)) => cfg.authentication(AuthMethod::sql_server(u, p)),
+        _ => {
+            // No creds — let tiberius try Windows-Integrated (will fail on
+            // Linux without Kerberos config but produces a clear error).
+        }
+    }
+
+    let tcp = TcpStream::connect(cfg.get_addr()).await
+        .map_err(|e| tiberius::error::Error::Io { kind: e.kind(), message: e.to_string() })?;
+    tcp.set_nodelay(true)
+        .map_err(|e| tiberius::error::Error::Io { kind: e.kind(), message: e.to_string() })?;
+    Client::connect(cfg, tcp.compat_write()).await
+}
+
+#[cfg(feature = "sql")]
+fn sql_open(conn: &SqlConn) -> Result<
+    (tokio::runtime::Runtime,
+     tiberius::Client<tokio_util::compat::Compat<tokio::net::TcpStream>>),
+    IoError,
+> {
+    if conn.user.is_none() || conn.password.is_none() {
+        return Err(IoError::Other(format!(
+            "Sql connect ({}:{}): no credentials. Pass [UserName=..., Password=...] \
+             in the options record, or set MRSFLOW_SQL_USER / MRSFLOW_SQL_PASS env vars.",
+            conn.host, conn.port,
+        )));
+    }
+    let rt = sql_runtime();
+    let client = rt.block_on(sql_open_async(conn))
+        .map_err(|e| IoError::Other(format!(
+            "Sql connect ({}:{} db={}): {}",
+            conn.host, conn.port,
+            conn.database.as_deref().unwrap_or("<none>"),
+            e,
+        )))?;
+    Ok((rt, client))
+}
+
+#[cfg(feature = "sql")]
+fn sql_list_databases(conn: &SqlConn) -> Result<Vec<String>, IoError> {
+    let (rt, mut client) = sql_open(conn)?;
+    // database_id > 4 skips master/tempdb/model/msdb. PQ's Sql.Databases
+    // omits them too.
+    let sql = "SELECT name FROM sys.databases WHERE database_id > 4 ORDER BY name";
+    let names = rt.block_on(async {
+        let stream = client.simple_query(sql).await
+            .map_err(|e| IoError::Other(format!("Sql list databases: {}", e)))?;
+        let rows: Vec<tiberius::Row> = stream.into_first_result().await
+            .map_err(|e| IoError::Other(format!("Sql list databases: {}", e)))?;
+        let mut out = Vec::with_capacity(rows.len());
+        for row in rows {
+            let n: Option<&str> = row.get(0);
+            if let Some(s) = n { out.push(s.to_string()); }
+        }
+        Ok::<_, IoError>(out)
+    })?;
+    Ok(names)
+}
+
+#[cfg(feature = "sql")]
+fn sql_list_tables(conn: &SqlConn) -> Result<Vec<(String, String)>, IoError> {
+    let (rt, mut client) = sql_open(conn)?;
+    let sql = "SELECT TABLE_SCHEMA, TABLE_NAME FROM INFORMATION_SCHEMA.TABLES \
+               WHERE TABLE_TYPE IN ('BASE TABLE', 'VIEW') \
+               ORDER BY TABLE_SCHEMA, TABLE_NAME";
+    let pairs = rt.block_on(async {
+        let stream = client.simple_query(sql).await
+            .map_err(|e| IoError::Other(format!("Sql list tables: {}", e)))?;
+        let rows: Vec<tiberius::Row> = stream.into_first_result().await
+            .map_err(|e| IoError::Other(format!("Sql list tables: {}", e)))?;
+        let mut out = Vec::with_capacity(rows.len());
+        for row in rows {
+            let schema: Option<&str> = row.get(0);
+            let name: Option<&str> = row.get(1);
+            if let (Some(s), Some(n)) = (schema, name) {
+                out.push((s.to_string(), n.to_string()));
+            }
+        }
+        Ok::<_, IoError>(out)
+    })?;
+    Ok(pairs)
+}
+
+#[cfg(feature = "sql")]
+fn sql_query_value(conn: &SqlConn, sql: &str) -> Result<Value, IoError> {
+    let (rt, mut client) = sql_open(conn)?;
+    rt.block_on(async {
+        let stream = client.simple_query(sql).await
+            .map_err(|e| IoError::Other(format!("Sql query: {}", e)))?;
+        let rows: Vec<tiberius::Row> = stream.into_first_result().await
+            .map_err(|e| IoError::Other(format!("Sql query: {}", e)))?;
+
+        let columns: Vec<String> = if let Some(r0) = rows.first() {
+            r0.columns().iter().map(|c| c.name().to_string()).collect()
+        } else {
+            vec![]
+        };
+
+        let mut out_rows: Vec<Vec<Value>> = Vec::with_capacity(rows.len());
+        for row in rows {
+            // Row is IntoIterator<Item = ColumnData<'static>> — each yield
+            // is one cell in column order.
+            let cells: Vec<Value> = row
+                .into_iter()
+                .map(|cd| sql_cell_to_value(&cd))
+                .collect();
+            out_rows.push(cells);
+        }
+        Ok::<_, IoError>(Value::Table(Table::from_rows(columns, out_rows)))
+    })
+}
+
+#[cfg(feature = "sql")]
+fn sql_cell_to_value(cd: &tiberius::ColumnData<'_>) -> Value {
+    use tiberius::ColumnData;
+    match cd {
+        ColumnData::U8(Some(v))     => Value::Number(*v as f64),
+        ColumnData::I16(Some(v))    => Value::Number(*v as f64),
+        ColumnData::I32(Some(v))    => Value::Number(*v as f64),
+        ColumnData::I64(Some(v))    => Value::Number(*v as f64),
+        ColumnData::F32(Some(v))    => Value::Number(*v as f64),
+        ColumnData::F64(Some(v))    => Value::Number(*v),
+        ColumnData::Bit(Some(v))    => Value::Logical(*v),
+        ColumnData::String(Some(s)) => Value::Text(s.to_string()),
+        ColumnData::Guid(Some(g))   => Value::Text(g.to_string()),
+        ColumnData::Binary(Some(b)) => Value::Binary(b.to_vec()),
+        ColumnData::Numeric(Some(n)) => {
+            // Numeric carries (mantissa, precision, scale). For v1, fold
+            // into f64 — same lossy choice mysql/odbc make for NUMERIC
+            // outside [-2^53, 2^53].
+            let mantissa = n.value() as f64;
+            let scale = n.scale() as i32;
+            Value::Number(mantissa * 10f64.powi(-scale))
+        }
+        _ => Value::Null,
+    }
+}
+
+#[cfg(feature = "sql")]
+fn sql_database_impl(
+    server: &str,
+    database: &str,
+    options: Option<&Value>,
+) -> Result<Value, IoError> {
+    use std::cell::RefCell;
+    use std::rc::Rc;
+    use mrsflow_core::eval::{MError, ThunkState};
+
+    let conn = parse_sql_conn(server, Some(database), options)?;
+    let tables = sql_list_tables(&conn)?;
+
+    let cols = vec![
+        "Name".to_string(),
+        "Data".to_string(),
+        "Schema".to_string(),
+        "Item".to_string(),
+        "ItemKind".to_string(),
+        "ItemName".to_string(),
+        "IsLeaf".to_string(),
+    ];
+    let mut rows: Vec<Vec<Value>> = Vec::with_capacity(tables.len());
+    for (schema, name) in tables {
+        let conn_for_thunk = conn.clone();
+        let schema_for_thunk = schema.clone();
+        let name_for_thunk = name.clone();
+        let fetcher: Rc<dyn Fn() -> Result<Value, MError>> = Rc::new(move || {
+            // Bracket-quote identifiers — SQL Server style; ']' escaped as ']]'.
+            let sql = format!(
+                "SELECT * FROM [{}].[{}]",
+                schema_for_thunk.replace(']', "]]"),
+                name_for_thunk.replace(']', "]]"),
+            );
+            sql_query_value(&conn_for_thunk, &sql)
+                .map_err(|e| MError::Other(format!("Sql fetch: {e:?}")))
+        });
+        let data = Value::Thunk(Rc::new(RefCell::new(ThunkState::Native(fetcher))));
+        rows.push(vec![
+            Value::Text(name.clone()),
+            data,
+            Value::Text(schema),
+            Value::Text(name.clone()),
+            Value::Text("Table".to_string()),
+            Value::Text(name),
+            Value::Logical(true),
+        ]);
+    }
+    Ok(Value::Table(Table::from_rows(cols, rows)))
+}
+
+#[cfg(feature = "sql")]
+fn sql_databases_impl(
+    server: &str,
+    options: Option<&Value>,
+) -> Result<Value, IoError> {
+    use std::cell::RefCell;
+    use std::rc::Rc;
+    use mrsflow_core::eval::{MError, ThunkState};
+
+    // Connect to master to enumerate. parse_sql_conn defaults database to None
+    // when called with None — tiberius then connects to the login's default
+    // database, which is fine for sys.databases.
+    let conn = parse_sql_conn(server, None, options)?;
+    let db_names = sql_list_databases(&conn)?;
+
+    let cols = vec![
+        "Name".to_string(),
+        "Data".to_string(),
+        "ItemKind".to_string(),
+        "ItemName".to_string(),
+        "IsLeaf".to_string(),
+    ];
+    let server_owned = server.to_string();
+    // Forward the same options to each Sql.Database call so creds carry through.
+    let opts_owned: Option<Value> = options.cloned();
+
+    let mut rows: Vec<Vec<Value>> = Vec::with_capacity(db_names.len());
+    for db_name in db_names {
+        let server_for_thunk = server_owned.clone();
+        let db_for_thunk = db_name.clone();
+        let opts_for_thunk = opts_owned.clone();
+        let fetcher: Rc<dyn Fn() -> Result<Value, MError>> = Rc::new(move || {
+            sql_database_impl(&server_for_thunk, &db_for_thunk, opts_for_thunk.as_ref())
+                .map_err(|e| MError::Other(format!("Sql.Databases nav: {e:?}")))
+        });
+        let data = Value::Thunk(Rc::new(RefCell::new(ThunkState::Native(fetcher))));
+        rows.push(vec![
+            Value::Text(db_name.clone()),
+            data,
+            Value::Text("Database".to_string()),
+            Value::Text(db_name),
+            Value::Logical(false),
+        ]);
+    }
+    Ok(Value::Table(Table::from_rows(cols, rows)))
 }

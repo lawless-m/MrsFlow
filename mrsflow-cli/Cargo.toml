@@ -22,6 +22,10 @@ mysql = ["dep:mysql"]
 # Pulls in tokio-postgres + tokio-postgres-rustls for PostgreSQL.Database.
 # Pure-Rust TLS via rustls. Off by default to keep the dep graph light.
 postgresql = ["dep:tokio-postgres", "dep:tokio-postgres-rustls", "dep:tokio", "dep:rustls", "dep:webpki-roots", "dep:serde_json", "dep:uuid", "dep:rust_decimal"]
+# Pulls in `tiberius` for Sql.Database / Sql.Databases — native SQL Server
+# TDS client over rustls. Async, so we share the tokio runtime with the
+# postgresql feature. Off by default to keep the dep graph light.
+sql = ["dep:tiberius", "dep:tokio", "dep:tokio-util", "dep:rustls"]
 
 [dependencies]
 mrsflow-core = { path = "../mrsflow-core" }
@@ -54,7 +58,7 @@ tokio-postgres = { version = "0.7", features = ["with-chrono-0_4", "with-uuid-1"
 # postgresql codepath can parse JSONB into M records.
 serde_json = { version = "1", default-features = false, features = ["std", "preserve_order"], optional = true }
 tokio-postgres-rustls = { version = "0.13", optional = true }
-tokio = { version = "1", default-features = false, features = ["rt", "macros"], optional = true }
+tokio = { version = "1", default-features = false, features = ["rt", "macros", "net"], optional = true }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"], optional = true }
 webpki-roots = { version = "0.26", optional = true }
 uuid = { version = "1", optional = true }
@@ -63,6 +67,14 @@ uuid = { version = "1", optional = true }
 # for the common NUMERIC(38,s) range. `db-tokio-postgres` provides the
 # FromSql/ToSql impls.
 rust_decimal = { version = "1", default-features = false, features = ["std", "db-tokio-postgres"], optional = true }
+# Native SQL Server TDS client. `default-features = false` strips the
+# system-openssl bridge; `rustls` selects pure-Rust TLS matching the rest
+# of this crate; `chrono` enables FromSql for Date/Time/DateTime. `tds73`
+# picks the modern protocol version (SQL Server 2012+); X3 runs newer.
+tiberius = { version = "0.12", default-features = false, features = ["chrono", "tds73", "rustls"], optional = true }
+# Compat shim — tiberius writes/reads on futures::AsyncRead+Write; tokio's
+# TcpStream is tokio::AsyncRead+Write. tokio-util's compat() bridges them.
+tokio-util = { version = "0.7", default-features = false, features = ["compat"], optional = true }
 
 [[bin]]
 name = "mrsflow"

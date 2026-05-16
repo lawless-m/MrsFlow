@@ -50,6 +50,7 @@ mod diagnostics;
 mod variable;
 mod mysql;
 mod postgres;
+mod sql;
 mod xml;
 mod html;
 
@@ -565,6 +566,7 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         variable::bindings(),
         mysql::bindings(),
         postgres::bindings(),
+        sql::bindings(),
         xml::bindings(),
         html::bindings(),
     ] {
