@@ -28,14 +28,14 @@ Source: q1167.mrsflow.out.
 | AzureDataExplorer | 3 | 3 | 0 | 0 | 3 | 0 | 0 | 0 |
 | AzureStorage | 5 | 5 | 0 | 0 | 5 | 0 | 0 | 0 |
 | Binary | 18 | 18 | 18 | 18 | 0 | 0 | 6 | 0 |
-| BinaryEncoding | 3 | 3 | 2 | 2 | 1 | 0 | 0 | 0 |
+| BinaryEncoding | 3 | 3 | 3 | 3 | 0 | 0 | 0 | 0 |
 | BinaryFormat | 22 | 22 | 0 | 0 | 22 | 0 | 0 | 0 |
 | BinaryOccurrence | 4 | 4 | 0 | 0 | 4 | 0 | 0 | 0 |
 | BufferMode | 3 | 3 | 0 | 0 | 3 | 0 | 0 | 0 |
-| Byte | 2 | 2 | 1 | 1 | 1 | 0 | 0 | 0 |
+| Byte | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
 | ByteOrder | 3 | 3 | 0 | 0 | 3 | 0 | 0 | 0 |
 | Certificate | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
-| Character | 3 | 3 | 2 | 2 | 1 | 0 | 2 | 0 |
+| Character | 3 | 3 | 3 | 3 | 0 | 0 | 2 | 0 |
 | Combiner | 5 | 5 | 5 | 5 | 0 | 0 | 4 | 0 |
 | CommonDataService | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Comparer | 4 | 4 | 4 | 4 | 0 | 0 | 4 | 0 |
@@ -49,7 +49,7 @@ Source: q1167.mrsflow.out.
 | Date | 58 | 58 | 58 | 58 | 0 | 0 | 20 | 0 |
 | DateTime | 26 | 26 | 26 | 26 | 0 | 0 | 5 | 0 |
 | DateTimeZone | 16 | 16 | 16 | 16 | 0 | 0 | 5 | 0 |
-| Day | 8 | 8 | 7 | 7 | 1 | 0 | 0 | 0 |
+| Day | 8 | 8 | 8 | 8 | 0 | 0 | 0 | 0 |
 | DB2 | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Decimal | 2 | 2 | 2 | 2 | 0 | 0 | 1 | 0 |
 | Diagnostics | 3 | 3 | 3 | 3 | 0 | 0 | 0 | 0 |
@@ -61,7 +61,7 @@ Source: q1167.mrsflow.out.
 | Excel | 4 | 4 | 3 | 3 | 1 | 0 | 1 | 0 |
 | Exchange | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Expression | 3 | 3 | 3 | 3 | 0 | 0 | 1 | 0 |
-| ExtraValues | 4 | 4 | 3 | 3 | 1 | 0 | 0 | 0 |
+| ExtraValues | 4 | 4 | 4 | 4 | 0 | 0 | 0 | 0 |
 | Fabric | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | File | 2 | 1 | 2 | 1 | 0 | 1 | 0 | 0 |
 | Folder | 2 | 2 | 2 | 2 | 0 | 0 | 1 | 0 |
@@ -71,7 +71,7 @@ Source: q1167.mrsflow.out.
 | Geometry | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
 | GeometryPoint | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Graph | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
-| GroupKind | 3 | 3 | 2 | 2 | 1 | 0 | 1 | 0 |
+| GroupKind | 3 | 3 | 3 | 3 | 0 | 0 | 1 | 0 |
 | Guid | 2 | 2 | 1 | 1 | 1 | 0 | 0 | 0 |
 | Hdfs | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
 | HdInsight | 3 | 3 | 0 | 0 | 3 | 0 | 0 | 0 |
@@ -85,7 +85,7 @@ Source: q1167.mrsflow.out.
 | Int8 | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
 | ItemExpression | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
 | JoinAlgorithm | 8 | 8 | 0 | 0 | 8 | 0 | 0 | 0 |
-| JoinKind | 9 | 9 | 6 | 6 | 3 | 0 | 1 | 0 |
+| JoinKind | 9 | 9 | 7 | 7 | 2 | 0 | 1 | 0 |
 | JoinSide | 3 | 3 | 0 | 0 | 3 | 0 | 0 | 0 |
 | Json | 2 | 2 | 2 | 2 | 0 | 0 | 2 | 0 |
 | Kusto | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
@@ -117,14 +117,14 @@ Source: q1167.mrsflow.out.
 | PowerPlatform | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Precision | 3 | 3 | 0 | 0 | 3 | 0 | 0 | 0 |
 | Progress | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
-| QuoteStyle | 3 | 3 | 2 | 2 | 1 | 0 | 1 | 0 |
+| QuoteStyle | 3 | 3 | 3 | 3 | 0 | 0 | 1 | 0 |
 | RankKind | 4 | 4 | 3 | 3 | 1 | 0 | 0 | 0 |
 | RData | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Record | 18 | 18 | 17 | 17 | 1 | 0 | 17 | 3 |
 | RelativePosition | 3 | 3 | 0 | 0 | 3 | 0 | 0 | 0 |
 | Replacer | 2 | 2 | 2 | 2 | 0 | 0 | 2 | 0 |
 | Resource | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
-| RoundingMode | 6 | 6 | 5 | 5 | 1 | 0 | 0 | 0 |
+| RoundingMode | 6 | 6 | 6 | 6 | 0 | 0 | 0 | 0 |
 | RowExpression | 3 | 3 | 0 | 0 | 3 | 0 | 0 | 0 |
 | Salesforce | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
 | SapBusinessWarehouse | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
@@ -148,14 +148,14 @@ Source: q1167.mrsflow.out.
 | TimeZone | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | TraceLevel | 6 | 6 | 5 | 5 | 1 | 0 | 0 | 0 |
 | Type | 25 | 25 | 24 | 24 | 1 | 0 | 3 | 0 |
-| Uri | 5 | 5 | 4 | 4 | 1 | 0 | 0 | 0 |
+| Uri | 5 | 5 | 5 | 5 | 0 | 0 | 0 | 0 |
 | Value | 27 | 27 | 26 | 26 | 1 | 0 | 4 | 0 |
 | Variable | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
 | Web | 4 | 4 | 4 | 4 | 0 | 0 | 0 | 0 |
 | WebAction | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | WebMethod | 7 | 7 | 0 | 0 | 7 | 0 | 0 | 0 |
 | Xml | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| **TOTAL** | 860 | 856 | 640 | 636 | 220 | 4 | 301 | 5 |
+| **TOTAL** | 860 | 856 | 650 | 646 | 210 | 4 | 301 | 5 |
 
 ## Per-name detail
 
@@ -204,7 +204,7 @@ Source: q1167.mrsflow.out.
 | `Binary.ViewFunction` | Y | Y | function |  |  |
 | `BinaryEncoding.Base64` | Y | Y | constant |  |  |
 | `BinaryEncoding.Hex` | Y | Y | constant |  |  |
-| `BinaryEncoding.Type` | Y |  | missing |  |  |
+| `BinaryEncoding.Type` | Y | Y | constant |  |  |
 | `BinaryFormat.7BitEncodedSignedInteger` | Y |  | missing |  |  |
 | `BinaryFormat.7BitEncodedUnsignedInteger` | Y |  | missing |  |  |
 | `BinaryFormat.Binary` | Y |  | missing |  |  |
@@ -235,14 +235,14 @@ Source: q1167.mrsflow.out.
 | `BufferMode.Eager` | Y |  | missing |  |  |
 | `BufferMode.Type` | Y |  | missing |  |  |
 | `Byte.From` | Y | Y | function |  |  |
-| `Byte.Type` | Y |  | missing |  |  |
+| `Byte.Type` | Y | Y | constant |  |  |
 | `ByteOrder.BigEndian` | Y |  | missing |  |  |
 | `ByteOrder.LittleEndian` | Y |  | missing |  |  |
 | `ByteOrder.Type` | Y |  | missing |  |  |
 | `Certificate.Type` | Y |  | missing |  |  |
 | `Character.FromNumber` | Y | Y | function | q531 q533 q534 q535 | MATCH |
 | `Character.ToNumber` | Y | Y | function | q532 q533 q534 q535 q570 | MATCH |
-| `Character.Type` | Y |  | missing |  |  |
+| `Character.Type` | Y | Y | constant |  |  |
 | `Combiner.CombineTextByDelimiter` | Y | Y | function | q101 q102 q376 q377 q438 | MATCH |
 | `Combiner.CombineTextByEachDelimiter` | Y | Y | function | q378 | MATCH |
 | `Combiner.CombineTextByLengths` | Y | Y | function | q379 | MATCH |
@@ -392,7 +392,7 @@ Source: q1167.mrsflow.out.
 | `Day.Sunday` | Y | Y | constant |  |  |
 | `Day.Thursday` | Y | Y | constant |  |  |
 | `Day.Tuesday` | Y | Y | constant |  |  |
-| `Day.Type` | Y |  | missing |  |  |
+| `Day.Type` | Y | Y | constant |  |  |
 | `Day.Wednesday` | Y | Y | constant |  |  |
 | `DB2.Database` | Y |  | missing |  |  |
 | `Decimal.From` | Y | Y | function | q277 q280 q471 q472 q473 q474 | MATCH |
@@ -430,7 +430,7 @@ Source: q1167.mrsflow.out.
 | `ExtraValues.Error` | Y | Y | constant |  |  |
 | `ExtraValues.Ignore` | Y | Y | constant |  |  |
 | `ExtraValues.List` | Y | Y | constant |  |  |
-| `ExtraValues.Type` | Y |  | missing |  |  |
+| `ExtraValues.Type` | Y | Y | constant |  |  |
 | `Fabric.Warehouse` | Y |  | missing |  |  |
 | `File.Contents` | Y | Y | function |  |  |
 | `File.Modified` |  | Y | function |  |  |
@@ -452,7 +452,7 @@ Source: q1167.mrsflow.out.
 | `Graph.Nodes` | Y |  | missing |  |  |
 | `GroupKind.Global` | Y | Y | constant | q89 | MATCH |
 | `GroupKind.Local` | Y | Y | constant |  |  |
-| `GroupKind.Type` | Y |  | missing |  |  |
+| `GroupKind.Type` | Y | Y | constant |  |  |
 | `Guid.From` | Y | Y | function |  |  |
 | `Guid.Type` | Y |  | missing |  |  |
 | `Hdfs.Contents` | Y |  | missing |  |  |
@@ -494,7 +494,7 @@ Source: q1167.mrsflow.out.
 | `JoinKind.RightAnti` | Y | Y | constant |  |  |
 | `JoinKind.RightOuter` | Y | Y | constant |  |  |
 | `JoinKind.RightSemi` | Y |  | missing |  |  |
-| `JoinKind.Type` | Y |  | missing |  |  |
+| `JoinKind.Type` | Y | Y | constant |  |  |
 | `JoinSide.Left` | Y |  | missing |  |  |
 | `JoinSide.Right` | Y |  | missing |  |  |
 | `JoinSide.Type` | Y |  | missing |  |  |
@@ -686,7 +686,7 @@ Source: q1167.mrsflow.out.
 | `Progress.DataSourceProgress` | Y |  | missing |  |  |
 | `QuoteStyle.Csv` | Y | Y | constant |  |  |
 | `QuoteStyle.None` | Y | Y | constant | q98 | MATCH |
-| `QuoteStyle.Type` | Y |  | missing |  |  |
+| `QuoteStyle.Type` | Y | Y | constant |  |  |
 | `RankKind.Competition` | Y | Y | constant |  |  |
 | `RankKind.Dense` | Y | Y | constant |  |  |
 | `RankKind.Ordinal` | Y | Y | constant |  |  |
@@ -720,7 +720,7 @@ Source: q1167.mrsflow.out.
 | `RoundingMode.Down` | Y | Y | constant |  |  |
 | `RoundingMode.ToEven` | Y | Y | constant |  |  |
 | `RoundingMode.TowardZero` | Y | Y | constant |  |  |
-| `RoundingMode.Type` | Y |  | missing |  |  |
+| `RoundingMode.Type` | Y | Y | constant |  |  |
 | `RoundingMode.Up` | Y | Y | constant |  |  |
 | `RowExpression.Column` | Y |  | missing |  |  |
 | `RowExpression.From` | Y |  | missing |  |  |
@@ -977,7 +977,7 @@ Source: q1167.mrsflow.out.
 | `Uri.Combine` | Y | Y | function |  |  |
 | `Uri.EscapeDataString` | Y | Y | function |  |  |
 | `Uri.Parts` | Y | Y | function |  |  |
-| `Uri.Type` | Y |  | missing |  |  |
+| `Uri.Type` | Y | Y | constant |  |  |
 | `Value.Add` | Y | Y | function |  |  |
 | `Value.Alternates` | Y | Y | function |  |  |
 | `Value.As` | Y | Y | function |  |  |

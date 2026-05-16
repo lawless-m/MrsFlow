@@ -20,9 +20,12 @@ Binary.ViewError
 Binary.ViewFunction
 BinaryEncoding.Base64
 BinaryEncoding.Hex
+BinaryEncoding.Type
 Byte.From
+Byte.Type
 Character.FromNumber
 Character.ToNumber
+Character.Type
 Combiner.CombineTextByDelimiter
 Combiner.CombineTextByEachDelimiter
 Combiner.CombineTextByLengths
@@ -145,6 +148,7 @@ Day.Saturday
 Day.Sunday
 Day.Thursday
 Day.Tuesday
+Day.Type
 Day.Wednesday
 Decimal.From
 Decimal.Type
@@ -176,6 +180,7 @@ Expression.Identifier
 ExtraValues.Error
 ExtraValues.Ignore
 ExtraValues.List
+ExtraValues.Type
 File.Contents
 File.Modified
 Folder.Contents
@@ -188,6 +193,7 @@ Function.IsDataSource
 Function.ScalarVector
 GroupKind.Global
 GroupKind.Local
+GroupKind.Type
 Guid.From
 Html.Table
 Int16.From
@@ -204,6 +210,7 @@ JoinKind.LeftAnti
 JoinKind.LeftOuter
 JoinKind.RightAnti
 JoinKind.RightOuter
+JoinKind.Type
 Json.Document
 Json.FromValue
 Lines.FromBinary
@@ -359,6 +366,7 @@ PostgreSQL.Database
 PostgreSQL.Query
 QuoteStyle.Csv
 QuoteStyle.None
+QuoteStyle.Type
 RankKind.Competition
 RankKind.Dense
 RankKind.Ordinal
@@ -385,6 +393,7 @@ RoundingMode.AwayFromZero
 RoundingMode.Down
 RoundingMode.ToEven
 RoundingMode.TowardZero
+RoundingMode.Type
 RoundingMode.Up
 Single.From
 Single.Type
@@ -604,6 +613,7 @@ Uri.BuildQueryString
 Uri.Combine
 Uri.EscapeDataString
 Uri.Parts
+Uri.Type
 Value.Add
 Value.Alternates
 Value.As

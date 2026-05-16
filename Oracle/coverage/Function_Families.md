@@ -24,14 +24,14 @@ Counts come from `COVERAGE.md`; refresh both via `render.ps1`.
 | AzureDataExplorer | Untouched | 0 / 3 | Azure Data Explorer / Kusto connector entry. |
 | AzureStorage | Untouched | 0 / 5 | Azure Blob / Table / Data Lake storage connector. |
 | Binary | Tested | 18 / 18 | Binary value operations (length, slice, encode, base64, compression). |
-| BinaryEncoding | Partial | 2 / 3 | Base64 / Hex encoding constants for Binary.FromText / ToText. |
+| BinaryEncoding | Implemented | 3 / 3 | Base64 / Hex encoding constants for Binary.FromText / ToText. |
 | BinaryFormat | Untouched | 0 / 22 | Declarative parser-combinator framework for binary streams ("Wireshark in M" — describe a wire format, get a typed parser). |
 | BinaryOccurrence | Untouched | 0 / 4 | Occurrence constants (optional / repeating / required) used by BinaryFormat. |
 | BufferMode | Untouched | 0 / 3 | Buffer eagerness mode (Eager / Delayed) for *.Buffer. |
-| Byte | Partial | 1 / 2 | Byte-typed numeric (0–255) conversion + type companion. |
+| Byte | Implemented | 2 / 2 | Byte-typed numeric (0–255) conversion + type companion. |
 | ByteOrder | Untouched | 0 / 3 | Big / little endian constants used by BinaryFormat. |
 | Certificate | Untouched | 0 / 1 | Certificate type-record companion. |
-| Character | Partial | 2 / 3 | Character-codepoint conversion (FromNumber / ToNumber). |
+| Character | Tested | 3 / 3 | Character-codepoint conversion (FromNumber / ToNumber). |
 | Combiner | Tested | 5 / 5 | Text-combine combinators (delimiter, lengths, positions). Symmetric with Splitter. |
 | CommonDataService | Untouched | 0 / 1 | Microsoft Dataverse / Common Data Service connector. |
 | Comparer | Tested | 4 / 4 | Sort / equality comparer constants and factories (Ordinal, OrdinalIgnoreCase, FromCulture). |
@@ -45,7 +45,7 @@ Counts come from `COVERAGE.md`; refresh both via `render.ps1`.
 | Date | Tested | 58 / 58 | Date value operations: arithmetic, parts, IsIn*, FromText, formatting. |
 | DateTime | Tested | 26 / 26 | DateTime value operations (date + time without zone). |
 | DateTimeZone | Tested | 16 / 16 | DateTimeZone value operations (date + time + offset). Includes culture-aware ToText / FromText. |
-| Day | Partial | 7 / 8 | Day-of-week enum constants (Monday=0 .. Sunday=6). |
+| Day | Implemented | 8 / 8 | Day-of-week enum constants (Monday=0 .. Sunday=6). |
 | DB2 | Untouched | 0 / 1 | IBM DB2 connector. |
 | Decimal | Tested | 2 / 2 | Decimal-typed numeric (high-precision) operations. |
 | Diagnostics | Implemented | 3 / 3 | Tracing primitives (Diagnostics.Trace, ActivityId). |
@@ -57,7 +57,7 @@ Counts come from `COVERAGE.md`; refresh both via `render.ps1`.
 | Excel | Partial | 3 / 4 | Excel workbook reader (Excel.Workbook, Excel.CurrentWorkbook, Excel.ShapeTable). |
 | Exchange | Untouched | 0 / 1 | Microsoft Exchange Server connector. |
 | Expression | Tested | 3 / 3 | Expression evaluation primitives (Expression.Evaluate — run M-as-text against an env). |
-| ExtraValues | Partial | 3 / 4 | Csv ragged-row handling enum. |
+| ExtraValues | Implemented | 4 / 4 | Csv ragged-row handling enum. |
 | Fabric | Untouched | 0 / 1 | Microsoft Fabric (workspace) connector. |
 | File | Implemented | 2 / 1 | File reader (File.Contents, File.Modified). |
 | Folder | Tested | 2 / 2 | Folder enumeration (Folder.Contents, Folder.Files). |
@@ -67,7 +67,7 @@ Counts come from `COVERAGE.md`; refresh both via `render.ps1`.
 | Geometry | Untouched | 0 / 2 | Geometry (planar) WKT conversion. |
 | GeometryPoint | Untouched | 0 / 1 | Geometry point constructor. |
 | Graph | Untouched | 0 / 1 | Microsoft Graph entity-graph navigation. |
-| GroupKind | Partial | 2 / 3 | Table.Group kind (Global / Local). |
+| GroupKind | Tested | 3 / 3 | Table.Group kind (Global / Local). |
 | Guid | Partial | 1 / 2 | GUID type companion. |
 | Hdfs | Untouched | 0 / 2 | HDFS file system connector. |
 | HdInsight | Untouched | 0 / 3 | Azure HDInsight Hadoop connector. |
@@ -81,7 +81,7 @@ Counts come from `COVERAGE.md`; refresh both via `render.ps1`.
 | Int8 | Implemented | 2 / 2 | 8-bit signed integer numeric type. |
 | ItemExpression | Untouched | 0 / 2 | Query-folding helper for per-item expressions inside List.* projections. |
 | JoinAlgorithm | Untouched | 0 / 8 | Table.NestedJoin algorithm hint (Hash / SortMerge / etc.). |
-| JoinKind | Partial | 6 / 9 | Table.Join / NestedJoin kind (Inner / LeftOuter / FullOuter / etc.). |
+| JoinKind | Partial | 7 / 9 | Table.Join / NestedJoin kind (Inner / LeftOuter / FullOuter / etc.). |
 | JoinSide | Untouched | 0 / 3 | Join-side enum for asymmetric joins. |
 | Json | Tested | 2 / 2 | JSON parser / serialiser (Json.Document, Json.FromValue). |
 | Kusto | Untouched | 0 / 2 | Azure Data Explorer (KQL) connector. |
@@ -113,14 +113,14 @@ Counts come from `COVERAGE.md`; refresh both via `render.ps1`.
 | PowerPlatform | Untouched | 0 / 1 | Power Platform dataflows connector. |
 | Precision | Untouched | 0 / 3 | Decimal / Double precision enum for numeric typing. |
 | Progress | Untouched | 0 / 1 | Progress / DataDirect connector. |
-| QuoteStyle | Partial | 2 / 3 | Csv.Document quote-style enum (Csv / None). |
+| QuoteStyle | Tested | 3 / 3 | Csv.Document quote-style enum (Csv / None). |
 | RankKind | Partial | 3 / 4 | Table.AddRankColumn tie-handling (Competition / Ordinal / Dense). |
 | RData | Untouched | 0 / 1 | R serialisation format reader. |
 | Record | Partial | 17 / 18 | Record operations: field access, transform, combine, FromList / FromTable round-trips. |
 | RelativePosition | Untouched | 0 / 3 | Text.Range / .Middle relative-position enum (FromStart / FromEnd). |
 | Replacer | Tested | 2 / 2 | Replacer.ReplaceValue / .ReplaceText — passed as the replacer arg to Table.ReplaceValue. |
 | Resource | Untouched | 0 / 1 | Connector resource-access plumbing. |
-| RoundingMode | Partial | 5 / 6 | Number.Round mode (ToEven / Up / Down / AwayFromZero / TowardZero). |
+| RoundingMode | Implemented | 6 / 6 | Number.Round mode (ToEven / Up / Down / AwayFromZero / TowardZero). |
 | RowExpression | Untouched | 0 / 3 | Query-folding helper for per-row expressions. |
 | Salesforce | Untouched | 0 / 2 | Salesforce Data / Reports connector. |
 | SapBusinessWarehouse | Untouched | 0 / 1 | SAP BW cube connector. |
@@ -144,7 +144,7 @@ Counts come from `COVERAGE.md`; refresh both via `render.ps1`.
 | TimeZone | Untouched | 0 / 1 | TimeZone.Current — host timezone probe. |
 | TraceLevel | Partial | 5 / 6 | Diagnostics.Trace level enum. |
 | Type | Partial | 24 / 25 | Type-value construction and introspection (Type.Is, RecordFields, TableSchema, etc.). |
-| Uri | Partial | 4 / 5 | URI parsing / building. |
+| Uri | Implemented | 5 / 5 | URI parsing / building. |
 | Value | Partial | 26 / 27 | Generic value introspection (Compare, Equals, Is, NativeQuery, Metadata). |
 | Variable | Implemented | 2 / 2 | Variable.Value / .ValueOrDefault — env probe. |
 | Web | Implemented | 4 / 4 | HTTP-fetching connector (Web.Contents, Web.Headers, Web.Page). |

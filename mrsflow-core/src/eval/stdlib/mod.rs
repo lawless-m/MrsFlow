@@ -98,6 +98,20 @@ pub fn root_env() -> Env {
         ("Binary.Type",   TypeRep::Binary),
         ("Null.Type",     TypeRep::Null),
         ("Any.Type",      TypeRep::Any),
+        // Enum-family `.Type` companions. PQ exposes each enum's `.Type`
+        // as the type-value for its underlying representation (most are
+        // numeric; Character.Type is text, Uri.Type is text). They appear
+        // in Type.Is / Type.IsNullable probes and as type annotations.
+        ("BinaryEncoding.Type", TypeRep::Number),
+        ("Byte.Type",           TypeRep::NamedNumeric("Byte.Type")),
+        ("Character.Type",      TypeRep::Text),
+        ("Day.Type",            TypeRep::Number),
+        ("ExtraValues.Type",    TypeRep::Number),
+        ("GroupKind.Type",      TypeRep::Number),
+        ("JoinKind.Type",       TypeRep::Number),
+        ("QuoteStyle.Type",     TypeRep::Number),
+        ("RoundingMode.Type",   TypeRep::Number),
+        ("Uri.Type",            TypeRep::Text),
     ] {
         env = env.extend(name.to_string(), Value::Type(tr));
     }
