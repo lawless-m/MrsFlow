@@ -21,6 +21,16 @@ Binary.ViewFunction
 BinaryEncoding.Base64
 BinaryEncoding.Hex
 BinaryEncoding.Type
+BinaryFormat.Byte
+BinaryFormat.Decimal
+BinaryFormat.Double
+BinaryFormat.SignedInteger16
+BinaryFormat.SignedInteger32
+BinaryFormat.SignedInteger64
+BinaryFormat.Single
+BinaryFormat.UnsignedInteger16
+BinaryFormat.UnsignedInteger32
+BinaryFormat.UnsignedInteger64
 BinaryOccurrence.Optional
 BinaryOccurrence.Repeating
 BinaryOccurrence.Required

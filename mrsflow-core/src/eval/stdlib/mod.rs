@@ -37,6 +37,7 @@ mod lines;
 mod type_ops;
 pub(super) mod value_ops;
 mod binary;
+mod binary_format;
 mod function_ops;
 mod expression;
 mod error_ops;
@@ -484,6 +485,7 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         type_ops::bindings(),
         value_ops::bindings(),
         binary::bindings(),
+        binary_format::bindings(),
         function_ops::bindings(),
         expression::bindings(),
         error_ops::bindings(),

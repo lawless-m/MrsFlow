@@ -10744,6 +10744,43 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        // q1170: BinaryFormat unsigned reads. Little-endian.
+        SafeSerialize("q1170", () =>
+            let
+                r = try {
+                    BinaryFormat.Byte(#binary({42})),
+                    BinaryFormat.UnsignedInteger16(#binary({1, 0})),
+                    BinaryFormat.UnsignedInteger32(#binary({1, 0, 0, 0})),
+                    BinaryFormat.UnsignedInteger16(#binary({255, 255})),
+                    BinaryFormat.UnsignedInteger32(#binary({255, 255, 255, 255}))
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        // q1171: BinaryFormat signed reads — two's complement.
+        SafeSerialize("q1171", () =>
+            let
+                r = try {
+                    BinaryFormat.SignedInteger16(#binary({255, 255})),
+                    BinaryFormat.SignedInteger32(#binary({0, 0, 0, 128})),
+                    BinaryFormat.SignedInteger16(#binary({1, 0})),
+                    BinaryFormat.SignedInteger32(#binary({255, 255, 255, 255}))
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        // q1172: BinaryFormat float reads. IEEE 754 little-endian.
+        // 1.0 Single: 00 00 80 3F. 1.0 Double: 00 00 00 00 00 00 F0 3F.
+        SafeSerialize("q1172", () =>
+            let
+                r = try {
+                    BinaryFormat.Single(#binary({0, 0, 128, 63})),
+                    BinaryFormat.Double(#binary({0, 0, 0, 0, 0, 0, 240, 63})),
+                    BinaryFormat.Single(#binary({0, 0, 128, 191}))
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 
