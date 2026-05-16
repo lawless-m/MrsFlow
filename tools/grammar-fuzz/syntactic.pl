@@ -274,15 +274,29 @@ optional_marker(req) --> [].
 % single spaces). Used in record fields and field-access selectors.
 field_name(N) --> [quoted_ident(N)], !.
 field_name(N) -->
-    [ident(First)],
+    gen_id_token(First),
     field_name_tail(More),
     { join_chars_with_space([First | More], N) }.
 
 field_name_tail([Cs | Rest]) -->
-    [ident(Cs)],
+    gen_id_token(Cs),
     !,
     field_name_tail(Rest).
 field_name_tail([]) --> [].
+
+% A token usable in a generalized identifier — idents, numbers, and
+% most keywords (PQ corpus has [Bastian L H2 2023], [Company or Comment]
+% etc.). The block list `let|in|if|then|else` is intentionally NOT
+% joinable: they're the entry tokens of major expression forms and
+% would create unbounded ambiguity in record-literal field names which
+% reuse this rule via `[name = expr]`. Mirrors the Rust
+% `generalized_identifier_text` helper.
+gen_id_token(Cs) --> [ident(Cs)], !.
+gen_id_token(Cs) --> [number(Cs)], !.
+gen_id_token(Cs) -->
+    [keyword(K)],
+    { \+ member(K, [let, in, if, then, else]),
+      atom_chars(K, Cs) }.
 
 % Join a list of char-lists with single ' ' separator.
 join_chars_with_space([Cs], Cs) :- !.

@@ -34,6 +34,44 @@ pub fn parse(tokens: &[Token]) -> Result<Expr, ParseError> {
     Ok(expr)
 }
 
+/// Returns the source text of a token when it can extend a generalized
+/// identifier — used by `expect_field_name`. Identifiers, numbers, and
+/// most keywords qualify (`keyword-or-identifier` in the M spec); the
+/// numbers branch returns the verbatim source so `[H2 2023]` joins to
+/// `"H2 2023"` rather than `"H2 2023.0"`. Returns None for tokens that
+/// cannot syntactically be part of a field name (operators, brackets,
+/// `let`/`in`/`if`/etc. which would create real parse ambiguity).
+fn generalized_identifier_text(k: &TokenKind) -> Option<&str> {
+    match k {
+        TokenKind::Identifier(s) => Some(s),
+        TokenKind::Number(s) => Some(s),
+        TokenKind::And => Some("and"),
+        TokenKind::Or => Some("or"),
+        TokenKind::Not => Some("not"),
+        TokenKind::Each => Some("each"),
+        TokenKind::Try => Some("try"),
+        TokenKind::Otherwise => Some("otherwise"),
+        TokenKind::Error => Some("error"),
+        TokenKind::As => Some("as"),
+        TokenKind::Is => Some("is"),
+        TokenKind::Type => Some("type"),
+        TokenKind::Meta => Some("meta"),
+        TokenKind::Section => Some("section"),
+        TokenKind::Shared => Some("shared"),
+        TokenKind::True => Some("true"),
+        TokenKind::False => Some("false"),
+        TokenKind::Null => Some("null"),
+        // Intentionally excluded: Let, In, If, Then, Else — these would
+        // create unbounded ambiguity in record-literal field-name position
+        // because they're the entry tokens of major expression forms.
+        // Field selectors `[…]` close on `]` so they'd be unambiguous,
+        // but record literals use the same `expect_field_name` and need
+        // `=` to follow — and a name like `[if = 1]` is too rare to
+        // justify the risk.
+        _ => None,
+    }
+}
+
 fn hash_keyword_name(k: &TokenKind) -> Option<&'static str> {
     Some(match k {
         TokenKind::HashBinary => "#binary",
@@ -527,36 +565,55 @@ impl<'a> Parser<'a> {
         }
     }
 
-    /// Field names accept generalized-identifier (one or more adjacent ident
-    /// tokens, joined with single spaces) or a single quoted-identifier.
-    /// Used by record literal field names AND field-access selectors.
+    /// Field names accept generalized-identifier (one or more adjacent
+    /// identifier-like tokens, joined with single spaces) or a single
+    /// quoted-identifier. Used by record literal field names AND
+    /// field-access selectors. Per the M spec, a generalized-identifier
+    /// segment is a `keyword-or-identifier` possibly followed by digits —
+    /// so we also consume keywords (`or`, `and`, `not`, …) and numbers
+    /// (`[Bastian L H2 2023]`) as continuation tokens, joining each with
+    /// a single space. The corpus shows real workbooks using this freely.
     fn expect_field_name(&mut self) -> Result<String, ParseError> {
         match self.peek() {
             None => Err(ParseError::UnexpectedEof {
                 expected: "field name",
             }),
-            Some(t) => match &t.kind {
-                TokenKind::QuotedIdentifier(n) => {
+            Some(t) => {
+                if let TokenKind::QuotedIdentifier(n) = &t.kind {
                     let n = n.clone();
                     self.pos += 1;
-                    Ok(n)
+                    return Ok(n);
                 }
-                TokenKind::Identifier(first) => {
-                    let mut name = first.clone();
-                    self.pos += 1;
-                    while let Some(TokenKind::Identifier(more)) = self.peek_kind() {
-                        name.push(' ');
-                        name.push_str(more);
-                        self.pos += 1;
+                // Generalised-identifier: any joinable token starts a name
+                // (PQ accepts e.g. `[2024]`, `[2024 Q1]` even though the
+                // published spec implies a leading segment); subsequent
+                // joinable tokens are space-joined.
+                let first = match generalized_identifier_text(&t.kind) {
+                    Some(s) => s.to_string(),
+                    None => {
+                        let kind = t.kind.clone();
+                        let pos = t.span.start;
+                        return Err(ParseError::Unexpected {
+                            pos,
+                            found: kind,
+                            expected: "field name",
+                        });
                     }
-                    Ok(name)
+                };
+                self.pos += 1;
+                let mut name = first;
+                while let Some(k) = self.peek_kind() {
+                    match generalized_identifier_text(k) {
+                        Some(s) => {
+                            name.push(' ');
+                            name.push_str(s);
+                            self.pos += 1;
+                        }
+                        None => break,
+                    }
                 }
-                other => Err(ParseError::Unexpected {
-                    pos: t.span.start,
-                    found: other.clone(),
-                    expected: "field name",
-                }),
-            },
+                Ok(name)
+            }
         }
     }
 
@@ -761,13 +818,14 @@ impl<'a> Parser<'a> {
         let mut i = self.pos + 1;
         match self.tokens.get(i).map(|t| &t.kind) {
             Some(TokenKind::QuotedIdentifier(_)) => i += 1,
-            Some(TokenKind::Identifier(_)) => {
+            Some(k) if generalized_identifier_text(k).is_some() => {
                 i += 1;
-                while matches!(
-                    self.tokens.get(i).map(|t| &t.kind),
-                    Some(TokenKind::Identifier(_))
-                ) {
-                    i += 1;
+                while let Some(k) = self.tokens.get(i).map(|t| &t.kind) {
+                    if generalized_identifier_text(k).is_some() {
+                        i += 1;
+                    } else {
+                        break;
+                    }
                 }
             }
             _ => return self.parse_record(),
