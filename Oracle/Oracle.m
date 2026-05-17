@@ -11687,7 +11687,71 @@ let
         SafeSerialize("q1345", () =>
             // 5 months ago is in the previous 12 months → true.
             Date.IsInPreviousNMonths(
-                Date.AddDays(DateTime.Date(DateTime.LocalNow()), -150), 12))
+                Date.AddDays(DateTime.Date(DateTime.LocalNow()), -150), 12)),
+        // q1346-q1360: remaining Date.IsIn* — bare singulars
+        // (IsInCurrent*, IsInPrevious*, IsInNext*) using a date
+        // arithmetic that puts the input squarely in the asserted range.
+        SafeSerialize("q1346", () =>
+            // Today IS in current day.
+            Date.IsInCurrentDay(DateTime.Date(DateTime.LocalNow()))),
+        SafeSerialize("q1347", () =>
+            // Today IS in current month.
+            Date.IsInCurrentMonth(DateTime.Date(DateTime.LocalNow()))),
+        SafeSerialize("q1348", () =>
+            // Today IS in current week.
+            Date.IsInCurrentWeek(DateTime.Date(DateTime.LocalNow()))),
+        SafeSerialize("q1349", () =>
+            // Today IS in current quarter.
+            Date.IsInCurrentQuarter(DateTime.Date(DateTime.LocalNow()))),
+        SafeSerialize("q1350", () =>
+            // Tomorrow IS in next day.
+            Date.IsInNextDay(
+                Date.AddDays(DateTime.Date(DateTime.LocalNow()), 1))),
+        SafeSerialize("q1351", () =>
+            // 35 days ahead is in next month. To be safely in
+            // *next* month not *month after next*, use a small
+            // offset within the next month — 40 days catches at
+            // least part of a 30-day next month.
+            Date.IsInNextMonth(
+                Date.AddDays(Date.EndOfMonth(DateTime.Date(DateTime.LocalNow())), 5))),
+        SafeSerialize("q1352", () =>
+            // ~100 days ahead is in next quarter.
+            Date.IsInNextQuarter(
+                Date.AddDays(Date.EndOfQuarter(DateTime.Date(DateTime.LocalNow())), 5))),
+        SafeSerialize("q1353", () =>
+            // Add 1 year via 366 days then trim back so it lands
+            // in next calendar year.
+            Date.IsInNextYear(
+                Date.AddDays(Date.EndOfYear(DateTime.Date(DateTime.LocalNow())), 5))),
+        SafeSerialize("q1354", () =>
+            // Yesterday IS in previous day.
+            Date.IsInPreviousDay(
+                Date.AddDays(DateTime.Date(DateTime.LocalNow()), -1))),
+        SafeSerialize("q1355", () =>
+            // 5 days before start of this month → previous month.
+            Date.IsInPreviousMonth(
+                Date.AddDays(Date.StartOfMonth(DateTime.Date(DateTime.LocalNow())), -5))),
+        SafeSerialize("q1356", () =>
+            // 5 days before start of this quarter → previous quarter.
+            Date.IsInPreviousQuarter(
+                Date.AddDays(Date.StartOfQuarter(DateTime.Date(DateTime.LocalNow())), -5))),
+        SafeSerialize("q1357", () =>
+            // 5 days before start of this year → previous year.
+            Date.IsInPreviousYear(
+                Date.AddDays(Date.StartOfYear(DateTime.Date(DateTime.LocalNow())), -5))),
+        SafeSerialize("q1358", () =>
+            // 2 weeks ago → in previous 4 weeks.
+            Date.IsInPreviousNWeeks(
+                Date.AddDays(DateTime.Date(DateTime.LocalNow()), -14), 4)),
+        SafeSerialize("q1359", () =>
+            // 100 days ahead → in next 200 days.
+            Date.IsInNextNDays(
+                Date.AddDays(DateTime.Date(DateTime.LocalNow()), 100), 200)),
+        SafeSerialize("q1360", () =>
+            // 2 quarters ago → in previous 4 quarters.
+            Date.IsInPreviousNQuarters(
+                Date.AddDays(Date.StartOfQuarter(
+                    DateTime.Date(DateTime.LocalNow())), -180), 4))
     },
 
     Catalog = Table.FromRecords(cases)

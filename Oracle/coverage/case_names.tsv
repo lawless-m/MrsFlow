@@ -1344,3 +1344,18 @@ q1342	BinaryFormat.SignedInteger64 Number.ToText
 q1343	BinaryFormat.UnsignedInteger64 Number.ToText
 q1344	Date.AddDays Date.IsInPreviousNWeeks DateTime.Date DateTime.LocalNow
 q1345	Date.AddDays Date.IsInPreviousNMonths DateTime.Date DateTime.LocalNow
+q1346	Date.IsInCurrentDay DateTime.Date DateTime.LocalNow
+q1347	Date.IsInCurrentMonth DateTime.Date DateTime.LocalNow
+q1348	Date.IsInCurrentWeek DateTime.Date DateTime.LocalNow
+q1349	Date.IsInCurrentQuarter DateTime.Date DateTime.LocalNow
+q1350	Date.AddDays Date.IsInNextDay DateTime.Date DateTime.LocalNow
+q1351	Date.AddDays Date.EndOfMonth Date.IsInNextMonth DateTime.Date DateTime.LocalNow
+q1352	Date.AddDays Date.EndOfQuarter Date.IsInNextQuarter DateTime.Date DateTime.LocalNow
+q1353	Date.AddDays Date.EndOfYear Date.IsInNextYear DateTime.Date DateTime.LocalNow
+q1354	Date.AddDays Date.IsInPreviousDay DateTime.Date DateTime.LocalNow
+q1355	Date.AddDays Date.IsInPreviousMonth Date.StartOfMonth DateTime.Date DateTime.LocalNow
+q1356	Date.AddDays Date.IsInPreviousQuarter Date.StartOfQuarter DateTime.Date DateTime.LocalNow
+q1357	Date.AddDays Date.IsInPreviousYear Date.StartOfYear DateTime.Date DateTime.LocalNow
+q1358	Date.AddDays Date.IsInPreviousNWeeks DateTime.Date DateTime.LocalNow
+q1359	Date.AddDays Date.IsInNextNDays DateTime.Date DateTime.LocalNow
+q1360	Date.AddDays Date.IsInPreviousNQuarters Date.StartOfQuarter DateTime.Date DateTime.LocalNow
