@@ -48,7 +48,7 @@ Source: q1167.mrsflow.out.
 | DataLake | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
 | Date | 58 | 58 | 58 | 58 | 0 | 0 | 58 | 0 |
 | DateTime | 26 | 26 | 26 | 26 | 0 | 0 | 16 | 0 |
-| DateTimeZone | 16 | 16 | 16 | 16 | 0 | 0 | 10 | 0 |
+| DateTimeZone | 16 | 16 | 16 | 16 | 0 | 0 | 12 | 0 |
 | Day | 8 | 8 | 8 | 8 | 0 | 0 | 7 | 0 |
 | DB2 | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Decimal | 2 | 2 | 2 | 2 | 0 | 0 | 1 | 0 |
@@ -155,7 +155,7 @@ Source: q1167.mrsflow.out.
 | WebAction | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | WebMethod | 7 | 7 | 7 | 7 | 0 | 0 | 0 | 0 |
 | Xml | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| **TOTAL** | 860 | 856 | 720 | 716 | 140 | 4 | 521 | 19 |
+| **TOTAL** | 860 | 856 | 720 | 716 | 140 | 4 | 523 | 19 |
 
 ## Per-name detail
 
@@ -371,7 +371,7 @@ Source: q1167.mrsflow.out.
 | `DateTime.ToText` | Y | Y | function | q160 q161 q183 q184 q611 q612 q613 q614 q615 q1070 | MATCH |
 | `DateTime.Type` | Y | Y | constant |  |  |
 | `DateTimeZone.FixedLocalNow` | Y | Y | function |  |  |
-| `DateTimeZone.FixedUtcNow` | Y | Y | function |  |  |
+| `DateTimeZone.FixedUtcNow` | Y | Y | function | q1392 | MATCH |
 | `DateTimeZone.From` | Y | Y | function | q1258 | MATCH |
 | `DateTimeZone.FromFileTime` | Y | Y | function | q1259 | MATCH |
 | `DateTimeZone.FromText` | Y | Y | function | q1163 | MATCH |
@@ -383,8 +383,8 @@ Source: q1167.mrsflow.out.
 | `DateTimeZone.ToText` | Y | Y | function | q185 q1158 q1159 q1160 q1161 q1162 q1163 q1164 | MATCH |
 | `DateTimeZone.ToUtc` | Y | Y | function | q1069 | MATCH |
 | `DateTimeZone.Type` | Y | Y | constant |  |  |
-| `DateTimeZone.UtcNow` | Y | Y | function |  |  |
-| `DateTimeZone.ZoneHours` | Y | Y | function | q1261 | MATCH |
+| `DateTimeZone.UtcNow` | Y | Y | function | q1391 | MATCH |
+| `DateTimeZone.ZoneHours` | Y | Y | function | q1261 q1391 q1392 | MATCH |
 | `DateTimeZone.ZoneMinutes` | Y | Y | function | q1262 | MATCH |
 | `Day.Friday` | Y | Y | constant | q1227 | MATCH |
 | `Day.Monday` | Y | Y | constant | q1227 | MATCH |

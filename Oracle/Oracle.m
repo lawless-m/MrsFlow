@@ -11898,7 +11898,20 @@ let
         SafeSerialize("q1390", () =>
             // 0th and 100th percentile = min and max.
             { List.Percentile({3, 1, 4, 1, 5, 9, 2, 6}, 0),
-              List.Percentile({3, 1, 4, 1, 5, 9, 2, 6}, 1) })
+              List.Percentile({3, 1, 4, 1, 5, 9, 2, 6}, 1) }),
+        // Parked:
+        // - TimeZone.Current: mrsflow returns a duration value;
+        //   Excel returns the timezone name as text and refuses the
+        //   no-arg signature. Different return type.
+        // - List.Alternate: mrsflow's offset handling diverges from PQ
+        //   (already known from batch 2).
+        SafeSerialize("q1391", () =>
+            // DateTimeZone.UtcNow's offset is always 0. Probe via
+            // ZoneHours of UtcNow().
+            DateTimeZone.ZoneHours(DateTimeZone.UtcNow())),
+        SafeSerialize("q1392", () =>
+            // DateTimeZone.FixedUtcNow's offset is also 0.
+            DateTimeZone.ZoneHours(DateTimeZone.FixedUtcNow()))
     },
 
     Catalog = Table.FromRecords(cases)

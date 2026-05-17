@@ -1389,3 +1389,5 @@ q1387	Uri.Parts
 q1388	List.Percentile
 q1389	List.Percentile
 q1390	List.Percentile
+q1391	DateTimeZone.UtcNow DateTimeZone.ZoneHours
+q1392	DateTimeZone.FixedUtcNow DateTimeZone.ZoneHours
