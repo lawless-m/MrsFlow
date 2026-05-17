@@ -11226,7 +11226,46 @@ let
         SafeSerialize("q1262", () =>
             // Extract the offset minutes.
             DateTimeZone.ZoneMinutes(
-                #datetimezone(2024, 3, 15, 12, 0, 0, 1, 30)))
+                #datetimezone(2024, 3, 15, 12, 0, 0, 1, 30))),
+        // q1263-q1273: Value family — implemented but untested.
+        // Skipped (connector/folding): NativeQuery, Firewall, Optimize,
+        // Versions, VersionIdentity, Lineage, Traits, Alternates,
+        // Expression, ViewError, ViewFunction.
+        SafeSerialize("q1263", () =>
+            // Value.Add with two numbers — equivalent to operator +.
+            Value.Add(7, 5)),
+        SafeSerialize("q1264", () =>
+            // Value.Subtract.
+            Value.Subtract(10, 3)),
+        SafeSerialize("q1265", () =>
+            // Value.Multiply.
+            Value.Multiply(6, 7)),
+        SafeSerialize("q1266", () =>
+            // Value.Divide.
+            Value.Divide(20, 4)),
+        SafeSerialize("q1267", () =>
+            // Parse a text literal as a number.
+            Value.FromText("3.14")),
+        SafeSerialize("q1268", () =>
+            // Reading metadata before attachment returns an empty record.
+            Value.Metadata(42)),
+        SafeSerialize("q1269", () =>
+            // Attach metadata then strip it via Value.RemoveMetadata.
+            Value.RemoveMetadata(42 meta [Note = "answer"])),
+        SafeSerialize("q1270", () =>
+            // Replace metadata wholesale; read it back.
+            Value.Metadata(Value.ReplaceMetadata(42, [Tag = "x"]))),
+        // Value.NullableEquals parked: mrsflow treats null=null as true
+        // and null=1 as false; PQ returns null for both. Real semantic
+        // bug.
+        SafeSerialize("q1271", () =>
+            // Value.As asserts the value has the target type; pass-through
+            // on success.
+            Value.As(42, type number)),
+        SafeSerialize("q1272", () =>
+            // ReplaceType stamps a new type on a value (which round-trips
+            // through Type.Is on the result).
+            Type.Is(Value.Type(Value.ReplaceType(42, type number)), Number.Type))
     },
 
     Catalog = Table.FromRecords(cases)

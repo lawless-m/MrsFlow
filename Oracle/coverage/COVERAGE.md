@@ -149,13 +149,13 @@ Source: q1167.mrsflow.out.
 | TraceLevel | 6 | 6 | 5 | 5 | 1 | 0 | 0 | 0 |
 | Type | 25 | 25 | 24 | 24 | 1 | 0 | 9 | 0 |
 | Uri | 5 | 5 | 5 | 5 | 0 | 0 | 0 | 0 |
-| Value | 27 | 27 | 26 | 26 | 1 | 0 | 4 | 0 |
+| Value | 27 | 27 | 26 | 26 | 1 | 0 | 14 | 0 |
 | Variable | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
 | Web | 4 | 4 | 4 | 4 | 0 | 0 | 0 | 0 |
 | WebAction | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | WebMethod | 7 | 7 | 7 | 7 | 0 | 0 | 0 | 0 |
 | Xml | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| **TOTAL** | 860 | 856 | 720 | 716 | 140 | 4 | 404 | 19 |
+| **TOTAL** | 860 | 856 | 720 | 716 | 140 | 4 | 414 | 19 |
 
 ## Per-name detail
 
@@ -956,7 +956,7 @@ Source: q1167.mrsflow.out.
 | `Type.FunctionParameters` | Y | Y | function | q398 | MATCH |
 | `Type.FunctionRequiredParameters` | Y | Y | function |  |  |
 | `Type.FunctionReturn` | Y | Y | function |  |  |
-| `Type.Is` | Y | Y | function | q119 q120 q396 q1190 q1217 q1222 q1225 q1233 q1238 q1239 q1254 q1257 | MATCH |
+| `Type.Is` | Y | Y | function | q119 q120 q396 q1190 q1217 q1222 q1225 q1233 q1238 q1239 q1254 q1257 q1272 | MATCH |
 | `Type.IsNullable` | Y | Y | function | q1237 | MATCH |
 | `Type.IsOpenRecord` | Y | Y | function | q1240 q1241 q1242 | MATCH |
 | `Type.ListItem` | Y | Y | function | q1239 | MATCH |
@@ -978,29 +978,29 @@ Source: q1167.mrsflow.out.
 | `Uri.EscapeDataString` | Y | Y | function |  |  |
 | `Uri.Parts` | Y | Y | function |  |  |
 | `Uri.Type` | Y | Y | constant |  |  |
-| `Value.Add` | Y | Y | function |  |  |
+| `Value.Add` | Y | Y | function | q1263 | MATCH |
 | `Value.Alternates` | Y | Y | function |  |  |
-| `Value.As` | Y | Y | function |  |  |
+| `Value.As` | Y | Y | function | q1271 | MATCH |
 | `Value.Compare` | Y | Y | function | q82 q89 q129 q132 q135 q138 q142 q145 q149 q388 q389 q390 q767 q850 q854 q946 q1098 q1099 | MATCH |
-| `Value.Divide` | Y | Y | function |  |  |
+| `Value.Divide` | Y | Y | function | q1266 | MATCH |
 | `Value.Equals` | Y | Y | function | q87 q141 q142 q143 q144 q386 q387 | MATCH |
 | `Value.Expression` | Y | Y | function |  |  |
 | `Value.Firewall` | Y | Y | function |  |  |
-| `Value.FromText` | Y | Y | function |  |  |
+| `Value.FromText` | Y | Y | function | q1267 | MATCH |
 | `Value.Is` | Y | Y | function | q233 q235 q244 q399 q400 q408 q409 q410 q463 q468 q472 q473 q1095 q1096 q1097 q1100 q1148 q1169 | MATCH |
 | `Value.Lineage` | Y | Y | function |  |  |
-| `Value.Metadata` | Y | Y | function |  |  |
-| `Value.Multiply` | Y | Y | function |  |  |
+| `Value.Metadata` | Y | Y | function | q1268 q1270 | MATCH |
+| `Value.Multiply` | Y | Y | function | q1265 | MATCH |
 | `Value.NativeQuery` | Y | Y | function |  |  |
 | `Value.NullableEquals` | Y | Y | function |  |  |
 | `Value.Optimize` | Y | Y | function |  |  |
-| `Value.RemoveMetadata` | Y | Y | function |  |  |
-| `Value.ReplaceMetadata` | Y | Y | function |  |  |
-| `Value.ReplaceType` | Y | Y | function |  |  |
+| `Value.RemoveMetadata` | Y | Y | function | q1269 | MATCH |
+| `Value.ReplaceMetadata` | Y | Y | function | q1270 | MATCH |
+| `Value.ReplaceType` | Y | Y | function | q1272 | MATCH |
 | `Value.ResourceExpression` | Y |  | missing |  |  |
-| `Value.Subtract` | Y | Y | function |  |  |
+| `Value.Subtract` | Y | Y | function | q1264 | MATCH |
 | `Value.Traits` | Y | Y | function |  |  |
-| `Value.Type` | Y | Y | function | q1100 | MATCH |
+| `Value.Type` | Y | Y | function | q1100 q1272 | MATCH |
 | `Value.VersionIdentity` | Y | Y | function |  |  |
 | `Value.Versions` | Y | Y | function |  |  |
 | `Value.ViewError` | Y | Y | function |  |  |

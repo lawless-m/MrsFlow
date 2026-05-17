@@ -1261,3 +1261,13 @@ q1259	DateTimeZone.FromFileTime
 q1260	DateTimeZone.ToRecord
 q1261	DateTimeZone.ZoneHours
 q1262	DateTimeZone.ZoneMinutes
+q1263	Value.Add
+q1264	Value.Subtract
+q1265	Value.Multiply
+q1266	Value.Divide
+q1267	Value.FromText
+q1268	Value.Metadata
+q1269	Value.RemoveMetadata
+q1270	Value.Metadata Value.ReplaceMetadata
+q1271	Value.As
+q1272	Type.Is Value.ReplaceType Value.Type
