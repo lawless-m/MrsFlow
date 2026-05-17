@@ -1206,3 +1206,13 @@ q1204	List.Split
 q1205	List.Single
 q1206	List.SingleOrDefault
 q1207	List.TransformMany
+q1208	Number.Combinations
+q1209	Number.Cosh
+q1210	
+q1211	Number.Factorial
+q1212	Number.Permutations
+q1213	Number.RoundAwayFromZero
+q1214	Number.RoundTowardZero
+q1215	Number.Sinh
+q1216	Number.Tanh
+q1217	Type.Is

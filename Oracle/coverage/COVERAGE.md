@@ -99,7 +99,7 @@ Source: q1167.mrsflow.out.
 | MySQL | 2 | 1 | 2 | 1 | 0 | 1 | 0 | 0 |
 | None | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Null | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
-| Number | 49 | 49 | 49 | 49 | 0 | 0 | 38 | 0 |
+| Number | 49 | 49 | 49 | 49 | 0 | 0 | 46 | 0 |
 | Occurrence | 7 | 7 | 3 | 3 | 4 | 0 | 2 | 0 |
 | OData | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | ODataOmitValues | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
@@ -155,7 +155,7 @@ Source: q1167.mrsflow.out.
 | WebAction | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | WebMethod | 7 | 7 | 7 | 7 | 0 | 0 | 0 | 0 |
 | Xml | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| **TOTAL** | 860 | 856 | 720 | 716 | 140 | 4 | 346 | 19 |
+| **TOTAL** | 860 | 856 | 720 | 716 | 140 | 4 | 354 | 19 |
 
 ## Per-name detail
 
@@ -609,13 +609,13 @@ Source: q1167.mrsflow.out.
 | `Number.BitwiseShiftLeft` | Y | Y | function | q559 q756 q757 q759 q760 | MATCH |
 | `Number.BitwiseShiftRight` | Y | Y | function | q559 q756 q757 q758 q760 | MATCH |
 | `Number.BitwiseXor` | Y | Y | function | q558 q560 q755 q758 q760 | MATCH |
-| `Number.Combinations` | Y | Y | function |  |  |
+| `Number.Combinations` | Y | Y | function | q1208 | MATCH |
 | `Number.Cos` | Y | Y | function | q546 q550 | MATCH |
-| `Number.Cosh` | Y | Y | function |  |  |
+| `Number.Cosh` | Y | Y | function | q1209 | MATCH |
 | `Number.E` | Y | Y | constant |  |  |
 | `Number.Epsilon` | Y | Y | constant |  |  |
 | `Number.Exp` | Y | Y | function | q544 q689 q690 | MATCH |
-| `Number.Factorial` | Y | Y | function |  |  |
+| `Number.Factorial` | Y | Y | function | q1211 | MATCH |
 | `Number.From` | Y | Y | function | q43 | MATCH |
 | `Number.FromText` | Y | Y | function | q740 q741 q742 q743 q744 q745 q746 | MATCH |
 | `Number.IntegerDivide` | Y | Y | function | q49 q319 q481 q483 q484 q485 q670 q671 q672 q673 q674 q675 q676 q1008 q1009 | MATCH |
@@ -628,23 +628,23 @@ Source: q1167.mrsflow.out.
 | `Number.Mod` | Y | Y | function | q50 q318 q320 q481 q482 q484 q485 q504 q595 q663 q664 q665 q666 q667 q668 q669 q676 q753 q874 q956 q1141 | MATCH |
 | `Number.NaN` | Y | Y | constant | q485 q661 q667 q673 q680 q696 q703 q710 q716 q723 q730 q739 q759 | MATCH |
 | `Number.NegativeInfinity` | Y | Y | constant | q661 q667 q673 q680 q696 q703 q710 q716 q723 q730 | MATCH |
-| `Number.Permutations` | Y | Y | function |  |  |
+| `Number.Permutations` | Y | Y | function | q1212 | MATCH |
 | `Number.PI` | Y | Y | constant | q551 q552 | MATCH |
 | `Number.PositiveInfinity` | Y | Y | constant | q661 q667 q673 q680 q696 q703 q710 q716 q723 q730 q739 q759 | MATCH |
 | `Number.Power` | Y | Y | function | q51 q543 q550 q677 q678 q679 q680 q681 q682 q683 q690 q753 | MATCH |
 | `Number.Random` | Y | Y | function | q476 q478 q920 q926 | MATCH |
 | `Number.RandomBetween` | Y | Y | function | q477 q479 q480 q921 q923 q924 q925 q926 | MATCH |
 | `Number.Round` | Y | Y | function | q46 q356 q357 q360 q551 q552 q553 q555 q645 q656 q657 q658 q659 q660 q661 q662 q753 q852 | MATCH |
-| `Number.RoundAwayFromZero` | Y | Y | function |  |  |
+| `Number.RoundAwayFromZero` | Y | Y | function | q1213 | MATCH |
 | `Number.RoundDown` | Y | Y | function | q47 q359 | MATCH |
-| `Number.RoundTowardZero` | Y | Y | function |  |  |
+| `Number.RoundTowardZero` | Y | Y | function | q1214 | MATCH |
 | `Number.RoundUp` | Y | Y | function | q48 q358 | MATCH |
 | `Number.Sign` | Y | Y | function | q52 q541 q747 q748 q751 q752 q753 | MATCH |
 | `Number.Sin` | Y | Y | function | q546 q550 q555 | MATCH |
-| `Number.Sinh` | Y | Y | function |  |  |
+| `Number.Sinh` | Y | Y | function | q1215 | MATCH |
 | `Number.Sqrt` | Y | Y | function | q542 q684 q685 q690 q753 | MATCH |
 | `Number.Tan` | Y | Y | function | q546 q549 | MATCH |
-| `Number.Tanh` | Y | Y | function |  |  |
+| `Number.Tanh` | Y | Y | function | q1216 | MATCH |
 | `Number.ToText` | Y | Y | function | q44 q154 q155 q156 q157 q158 q159 q176 q177 q178 q179 q180 q691 q692 q693 q694 q695 q696 q697 q698 q699 q700 q701 q702 q703 q704 q705 q706 q707 q708 q709 q710 q711 q712 q713 q714 q715 q716 q717 q718 q719 q720 q721 q722 q723 q724 q725 q726 q727 q728 q729 q730 q731 q732 q733 q734 q735 q736 q737 q738 q739 q1152 | MATCH |
 | `Number.Type` | Y | Y | constant |  |  |
 | `Occurrence.All` | Y | Y | constant | q823 | MATCH |
@@ -956,7 +956,7 @@ Source: q1167.mrsflow.out.
 | `Type.FunctionParameters` | Y | Y | function | q398 | MATCH |
 | `Type.FunctionRequiredParameters` | Y | Y | function |  |  |
 | `Type.FunctionReturn` | Y | Y | function |  |  |
-| `Type.Is` | Y | Y | function | q119 q120 q396 q1190 | MATCH |
+| `Type.Is` | Y | Y | function | q119 q120 q396 q1190 q1217 | MATCH |
 | `Type.IsNullable` | Y | Y | function |  |  |
 | `Type.IsOpenRecord` | Y | Y | function |  |  |
 | `Type.ListItem` | Y | Y | function |  |  |

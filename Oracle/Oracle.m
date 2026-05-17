@@ -11011,7 +11011,46 @@ let
         SafeSerialize("q1207", () =>
             // TransformMany — for each item, generate a list and project
             // pairs. Equivalent to a flat-map / SQL CROSS APPLY.
-            List.TransformMany({1, 2, 3}, each {10, 20}, (x, y) => x * y))
+            List.TransformMany({1, 2, 3}, each {10, 20}, (x, y) => x * y)),
+        // q1208-q1217: Number family — implemented but untested.
+        // Float-valued cases (Cosh/Sinh/Tanh, E) are at risk of
+        // precision-driven diffs; the harness collapses 16-vs-17-
+        // sig-digit forms of the same f64 so those should MATCH.
+        //
+        // Parked: Number.Epsilon — mrsflow returns f64::EPSILON
+        // (~2.2e-16, machine epsilon), Excel returns
+        // 4.94065645841247E-324 (smallest positive denormal).
+        // Real mrsflow bug; needs its own fix + case.
+        SafeSerialize("q1208", () =>
+            Number.Combinations(5, 2)),
+        SafeSerialize("q1209", () =>
+            // cosh(1) ≈ 1.5430806348152437
+            Number.Cosh(1)),
+        SafeSerialize("q1210", () =>
+            // Euler's constant.
+            Number.E),
+        SafeSerialize("q1211", () =>
+            Number.Factorial(6)),
+        SafeSerialize("q1212", () =>
+            Number.Permutations(5, 2)),
+        SafeSerialize("q1213", () =>
+            // 2.5 → 3, -2.5 → -3, both away from zero.
+            { Number.RoundAwayFromZero(2.5),
+              Number.RoundAwayFromZero(-2.5) }),
+        SafeSerialize("q1214", () =>
+            // 2.7 → 2, -2.7 → -2, both toward zero.
+            { Number.RoundTowardZero(2.7),
+              Number.RoundTowardZero(-2.7) }),
+        SafeSerialize("q1215", () =>
+            // sinh(0) = 0, sinh(1) ≈ 1.1752011936438014
+            { Number.Sinh(0), Number.Sinh(1) }),
+        SafeSerialize("q1216", () =>
+            // tanh(0) = 0, tanh(1) ≈ 0.7615941559557649
+            { Number.Tanh(0), Number.Tanh(1) }),
+        SafeSerialize("q1217", () =>
+            // Number.Type is the type-value for number; Type.Is on a
+            // number should be true.
+            Type.Is(type number, Number.Type))
     },
 
     Catalog = Table.FromRecords(cases)
