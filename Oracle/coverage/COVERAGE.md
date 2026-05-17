@@ -46,8 +46,8 @@ Source: q1167.mrsflow.out.
 | Culture | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Currency | 2 | 2 | 2 | 2 | 0 | 0 | 1 | 0 |
 | DataLake | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
-| Date | 58 | 58 | 58 | 58 | 0 | 0 | 51 | 0 |
-| DateTime | 26 | 26 | 26 | 26 | 0 | 0 | 8 | 0 |
+| Date | 58 | 58 | 58 | 58 | 0 | 0 | 58 | 0 |
+| DateTime | 26 | 26 | 26 | 26 | 0 | 0 | 16 | 0 |
 | DateTimeZone | 16 | 16 | 16 | 16 | 0 | 0 | 10 | 0 |
 | Day | 8 | 8 | 8 | 8 | 0 | 0 | 6 | 0 |
 | DB2 | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
@@ -155,7 +155,7 @@ Source: q1167.mrsflow.out.
 | WebAction | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | WebMethod | 7 | 7 | 7 | 7 | 0 | 0 | 0 | 0 |
 | Xml | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| **TOTAL** | 860 | 856 | 720 | 716 | 140 | 4 | 495 | 19 |
+| **TOTAL** | 860 | 856 | 720 | 716 | 140 | 4 | 510 | 19 |
 
 ## Per-name detail
 
@@ -286,7 +286,7 @@ Source: q1167.mrsflow.out.
 | `Currency.Type` | Y | Y | constant |  |  |
 | `DataLake.Contents` | Y |  | missing |  |  |
 | `DataLake.Files` | Y |  | missing |  |  |
-| `Date.AddDays` | Y | Y | function | q78 q224 q229 q606 q616 q1062 q1333 q1334 q1335 q1336 q1338 q1340 q1344 q1345 q1350 q1351 q1352 q1353 q1354 q1355 q1356 q1357 q1358 q1359 q1360 | MATCH |
+| `Date.AddDays` | Y | Y | function | q78 q224 q229 q606 q616 q1062 q1333 q1334 q1335 q1336 q1338 q1340 q1344 q1345 q1350 q1351 q1352 q1353 q1354 q1355 q1356 q1357 q1358 q1359 q1360 q1361 q1362 q1363 q1364 q1365 q1366 q1367 | MATCH |
 | `Date.AddMonths` | Y | Y | function | q221 q617 q1061 | MATCH |
 | `Date.AddQuarters` | Y | Y | function | q225 q620 | MATCH |
 | `Date.AddWeeks` | Y | Y | function | q620 | MATCH |
@@ -297,10 +297,10 @@ Source: q1167.mrsflow.out.
 | `Date.DayOfYear` | Y | Y | function | q314 q620 | MATCH |
 | `Date.DaysInMonth` | Y | Y | function | q315 q619 | MATCH |
 | `Date.EndOfDay` | Y | Y | function | q1244 | MATCH |
-| `Date.EndOfMonth` | Y | Y | function | q1246 q1351 | MATCH |
-| `Date.EndOfQuarter` | Y | Y | function | q1248 q1352 | MATCH |
+| `Date.EndOfMonth` | Y | Y | function | q1246 q1351 q1361 | MATCH |
+| `Date.EndOfQuarter` | Y | Y | function | q1248 q1352 q1362 | MATCH |
 | `Date.EndOfWeek` | Y | Y | function | q444 | MATCH |
-| `Date.EndOfYear` | Y | Y | function | q1250 q1353 | MATCH |
+| `Date.EndOfYear` | Y | Y | function | q1250 q1353 q1364 | MATCH |
 | `Date.From` | Y | Y | function | q1065 | MATCH |
 | `Date.FromText` | Y | Y | function | q446 q447 q448 q449 q450 q1071 | MATCH |
 | `Date.IsInCurrentDay` | Y | Y | function | q1346 | MATCH |
@@ -311,12 +311,12 @@ Source: q1167.mrsflow.out.
 | `Date.IsInNextDay` | Y | Y | function | q1350 | MATCH |
 | `Date.IsInNextMonth` | Y | Y | function | q1351 | MATCH |
 | `Date.IsInNextNDays` | Y | Y | function | q1335 q1336 q1359 | MATCH |
-| `Date.IsInNextNMonths` | Y | Y | function |  |  |
-| `Date.IsInNextNQuarters` | Y | Y | function |  |  |
-| `Date.IsInNextNWeeks` | Y | Y | function |  |  |
-| `Date.IsInNextNYears` | Y | Y | function |  |  |
+| `Date.IsInNextNMonths` | Y | Y | function | q1361 | MATCH |
+| `Date.IsInNextNQuarters` | Y | Y | function | q1362 | MATCH |
+| `Date.IsInNextNWeeks` | Y | Y | function | q1363 | MATCH |
+| `Date.IsInNextNYears` | Y | Y | function | q1364 | MATCH |
 | `Date.IsInNextQuarter` | Y | Y | function | q1352 | MATCH |
-| `Date.IsInNextWeek` | Y | Y | function |  |  |
+| `Date.IsInNextWeek` | Y | Y | function | q1365 | MATCH |
 | `Date.IsInNextYear` | Y | Y | function | q1353 | MATCH |
 | `Date.IsInPreviousDay` | Y | Y | function | q1354 | MATCH |
 | `Date.IsInPreviousMonth` | Y | Y | function | q1355 | MATCH |
@@ -324,9 +324,9 @@ Source: q1167.mrsflow.out.
 | `Date.IsInPreviousNMonths` | Y | Y | function | q1345 | MATCH |
 | `Date.IsInPreviousNQuarters` | Y | Y | function | q1360 | MATCH |
 | `Date.IsInPreviousNWeeks` | Y | Y | function | q1344 q1358 | MATCH |
-| `Date.IsInPreviousNYears` | Y | Y | function |  |  |
+| `Date.IsInPreviousNYears` | Y | Y | function | q1366 | MATCH |
 | `Date.IsInPreviousQuarter` | Y | Y | function | q1356 | MATCH |
-| `Date.IsInPreviousWeek` | Y | Y | function |  |  |
+| `Date.IsInPreviousWeek` | Y | Y | function | q1367 | MATCH |
 | `Date.IsInPreviousYear` | Y | Y | function | q1357 | MATCH |
 | `Date.IsInYearToDate` | Y | Y | function | q1339 q1340 | MATCH |
 | `Date.IsLeapYear` | Y | Y | function | q618 | MATCH |
@@ -337,7 +337,7 @@ Source: q1167.mrsflow.out.
 | `Date.StartOfMonth` | Y | Y | function | q1245 q1355 | MATCH |
 | `Date.StartOfQuarter` | Y | Y | function | q1247 q1356 q1360 | MATCH |
 | `Date.StartOfWeek` | Y | Y | function | q443 | MATCH |
-| `Date.StartOfYear` | Y | Y | function | q1249 q1357 | MATCH |
+| `Date.StartOfYear` | Y | Y | function | q1249 q1357 q1366 | MATCH |
 | `Date.ToRecord` | Y | Y | function | q1253 | MATCH |
 | `Date.ToText` | Y | Y | function | q3 q4 q5 q6 q181 q182 | MATCH |
 | `Date.Type` | Y | Y | constant | q1280 | MATCH |
@@ -345,7 +345,7 @@ Source: q1167.mrsflow.out.
 | `Date.WeekOfYear` | Y | Y | function | q442 q1064 | MATCH |
 | `Date.Year` | Y | Y | function | q75 q1073 | MATCH |
 | `DateTime.AddZone` | Y | Y | function |  |  |
-| `DateTime.Date` | Y | Y | function | q1073 q1333 q1334 q1335 q1336 q1337 q1338 q1339 q1340 q1344 q1345 q1346 q1347 q1348 q1349 q1350 q1351 q1352 q1353 q1354 q1355 q1356 q1357 q1358 q1359 q1360 | MATCH |
+| `DateTime.Date` | Y | Y | function | q1073 q1333 q1334 q1335 q1336 q1337 q1338 q1339 q1340 q1344 q1345 q1346 q1347 q1348 q1349 q1350 q1351 q1352 q1353 q1354 q1355 q1356 q1357 q1358 q1359 q1360 q1361 q1362 q1363 q1364 q1365 q1366 q1367 | MATCH |
 | `DateTime.FixedLocalNow` | Y | Y | function |  |  |
 | `DateTime.From` | Y | Y | function | q1067 q1068 | MATCH |
 | `DateTime.FromFileTime` | Y | Y | function | q1255 | MATCH |
@@ -353,19 +353,19 @@ Source: q1167.mrsflow.out.
 | `DateTime.IsInCurrentHour` | Y | Y | function |  |  |
 | `DateTime.IsInCurrentMinute` | Y | Y | function |  |  |
 | `DateTime.IsInCurrentSecond` | Y | Y | function |  |  |
-| `DateTime.IsInNextHour` | Y | Y | function |  |  |
+| `DateTime.IsInNextHour` | Y | Y | function | q1374 | MATCH |
 | `DateTime.IsInNextMinute` | Y | Y | function |  |  |
-| `DateTime.IsInNextNHours` | Y | Y | function |  |  |
-| `DateTime.IsInNextNMinutes` | Y | Y | function |  |  |
-| `DateTime.IsInNextNSeconds` | Y | Y | function |  |  |
+| `DateTime.IsInNextNHours` | Y | Y | function | q1368 | MATCH |
+| `DateTime.IsInNextNMinutes` | Y | Y | function | q1369 | MATCH |
+| `DateTime.IsInNextNSeconds` | Y | Y | function | q1370 | MATCH |
 | `DateTime.IsInNextSecond` | Y | Y | function |  |  |
-| `DateTime.IsInPreviousHour` | Y | Y | function |  |  |
+| `DateTime.IsInPreviousHour` | Y | Y | function | q1375 | MATCH |
 | `DateTime.IsInPreviousMinute` | Y | Y | function |  |  |
-| `DateTime.IsInPreviousNHours` | Y | Y | function |  |  |
-| `DateTime.IsInPreviousNMinutes` | Y | Y | function |  |  |
-| `DateTime.IsInPreviousNSeconds` | Y | Y | function |  |  |
+| `DateTime.IsInPreviousNHours` | Y | Y | function | q1371 | MATCH |
+| `DateTime.IsInPreviousNMinutes` | Y | Y | function | q1372 | MATCH |
+| `DateTime.IsInPreviousNSeconds` | Y | Y | function | q1373 | MATCH |
 | `DateTime.IsInPreviousSecond` | Y | Y | function |  |  |
-| `DateTime.LocalNow` | Y | Y | function | q1333 q1334 q1335 q1336 q1337 q1338 q1339 q1340 q1344 q1345 q1346 q1347 q1348 q1349 q1350 q1351 q1352 q1353 q1354 q1355 q1356 q1357 q1358 q1359 q1360 | MATCH |
+| `DateTime.LocalNow` | Y | Y | function | q1333 q1334 q1335 q1336 q1337 q1338 q1339 q1340 q1344 q1345 q1346 q1347 q1348 q1349 q1350 q1351 q1352 q1353 q1354 q1355 q1356 q1357 q1358 q1359 q1360 q1361 q1362 q1363 q1364 q1365 q1366 q1367 q1368 q1369 q1370 q1371 q1372 q1373 q1374 q1375 | MATCH |
 | `DateTime.Time` | Y | Y | function | q1073 | MATCH |
 | `DateTime.ToRecord` | Y | Y | function | q1256 | MATCH |
 | `DateTime.ToText` | Y | Y | function | q160 q161 q183 q184 q611 q612 q613 q614 q615 q1070 | MATCH |
@@ -956,7 +956,7 @@ Source: q1167.mrsflow.out.
 | `Type.FunctionParameters` | Y | Y | function | q398 | MATCH |
 | `Type.FunctionRequiredParameters` | Y | Y | function | q1328 | MATCH |
 | `Type.FunctionReturn` | Y | Y | function |  |  |
-| `Type.Is` | Y | Y | function | q119 q120 q396 q1190 q1217 q1222 q1225 q1233 q1238 q1239 q1254 q1257 q1272 q1277 q1278 q1279 q1280 q1281 q1282 q1283 q1284 q1285 | MATCH |
+| `Type.Is` | Y | Y | function | q119 q120 q396 q1190 q1217 q1222 q1225 q1233 q1238 q1239 q1254 q1257 q1272 q1277 q1278 q1279 q1280 q1281 q1282 q1283 q1284 q1285 q1376 | MATCH |
 | `Type.IsNullable` | Y | Y | function | q1237 | MATCH |
 | `Type.IsOpenRecord` | Y | Y | function | q1240 q1241 q1242 q1329 q1331 q1332 | MATCH |
 | `Type.ListItem` | Y | Y | function | q1239 | MATCH |

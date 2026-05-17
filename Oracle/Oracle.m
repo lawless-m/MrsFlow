@@ -11751,7 +11751,81 @@ let
             // 2 quarters ago → in previous 4 quarters.
             Date.IsInPreviousNQuarters(
                 Date.AddDays(Date.StartOfQuarter(
-                    DateTime.Date(DateTime.LocalNow())), -180), 4))
+                    DateTime.Date(DateTime.LocalNow())), -180), 4)),
+        // q1361-q1378: more Date.IsInNextN* + DateTime.IsIn* sweep.
+        // DateTime.IsInCurrent*Second/Minute/Hour are fragile across
+        // even sub-second engine drift; we keep the bounded N=large
+        // forms and skip the "current second/minute" probes.
+        SafeSerialize("q1361", () =>
+            // 1 month ahead → in next 6 months.
+            Date.IsInNextNMonths(
+                Date.AddDays(Date.EndOfMonth(DateTime.Date(DateTime.LocalNow())), 5), 6)),
+        SafeSerialize("q1362", () =>
+            // 1 quarter ahead → in next 4 quarters.
+            Date.IsInNextNQuarters(
+                Date.AddDays(Date.EndOfQuarter(DateTime.Date(DateTime.LocalNow())), 5), 4)),
+        SafeSerialize("q1363", () =>
+            // 2 weeks ahead → in next 8 weeks.
+            Date.IsInNextNWeeks(
+                Date.AddDays(DateTime.Date(DateTime.LocalNow()), 14), 8)),
+        SafeSerialize("q1364", () =>
+            // 1 year ahead → in next 4 years.
+            Date.IsInNextNYears(
+                Date.AddDays(Date.EndOfYear(DateTime.Date(DateTime.LocalNow())), 30), 4)),
+        SafeSerialize("q1365", () =>
+            // Add 5 days past end-of-this-week → in next week.
+            Date.IsInNextWeek(
+                Date.AddDays(DateTime.Date(DateTime.LocalNow()), 7))),
+        SafeSerialize("q1366", () =>
+            // 2 years ago → in previous 4 years.
+            Date.IsInPreviousNYears(
+                Date.AddDays(Date.StartOfYear(
+                    DateTime.Date(DateTime.LocalNow())), -400), 4)),
+        SafeSerialize("q1367", () =>
+            // 8 days ago → in previous week (covers the week immediately
+            // before this one).
+            Date.IsInPreviousWeek(
+                Date.AddDays(DateTime.Date(DateTime.LocalNow()), -8))),
+        SafeSerialize("q1368", () =>
+            // 2 hours from now → in next 4 hours.
+            DateTime.IsInNextNHours(
+                DateTime.LocalNow() + #duration(0, 2, 0, 0), 4)),
+        SafeSerialize("q1369", () =>
+            // 5 minutes from now → in next 30 minutes.
+            DateTime.IsInNextNMinutes(
+                DateTime.LocalNow() + #duration(0, 0, 5, 0), 30)),
+        SafeSerialize("q1370", () =>
+            // 10 seconds from now → in next 60 seconds.
+            DateTime.IsInNextNSeconds(
+                DateTime.LocalNow() + #duration(0, 0, 0, 10), 60)),
+        SafeSerialize("q1371", () =>
+            // 2 hours ago → in previous 4 hours.
+            DateTime.IsInPreviousNHours(
+                DateTime.LocalNow() - #duration(0, 2, 0, 0), 4)),
+        SafeSerialize("q1372", () =>
+            // 5 minutes ago → in previous 30 minutes.
+            DateTime.IsInPreviousNMinutes(
+                DateTime.LocalNow() - #duration(0, 0, 5, 0), 30)),
+        SafeSerialize("q1373", () =>
+            // 10 seconds ago → in previous 60 seconds.
+            DateTime.IsInPreviousNSeconds(
+                DateTime.LocalNow() - #duration(0, 0, 0, 10), 60)),
+        SafeSerialize("q1374", () =>
+            // Add 90 minutes → in next hour (the "next-hour" window
+            // covers the hour AFTER this one). 65 mins from now is
+            // squarely in next-hour even if it's "now+0..2 hours" sense.
+            DateTime.IsInNextHour(
+                DateTime.LocalNow() + #duration(0, 1, 5, 0))),
+        SafeSerialize("q1375", () =>
+            // 65 min ago → in previous hour.
+            DateTime.IsInPreviousHour(
+                DateTime.LocalNow() - #duration(0, 1, 5, 0))),
+        // DateTime.IsInNextMinute and IsInPreviousSecond parked: each
+        // is bounded by the *current* minute/second clock-tick, so the
+        // input has to land in a 1-minute or 1-second window — too
+        // tight given LocalNow can drift between engines.
+        SafeSerialize("q1376", () =>
+            Type.Is(type datetime, DateTime.Type))
     },
 
     Catalog = Table.FromRecords(cases)

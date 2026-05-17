@@ -1359,3 +1359,19 @@ q1357	Date.AddDays Date.IsInPreviousYear Date.StartOfYear DateTime.Date DateTime
 q1358	Date.AddDays Date.IsInPreviousNWeeks DateTime.Date DateTime.LocalNow
 q1359	Date.AddDays Date.IsInNextNDays DateTime.Date DateTime.LocalNow
 q1360	Date.AddDays Date.IsInPreviousNQuarters Date.StartOfQuarter DateTime.Date DateTime.LocalNow
+q1361	Date.AddDays Date.EndOfMonth Date.IsInNextNMonths DateTime.Date DateTime.LocalNow
+q1362	Date.AddDays Date.EndOfQuarter Date.IsInNextNQuarters DateTime.Date DateTime.LocalNow
+q1363	Date.AddDays Date.IsInNextNWeeks DateTime.Date DateTime.LocalNow
+q1364	Date.AddDays Date.EndOfYear Date.IsInNextNYears DateTime.Date DateTime.LocalNow
+q1365	Date.AddDays Date.IsInNextWeek DateTime.Date DateTime.LocalNow
+q1366	Date.AddDays Date.IsInPreviousNYears Date.StartOfYear DateTime.Date DateTime.LocalNow
+q1367	Date.AddDays Date.IsInPreviousWeek DateTime.Date DateTime.LocalNow
+q1368	DateTime.IsInNextNHours DateTime.LocalNow
+q1369	DateTime.IsInNextNMinutes DateTime.LocalNow
+q1370	DateTime.IsInNextNSeconds DateTime.LocalNow
+q1371	DateTime.IsInPreviousNHours DateTime.LocalNow
+q1372	DateTime.IsInPreviousNMinutes DateTime.LocalNow
+q1373	DateTime.IsInPreviousNSeconds DateTime.LocalNow
+q1374	DateTime.IsInNextHour DateTime.LocalNow
+q1375	DateTime.IsInPreviousHour DateTime.LocalNow
+q1376	Type.Is
