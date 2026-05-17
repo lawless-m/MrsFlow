@@ -11193,7 +11193,40 @@ let
             // Splits date into [Year, Month, Day].
             Date.ToRecord(#date(2024, 3, 15))),
         SafeSerialize("q1254", () =>
-            Type.Is(type date, Date.Type))
+            Type.Is(type date, Date.Type)),
+        // q1255-q1262: DateTime / DateTimeZone — fixed-input only.
+        // Skipped (system-clock dependent): *LocalNow, *UtcNow,
+        // ToLocal (OS timezone), all IsIn* variants.
+        // Parked: DateTime.AddZone (mrsflow NotImplemented despite
+        // catalog claim; pending Datetimezone Value variant work),
+        // DateTimeZone.Type (mrsflow's `type datetimezone` primitive
+        // unrecognised — same family as `type time`).
+        SafeSerialize("q1255", () =>
+            // Windows FILETIME ticks → DateTime. 0 = 1601-01-01 00:00.
+            DateTime.FromFileTime(0)),
+        SafeSerialize("q1256", () =>
+            // Split datetime into [Year..Second].
+            DateTime.ToRecord(#datetime(2024, 3, 15, 12, 34, 56))),
+        SafeSerialize("q1257", () =>
+            Type.Is(type datetime, DateTime.Type)),
+        SafeSerialize("q1258", () =>
+            // DateTimeZone.From parses an ISO-ish text into a dtz.
+            DateTimeZone.From("2024-03-15T12:00:00+01:00")),
+        SafeSerialize("q1259", () =>
+            // FILETIME ticks → DateTimeZone (in UTC by spec).
+            DateTimeZone.FromFileTime(0)),
+        SafeSerialize("q1260", () =>
+            // Splits dtz into [Year..Second, ZoneHours, ZoneMinutes].
+            DateTimeZone.ToRecord(
+                #datetimezone(2024, 3, 15, 12, 0, 0, 1, 30))),
+        SafeSerialize("q1261", () =>
+            // Extract the offset hours.
+            DateTimeZone.ZoneHours(
+                #datetimezone(2024, 3, 15, 12, 0, 0, 1, 30))),
+        SafeSerialize("q1262", () =>
+            // Extract the offset minutes.
+            DateTimeZone.ZoneMinutes(
+                #datetimezone(2024, 3, 15, 12, 0, 0, 1, 30)))
     },
 
     Catalog = Table.FromRecords(cases)

@@ -1253,3 +1253,11 @@ q1251	Date.MonthName
 q1252	Date.QuarterOfYear
 q1253	Date.ToRecord
 q1254	Type.Is
+q1255	DateTime.FromFileTime
+q1256	DateTime.ToRecord
+q1257	Type.Is
+q1258	DateTimeZone.From
+q1259	DateTimeZone.FromFileTime
+q1260	DateTimeZone.ToRecord
+q1261	DateTimeZone.ZoneHours
+q1262	DateTimeZone.ZoneMinutes
