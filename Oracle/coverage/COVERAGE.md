@@ -29,7 +29,7 @@ Source: q1167.mrsflow.out.
 | AzureStorage | 5 | 5 | 0 | 0 | 5 | 0 | 0 | 0 |
 | Binary | 18 | 18 | 18 | 18 | 0 | 0 | 6 | 0 |
 | BinaryEncoding | 3 | 3 | 3 | 3 | 0 | 0 | 0 | 0 |
-| BinaryFormat | 22 | 22 | 16 | 16 | 6 | 0 | 0 | 0 |
+| BinaryFormat | 22 | 22 | 22 | 22 | 0 | 0 | 0 | 0 |
 | BinaryOccurrence | 4 | 4 | 4 | 4 | 0 | 0 | 0 | 0 |
 | BufferMode | 3 | 3 | 3 | 3 | 0 | 0 | 0 | 0 |
 | Byte | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
@@ -155,7 +155,7 @@ Source: q1167.mrsflow.out.
 | WebAction | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | WebMethod | 7 | 7 | 7 | 7 | 0 | 0 | 0 | 0 |
 | Xml | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| **TOTAL** | 860 | 856 | 714 | 710 | 146 | 4 | 301 | 5 |
+| **TOTAL** | 860 | 856 | 720 | 716 | 140 | 4 | 301 | 5 |
 
 ## Per-name detail
 
@@ -210,20 +210,20 @@ Source: q1167.mrsflow.out.
 | `BinaryFormat.Binary` | Y | Y | function |  |  |
 | `BinaryFormat.Byte` | Y | Y | function |  |  |
 | `BinaryFormat.ByteOrder` | Y | Y | function |  |  |
-| `BinaryFormat.Choice` | Y |  | missing |  |  |
+| `BinaryFormat.Choice` | Y | Y | function |  |  |
 | `BinaryFormat.Decimal` | Y | Y | function |  |  |
 | `BinaryFormat.Double` | Y | Y | function |  |  |
-| `BinaryFormat.Group` | Y |  | missing |  |  |
-| `BinaryFormat.Length` | Y |  | missing |  |  |
-| `BinaryFormat.List` | Y |  | missing |  |  |
+| `BinaryFormat.Group` | Y | Y | function |  |  |
+| `BinaryFormat.Length` | Y | Y | function |  |  |
+| `BinaryFormat.List` | Y | Y | function |  |  |
 | `BinaryFormat.Null` | Y | Y | function |  |  |
-| `BinaryFormat.Record` | Y |  | missing |  |  |
+| `BinaryFormat.Record` | Y | Y | function |  |  |
 | `BinaryFormat.SignedInteger16` | Y | Y | function |  |  |
 | `BinaryFormat.SignedInteger32` | Y | Y | function |  |  |
 | `BinaryFormat.SignedInteger64` | Y | Y | function |  |  |
 | `BinaryFormat.Single` | Y | Y | function |  |  |
 | `BinaryFormat.Text` | Y | Y | function |  |  |
-| `BinaryFormat.Transform` | Y |  | missing |  |  |
+| `BinaryFormat.Transform` | Y | Y | function |  |  |
 | `BinaryFormat.UnsignedInteger16` | Y | Y | function |  |  |
 | `BinaryFormat.UnsignedInteger32` | Y | Y | function |  |  |
 | `BinaryFormat.UnsignedInteger64` | Y | Y | function |  |  |

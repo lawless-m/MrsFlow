@@ -10833,6 +10833,71 @@ let
                 } in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        // q1178: BinaryFormat.Record — parse {1, 2,0, 100,1} as
+        // [a = Byte, b = u16, c = u16] -> [a=1, b=2, c=356].
+        SafeSerialize("q1178", () =>
+            let
+                fmt = BinaryFormat.Record([
+                    a = BinaryFormat.Byte,
+                    b = BinaryFormat.UnsignedInteger16,
+                    c = BinaryFormat.UnsignedInteger16
+                ]),
+                r = try fmt(#binary({1, 2, 0, 100, 1})) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        // q1179: BinaryFormat.Group — unnamed Record; result is a list.
+        SafeSerialize("q1179", () =>
+            let
+                fmt = BinaryFormat.Group({
+                    BinaryFormat.Byte,
+                    BinaryFormat.UnsignedInteger16
+                }),
+                r = try fmt(#binary({42, 1, 0})) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        // q1180: BinaryFormat.List with explicit count.
+        SafeSerialize("q1180", () =>
+            let
+                fmt = BinaryFormat.List(BinaryFormat.Byte, 3),
+                r = try fmt(#binary({10, 20, 30, 40, 50})) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        // q1181: BinaryFormat.Choice — branch on a tag byte.
+        SafeSerialize("q1181", () =>
+            let
+                fmt = BinaryFormat.Choice(BinaryFormat.Byte, (key) =>
+                    if key = 1 then BinaryFormat.UnsignedInteger16
+                    else if key = 2 then BinaryFormat.UnsignedInteger32
+                    else BinaryFormat.Null),
+                r = try {
+                    fmt(#binary({1, 100, 0})),
+                    fmt(#binary({2, 1, 0, 0, 0})),
+                    fmt(#binary({9}))
+                } in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        // q1182: BinaryFormat.Length — u8-prefixed Text body. {3,'a','b','c'}
+        // -> "abc". The Text inner format consumes 3 bytes; Length supplies
+        // exactly that.
+        SafeSerialize("q1182", () =>
+            let
+                fmt = BinaryFormat.Length(BinaryFormat.Text(3), BinaryFormat.Byte),
+                r = try fmt(#binary({3, 97, 98, 99})) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
+        // q1183: BinaryFormat.Transform — parse a u8 then double it.
+        SafeSerialize("q1183", () =>
+            let
+                fmt = BinaryFormat.Transform(BinaryFormat.Byte, (v) => v * 2),
+                r = try fmt(#binary({21})) in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                         else [HasError=false, Value=r[Value]])
     },
 

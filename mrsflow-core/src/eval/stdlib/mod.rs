@@ -72,6 +72,38 @@ pub fn root_env() -> Env {
     env = env.extend("#nan".into(), Value::Number(f64::NAN));
     env = env.extend("#infinity".into(), Value::Number(f64::INFINITY));
 
+    // BinaryFormat atoms (Byte, UnsignedInteger32, Null, etc.) are
+    // registered above as 0-arg factories. In PQ they're parser VALUES
+    // — you call BinaryFormat.UnsignedInteger32(bytes) directly. Run
+    // each factory once at env-build time and replace the binding with
+    // the resulting tagged closure so end users see the parser value.
+    let host = super::iohost::NoIoHost;
+    for atom in [
+        "BinaryFormat.Byte",
+        "BinaryFormat.SignedInteger16",
+        "BinaryFormat.SignedInteger32",
+        "BinaryFormat.SignedInteger64",
+        "BinaryFormat.UnsignedInteger16",
+        "BinaryFormat.UnsignedInteger32",
+        "BinaryFormat.UnsignedInteger64",
+        "BinaryFormat.Single",
+        "BinaryFormat.Double",
+        "BinaryFormat.Decimal",
+        "BinaryFormat.Null",
+        "BinaryFormat.7BitEncodedUnsignedInteger",
+        "BinaryFormat.7BitEncodedSignedInteger",
+    ] {
+        if let Some(Value::Function(factory)) = env.lookup(atom) {
+            // The 0-arg factory takes no real args; call its builtin.
+            let factory = factory.clone();
+            if let FnBody::Builtin(f) = factory.body {
+                if let Ok(parser) = f(&[], &host) {
+                    env = env.extend(atom.to_string(), parser);
+                }
+            }
+        }
+    }
+
     // Type intrinsics (dotted-name values). Power Query exposes these as
     // type values; the corpus uses them in Table.AddColumn type args and
     // Table.TransformColumnTypes pairs. Several numeric intrinsics collapse
