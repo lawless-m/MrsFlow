@@ -10923,7 +10923,41 @@ let
             in
                 if decoded[Success]
                     then QuadrantTable(decoded[RGBA8], decoded[Width], decoded[Height])
-                    else error decoded[Error])
+                    else error decoded[Error]),
+        // q1185-q1191: Binary family — implemented but untested. Each
+        // case is a tiny round-trip on a known literal.
+        //
+        // Parked from this batch:
+        // - Binary.From with text input: mrsflow returns raw UTF-8 bytes,
+        //   Excel base64-decodes. Known divergence; awaits an mrsflow fix.
+        // - Binary.View, Binary.ViewError, Binary.ViewFunction: query-
+        //   folding hooks with no value-level observable shape.
+        // - Binary.InferContentType: needs a signature-bearing fixture.
+        SafeSerialize("q1185", () =>
+            Binary.ApproximateLength(#binary({1, 2, 3, 4, 5}))),
+        SafeSerialize("q1186", () =>
+            // Buffer is a hint; the value round-trips unchanged.
+            Binary.ToList(Binary.Buffer(#binary({10, 20, 30})))),
+        SafeSerialize("q1187", () =>
+            // Compress then decompress should round-trip.
+            Binary.ToList(Binary.Decompress(
+                Binary.Compress(#binary({0, 1, 2, 3, 4, 5}), Compression.Deflate),
+                Compression.Deflate))),
+        SafeSerialize("q1188", () =>
+            // Split into 2-byte chunks.
+            List.Transform(Binary.Split(#binary({1, 2, 3, 4, 5}), 2),
+                each Binary.ToList(_))),
+        SafeSerialize("q1189", () =>
+            Binary.ToList(#binary({200, 100, 50}))),
+        SafeSerialize("q1190", () =>
+            // Binary.Type is the type-value for binary; Type.Is on a
+            // binary literal should be true.
+            Type.Is(type binary, Binary.Type)),
+        SafeSerialize("q1191", () =>
+            // Round-trip via Compression.GZip too.
+            Binary.ToList(Binary.Decompress(
+                Binary.Compress(#binary({5, 4, 3, 2, 1}), Compression.GZip),
+                Compression.GZip)))
     },
 
     Catalog = Table.FromRecords(cases)

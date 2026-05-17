@@ -1183,3 +1183,10 @@ q1181	BinaryFormat.Byte BinaryFormat.Choice
 q1182	BinaryFormat.Length BinaryFormat.Text
 q1183	BinaryFormat.Byte BinaryFormat.Transform
 q1184	Expression.Evaluate File.Contents Text.FromBinary
+q1185	Binary.ApproximateLength
+q1186	Binary.Buffer Binary.ToList
+q1187	Binary.Compress Binary.Decompress Binary.ToList
+q1188	Binary.Split Binary.ToList List.Transform
+q1189	Binary.ToList
+q1190	Type.Is
+q1191	Binary.Compress Binary.Decompress Binary.ToList

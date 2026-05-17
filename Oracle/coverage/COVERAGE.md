@@ -27,9 +27,9 @@ Source: q1167.mrsflow.out.
 | Any | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | AzureDataExplorer | 3 | 3 | 0 | 0 | 3 | 0 | 0 | 0 |
 | AzureStorage | 5 | 5 | 0 | 0 | 5 | 0 | 0 | 0 |
-| Binary | 18 | 18 | 18 | 18 | 0 | 0 | 6 | 0 |
+| Binary | 18 | 18 | 18 | 18 | 0 | 0 | 12 | 0 |
 | BinaryEncoding | 3 | 3 | 3 | 3 | 0 | 0 | 0 | 0 |
-| BinaryFormat | 22 | 22 | 22 | 22 | 0 | 0 | 19 | 0 |
+| BinaryFormat | 22 | 22 | 22 | 22 | 0 | 0 | 19 | 13 |
 | BinaryOccurrence | 4 | 4 | 4 | 4 | 0 | 0 | 0 | 0 |
 | BufferMode | 3 | 3 | 3 | 3 | 0 | 0 | 0 | 0 |
 | Byte | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
@@ -60,10 +60,10 @@ Source: q1167.mrsflow.out.
 | Error | 1 | 1 | 1 | 1 | 0 | 0 | 1 | 0 |
 | Excel | 4 | 4 | 3 | 3 | 1 | 0 | 1 | 0 |
 | Exchange | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
-| Expression | 3 | 3 | 3 | 3 | 0 | 0 | 1 | 0 |
+| Expression | 3 | 3 | 3 | 3 | 0 | 0 | 1 | 1 |
 | ExtraValues | 4 | 4 | 4 | 4 | 0 | 0 | 0 | 0 |
 | Fabric | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
-| File | 2 | 1 | 2 | 1 | 0 | 1 | 1 | 0 |
+| File | 2 | 1 | 2 | 1 | 0 | 1 | 1 | 1 |
 | Folder | 2 | 2 | 2 | 2 | 0 | 0 | 1 | 0 |
 | Function | 7 | 7 | 6 | 6 | 1 | 0 | 1 | 0 |
 | Geography | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
@@ -92,7 +92,7 @@ Source: q1167.mrsflow.out.
 | Lakehouse | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | LimitClauseKind | 6 | 6 | 6 | 6 | 0 | 0 | 0 | 0 |
 | Lines | 4 | 4 | 4 | 4 | 0 | 0 | 2 | 0 |
-| List | 72 | 72 | 71 | 71 | 1 | 0 | 49 | 3 |
+| List | 72 | 72 | 71 | 71 | 1 | 0 | 49 | 1 |
 | Logical | 4 | 4 | 4 | 4 | 0 | 0 | 3 | 0 |
 | MissingField | 4 | 4 | 3 | 3 | 1 | 0 | 1 | 0 |
 | Module | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
@@ -120,7 +120,7 @@ Source: q1167.mrsflow.out.
 | QuoteStyle | 3 | 3 | 3 | 3 | 0 | 0 | 1 | 0 |
 | RankKind | 4 | 4 | 3 | 3 | 1 | 0 | 0 | 0 |
 | RData | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
-| Record | 18 | 18 | 17 | 17 | 1 | 0 | 17 | 3 |
+| Record | 18 | 18 | 17 | 17 | 1 | 0 | 17 | 1 |
 | RelativePosition | 3 | 3 | 0 | 0 | 3 | 0 | 0 | 0 |
 | Replacer | 2 | 2 | 2 | 2 | 0 | 0 | 2 | 0 |
 | Resource | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
@@ -142,7 +142,7 @@ Source: q1167.mrsflow.out.
 | Table | 114 | 114 | 113 | 113 | 1 | 0 | 58 | 0 |
 | Tables | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Teradata | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
-| Text | 42 | 42 | 42 | 42 | 0 | 0 | 34 | 1 |
+| Text | 42 | 42 | 42 | 42 | 0 | 0 | 34 | 2 |
 | TextEncoding | 7 | 7 | 6 | 6 | 1 | 0 | 0 | 0 |
 | Time | 10 | 10 | 10 | 10 | 0 | 0 | 5 | 0 |
 | TimeZone | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
@@ -155,7 +155,7 @@ Source: q1167.mrsflow.out.
 | WebAction | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | WebMethod | 7 | 7 | 7 | 7 | 0 | 0 | 0 | 0 |
 | Xml | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| **TOTAL** | 860 | 856 | 720 | 716 | 140 | 4 | 324 | 7 |
+| **TOTAL** | 860 | 856 | 720 | 716 | 140 | 4 | 330 | 19 |
 
 ## Per-name detail
 
@@ -184,19 +184,19 @@ Source: q1167.mrsflow.out.
 | `AzureStorage.DataLake` | Y |  | missing |  |  |
 | `AzureStorage.DataLakeContents` | Y |  | missing |  |  |
 | `AzureStorage.Tables` | Y |  | missing |  |  |
-| `Binary.ApproximateLength` | Y | Y | function |  |  |
-| `Binary.Buffer` | Y | Y | function |  |  |
+| `Binary.ApproximateLength` | Y | Y | function | q1185 | MATCH |
+| `Binary.Buffer` | Y | Y | function | q1186 | MATCH |
 | `Binary.Combine` | Y | Y | function | q239 | MATCH |
-| `Binary.Compress` | Y | Y | function |  |  |
-| `Binary.Decompress` | Y | Y | function |  |  |
+| `Binary.Compress` | Y | Y | function | q1187 q1191 | MATCH |
+| `Binary.Decompress` | Y | Y | function | q1187 q1191 | MATCH |
 | `Binary.From` | Y | Y | function |  |  |
 | `Binary.FromList` | Y | Y | function | q351 q352 q353 q354 q355 | MATCH |
 | `Binary.FromText` | Y | Y | function | q346 q347 q348 q349 q354 | MATCH |
 | `Binary.InferContentType` | Y | Y | function |  |  |
 | `Binary.Length` | Y | Y | function | q346 q349 | MATCH |
 | `Binary.Range` | Y | Y | function | q348 | MATCH |
-| `Binary.Split` | Y | Y | function |  |  |
-| `Binary.ToList` | Y | Y | function |  |  |
+| `Binary.Split` | Y | Y | function | q1188 | MATCH |
+| `Binary.ToList` | Y | Y | function | q1186 q1187 q1188 q1189 q1191 | MATCH |
 | `Binary.ToText` | Y | Y | function | q9 q347 q348 q350 q351 q352 q353 q354 q355 q1174 | MATCH |
 | `Binary.Type` | Y | Y | constant |  |  |
 | `Binary.View` | Y | Y | function |  |  |
@@ -205,27 +205,27 @@ Source: q1167.mrsflow.out.
 | `BinaryEncoding.Base64` | Y | Y | constant |  |  |
 | `BinaryEncoding.Hex` | Y | Y | constant |  |  |
 | `BinaryEncoding.Type` | Y | Y | constant |  |  |
-| `BinaryFormat.7BitEncodedSignedInteger` | Y | Y | function | q1177 | MATCH |
-| `BinaryFormat.7BitEncodedUnsignedInteger` | Y | Y | function | q1177 | MATCH |
+| `BinaryFormat.7BitEncodedSignedInteger` | Y | Y | function | q1177 | DIFF |
+| `BinaryFormat.7BitEncodedUnsignedInteger` | Y | Y | function | q1177 | DIFF |
 | `BinaryFormat.Binary` | Y | Y | function | q1174 | MATCH |
-| `BinaryFormat.Byte` | Y | Y | function | q1170 q1178 q1179 q1180 q1181 q1183 | MATCH |
-| `BinaryFormat.ByteOrder` | Y | Y | function | q1176 | MATCH |
-| `BinaryFormat.Choice` | Y | Y | function | q1181 | MATCH |
+| `BinaryFormat.Byte` | Y | Y | function | q1170 q1178 q1179 q1180 q1181 q1183 | MIXED |
+| `BinaryFormat.ByteOrder` | Y | Y | function | q1176 | DIFF |
+| `BinaryFormat.Choice` | Y | Y | function | q1181 | DIFF |
 | `BinaryFormat.Decimal` | Y | Y | function |  |  |
-| `BinaryFormat.Double` | Y | Y | function | q1172 | MATCH |
-| `BinaryFormat.Group` | Y | Y | function | q1179 | MATCH |
+| `BinaryFormat.Double` | Y | Y | function | q1172 | DIFF |
+| `BinaryFormat.Group` | Y | Y | function | q1179 | DIFF |
 | `BinaryFormat.Length` | Y | Y | function | q1182 | MATCH |
 | `BinaryFormat.List` | Y | Y | function | q1180 | MATCH |
 | `BinaryFormat.Null` | Y | Y | function | q1173 | MATCH |
-| `BinaryFormat.Record` | Y | Y | function | q1178 | MATCH |
-| `BinaryFormat.SignedInteger16` | Y | Y | function | q1171 | MATCH |
-| `BinaryFormat.SignedInteger32` | Y | Y | function | q1171 | MATCH |
+| `BinaryFormat.Record` | Y | Y | function | q1178 | DIFF |
+| `BinaryFormat.SignedInteger16` | Y | Y | function | q1171 | DIFF |
+| `BinaryFormat.SignedInteger32` | Y | Y | function | q1171 | DIFF |
 | `BinaryFormat.SignedInteger64` | Y | Y | function |  |  |
-| `BinaryFormat.Single` | Y | Y | function | q1172 | MATCH |
+| `BinaryFormat.Single` | Y | Y | function | q1172 | DIFF |
 | `BinaryFormat.Text` | Y | Y | function | q1175 q1182 | MATCH |
 | `BinaryFormat.Transform` | Y | Y | function | q1183 | MATCH |
-| `BinaryFormat.UnsignedInteger16` | Y | Y | function | q1170 q1178 | MATCH |
-| `BinaryFormat.UnsignedInteger32` | Y | Y | function | q1170 q1176 | MATCH |
+| `BinaryFormat.UnsignedInteger16` | Y | Y | function | q1170 q1178 | DIFF |
+| `BinaryFormat.UnsignedInteger32` | Y | Y | function | q1170 q1176 | DIFF |
 | `BinaryFormat.UnsignedInteger64` | Y | Y | function |  |  |
 | `BinaryOccurrence.Optional` | Y | Y | constant |  |  |
 | `BinaryOccurrence.Repeating` | Y | Y | constant |  |  |
@@ -425,14 +425,14 @@ Source: q1167.mrsflow.out.
 | `Excel.Workbook` | Y | Y | function |  |  |
 | `Exchange.Contents` | Y |  | missing |  |  |
 | `Expression.Constant` | Y | Y | function |  |  |
-| `Expression.Evaluate` | Y | Y | function | q401 q402 q403 q404 q405 q1167 q1184 | MATCH |
+| `Expression.Evaluate` | Y | Y | function | q401 q402 q403 q404 q405 q1167 q1184 | MIXED |
 | `Expression.Identifier` | Y | Y | function |  |  |
 | `ExtraValues.Error` | Y | Y | constant |  |  |
 | `ExtraValues.Ignore` | Y | Y | constant |  |  |
 | `ExtraValues.List` | Y | Y | constant |  |  |
 | `ExtraValues.Type` | Y | Y | constant |  |  |
 | `Fabric.Warehouse` | Y |  | missing |  |  |
-| `File.Contents` | Y | Y | function | q1167 q1184 | MATCH |
+| `File.Contents` | Y | Y | function | q1167 q1184 | MIXED |
 | `File.Modified` |  | Y | function |  |  |
 | `Folder.Contents` | Y | Y | function | q11 | MATCH |
 | `Folder.Files` | Y | Y | function |  |  |
@@ -524,13 +524,13 @@ Source: q1167.mrsflow.out.
 | `List.Contains` | Y | Y | function | q80 q122 q369 q815 q816 q1122 q1145 | MATCH |
 | `List.ContainsAll` | Y | Y | function |  |  |
 | `List.ContainsAny` | Y | Y | function |  |  |
-| `List.Count` | Y | Y | function | q53 q118 q480 q498 q645 q817 q819 q875 q889 q914 q922 q923 q1127 q1128 q1146 q1147 | MIXED |
+| `List.Count` | Y | Y | function | q53 q118 q480 q498 q645 q817 q819 q875 q889 q914 q922 q923 q1127 q1128 q1146 q1147 | MATCH |
 | `List.Covariance` | Y | Y | function |  |  |
 | `List.Dates` | Y | Y | function | q515 q906 q907 q910 q911 q912 | MATCH |
 | `List.DateTimes` | Y | Y | function | q908 | MATCH |
 | `List.DateTimeZones` | Y | Y | function |  |  |
 | `List.Difference` | Y | Y | function | q88 q134 q135 q136 q524 | MATCH |
-| `List.Distinct` | Y | Y | function | q62 q81 q121 q127 q128 q129 q130 q480 q498 q521 q817 q856 q857 q858 q859 q860 q861 q862 q923 q1146 | MIXED |
+| `List.Distinct` | Y | Y | function | q62 q81 q121 q127 q128 q129 q130 q480 q498 q521 q817 q856 q857 q858 q859 q860 q861 q862 q923 q1146 | MATCH |
 | `List.Durations` | Y | Y | function | q909 | MATCH |
 | `List.FindText` | Y | Y | function |  |  |
 | `List.First` | Y | Y | function | q58 | MATCH |
@@ -580,7 +580,7 @@ Source: q1167.mrsflow.out.
 | `List.StandardDeviation` | Y | Y | function | q645 q895 q898 | MATCH |
 | `List.Sum` | Y | Y | function | q54 q89 q115 q120 q330 q341 q393 q416 q420 q641 q875 q892 q896 q897 q898 q905 q914 q915 q934 q935 q936 q937 q939 q940 q1127 q1138 | MATCH |
 | `List.Times` | Y | Y | function |  |  |
-| `List.Transform` | Y | Y | function | q21 q478 q480 q497 q498 q499 q519 q571 q572 q573 q574 q575 q816 q914 q923 q927 q928 q929 q930 q931 | MATCH |
+| `List.Transform` | Y | Y | function | q21 q478 q480 q497 q498 q499 q519 q571 q572 q573 q574 q575 q816 q914 q923 q927 q928 q929 q930 q931 q1188 | MATCH |
 | `List.TransformMany` | Y | Y | function |  |  |
 | `List.Type` | Y |  | missing |  |  |
 | `List.Union` | Y | Y | function | q522 q525 | MATCH |
@@ -695,13 +695,13 @@ Source: q1167.mrsflow.out.
 | `Record.AddField` | Y | Y | function | q231 q232 q233 q234 q235 q406 q407 q408 q409 q410 q864 q1046 q1047 q1048 | MATCH |
 | `Record.Combine` | Y | Y | function | q286 q287 q288 q289 q290 q1049 | MATCH |
 | `Record.Field` | Y | Y | function | q290 q408 q409 q410 q1059 q1148 | MATCH |
-| `Record.FieldCount` | Y | Y | function | q241 q1144 q1149 q1150 | MIXED |
+| `Record.FieldCount` | Y | Y | function | q241 q1144 q1149 q1150 | MATCH |
 | `Record.FieldNames` | Y | Y | function | q66 q232 q234 q397 q398 q406 q407 q415 q1145 q1146 q1147 q1150 q1165 | MIXED |
 | `Record.FieldOrDefault` | Y | Y | function | q1052 | MATCH |
 | `Record.FieldValues` | Y | Y | function | q67 q415 | MATCH |
 | `Record.FromList` | Y | Y | function | q411 q415 q1056 q1057 | MATCH |
 | `Record.FromTable` | Y | Y | function | q413 | MATCH |
-| `Record.HasFields` | Y | Y | function | q68 q242 q243 q1059 q1144 | MIXED |
+| `Record.HasFields` | Y | Y | function | q68 q242 q243 q1059 q1144 | MATCH |
 | `Record.RemoveFields` | Y | Y | function | q69 q105 q333 q576 q579 q580 q1058 q1150 | MATCH |
 | `Record.RenameFields` | Y | Y | function | q106 q334 q577 q579 q580 q1050 | MATCH |
 | `Record.ReorderFields` | Y | Y | function | q335 | MATCH |
@@ -893,7 +893,7 @@ Source: q1167.mrsflow.out.
 | `Text.EndsWith` | Y | Y | function | q495 q1118 | MATCH |
 | `Text.Format` | Y | Y | function | q191 q192 q193 q194 q195 q828 q829 q830 q831 q832 q833 q834 | MATCH |
 | `Text.From` | Y | Y | function | q27 q228 q271 q272 q273 q274 q275 q868 q871 q928 q955 q956 q1053 q1151 q1154 q1156 q1157 | MATCH |
-| `Text.FromBinary` | Y | Y | function | q8 q266 q267 q268 q269 q270 q536 q537 q538 q539 q540 q1155 q1167 q1184 | MATCH |
+| `Text.FromBinary` | Y | Y | function | q8 q266 q267 q268 q269 q270 q536 q537 q538 q539 q540 q1155 q1167 q1184 | MIXED |
 | `Text.InferNumberType` | Y | Y | function |  |  |
 | `Text.Insert` | Y | Y | function | q486 q490 q791 q792 q793 q794 q795 q796 q797 | MATCH |
 | `Text.Length` | Y | Y | function | q30 q496 q497 q500 q569 q570 q651 q813 q814 q819 q844 q845 q846 q848 q852 q870 | MATCH |
@@ -956,7 +956,7 @@ Source: q1167.mrsflow.out.
 | `Type.FunctionParameters` | Y | Y | function | q398 | MATCH |
 | `Type.FunctionRequiredParameters` | Y | Y | function |  |  |
 | `Type.FunctionReturn` | Y | Y | function |  |  |
-| `Type.Is` | Y | Y | function | q119 q120 q396 | MATCH |
+| `Type.Is` | Y | Y | function | q119 q120 q396 q1190 | MATCH |
 | `Type.IsNullable` | Y | Y | function |  |  |
 | `Type.IsOpenRecord` | Y | Y | function |  |  |
 | `Type.ListItem` | Y | Y | function |  |  |
