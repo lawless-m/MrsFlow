@@ -28,7 +28,7 @@ Source: q1167.mrsflow.out.
 | AzureDataExplorer | 3 | 3 | 0 | 0 | 3 | 0 | 0 | 0 |
 | AzureStorage | 5 | 5 | 0 | 0 | 5 | 0 | 0 | 0 |
 | Binary | 18 | 18 | 18 | 18 | 0 | 0 | 12 | 0 |
-| BinaryEncoding | 3 | 3 | 3 | 3 | 0 | 0 | 0 | 0 |
+| BinaryEncoding | 3 | 3 | 3 | 3 | 0 | 0 | 1 | 0 |
 | BinaryFormat | 22 | 22 | 22 | 22 | 0 | 0 | 19 | 13 |
 | BinaryOccurrence | 4 | 4 | 4 | 4 | 0 | 0 | 0 | 0 |
 | BufferMode | 3 | 3 | 3 | 3 | 0 | 0 | 0 | 0 |
@@ -49,7 +49,7 @@ Source: q1167.mrsflow.out.
 | Date | 58 | 58 | 58 | 58 | 0 | 0 | 20 | 0 |
 | DateTime | 26 | 26 | 26 | 26 | 0 | 0 | 5 | 0 |
 | DateTimeZone | 16 | 16 | 16 | 16 | 0 | 0 | 5 | 0 |
-| Day | 8 | 8 | 8 | 8 | 0 | 0 | 0 | 0 |
+| Day | 8 | 8 | 8 | 8 | 0 | 0 | 6 | 0 |
 | DB2 | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Decimal | 2 | 2 | 2 | 2 | 0 | 0 | 1 | 0 |
 | Diagnostics | 3 | 3 | 3 | 3 | 0 | 0 | 0 | 0 |
@@ -85,8 +85,8 @@ Source: q1167.mrsflow.out.
 | Int8 | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
 | ItemExpression | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
 | JoinAlgorithm | 8 | 8 | 8 | 8 | 0 | 0 | 3 | 0 |
-| JoinKind | 9 | 9 | 9 | 9 | 0 | 0 | 1 | 0 |
-| JoinSide | 3 | 3 | 3 | 3 | 0 | 0 | 0 | 0 |
+| JoinKind | 9 | 9 | 9 | 9 | 0 | 0 | 7 | 0 |
+| JoinSide | 3 | 3 | 3 | 3 | 0 | 0 | 1 | 0 |
 | Json | 2 | 2 | 2 | 2 | 0 | 0 | 2 | 0 |
 | Kusto | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
 | Lakehouse | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
@@ -94,7 +94,7 @@ Source: q1167.mrsflow.out.
 | Lines | 4 | 4 | 4 | 4 | 0 | 0 | 2 | 0 |
 | List | 72 | 72 | 71 | 71 | 1 | 0 | 65 | 1 |
 | Logical | 4 | 4 | 4 | 4 | 0 | 0 | 3 | 0 |
-| MissingField | 4 | 4 | 3 | 3 | 1 | 0 | 1 | 0 |
+| MissingField | 4 | 4 | 3 | 3 | 1 | 0 | 2 | 0 |
 | Module | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | MySQL | 2 | 1 | 2 | 1 | 0 | 1 | 0 | 0 |
 | None | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
@@ -155,7 +155,7 @@ Source: q1167.mrsflow.out.
 | WebAction | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | WebMethod | 7 | 7 | 7 | 7 | 0 | 0 | 0 | 0 |
 | Xml | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| **TOTAL** | 860 | 856 | 720 | 716 | 140 | 4 | 361 | 19 |
+| **TOTAL** | 860 | 856 | 720 | 716 | 140 | 4 | 376 | 19 |
 
 ## Per-name detail
 
@@ -202,7 +202,7 @@ Source: q1167.mrsflow.out.
 | `Binary.View` | Y | Y | function |  |  |
 | `Binary.ViewError` | Y | Y | function |  |  |
 | `Binary.ViewFunction` | Y | Y | function |  |  |
-| `BinaryEncoding.Base64` | Y | Y | constant |  |  |
+| `BinaryEncoding.Base64` | Y | Y | constant | q1226 | MATCH |
 | `BinaryEncoding.Hex` | Y | Y | constant |  |  |
 | `BinaryEncoding.Type` | Y | Y | constant |  |  |
 | `BinaryFormat.7BitEncodedSignedInteger` | Y | Y | function | q1177 | DIFF |
@@ -386,14 +386,14 @@ Source: q1167.mrsflow.out.
 | `DateTimeZone.UtcNow` | Y | Y | function |  |  |
 | `DateTimeZone.ZoneHours` | Y | Y | function |  |  |
 | `DateTimeZone.ZoneMinutes` | Y | Y | function |  |  |
-| `Day.Friday` | Y | Y | constant |  |  |
-| `Day.Monday` | Y | Y | constant |  |  |
+| `Day.Friday` | Y | Y | constant | q1227 | MATCH |
+| `Day.Monday` | Y | Y | constant | q1227 | MATCH |
 | `Day.Saturday` | Y | Y | constant |  |  |
-| `Day.Sunday` | Y | Y | constant |  |  |
-| `Day.Thursday` | Y | Y | constant |  |  |
-| `Day.Tuesday` | Y | Y | constant |  |  |
+| `Day.Sunday` | Y | Y | constant | q1227 | MATCH |
+| `Day.Thursday` | Y | Y | constant | q1227 | MATCH |
+| `Day.Tuesday` | Y | Y | constant | q1227 | MATCH |
 | `Day.Type` | Y | Y | constant |  |  |
-| `Day.Wednesday` | Y | Y | constant |  |  |
+| `Day.Wednesday` | Y | Y | constant | q1227 | MATCH |
 | `DB2.Database` | Y |  | missing |  |  |
 | `Decimal.From` | Y | Y | function | q277 q280 q471 q472 q473 q474 | MATCH |
 | `Decimal.Type` | Y | Y | constant |  |  |
@@ -486,16 +486,16 @@ Source: q1167.mrsflow.out.
 | `JoinAlgorithm.RightIndex` | Y | Y | constant |  |  |
 | `JoinAlgorithm.SortMerge` | Y | Y | constant | q1169 | MATCH |
 | `JoinAlgorithm.Type` | Y | Y | constant |  |  |
-| `JoinKind.FullOuter` | Y | Y | constant |  |  |
-| `JoinKind.Inner` | Y | Y | constant | q339 q340 | MATCH |
-| `JoinKind.LeftAnti` | Y | Y | constant |  |  |
-| `JoinKind.LeftOuter` | Y | Y | constant |  |  |
-| `JoinKind.LeftSemi` | Y | Y | constant |  |  |
-| `JoinKind.RightAnti` | Y | Y | constant |  |  |
-| `JoinKind.RightOuter` | Y | Y | constant |  |  |
+| `JoinKind.FullOuter` | Y | Y | constant | q1228 | MATCH |
+| `JoinKind.Inner` | Y | Y | constant | q339 q340 q1228 | MATCH |
+| `JoinKind.LeftAnti` | Y | Y | constant | q1228 | MATCH |
+| `JoinKind.LeftOuter` | Y | Y | constant | q1228 | MATCH |
+| `JoinKind.LeftSemi` | Y | Y | constant | q1228 | MATCH |
+| `JoinKind.RightAnti` | Y | Y | constant | q1228 | MATCH |
+| `JoinKind.RightOuter` | Y | Y | constant | q1228 | MATCH |
 | `JoinKind.RightSemi` | Y | Y | constant |  |  |
 | `JoinKind.Type` | Y | Y | constant |  |  |
-| `JoinSide.Left` | Y | Y | constant |  |  |
+| `JoinSide.Left` | Y | Y | constant | q1229 | MATCH |
 | `JoinSide.Right` | Y | Y | constant |  |  |
 | `JoinSide.Type` | Y | Y | constant |  |  |
 | `Json.Document` | Y | Y | function | q23 q251 q252 q253 q254 q255 q1081 q1082 q1083 q1084 q1085 q1086 q1155 | MATCH |
@@ -589,7 +589,7 @@ Source: q1167.mrsflow.out.
 | `Logical.FromText` | Y | Y | function | q457 q458 | MATCH |
 | `Logical.ToText` | Y | Y | function | q459 | MATCH |
 | `Logical.Type` | Y | Y | constant |  |  |
-| `MissingField.Error` | Y | Y | constant |  |  |
+| `MissingField.Error` | Y | Y | constant | q1230 | MATCH |
 | `MissingField.Ignore` | Y | Y | constant | q1055 | MATCH |
 | `MissingField.Type` | Y |  | missing |  |  |
 | `MissingField.UseNull` | Y | Y | constant |  |  |

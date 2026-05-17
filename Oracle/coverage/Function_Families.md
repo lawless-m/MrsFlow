@@ -24,7 +24,7 @@ Counts come from `COVERAGE.md`; refresh both via `render.ps1`.
 | AzureDataExplorer | Untouched | 0 / 3 | Azure Data Explorer / Kusto connector entry. |
 | AzureStorage | Untouched | 0 / 5 | Azure Blob / Table / Data Lake storage connector. |
 | Binary | Tested | 18 / 18 | Binary value operations (length, slice, encode, base64, compression). |
-| BinaryEncoding | Implemented | 3 / 3 | Base64 / Hex encoding constants for Binary.FromText / ToText. |
+| BinaryEncoding | Tested | 3 / 3 | Base64 / Hex encoding constants for Binary.FromText / ToText. |
 | BinaryFormat | Tested | 22 / 22 | Declarative parser-combinator framework for binary streams ("Wireshark in M" — describe a wire format, get a typed parser). |
 | BinaryOccurrence | Implemented | 4 / 4 | Occurrence constants (optional / repeating / required) used by BinaryFormat. |
 | BufferMode | Implemented | 3 / 3 | Buffer eagerness mode (Eager / Delayed) for *.Buffer. |
@@ -45,7 +45,7 @@ Counts come from `COVERAGE.md`; refresh both via `render.ps1`.
 | Date | Tested | 58 / 58 | Date value operations: arithmetic, parts, IsIn*, FromText, formatting. |
 | DateTime | Tested | 26 / 26 | DateTime value operations (date + time without zone). |
 | DateTimeZone | Tested | 16 / 16 | DateTimeZone value operations (date + time + offset). Includes culture-aware ToText / FromText. |
-| Day | Implemented | 8 / 8 | Day-of-week enum constants (Monday=0 .. Sunday=6). |
+| Day | Tested | 8 / 8 | Day-of-week enum constants (Monday=0 .. Sunday=6). |
 | DB2 | Untouched | 0 / 1 | IBM DB2 connector. |
 | Decimal | Tested | 2 / 2 | Decimal-typed numeric (high-precision) operations. |
 | Diagnostics | Implemented | 3 / 3 | Tracing primitives (Diagnostics.Trace, ActivityId). |
@@ -82,7 +82,7 @@ Counts come from `COVERAGE.md`; refresh both via `render.ps1`.
 | ItemExpression | Untouched | 0 / 2 | Query-folding helper for per-item expressions inside List.* projections. |
 | JoinAlgorithm | Tested | 8 / 8 | Table.NestedJoin algorithm hint (Hash / SortMerge / etc.). |
 | JoinKind | Tested | 9 / 9 | Table.Join / NestedJoin kind (Inner / LeftOuter / FullOuter / etc.). |
-| JoinSide | Implemented | 3 / 3 | Join-side enum for asymmetric joins. |
+| JoinSide | Tested | 3 / 3 | Join-side enum for asymmetric joins. |
 | Json | Tested | 2 / 2 | JSON parser / serialiser (Json.Document, Json.FromValue). |
 | Kusto | Untouched | 0 / 2 | Azure Data Explorer (KQL) connector. |
 | Lakehouse | Untouched | 0 / 1 | Microsoft Fabric Lakehouse connector. |

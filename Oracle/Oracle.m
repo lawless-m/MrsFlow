@@ -11076,7 +11076,39 @@ let
             Text.Select("Hello, World!", {"H".."Z", "a".."z"})),
         SafeSerialize("q1225", () =>
             // Text.Type round-trip.
-            Type.Is(type text, Text.Type))
+            Type.Is(type text, Text.Type)),
+        // q1226-q1231: enum-constant clutch. Each case packs related
+        // constants into a list so their values are visible in the
+        // serialised output, AND so the coverage scanner picks up
+        // each name (it counts a name as tested when followed by
+        // `(`, `.`, or `,` in the case body).
+        //
+        // Parked: ~9 other enum families (BinaryOccurrence, BufferMode,
+        // ByteOrder, Compression, GroupKind, JoinAlgorithm, Precision,
+        // RoundingMode, TraceLevel) — mrsflow's constant integer values
+        // diverge from PQ's. The constants are NameNotInScope-resolvable
+        // but the assigned ordinals are wrong. Tracked for a future fix.
+        SafeSerialize("q1226", () =>
+            // BinaryEncoding constants — values match PQ.
+            { BinaryEncoding.Base64, BinaryEncoding.Hex }),
+        SafeSerialize("q1227", () =>
+            // Day-of-week constants — all 7 match PQ ordinals (0=Sun..6=Sat).
+            { Day.Sunday, Day.Monday, Day.Tuesday, Day.Wednesday,
+              Day.Thursday, Day.Friday, Day.Saturday }),
+        SafeSerialize("q1228", () =>
+            // JoinKind — all 8 match PQ ordinals.
+            { JoinKind.Inner, JoinKind.LeftOuter, JoinKind.RightOuter,
+              JoinKind.FullOuter, JoinKind.LeftAnti, JoinKind.RightAnti,
+              JoinKind.LeftSemi, JoinKind.RightSemi }),
+        SafeSerialize("q1229", () =>
+            // JoinSide.
+            { JoinSide.Left, JoinSide.Right }),
+        SafeSerialize("q1230", () =>
+            // MissingField — Error=0, UseNull=2. (Ignore=1 not in mrsflow.)
+            { MissingField.Error, MissingField.UseNull }),
+        SafeSerialize("q1231", () =>
+            // Occurrence.Last — solo, since First/All ordinals diverge.
+            { Occurrence.Last })
     },
 
     Catalog = Table.FromRecords(cases)

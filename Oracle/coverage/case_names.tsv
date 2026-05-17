@@ -1224,3 +1224,9 @@ q1222	Text.InferNumberType Type.Is
 q1223	Text.ReplaceRange
 q1224	Text.Select
 q1225	Type.Is
+q1226	BinaryEncoding.Base64
+q1227	Day.Friday Day.Monday Day.Sunday Day.Thursday Day.Tuesday Day.Wednesday
+q1228	JoinKind.FullOuter JoinKind.Inner JoinKind.LeftAnti JoinKind.LeftOuter JoinKind.LeftSemi JoinKind.RightAnti JoinKind.RightOuter
+q1229	JoinSide.Left
+q1230	MissingField.Error
+q1231	
