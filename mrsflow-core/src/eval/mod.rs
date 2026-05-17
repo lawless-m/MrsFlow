@@ -14,7 +14,7 @@ mod iohost;
 mod sexpr;
 mod stdlib;
 mod summary;
-mod value;
+pub mod value;
 
 pub use env::{Env, EnvNode, EnvOps};
 pub use iohost::{IoError, IoHost, NoIoHost};
@@ -1378,7 +1378,18 @@ where
     {
         let borrowed = thunk_state.borrow();
         match &*borrowed {
-            ThunkState::Forced(v) => return Ok(v.clone()),
+            ThunkState::Forced(v) => {
+                #[cfg(feature = "profile-clones")]
+                {
+                    use self::value::profile;
+                    use std::sync::atomic::Ordering;
+                    profile::FORCE_HITS.fetch_add(1, Ordering::Relaxed);
+                    if let Value::List(_) = v {
+                        profile::FORCE_LIST_HITS.fetch_add(1, Ordering::Relaxed);
+                    }
+                }
+                return Ok(v.clone());
+            }
             ThunkState::Forcing => {
                 return Err(MError::Other(
                     "cyclic reference: thunk forced while already evaluating".into(),

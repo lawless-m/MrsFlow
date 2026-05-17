@@ -18,7 +18,91 @@ use crate::parser::{Expr, Param};
 use super::env::{Env, EnvNode};
 use super::iohost::IoHost;
 
-#[derive(Debug, Clone)]
+// Profiling counters — bumped from the custom Clone impl below to find
+// hot paths. Read via `value::PROFILE.snapshot()` from the CLI.
+#[cfg(feature = "profile-clones")]
+pub mod profile {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    pub static LIST_CLONES: AtomicU64 = AtomicU64::new(0);
+    pub static LIST_TOTAL_LEN: AtomicU64 = AtomicU64::new(0);
+    // Size buckets: 0, 1, 2-3, 4-7, 8-15, ..., 16384-32767, 32768+
+    pub static LIST_CLONE_BUCKETS: [AtomicU64; 16] = [
+        AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0),
+        AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0),
+        AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0),
+        AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0),
+    ];
+    pub static LIST_CLONE_MAX_LEN: AtomicU64 = AtomicU64::new(0);
+    pub static RECORD_CLONES: AtomicU64 = AtomicU64::new(0);
+    pub static TEXT_CLONES: AtomicU64 = AtomicU64::new(0);
+    pub static BINARY_CLONES: AtomicU64 = AtomicU64::new(0);
+    pub static BINARY_TOTAL_BYTES: AtomicU64 = AtomicU64::new(0);
+    // env::lookup counters — every lookup increments ENV_LOOKUPS;
+    // ENV_LIST_LOOKUPS only when the bound value happens to be a List
+    // (so subtracting that from LIST_CLONES tells us how many list
+    // clones came from elsewhere — stdlib internals, etc).
+    pub static ENV_LOOKUPS: AtomicU64 = AtomicU64::new(0);
+    pub static ENV_LIST_LOOKUPS: AtomicU64 = AtomicU64::new(0);
+    pub static ENV_LIST_LOOKUP_TOTAL_LEN: AtomicU64 = AtomicU64::new(0);
+    // force(thunk) where thunk is already Forced — currently clones
+    // the memoised value. If FORCE_LIST_HITS is the bulk of LIST_CLONES,
+    // sharing the forced value via Rc is the fix.
+    pub static FORCE_HITS: AtomicU64 = AtomicU64::new(0);
+    pub static FORCE_LIST_HITS: AtomicU64 = AtomicU64::new(0);
+    pub fn bump_list(len: usize) {
+        LIST_CLONES.fetch_add(1, Ordering::Relaxed);
+        LIST_TOTAL_LEN.fetch_add(len as u64, Ordering::Relaxed);
+        // Bucket by log2(len) — index 0 = len 0, index 1 = len 1,
+        // index 2 = len 2-3, ..., index 15 = len 16384+.
+        let bucket = if len == 0 { 0 }
+            else if len == 1 { 1 }
+            else {
+                let lg = 64 - (len as u64).leading_zeros() as usize; // ceil(log2)+1
+                lg.min(15)
+            };
+        LIST_CLONE_BUCKETS[bucket].fetch_add(1, Ordering::Relaxed);
+        let mut prev = LIST_CLONE_MAX_LEN.load(Ordering::Relaxed);
+        while (len as u64) > prev {
+            match LIST_CLONE_MAX_LEN.compare_exchange_weak(
+                prev, len as u64, Ordering::Relaxed, Ordering::Relaxed,
+            ) {
+                Ok(_) => break,
+                Err(p) => prev = p,
+            }
+        }
+    }
+    pub fn bump_record() { RECORD_CLONES.fetch_add(1, Ordering::Relaxed); }
+    pub fn bump_text() { TEXT_CLONES.fetch_add(1, Ordering::Relaxed); }
+    pub fn bump_binary(len: usize) {
+        BINARY_CLONES.fetch_add(1, Ordering::Relaxed);
+        BINARY_TOTAL_BYTES.fetch_add(len as u64, Ordering::Relaxed);
+    }
+    pub fn snapshot() -> [(&'static str, u64); 12] {
+        [
+            ("list-clones", LIST_CLONES.load(Ordering::Relaxed)),
+            ("list-total-items-cloned", LIST_TOTAL_LEN.load(Ordering::Relaxed)),
+            ("list-clone-max-len", LIST_CLONE_MAX_LEN.load(Ordering::Relaxed)),
+            ("record-clones", RECORD_CLONES.load(Ordering::Relaxed)),
+            ("text-clones", TEXT_CLONES.load(Ordering::Relaxed)),
+            ("binary-clones", BINARY_CLONES.load(Ordering::Relaxed)),
+            ("binary-total-bytes-cloned", BINARY_TOTAL_BYTES.load(Ordering::Relaxed)),
+            ("env-lookups (total)", ENV_LOOKUPS.load(Ordering::Relaxed)),
+            ("env-list-lookups", ENV_LIST_LOOKUPS.load(Ordering::Relaxed)),
+            ("env-list-lookup-total-len", ENV_LIST_LOOKUP_TOTAL_LEN.load(Ordering::Relaxed)),
+            ("force-hits (forced thunks cloned)", FORCE_HITS.load(Ordering::Relaxed)),
+            ("force-list-hits", FORCE_LIST_HITS.load(Ordering::Relaxed)),
+        ]
+    }
+    pub fn bucket_snapshot() -> [u64; 16] {
+        let mut out = [0u64; 16];
+        for (i, b) in LIST_CLONE_BUCKETS.iter().enumerate() {
+            out[i] = b.load(Ordering::Relaxed);
+        }
+        out
+    }
+}
+
+#[derive(Debug)]
 pub enum Value {
     Null,
     Logical(bool),
@@ -65,6 +149,55 @@ pub enum Value {
     /// Lazy thunk — forced on first access, memoised thereafter. Central to
     /// M's laziness (per design doc §07 §1).
     Thunk(Rc<RefCell<ThunkState>>),
+}
+
+// Hand-written Clone so we can instrument the variants that carry owned
+// allocations. With `profile-clones`, every clone bumps a counter; without
+// it, this compiles to the same code `#[derive(Clone)]` would produce.
+impl Clone for Value {
+    fn clone(&self) -> Self {
+        match self {
+            Value::Null => Value::Null,
+            Value::Logical(b) => Value::Logical(*b),
+            Value::Number(n) => Value::Number(*n),
+            Value::Decimal { mantissa, scale, precision } => Value::Decimal {
+                mantissa: *mantissa, scale: *scale, precision: *precision,
+            },
+            Value::Text(s) => {
+                #[cfg(feature = "profile-clones")]
+                profile::bump_text();
+                Value::Text(s.clone())
+            }
+            Value::Date(d) => Value::Date(*d),
+            Value::Datetime(d) => Value::Datetime(*d),
+            Value::Datetimezone(d) => Value::Datetimezone(*d),
+            Value::Time(t) => Value::Time(*t),
+            Value::Duration(d) => Value::Duration(*d),
+            Value::Binary(b) => {
+                #[cfg(feature = "profile-clones")]
+                profile::bump_binary(b.len());
+                Value::Binary(b.clone())
+            }
+            Value::List(xs) => {
+                #[cfg(feature = "profile-clones")]
+                profile::bump_list(xs.len());
+                Value::List(xs.clone())
+            }
+            Value::Record(r) => {
+                #[cfg(feature = "profile-clones")]
+                profile::bump_record();
+                Value::Record(r.clone())
+            }
+            Value::Table(t) => Value::Table(t.clone()),
+            Value::Function(c) => Value::Function(c.clone()),
+            Value::Type(t) => Value::Type(t.clone()),
+            Value::WithMetadata { inner, meta } => Value::WithMetadata {
+                inner: inner.clone(),
+                meta: meta.clone(),
+            },
+            Value::Thunk(t) => Value::Thunk(t.clone()),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

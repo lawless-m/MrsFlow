@@ -9,6 +9,11 @@ description = "Core evaluator for the M (Power Query) language — lexer, parser
 [lints]
 workspace = true
 
+[features]
+# Bump per-variant clone counters from value::Value's Clone impl. Off by
+# default — flip on only to investigate where copies are happening.
+profile-clones = []
+
 [dependencies]
 unicode-general-category = "1"
 arrow = { version = "53", default-features = false }

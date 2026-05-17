@@ -236,4 +236,24 @@ fn real_main() {
     } else {
         println!("{}", value_to_sexpr(&value));
     }
+
+    #[cfg(feature = "profile-clones")]
+    {
+        eprintln!("--- value clone profile ---");
+        for (name, count) in mrsflow_core::eval::value::profile::snapshot() {
+            eprintln!("  {name}: {count}");
+        }
+        let buckets = mrsflow_core::eval::value::profile::bucket_snapshot();
+        eprintln!("  list-clone size histogram:");
+        let labels = [
+            "0", "1", "2-3", "4-7", "8-15", "16-31", "32-63", "64-127",
+            "128-255", "256-511", "512-1023", "1024-2047", "2048-4095",
+            "4096-8191", "8192-16383", "16384+",
+        ];
+        for (label, count) in labels.iter().zip(buckets.iter()) {
+            if *count > 0 {
+                eprintln!("    [{label:>10}] {count}");
+            }
+        }
+    }
 }

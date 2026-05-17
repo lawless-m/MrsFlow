@@ -55,6 +55,17 @@ impl EnvOps for Env {
         let mut current: Option<&EnvNode> = Some(self);
         while let Some(node) = current {
             if let Some(value) = node.bindings.get(name) {
+                #[cfg(feature = "profile-clones")]
+                {
+                    use super::value::profile;
+                    use std::sync::atomic::Ordering;
+                    profile::ENV_LOOKUPS.fetch_add(1, Ordering::Relaxed);
+                    if let Value::List(xs) = value {
+                        profile::ENV_LIST_LOOKUPS.fetch_add(1, Ordering::Relaxed);
+                        profile::ENV_LIST_LOOKUP_TOTAL_LEN
+                            .fetch_add(xs.len() as u64, Ordering::Relaxed);
+                    }
+                }
                 return Some(value.clone());
             }
             current = node.parent.as_deref();
