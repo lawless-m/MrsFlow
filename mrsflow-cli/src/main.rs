@@ -117,6 +117,21 @@ fn parse_args(raw: Vec<String>) -> CliArgs {
 }
 
 fn main() {
+    // Power Query workloads can build deep evaluator stacks (recursive
+    // closures, big List.Accumulate folds over nested lambdas). 1 MB
+    // Windows default isn't enough for non-trivial M; run main on a
+    // worker thread with a fat stack.
+    let handle = std::thread::Builder::new()
+        .stack_size(64 * 1024 * 1024)
+        .spawn(real_main)
+        .expect("spawn worker thread");
+    match handle.join() {
+        Ok(()) => {}
+        Err(_) => process::exit(101),
+    }
+}
+
+fn real_main() {
     let cli = parse_args(env::args().skip(1).collect());
 
     let want_outputs = !cli.out_names.is_empty() || cli.out_dir.is_some();

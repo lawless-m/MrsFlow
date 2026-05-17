@@ -143,6 +143,44 @@ let
             lumaAt = (idx as number) =>
                 let r = bytes{idx * 4}, g = bytes{idx * 4 + 1}, b = bytes{idx * 4 + 2}
                 in 0.2126 * r + 0.7152 * g + 0.0722 * b,
+            // Otsu threshold — find the 0..255 cut that maximises inter-class
+            // variance over the 8-bit luminance histogram. Single global
+            // threshold per image; the per-block-mean alternative produces
+            // noise, since by construction half the block is below its own
+            // mean regardless of the underlying image.
+            pixelCount = width * height,
+            lumas = List.Transform(List.Numbers(0, pixelCount), (i) =>
+                Number.RoundDown(lumaAt(i))),
+            // Count per bucket. O(256 * N) but each iteration is a tight
+            // List.Count(List.Select) — much faster than O(N) ReplaceRange
+            // builds inside an Accumulate, which clones the 256-list per
+            // pixel.
+            clamped = List.Transform(lumas, (v) =>
+                if v < 0 then 0 else if v > 255 then 255 else v),
+            hist = List.Transform(List.Numbers(0, 256), (i) =>
+                List.Count(List.Select(clamped, each _ = i))),
+            total = pixelCount,
+            sumAll = List.Sum(List.Transform(List.Numbers(0, 256), each _ * hist{_})),
+            otsuStep = (state, i) =>
+                let
+                    wB = state[WB] + hist{i},
+                    sumB = state[SumB] + i * hist{i}
+                in
+                    if wB = 0 or wB = total then
+                        [WB = wB, SumB = sumB, Best = state[Best], BestT = state[BestT]]
+                    else
+                        let
+                            wF = total - wB,
+                            mB = sumB / wB,
+                            mF = (sumAll - sumB) / wF,
+                            between = wB * wF * (mB - mF) * (mB - mF)
+                        in
+                            if between > state[Best]
+                                then [WB = wB, SumB = sumB, Best = between, BestT = i]
+                                else [WB = wB, SumB = sumB, Best = state[Best], BestT = state[BestT]],
+            otsuState = List.Accumulate(List.Numbers(0, 256),
+                [WB = 0, SumB = 0, Best = 0, BestT = 0], otsuStep),
+            threshold = otsuState[BestT],
             pxIdx = (x, y) => if x >= width or y >= height then null else y * width + x,
             cellGlyph = (cx, cy) =>
                 let
@@ -153,11 +191,10 @@ let
                     lTR = if iTR = null then 0 else lumaAt(iTR),
                     lBL = if iBL = null then 0 else lumaAt(iBL),
                     lBR = if iBR = null then 0 else lumaAt(iBR),
-                    mean = (lTL + lTR + lBL + lBR) / 4,
-                    onTL = if lTL > mean then 1 else 0,
-                    onTR = if lTR > mean then 1 else 0,
-                    onBL = if lBL > mean then 1 else 0,
-                    onBR = if lBR > mean then 1 else 0,
+                    onTL = if lTL > threshold then 1 else 0,
+                    onTR = if lTR > threshold then 1 else 0,
+                    onBL = if lBL > threshold then 1 else 0,
+                    onBR = if lBR > threshold then 1 else 0,
                     idx = onTL * 8 + onTR * 4 + onBL * 2 + onBR
                 in
                     glyphs{idx},

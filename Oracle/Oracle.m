@@ -10898,7 +10898,31 @@ let
                 r = try fmt(#binary({21})) in
                     if r[HasError]
                         then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
-                        else [HasError=false, Value=r[Value]])
+                        else [HasError=false, Value=r[Value]]),
+        // q1184: PNG decode + quadrant render — end-to-end exercise of
+        // BinaryFormat + Binary.Decompress + List.Accumulate + Table
+        // building. Loads the decoder and renderer from the
+        // tools/png-decoder source files (composed via
+        // Expression.Evaluate) and runs them over a 64×42 greyscale
+        // PNG, returning the resulting quadrant-glyph table. Uses the
+        // smallest test image in the suite to keep catalog refresh
+        // time bounded (~20s).
+        SafeSerialize("q1184", () =>
+            let
+                decodeSrc = Text.FromBinary(
+                    File.Contents("c:/Users/matthew.heath/Git/MrsFlow/tools/png-decoder/m/Decode.m"),
+                    TextEncoding.Utf8),
+                renderSrc = Text.FromBinary(
+                    File.Contents("c:/Users/matthew.heath/Git/MrsFlow/tools/png-decoder/m/Render.m"),
+                    TextEncoding.Utf8),
+                PngDecode = Expression.Evaluate(decodeSrc, #shared),
+                QuadrantTable = Expression.Evaluate(renderSrc, #shared),
+                decoded = PngDecode(File.Contents(
+                    "c:/Users/matthew.heath/Git/MrsFlow/tools/png-decoder/png-suite/rough-collie-64x42.png"))
+            in
+                if decoded[Success]
+                    then QuadrantTable(decoded[RGBA8], decoded[Width], decoded[Height])
+                    else error decoded[Error])
     },
 
     Catalog = Table.FromRecords(cases)

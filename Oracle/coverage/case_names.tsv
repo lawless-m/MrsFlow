@@ -1182,3 +1182,4 @@ q1180	BinaryFormat.Byte BinaryFormat.List
 q1181	BinaryFormat.Byte BinaryFormat.Choice
 q1182	BinaryFormat.Length BinaryFormat.Text
 q1183	BinaryFormat.Byte BinaryFormat.Transform
+q1184	Expression.Evaluate File.Contents Text.FromBinary

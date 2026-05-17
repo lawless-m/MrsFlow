@@ -59,6 +59,66 @@ let
             pxIdx = (x as number, y as number) =>
                 if x >= width or y >= height then null
                 else y * width + x,
+            // Otsu threshold — pick the 0..255 cut that maximises inter-
+            // class variance over the 8-bit luminance histogram. One
+            // global threshold for the whole image; the per-block-mean
+            // alternative produces noise (by construction half each
+            // block is below its own mean regardless of image content).
+            pixelCount = width * height,
+            lumas = List.Transform(List.Numbers(0, pixelCount), (i) =>
+                Number.RoundDown(lumaAt(i))),
+            clamped = List.Transform(lumas, (v) =>
+                if v < 0 then 0 else if v > 255 then 255 else v),
+            // Sort + single-pass run-length count → record keyed by
+            // luminance string. O(N log N) for the sort, O(N) for the
+            // pass — far better than O(N*256) (256 List.Count(List.Select)
+            // sweeps) or O(N*256) (ReplaceRange Accumulate).
+            sorted = List.Sort(clamped),
+            // Walk the sorted list, accumulating runs. State carries the
+            // current value, its running count, and the completed buckets
+            // (Vals + Counts parallel lists).
+            runState = List.Accumulate(sorted,
+                [Cur = -1, Cnt = 0, Vals = {}, Cnts = {}],
+                (s, v) =>
+                    if v = s[Cur] then
+                        [Cur = s[Cur], Cnt = s[Cnt] + 1, Vals = s[Vals], Cnts = s[Cnts]]
+                    else if s[Cur] = -1 then
+                        [Cur = v, Cnt = 1, Vals = s[Vals], Cnts = s[Cnts]]
+                    else
+                        [Cur = v, Cnt = 1,
+                         Vals = s[Vals] & {Number.ToText(s[Cur])},
+                         Cnts = s[Cnts] & {s[Cnt]}]),
+            // Flush the final run.
+            finalKeys = if runState[Cur] = -1 then runState[Vals]
+                else runState[Vals] & {Number.ToText(runState[Cur])},
+            finalCnts = if runState[Cur] = -1 then runState[Cnts]
+                else runState[Cnts] & {runState[Cnt]},
+            grouped = Record.FromList(finalCnts, finalKeys),
+            hist = List.Transform(List.Numbers(0, 256), (i) =>
+                let key = Number.ToText(i)
+                in if Record.HasFields(grouped, {key}) then Record.Field(grouped, key) else 0),
+            sumAll = List.Sum(List.Transform(List.Numbers(0, 256),
+                each _ * hist{_})),
+            otsuStep = (state, i) =>
+                let
+                    wB = state[WB] + hist{i},
+                    sumB = state[SumB] + i * hist{i}
+                in
+                    if wB = 0 or wB = pixelCount
+                        then [WB = wB, SumB = sumB, Best = state[Best], BestT = state[BestT]]
+                        else
+                            let
+                                wF = pixelCount - wB,
+                                mB = sumB / wB,
+                                mF = (sumAll - sumB) / wF,
+                                between = wB * wF * (mB - mF) * (mB - mF)
+                            in
+                                if between > state[Best]
+                                    then [WB = wB, SumB = sumB, Best = between, BestT = i]
+                                    else [WB = wB, SumB = sumB, Best = state[Best], BestT = state[BestT]],
+            otsuState = List.Accumulate(List.Numbers(0, 256),
+                [WB = 0, SumB = 0, Best = 0, BestT = 0], otsuStep),
+            threshold = otsuState[BestT],
             cellGlyph = (cx as number, cy as number) =>
                 let
                     x = cx * 2,
@@ -71,13 +131,10 @@ let
                     lTR = if iTR = null then 0 else lumaAt(iTR),
                     lBL = if iBL = null then 0 else lumaAt(iBL),
                     lBR = if iBR = null then 0 else lumaAt(iBR),
-                    // Per-block-mean threshold: each sub-pixel is "on"
-                    // if its luma is above the 2×2 block's mean.
-                    mean = (lTL + lTR + lBL + lBR) / 4,
-                    onTL = if lTL > mean then 1 else 0,
-                    onTR = if lTR > mean then 1 else 0,
-                    onBL = if lBL > mean then 1 else 0,
-                    onBR = if lBR > mean then 1 else 0,
+                    onTL = if lTL > threshold then 1 else 0,
+                    onTR = if lTR > threshold then 1 else 0,
+                    onBL = if lBL > threshold then 1 else 0,
+                    onBR = if lBR > threshold then 1 else 0,
                     idx = onTL * 8 + onTR * 4 + onBL * 2 + onBR
                 in
                     glyphs{idx},

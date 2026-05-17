@@ -56,7 +56,7 @@ let
                     acc2 = acc & {c}
                 in
                     if c[Type] = "IEND" then acc2
-                    else walkChunks(bin, offset + c[Consumed], acc2),
+                    else @walkChunks(bin, offset + c[Consumed], acc2),
 
             chunks = if sigMatch then walkChunks(input, 8, {}) else {},
 

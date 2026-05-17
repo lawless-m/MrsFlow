@@ -425,14 +425,14 @@ Source: q1167.mrsflow.out.
 | `Excel.Workbook` | Y | Y | function |  |  |
 | `Exchange.Contents` | Y |  | missing |  |  |
 | `Expression.Constant` | Y | Y | function |  |  |
-| `Expression.Evaluate` | Y | Y | function | q401 q402 q403 q404 q405 q1167 | MATCH |
+| `Expression.Evaluate` | Y | Y | function | q401 q402 q403 q404 q405 q1167 q1184 | MATCH |
 | `Expression.Identifier` | Y | Y | function |  |  |
 | `ExtraValues.Error` | Y | Y | constant |  |  |
 | `ExtraValues.Ignore` | Y | Y | constant |  |  |
 | `ExtraValues.List` | Y | Y | constant |  |  |
 | `ExtraValues.Type` | Y | Y | constant |  |  |
 | `Fabric.Warehouse` | Y |  | missing |  |  |
-| `File.Contents` | Y | Y | function | q1167 | MATCH |
+| `File.Contents` | Y | Y | function | q1167 q1184 | MATCH |
 | `File.Modified` |  | Y | function |  |  |
 | `Folder.Contents` | Y | Y | function | q11 | MATCH |
 | `Folder.Files` | Y | Y | function |  |  |
@@ -893,7 +893,7 @@ Source: q1167.mrsflow.out.
 | `Text.EndsWith` | Y | Y | function | q495 q1118 | MATCH |
 | `Text.Format` | Y | Y | function | q191 q192 q193 q194 q195 q828 q829 q830 q831 q832 q833 q834 | MATCH |
 | `Text.From` | Y | Y | function | q27 q228 q271 q272 q273 q274 q275 q868 q871 q928 q955 q956 q1053 q1151 q1154 q1156 q1157 | MATCH |
-| `Text.FromBinary` | Y | Y | function | q8 q266 q267 q268 q269 q270 q536 q537 q538 q539 q540 q1155 q1167 | MATCH |
+| `Text.FromBinary` | Y | Y | function | q8 q266 q267 q268 q269 q270 q536 q537 q538 q539 q540 q1155 q1167 q1184 | MATCH |
 | `Text.InferNumberType` | Y | Y | function |  |  |
 | `Text.Insert` | Y | Y | function | q486 q490 q791 q792 q793 q794 q795 q796 q797 | MATCH |
 | `Text.Length` | Y | Y | function | q30 q496 q497 q500 q569 q570 q651 q813 q814 q819 q844 q845 q846 q848 q852 q870 | MATCH |
