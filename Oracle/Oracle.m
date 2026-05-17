@@ -11616,7 +11616,78 @@ let
                 Type.ForRecord([a = [Type = type number, Optional = false]], false))),
         SafeSerialize("q1332", () =>
             // Same probe but with an empty Type.ForRecord.
-            Type.IsOpenRecord(Type.ForRecord([], false)))
+            Type.IsOpenRecord(Type.ForRecord([], false))),
+        // q1333-q1346: Date.IsIn* with fixed offsets from today, plus
+        // a few BinaryFormat numeric parsers. Action.WithErrorContext
+        // parked (mrsflow says "no Action type — Power BI internal").
+        //
+        // Date.IsIn* are bounded by "today" so they're sensitive to
+        // running across a midnight boundary. Each case is N>>1 days
+        // wide so the answer is the same whether mrsflow and Excel
+        // disagree by a minute.
+        SafeSerialize("q1333", () =>
+            // 5 days ago is in the previous 30 days → true.
+            Date.IsInPreviousNDays(
+                Date.AddDays(DateTime.Date(DateTime.LocalNow()), -5), 30)),
+        SafeSerialize("q1334", () =>
+            // 100 days ago is NOT in the previous 30 days → false.
+            Date.IsInPreviousNDays(
+                Date.AddDays(DateTime.Date(DateTime.LocalNow()), -100), 30)),
+        SafeSerialize("q1335", () =>
+            // 5 days from now is in the next 30 days → true.
+            Date.IsInNextNDays(
+                Date.AddDays(DateTime.Date(DateTime.LocalNow()), 5), 30)),
+        SafeSerialize("q1336", () =>
+            // 100 days from now is NOT in the next 30 → false.
+            Date.IsInNextNDays(
+                Date.AddDays(DateTime.Date(DateTime.LocalNow()), 100), 30)),
+        SafeSerialize("q1337", () =>
+            // Today IS in the current year.
+            Date.IsInCurrentYear(DateTime.Date(DateTime.LocalNow()))),
+        SafeSerialize("q1338", () =>
+            // 400 days ago is NOT in the current year.
+            Date.IsInCurrentYear(
+                Date.AddDays(DateTime.Date(DateTime.LocalNow()), -400))),
+        SafeSerialize("q1339", () =>
+            // Today IS in YearToDate.
+            Date.IsInYearToDate(DateTime.Date(DateTime.LocalNow()))),
+        SafeSerialize("q1340", () =>
+            // 400 days ago NOT in YearToDate.
+            Date.IsInYearToDate(
+                Date.AddDays(DateTime.Date(DateTime.LocalNow()), -400))),
+        SafeSerialize("q1341", () =>
+            // BinaryFormat.Decimal — 16-byte decimal, all-zero input
+            // decodes to 0.
+            let
+                fmt = BinaryFormat.Decimal,
+                r = try fmt(#binary({0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}))
+            in
+                if r[HasError] then "ERR" else Number.ToText(r[Value])),
+        SafeSerialize("q1342", () =>
+            // BinaryFormat.SignedInteger64 — 0 bytes = 0.
+            let
+                fmt = BinaryFormat.SignedInteger64,
+                r = try fmt(#binary({0,0,0,0,0,0,0,0}))
+            in
+                if r[HasError] then "ERR" else Number.ToText(r[Value])),
+        SafeSerialize("q1343", () =>
+            // BinaryFormat.UnsignedInteger64 — also 0 for zero bytes.
+            let
+                fmt = BinaryFormat.UnsignedInteger64,
+                r = try fmt(#binary({0,0,0,0,0,0,0,0}))
+            in
+                if r[HasError] then "ERR" else Number.ToText(r[Value])),
+        // Binary.InferContentType parked: mrsflow returns null,
+        // Excel returns a populated CSV-delimiter-detection record.
+        // Real feature gap.
+        SafeSerialize("q1344", () =>
+            // 5 weeks ago is in the previous 10 weeks → true.
+            Date.IsInPreviousNWeeks(
+                Date.AddDays(DateTime.Date(DateTime.LocalNow()), -35), 10)),
+        SafeSerialize("q1345", () =>
+            // 5 months ago is in the previous 12 months → true.
+            Date.IsInPreviousNMonths(
+                Date.AddDays(DateTime.Date(DateTime.LocalNow()), -150), 12))
     },
 
     Catalog = Table.FromRecords(cases)

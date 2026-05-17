@@ -1331,3 +1331,16 @@ q1329	Type.ForRecord Type.IsOpenRecord
 q1330	Type.TableKeys
 q1331	Type.ForRecord Type.IsOpenRecord
 q1332	Type.ForRecord Type.IsOpenRecord
+q1333	Date.AddDays Date.IsInPreviousNDays DateTime.Date DateTime.LocalNow
+q1334	Date.AddDays Date.IsInPreviousNDays DateTime.Date DateTime.LocalNow
+q1335	Date.AddDays Date.IsInNextNDays DateTime.Date DateTime.LocalNow
+q1336	Date.AddDays Date.IsInNextNDays DateTime.Date DateTime.LocalNow
+q1337	Date.IsInCurrentYear DateTime.Date DateTime.LocalNow
+q1338	Date.AddDays Date.IsInCurrentYear DateTime.Date DateTime.LocalNow
+q1339	Date.IsInYearToDate DateTime.Date DateTime.LocalNow
+q1340	Date.AddDays Date.IsInYearToDate DateTime.Date DateTime.LocalNow
+q1341	BinaryFormat.Decimal Number.ToText
+q1342	BinaryFormat.SignedInteger64 Number.ToText
+q1343	BinaryFormat.UnsignedInteger64 Number.ToText
+q1344	Date.AddDays Date.IsInPreviousNWeeks DateTime.Date DateTime.LocalNow
+q1345	Date.AddDays Date.IsInPreviousNMonths DateTime.Date DateTime.LocalNow

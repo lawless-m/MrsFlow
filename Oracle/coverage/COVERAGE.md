@@ -29,7 +29,7 @@ Source: q1167.mrsflow.out.
 | AzureStorage | 5 | 5 | 0 | 0 | 5 | 0 | 0 | 0 |
 | Binary | 18 | 18 | 18 | 18 | 0 | 0 | 12 | 0 |
 | BinaryEncoding | 3 | 3 | 3 | 3 | 0 | 0 | 1 | 0 |
-| BinaryFormat | 22 | 22 | 22 | 22 | 0 | 0 | 19 | 13 |
+| BinaryFormat | 22 | 22 | 22 | 22 | 0 | 0 | 22 | 13 |
 | BinaryOccurrence | 4 | 4 | 4 | 4 | 0 | 0 | 0 | 0 |
 | BufferMode | 3 | 3 | 3 | 3 | 0 | 0 | 0 | 0 |
 | Byte | 2 | 2 | 2 | 2 | 0 | 0 | 2 | 0 |
@@ -46,8 +46,8 @@ Source: q1167.mrsflow.out.
 | Culture | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Currency | 2 | 2 | 2 | 2 | 0 | 0 | 1 | 0 |
 | DataLake | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
-| Date | 58 | 58 | 58 | 58 | 0 | 0 | 32 | 0 |
-| DateTime | 26 | 26 | 26 | 26 | 0 | 0 | 7 | 0 |
+| Date | 58 | 58 | 58 | 58 | 0 | 0 | 38 | 0 |
+| DateTime | 26 | 26 | 26 | 26 | 0 | 0 | 8 | 0 |
 | DateTimeZone | 16 | 16 | 16 | 16 | 0 | 0 | 10 | 0 |
 | Day | 8 | 8 | 8 | 8 | 0 | 0 | 6 | 0 |
 | DB2 | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
@@ -155,7 +155,7 @@ Source: q1167.mrsflow.out.
 | WebAction | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | WebMethod | 7 | 7 | 7 | 7 | 0 | 0 | 0 | 0 |
 | Xml | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| **TOTAL** | 860 | 856 | 720 | 716 | 140 | 4 | 472 | 19 |
+| **TOTAL** | 860 | 856 | 720 | 716 | 140 | 4 | 482 | 19 |
 
 ## Per-name detail
 
@@ -211,7 +211,7 @@ Source: q1167.mrsflow.out.
 | `BinaryFormat.Byte` | Y | Y | function | q1170 q1178 q1179 q1180 q1181 q1183 | MIXED |
 | `BinaryFormat.ByteOrder` | Y | Y | function | q1176 | DIFF |
 | `BinaryFormat.Choice` | Y | Y | function | q1181 | DIFF |
-| `BinaryFormat.Decimal` | Y | Y | function |  |  |
+| `BinaryFormat.Decimal` | Y | Y | function | q1341 | MATCH |
 | `BinaryFormat.Double` | Y | Y | function | q1172 | DIFF |
 | `BinaryFormat.Group` | Y | Y | function | q1179 | DIFF |
 | `BinaryFormat.Length` | Y | Y | function | q1182 | MATCH |
@@ -220,13 +220,13 @@ Source: q1167.mrsflow.out.
 | `BinaryFormat.Record` | Y | Y | function | q1178 | DIFF |
 | `BinaryFormat.SignedInteger16` | Y | Y | function | q1171 | DIFF |
 | `BinaryFormat.SignedInteger32` | Y | Y | function | q1171 | DIFF |
-| `BinaryFormat.SignedInteger64` | Y | Y | function |  |  |
+| `BinaryFormat.SignedInteger64` | Y | Y | function | q1342 | MATCH |
 | `BinaryFormat.Single` | Y | Y | function | q1172 | DIFF |
 | `BinaryFormat.Text` | Y | Y | function | q1175 q1182 | MATCH |
 | `BinaryFormat.Transform` | Y | Y | function | q1183 | MATCH |
 | `BinaryFormat.UnsignedInteger16` | Y | Y | function | q1170 q1178 | DIFF |
 | `BinaryFormat.UnsignedInteger32` | Y | Y | function | q1170 q1176 | DIFF |
-| `BinaryFormat.UnsignedInteger64` | Y | Y | function |  |  |
+| `BinaryFormat.UnsignedInteger64` | Y | Y | function | q1343 | MATCH |
 | `BinaryOccurrence.Optional` | Y | Y | constant |  |  |
 | `BinaryOccurrence.Repeating` | Y | Y | constant |  |  |
 | `BinaryOccurrence.Required` | Y | Y | constant |  |  |
@@ -286,7 +286,7 @@ Source: q1167.mrsflow.out.
 | `Currency.Type` | Y | Y | constant |  |  |
 | `DataLake.Contents` | Y |  | missing |  |  |
 | `DataLake.Files` | Y |  | missing |  |  |
-| `Date.AddDays` | Y | Y | function | q78 q224 q229 q606 q616 q1062 | MATCH |
+| `Date.AddDays` | Y | Y | function | q78 q224 q229 q606 q616 q1062 q1333 q1334 q1335 q1336 q1338 q1340 q1344 q1345 | MATCH |
 | `Date.AddMonths` | Y | Y | function | q221 q617 q1061 | MATCH |
 | `Date.AddQuarters` | Y | Y | function | q225 q620 | MATCH |
 | `Date.AddWeeks` | Y | Y | function | q620 | MATCH |
@@ -307,10 +307,10 @@ Source: q1167.mrsflow.out.
 | `Date.IsInCurrentMonth` | Y | Y | function |  |  |
 | `Date.IsInCurrentQuarter` | Y | Y | function |  |  |
 | `Date.IsInCurrentWeek` | Y | Y | function |  |  |
-| `Date.IsInCurrentYear` | Y | Y | function |  |  |
+| `Date.IsInCurrentYear` | Y | Y | function | q1337 q1338 | MATCH |
 | `Date.IsInNextDay` | Y | Y | function |  |  |
 | `Date.IsInNextMonth` | Y | Y | function |  |  |
-| `Date.IsInNextNDays` | Y | Y | function |  |  |
+| `Date.IsInNextNDays` | Y | Y | function | q1335 q1336 | MATCH |
 | `Date.IsInNextNMonths` | Y | Y | function |  |  |
 | `Date.IsInNextNQuarters` | Y | Y | function |  |  |
 | `Date.IsInNextNWeeks` | Y | Y | function |  |  |
@@ -320,15 +320,15 @@ Source: q1167.mrsflow.out.
 | `Date.IsInNextYear` | Y | Y | function |  |  |
 | `Date.IsInPreviousDay` | Y | Y | function |  |  |
 | `Date.IsInPreviousMonth` | Y | Y | function |  |  |
-| `Date.IsInPreviousNDays` | Y | Y | function |  |  |
-| `Date.IsInPreviousNMonths` | Y | Y | function |  |  |
+| `Date.IsInPreviousNDays` | Y | Y | function | q1333 q1334 | MATCH |
+| `Date.IsInPreviousNMonths` | Y | Y | function | q1345 | MATCH |
 | `Date.IsInPreviousNQuarters` | Y | Y | function |  |  |
-| `Date.IsInPreviousNWeeks` | Y | Y | function |  |  |
+| `Date.IsInPreviousNWeeks` | Y | Y | function | q1344 | MATCH |
 | `Date.IsInPreviousNYears` | Y | Y | function |  |  |
 | `Date.IsInPreviousQuarter` | Y | Y | function |  |  |
 | `Date.IsInPreviousWeek` | Y | Y | function |  |  |
 | `Date.IsInPreviousYear` | Y | Y | function |  |  |
-| `Date.IsInYearToDate` | Y | Y | function |  |  |
+| `Date.IsInYearToDate` | Y | Y | function | q1339 q1340 | MATCH |
 | `Date.IsLeapYear` | Y | Y | function | q618 | MATCH |
 | `Date.Month` | Y | Y | function | q76 q1073 | MATCH |
 | `Date.MonthName` | Y | Y | function | q1251 | MATCH |
@@ -345,7 +345,7 @@ Source: q1167.mrsflow.out.
 | `Date.WeekOfYear` | Y | Y | function | q442 q1064 | MATCH |
 | `Date.Year` | Y | Y | function | q75 q1073 | MATCH |
 | `DateTime.AddZone` | Y | Y | function |  |  |
-| `DateTime.Date` | Y | Y | function | q1073 | MATCH |
+| `DateTime.Date` | Y | Y | function | q1073 q1333 q1334 q1335 q1336 q1337 q1338 q1339 q1340 q1344 q1345 | MATCH |
 | `DateTime.FixedLocalNow` | Y | Y | function |  |  |
 | `DateTime.From` | Y | Y | function | q1067 q1068 | MATCH |
 | `DateTime.FromFileTime` | Y | Y | function | q1255 | MATCH |
@@ -365,7 +365,7 @@ Source: q1167.mrsflow.out.
 | `DateTime.IsInPreviousNMinutes` | Y | Y | function |  |  |
 | `DateTime.IsInPreviousNSeconds` | Y | Y | function |  |  |
 | `DateTime.IsInPreviousSecond` | Y | Y | function |  |  |
-| `DateTime.LocalNow` | Y | Y | function |  |  |
+| `DateTime.LocalNow` | Y | Y | function | q1333 q1334 q1335 q1336 q1337 q1338 q1339 q1340 q1344 q1345 | MATCH |
 | `DateTime.Time` | Y | Y | function | q1073 | MATCH |
 | `DateTime.ToRecord` | Y | Y | function | q1256 | MATCH |
 | `DateTime.ToText` | Y | Y | function | q160 q161 q183 q184 q611 q612 q613 q614 q615 q1070 | MATCH |
@@ -645,7 +645,7 @@ Source: q1167.mrsflow.out.
 | `Number.Sqrt` | Y | Y | function | q542 q684 q685 q690 q753 | MATCH |
 | `Number.Tan` | Y | Y | function | q546 q549 | MATCH |
 | `Number.Tanh` | Y | Y | function | q1216 | MATCH |
-| `Number.ToText` | Y | Y | function | q44 q154 q155 q156 q157 q158 q159 q176 q177 q178 q179 q180 q691 q692 q693 q694 q695 q696 q697 q698 q699 q700 q701 q702 q703 q704 q705 q706 q707 q708 q709 q710 q711 q712 q713 q714 q715 q716 q717 q718 q719 q720 q721 q722 q723 q724 q725 q726 q727 q728 q729 q730 q731 q732 q733 q734 q735 q736 q737 q738 q739 q1152 | MATCH |
+| `Number.ToText` | Y | Y | function | q44 q154 q155 q156 q157 q158 q159 q176 q177 q178 q179 q180 q691 q692 q693 q694 q695 q696 q697 q698 q699 q700 q701 q702 q703 q704 q705 q706 q707 q708 q709 q710 q711 q712 q713 q714 q715 q716 q717 q718 q719 q720 q721 q722 q723 q724 q725 q726 q727 q728 q729 q730 q731 q732 q733 q734 q735 q736 q737 q738 q739 q1152 q1341 q1342 q1343 | MATCH |
 | `Number.Type` | Y | Y | constant |  |  |
 | `Occurrence.All` | Y | Y | constant | q823 | MATCH |
 | `Occurrence.First` | Y | Y | constant | q84 q123 q370 q494 q823 | MATCH |
