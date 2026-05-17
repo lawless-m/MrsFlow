@@ -1285,3 +1285,15 @@ q1283	Percentage.Type Type.Is
 q1284	Byte.Type Type.Is
 q1285	Type.Is
 q1286	Byte.From
+q1287	Table.ContainsAll Table.FromRecords
+q1288	Table.ContainsAny Table.FromRecords
+q1289	Table.DuplicateColumn Table.FromRecords
+q1290	Table.FindText Table.FromRecords
+q1291	Table.FirstValue Table.FromRecords
+q1292	Table.FromRecords Table.HasColumns
+q1293	Table.FromRecords Table.IsDistinct
+q1294	Table.FromRecords Table.LastN
+q1295	Number.Mod Table.FromRecords Table.MatchesAllRows
+q1296	Table.FromRecords Table.MatchesAnyRows
+q1297	Table.AlternateRows Table.FromRecords
+q1298	Table.FromRecords Table.Range

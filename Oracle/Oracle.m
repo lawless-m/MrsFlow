@@ -11342,7 +11342,74 @@ let
               Type.Is("ab", Character.Type) }),
         SafeSerialize("q1286", () =>
             // Byte.From converts a number to a byte (0..255).
-            { Byte.From(42), Byte.From(255) })
+            { Byte.From(42), Byte.From(255) }),
+        // q1287-q1298: Table family — implemented but untested.
+        // Each case spins up a small fixture via Table.FromRecords;
+        // read-only queries only.
+        SafeSerialize("q1287", () =>
+            // ContainsAll — true if EVERY supplied row exists.
+            Table.ContainsAll(
+                Table.FromRecords({[a=1,b=2],[a=3,b=4],[a=5,b=6]}),
+                {[a=1,b=2], [a=5,b=6]})),
+        SafeSerialize("q1288", () =>
+            // ContainsAny — true if ANY supplied row exists.
+            Table.ContainsAny(
+                Table.FromRecords({[a=1,b=2],[a=3,b=4]}),
+                {[a=99,b=99], [a=1,b=2]})),
+        SafeSerialize("q1289", () =>
+            // DuplicateColumn copies a column under a new name.
+            Table.DuplicateColumn(
+                Table.FromRecords({[a=1,b=2],[a=3,b=4]}),
+                "a", "a_copy")),
+        SafeSerialize("q1290", () =>
+            // FindText returns rows where any column's text-form contains
+            // the substring.
+            Table.FindText(
+                Table.FromRecords({[name="apple"],[name="banana"],[name="apricot"]}),
+                "ap")),
+        SafeSerialize("q1291", () =>
+            // FirstValue — top-left cell.
+            Table.FirstValue(
+                Table.FromRecords({[a=10,b=20],[a=30,b=40]}))),
+        SafeSerialize("q1292", () =>
+            // HasColumns — true iff all named columns exist.
+            { Table.HasColumns(
+                Table.FromRecords({[a=1,b=2]}), {"a","b"}),
+              Table.HasColumns(
+                Table.FromRecords({[a=1,b=2]}), {"a","c"}) }),
+        SafeSerialize("q1293", () =>
+            // IsDistinct — true if all rows are unique.
+            { Table.IsDistinct(
+                Table.FromRecords({[a=1],[a=2],[a=3]})),
+              Table.IsDistinct(
+                Table.FromRecords({[a=1],[a=2],[a=1]})) }),
+        SafeSerialize("q1294", () =>
+            // LastN — keep last N rows.
+            Table.LastN(
+                Table.FromRecords({[a=1],[a=2],[a=3],[a=4],[a=5]}), 2)),
+        SafeSerialize("q1295", () =>
+            // MatchesAllRows — predicate over rows.
+            Table.MatchesAllRows(
+                Table.FromRecords({[a=2],[a=4],[a=6]}),
+                each Number.Mod(_[a], 2) = 0)),
+        SafeSerialize("q1296", () =>
+            // MatchesAnyRows.
+            Table.MatchesAnyRows(
+                Table.FromRecords({[a=1],[a=3],[a=4]}),
+                each _[a] > 3)),
+        // Table.MaxN, Table.MinN parked: mrsflow v1 only accepts text
+        // column name for comparisonCriteria; Excel rejects the same
+        // and wants a lambda. Two different APIs.
+        SafeSerialize("q1297", () =>
+            // AlternateRows — drop every other row starting at offset.
+            Table.AlternateRows(
+                Table.FromRecords({[a=1],[a=2],[a=3],[a=4],[a=5],[a=6]}),
+                0, 1, 1)),
+        SafeSerialize("q1298", () =>
+            // Range — extract a window of rows starting at offset, count.
+            Table.Range(
+                Table.FromRecords({[a=1],[a=2],[a=3],[a=4],[a=5]}),
+                1, 2))
     },
 
     Catalog = Table.FromRecords(cases)
