@@ -11467,7 +11467,64 @@ let
             // Transpose swaps rows and columns. Column names of the
             // result are auto-generated.
             Table.Transpose(
-                Table.FromRecords({[a=1,b=2,c=3],[a=4,b=5,c=6]})))
+                Table.FromRecords({[a=1,b=2,c=3],[a=4,b=5,c=6]}))),
+        // q1311-q1322: more Table ops.
+        SafeSerialize("q1311", () =>
+            // Keys — list of key declarations on the table. A plain
+            // Table.FromRecords table has no keys; result is {}.
+            Table.Keys(Table.FromRecords({[a=1]}))),
+        // Parked from this batch:
+        // - Table.AddKey, Table.ReplaceKeys: mrsflow doesn't preserve
+        //   key metadata yet (Table.Keys always returns {}).
+        // - Table.CombineColumnsToRecord: mrsflow places the new
+        //   record-column at the end; Excel places it at the original
+        //   position of the first combined column.
+        SafeSerialize("q1312", () =>
+            // SplitAt — split into two tables at row N.
+            Table.SplitAt(
+                Table.FromRecords({[a=1],[a=2],[a=3],[a=4]}),
+                2)),
+        SafeSerialize("q1313", () =>
+            // Split — chunk into N-row sub-tables.
+            Table.Split(
+                Table.FromRecords({[a=1],[a=2],[a=3],[a=4],[a=5]}),
+                2)),
+        SafeSerialize("q1314", () =>
+            // RemoveMatchingRows — drop rows matching any of the given
+            // record predicates.
+            Table.RemoveMatchingRows(
+                Table.FromRecords({[a=1,b=2],[a=3,b=4],[a=5,b=6]}),
+                {[a=3,b=4]})),
+        SafeSerialize("q1315", () =>
+            // ReplaceMatchingRows — swap matching rows with replacement.
+            Table.ReplaceMatchingRows(
+                Table.FromRecords({[a=1],[a=2],[a=3]}),
+                {{[a=2], [a=99]}})),
+        SafeSerialize("q1316", () =>
+            // ReplaceRows — replace a contiguous range of rows.
+            Table.ReplaceRows(
+                Table.FromRecords({[a=1],[a=2],[a=3],[a=4],[a=5]}),
+                1, 2, {[a=99]})),
+        SafeSerialize("q1317", () =>
+            // TransformColumnNames maps each column name with a fn.
+            Table.TransformColumnNames(
+                Table.FromRecords({[a=1, b=2]}),
+                each Text.Upper(_))),
+        SafeSerialize("q1318", () =>
+            // TransformRows — project each row through a function.
+            // Returns a list (not a table) — Excel and mrsflow agree.
+            Table.TransformRows(
+                Table.FromRecords({[a=1],[a=2],[a=3]}),
+                each [a] * 10)),
+        SafeSerialize("q1319", () =>
+            // AddJoinColumn left-joins another table and stores its
+            // rows in a new (nested) column.
+            Table.AddJoinColumn(
+                Table.FromRecords({[id=1],[id=2]}),
+                "id",
+                Table.FromRecords({[id=1, v="a"], [id=1, v="b"], [id=2, v="c"]}),
+                "id",
+                "joined"))
     },
 
     Catalog = Table.FromRecords(cases)

@@ -1309,3 +1309,12 @@ q1307	Table.FromRecords Table.SingleRow
 q1308	Table.FromRecords Table.ToColumns
 q1309	Table.FromRecords Table.ToRecords
 q1310	Table.FromRecords Table.Transpose
+q1311	Table.FromRecords Table.Keys
+q1312	Table.FromRecords Table.SplitAt
+q1313	Table.FromRecords Table.Split
+q1314	Table.FromRecords Table.RemoveMatchingRows
+q1315	Table.FromRecords Table.ReplaceMatchingRows
+q1316	Table.FromRecords Table.ReplaceRows
+q1317	Table.FromRecords Table.TransformColumnNames Text.Upper
+q1318	Table.FromRecords Table.TransformRows
+q1319	Table.AddJoinColumn Table.FromRecords
