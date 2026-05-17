@@ -72,17 +72,17 @@ Source: q1167.mrsflow.out.
 | GeometryPoint | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Graph | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | GroupKind | 3 | 3 | 3 | 3 | 0 | 0 | 1 | 0 |
-| Guid | 2 | 2 | 1 | 1 | 1 | 0 | 0 | 0 |
+| Guid | 2 | 2 | 1 | 1 | 1 | 0 | 1 | 0 |
 | Hdfs | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
 | HdInsight | 3 | 3 | 0 | 0 | 3 | 0 | 0 | 0 |
 | Html | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | Identity | 3 | 3 | 0 | 0 | 3 | 0 | 0 | 0 |
 | IdentityProvider | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
 | Informix | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
-| Int16 | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| Int32 | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
+| Int16 | 2 | 2 | 2 | 2 | 0 | 0 | 1 | 0 |
+| Int32 | 2 | 2 | 2 | 2 | 0 | 0 | 1 | 0 |
 | Int64 | 2 | 2 | 2 | 2 | 0 | 0 | 1 | 0 |
-| Int8 | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
+| Int8 | 2 | 2 | 2 | 2 | 0 | 0 | 1 | 0 |
 | ItemExpression | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
 | JoinAlgorithm | 8 | 8 | 8 | 8 | 0 | 0 | 3 | 0 |
 | JoinKind | 9 | 9 | 9 | 9 | 0 | 0 | 7 | 0 |
@@ -91,7 +91,7 @@ Source: q1167.mrsflow.out.
 | Kusto | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
 | Lakehouse | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | LimitClauseKind | 6 | 6 | 6 | 6 | 0 | 0 | 0 | 0 |
-| Lines | 4 | 4 | 4 | 4 | 0 | 0 | 2 | 0 |
+| Lines | 4 | 4 | 4 | 4 | 0 | 0 | 3 | 0 |
 | List | 72 | 72 | 71 | 71 | 1 | 0 | 65 | 1 |
 | Logical | 4 | 4 | 4 | 4 | 0 | 0 | 4 | 0 |
 | MissingField | 4 | 4 | 3 | 3 | 1 | 0 | 2 | 0 |
@@ -148,14 +148,14 @@ Source: q1167.mrsflow.out.
 | TimeZone | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | TraceLevel | 6 | 6 | 5 | 5 | 1 | 0 | 0 | 0 |
 | Type | 25 | 25 | 24 | 24 | 1 | 0 | 12 | 0 |
-| Uri | 5 | 5 | 5 | 5 | 0 | 0 | 2 | 0 |
+| Uri | 5 | 5 | 5 | 5 | 0 | 0 | 3 | 0 |
 | Value | 27 | 27 | 26 | 26 | 1 | 0 | 14 | 0 |
 | Variable | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
 | Web | 4 | 4 | 4 | 4 | 0 | 0 | 0 | 0 |
 | WebAction | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | WebMethod | 7 | 7 | 7 | 7 | 0 | 0 | 0 | 0 |
 | Xml | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| **TOTAL** | 860 | 856 | 720 | 716 | 140 | 4 | 514 | 19 |
+| **TOTAL** | 860 | 856 | 720 | 716 | 140 | 4 | 520 | 19 |
 
 ## Per-name detail
 
@@ -453,7 +453,7 @@ Source: q1167.mrsflow.out.
 | `GroupKind.Global` | Y | Y | constant | q89 | MATCH |
 | `GroupKind.Local` | Y | Y | constant |  |  |
 | `GroupKind.Type` | Y | Y | constant |  |  |
-| `Guid.From` | Y | Y | function |  |  |
+| `Guid.From` | Y | Y | function | q1385 | MATCH |
 | `Guid.Type` | Y |  | missing |  |  |
 | `Hdfs.Contents` | Y |  | missing |  |  |
 | `Hdfs.Files` | Y |  | missing |  |  |
@@ -467,13 +467,13 @@ Source: q1167.mrsflow.out.
 | `IdentityProvider.Default` | Y |  | missing |  |  |
 | `IdentityProvider.Type` | Y |  | missing |  |  |
 | `Informix.Database` | Y |  | missing |  |  |
-| `Int16.From` | Y | Y | function |  |  |
+| `Int16.From` | Y | Y | function | q1383 | MATCH |
 | `Int16.Type` | Y | Y | constant |  |  |
-| `Int32.From` | Y | Y | function |  |  |
+| `Int32.From` | Y | Y | function | q1384 | MATCH |
 | `Int32.Type` | Y | Y | constant |  |  |
 | `Int64.From` | Y | Y | function | q475 | MATCH |
 | `Int64.Type` | Y | Y | constant |  |  |
-| `Int8.From` | Y | Y | function |  |  |
+| `Int8.From` | Y | Y | function | q1382 | MATCH |
 | `Int8.Type` | Y | Y | constant |  |  |
 | `Invoked FunctionEvalFile` | Y |  | missing |  |  |
 | `ItemExpression.From` | Y |  | missing |  |  |
@@ -509,7 +509,7 @@ Source: q1167.mrsflow.out.
 | `LimitClauseKind.None` | Y | Y | constant |  |  |
 | `LimitClauseKind.Top` | Y | Y | constant |  |  |
 | `LimitClauseKind.Type` | Y | Y | constant |  |  |
-| `Lines.FromBinary` | Y | Y | function |  |  |
+| `Lines.FromBinary` | Y | Y | function | q1386 | MATCH |
 | `Lines.FromText` | Y | Y | function | q296 q297 q298 q299 q300 q1093 | MATCH |
 | `Lines.ToBinary` | Y | Y | function |  |  |
 | `Lines.ToText` | Y | Y | function | q300 q1094 | MATCH |
@@ -917,7 +917,7 @@ Source: q1167.mrsflow.out.
 | `Text.SplitAny` | Y | Y | function | q304 q771 q773 | MATCH |
 | `Text.Start` | Y | Y | function | q33 q652 | MATCH |
 | `Text.StartsWith` | Y | Y | function | q495 q593 q1118 q1147 | MATCH |
-| `Text.ToBinary` | Y | Y | function | q8 q9 q10 q236 q237 q238 q239 q240 q350 q1088 q1089 q1090 q1091 q1092 | MATCH |
+| `Text.ToBinary` | Y | Y | function | q8 q9 q10 q236 q237 q238 q239 q240 q350 q1088 q1089 q1090 q1091 q1092 q1386 | MATCH |
 | `Text.ToList` | Y | Y | function | q499 q816 | MATCH |
 | `Text.Trim` | Y | Y | function | q38 q562 q564 q565 q798 q799 q800 q801 q802 q803 q804 | MATCH |
 | `Text.TrimEnd` | Y | Y | function | q563 q564 q801 q804 | MATCH |
@@ -976,7 +976,7 @@ Source: q1167.mrsflow.out.
 | `Uri.BuildQueryString` | Y | Y | function |  |  |
 | `Uri.Combine` | Y | Y | function | q1326 | MATCH |
 | `Uri.EscapeDataString` | Y | Y | function | q1327 | MATCH |
-| `Uri.Parts` | Y | Y | function |  |  |
+| `Uri.Parts` | Y | Y | function | q1387 | MATCH |
 | `Uri.Type` | Y | Y | constant |  |  |
 | `Value.Add` | Y | Y | function | q1263 | MATCH |
 | `Value.Alternates` | Y | Y | function |  |  |

@@ -1,0 +1,1 @@
+{"Scheme":"https","Host":"example.com","Port":8443,"Path":"\/foo\/bar","Query":{"x":"1"},"Fragment":"frag","UserName":"user","Password":"pwd"}

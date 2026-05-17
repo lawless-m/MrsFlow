@@ -75,10 +75,10 @@ Counts come from `COVERAGE.md`; refresh both via `render.ps1`.
 | Identity | Untouched | 0 / 3 | User-identity record. |
 | IdentityProvider | Untouched | 0 / 2 | Identity-provider constants for auth flows. |
 | Informix | Untouched | 0 / 1 | IBM Informix connector. |
-| Int16 | Implemented | 2 / 2 | 16-bit signed integer numeric type. |
-| Int32 | Implemented | 2 / 2 | 32-bit signed integer numeric type. |
+| Int16 | Tested | 2 / 2 | 16-bit signed integer numeric type. |
+| Int32 | Tested | 2 / 2 | 32-bit signed integer numeric type. |
 | Int64 | Tested | 2 / 2 | 64-bit signed integer numeric type. |
-| Int8 | Implemented | 2 / 2 | 8-bit signed integer numeric type. |
+| Int8 | Tested | 2 / 2 | 8-bit signed integer numeric type. |
 | ItemExpression | Untouched | 0 / 2 | Query-folding helper for per-item expressions inside List.* projections. |
 | JoinAlgorithm | Tested | 8 / 8 | Table.NestedJoin algorithm hint (Hash / SortMerge / etc.). |
 | JoinKind | Tested | 9 / 9 | Table.Join / NestedJoin kind (Inner / LeftOuter / FullOuter / etc.). |

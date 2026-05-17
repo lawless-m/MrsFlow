@@ -11850,7 +11850,37 @@ let
             { BinaryEncoding.Base64, BinaryEncoding.Hex }),
         SafeSerialize("q1381", () =>
             // Day.Saturday — scanner missed earlier (it ends the list).
-            { Day.Saturday, Day.Sunday })
+            { Day.Saturday, Day.Sunday }),
+        // q1382-q1387: numeric From + Lines + Uri.Parts.
+        //
+        // Parked from this batch:
+        // - Single.From: Excel f32-lossy (3.14 → 3.1400001049041748),
+        //   mrsflow keeps f64 precision (3.14). Real precision mismatch.
+        // - Lines.ToBinary: Excel adds trailing CRLF, mrsflow doesn't.
+        // - Diagnostics.Trace: mrsflow returns the inner function value
+        //   instead of invoking it; serialisation crashes the catalog.
+        // - Time.EndOfHour: known precision DIFF (sub-second).
+        SafeSerialize("q1382", () =>
+            // Int8.From — coerce a number to signed 8-bit.
+            Int8.From(42)),
+        SafeSerialize("q1383", () =>
+            // Int16.From.
+            Int16.From(1234)),
+        SafeSerialize("q1384", () =>
+            // Int32.From.
+            Int32.From(123456)),
+        SafeSerialize("q1385", () =>
+            // Guid.From — parse a guid text into a guid value.
+            Guid.From("12345678-1234-1234-1234-123456789abc")),
+        SafeSerialize("q1386", () =>
+            // Lines.FromBinary — split bytes into a list of text lines.
+            // (\n in M source is literal "\n" text, not LF — both engines
+            // see one logical "line".)
+            Lines.FromBinary(
+                Text.ToBinary("a\nb\nc", TextEncoding.Utf8))),
+        SafeSerialize("q1387", () =>
+            // Uri.Parts — parse a URL into a record of components.
+            Uri.Parts("https://user:pwd@example.com:8443/foo/bar?x=1#frag"))
     },
 
     Catalog = Table.FromRecords(cases)

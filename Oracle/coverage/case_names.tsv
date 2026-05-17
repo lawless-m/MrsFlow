@@ -1380,3 +1380,9 @@ q1378	Expression.Constant
 q1379	Expression.Identifier
 q1380	BinaryEncoding.Base64
 q1381	Day.Saturday
+q1382	Int8.From
+q1383	Int16.From
+q1384	Int32.From
+q1385	Guid.From
+q1386	Lines.FromBinary Text.ToBinary
+q1387	Uri.Parts
