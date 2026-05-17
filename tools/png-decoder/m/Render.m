@@ -46,7 +46,12 @@ let
 
     QuadrantTable = (rgba as binary, width as number, height as number) as table =>
         let
-            bytes = Binary.ToList(rgba),
+            // List.Buffer hints PQ to materialise as an array-backed
+            // list so `bytes{idx}` is O(1). Without it, indexing into a
+            // 230K-element list (240×240×4 RGBA) walks the list — every
+            // cell pays O(N) per pixel lookup, so a 240×240 render that
+            // *should* take seconds takes 10+ minutes.
+            bytes = List.Buffer(Binary.ToList(rgba)),
             // Luma at flat index — Rec. 709 weights.
             lumaAt = (idx as number) =>
                 let
@@ -77,17 +82,28 @@ let
             // Walk the sorted list, accumulating runs. State carries the
             // current value, its running count, and the completed buckets
             // (Vals + Counts parallel lists).
+            // List.Buffer on the Vals/Cnts carries each step is critical
+            // for Excel — without it, PQ keeps `Vals` and `Cnts` as a
+            // chain of lazy references through every prior accumulator
+            // record. The chain grows to N pixels deep and field access
+            // walks it. Buffering forces each step to materialise its own
+            // list. mrsflow's iterative force handles either shape, but
+            // the eager form is also faster there.
             runState = List.Accumulate(sorted,
                 [Cur = -1, Cnt = 0, Vals = {}, Cnts = {}],
                 (s, v) =>
                     if v = s[Cur] then
-                        [Cur = s[Cur], Cnt = s[Cnt] + 1, Vals = s[Vals], Cnts = s[Cnts]]
+                        [Cur = s[Cur], Cnt = s[Cnt] + 1,
+                         Vals = List.Buffer(s[Vals]),
+                         Cnts = List.Buffer(s[Cnts])]
                     else if s[Cur] = -1 then
-                        [Cur = v, Cnt = 1, Vals = s[Vals], Cnts = s[Cnts]]
+                        [Cur = v, Cnt = 1,
+                         Vals = List.Buffer(s[Vals]),
+                         Cnts = List.Buffer(s[Cnts])]
                     else
                         [Cur = v, Cnt = 1,
-                         Vals = s[Vals] & {Number.ToText(s[Cur])},
-                         Cnts = s[Cnts] & {s[Cnt]}]),
+                         Vals = List.Buffer(s[Vals] & {Number.ToText(s[Cur])}),
+                         Cnts = List.Buffer(s[Cnts] & {s[Cnt]})]),
             // Flush the final run.
             finalKeys = if runState[Cur] = -1 then runState[Vals]
                 else runState[Vals] & {Number.ToText(runState[Cur])},
