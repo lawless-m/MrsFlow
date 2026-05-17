@@ -1216,3 +1216,11 @@ q1214	Number.RoundTowardZero
 q1215	Number.Sinh
 q1216	Number.Tanh
 q1217	Type.Is
+q1218	Text.AfterDelimiter
+q1219	Text.BeforeDelimiter
+q1220	Text.BetweenDelimiters
+q1221	Text.Clean
+q1222	Text.InferNumberType Type.Is
+q1223	Text.ReplaceRange
+q1224	Text.Select
+q1225	Type.Is

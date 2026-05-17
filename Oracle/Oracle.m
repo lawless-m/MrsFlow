@@ -11050,7 +11050,33 @@ let
         SafeSerialize("q1217", () =>
             // Number.Type is the type-value for number; Type.Is on a
             // number should be true.
-            Type.Is(type number, Number.Type))
+            Type.Is(type number, Number.Type)),
+        // q1218-q1225: Text family — implemented but untested.
+        SafeSerialize("q1218", () =>
+            // Text after first ':'.
+            Text.AfterDelimiter("foo:bar:baz", ":")),
+        SafeSerialize("q1219", () =>
+            // Text before first ':'.
+            Text.BeforeDelimiter("foo:bar:baz", ":")),
+        SafeSerialize("q1220", () =>
+            // Text between '(' and ')'.
+            Text.BetweenDelimiters("hello (world) end", "(", ")")),
+        SafeSerialize("q1221", () =>
+            // Clean strips control characters (#(0001) U+0001).
+            Text.Clean("abc" & "#(0001)" & "def")),
+        SafeSerialize("q1222", () =>
+            // InferNumberType — return the inferred Type as a Type.Is
+            // probe (Type values themselves don't serialise nicely).
+            Type.Is(type number, Text.InferNumberType("3.14"))),
+        SafeSerialize("q1223", () =>
+            // Replace 3 chars starting at index 1 with "XYZ".
+            Text.ReplaceRange("abcdef", 1, 3, "XYZ")),
+        SafeSerialize("q1224", () =>
+            // Keep only the chars in the allowed set.
+            Text.Select("Hello, World!", {"H".."Z", "a".."z"})),
+        SafeSerialize("q1225", () =>
+            // Text.Type round-trip.
+            Type.Is(type text, Text.Type))
     },
 
     Catalog = Table.FromRecords(cases)

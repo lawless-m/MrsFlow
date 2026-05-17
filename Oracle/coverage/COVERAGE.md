@@ -142,7 +142,7 @@ Source: q1167.mrsflow.out.
 | Table | 114 | 114 | 113 | 113 | 1 | 0 | 58 | 0 |
 | Tables | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Teradata | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
-| Text | 42 | 42 | 42 | 42 | 0 | 0 | 34 | 2 |
+| Text | 42 | 42 | 42 | 42 | 0 | 0 | 41 | 2 |
 | TextEncoding | 7 | 7 | 6 | 6 | 1 | 0 | 0 | 0 |
 | Time | 10 | 10 | 10 | 10 | 0 | 0 | 5 | 0 |
 | TimeZone | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
@@ -155,7 +155,7 @@ Source: q1167.mrsflow.out.
 | WebAction | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | WebMethod | 7 | 7 | 7 | 7 | 0 | 0 | 0 | 0 |
 | Xml | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| **TOTAL** | 860 | 856 | 720 | 716 | 140 | 4 | 354 | 19 |
+| **TOTAL** | 860 | 856 | 720 | 716 | 140 | 4 | 361 | 19 |
 
 ## Per-name detail
 
@@ -882,11 +882,11 @@ Source: q1167.mrsflow.out.
 | `Table.WithErrorContext` | Y | Y | function |  |  |
 | `Tables.GetRelationships` | Y |  | missing |  |  |
 | `Teradata.Database` | Y |  | missing |  |  |
-| `Text.AfterDelimiter` | Y | Y | function |  |  |
+| `Text.AfterDelimiter` | Y | Y | function | q1218 | MATCH |
 | `Text.At` | Y | Y | function | q655 | MATCH |
-| `Text.BeforeDelimiter` | Y | Y | function |  |  |
-| `Text.BetweenDelimiters` | Y | Y | function |  |  |
-| `Text.Clean` | Y | Y | function |  |  |
+| `Text.BeforeDelimiter` | Y | Y | function | q1219 | MATCH |
+| `Text.BetweenDelimiters` | Y | Y | function | q1220 | MATCH |
+| `Text.Clean` | Y | Y | function | q1221 | MATCH |
 | `Text.Combine` | Y | Y | function | q36 q301 q302 q305 q394 q835 q836 q837 q838 q839 q840 q841 q1165 | MIXED |
 | `Text.Contains` | Y | Y | function | q25 q495 q499 q1116 q1117 | MATCH |
 | `Text.End` | Y | Y | function | q34 q653 | MATCH |
@@ -894,7 +894,7 @@ Source: q1167.mrsflow.out.
 | `Text.Format` | Y | Y | function | q191 q192 q193 q194 q195 q828 q829 q830 q831 q832 q833 q834 | MATCH |
 | `Text.From` | Y | Y | function | q27 q228 q271 q272 q273 q274 q275 q868 q871 q928 q955 q956 q1053 q1151 q1154 q1156 q1157 | MATCH |
 | `Text.FromBinary` | Y | Y | function | q8 q266 q267 q268 q269 q270 q536 q537 q538 q539 q540 q1155 q1167 q1184 | MIXED |
-| `Text.InferNumberType` | Y | Y | function |  |  |
+| `Text.InferNumberType` | Y | Y | function | q1222 | MATCH |
 | `Text.Insert` | Y | Y | function | q486 q490 q791 q792 q793 q794 q795 q796 q797 | MATCH |
 | `Text.Length` | Y | Y | function | q30 q496 q497 q500 q569 q570 q651 q813 q814 q819 q844 q845 q846 q848 q852 q870 | MATCH |
 | `Text.Lower` | Y | Y | function | q32 q80 q81 q83 q84 q85 q86 q87 q88 q89 q128 q129 q131 q132 q134 q135 q137 q138 q141 q142 q145 q499 q566 q567 q568 q569 q767 q805 q806 q807 q808 q809 q810 q811 q812 q815 q854 q858 q946 q1037 | MATCH |
@@ -910,9 +910,9 @@ Source: q1167.mrsflow.out.
 | `Text.RemoveRange` | Y | Y | function | q488 | MATCH |
 | `Text.Repeat` | Y | Y | function | q42 q363 q365 | MATCH |
 | `Text.Replace` | Y | Y | function | q20 q188 q189 q499 q500 q761 q762 q763 q764 q765 q766 q767 q813 q1135 | MATCH |
-| `Text.ReplaceRange` | Y | Y | function |  |  |
+| `Text.ReplaceRange` | Y | Y | function | q1223 | MATCH |
 | `Text.Reverse` | Y | Y | function | q41 q842 q843 q844 q845 q846 q847 | MATCH |
-| `Text.Select` | Y | Y | function |  |  |
+| `Text.Select` | Y | Y | function | q1224 | MATCH |
 | `Text.Split` | Y | Y | function | q37 q301 q302 q303 q305 q497 q768 q769 q770 q772 q774 q819 q841 | MATCH |
 | `Text.SplitAny` | Y | Y | function | q304 q771 q773 | MATCH |
 | `Text.Start` | Y | Y | function | q33 q652 | MATCH |
@@ -956,7 +956,7 @@ Source: q1167.mrsflow.out.
 | `Type.FunctionParameters` | Y | Y | function | q398 | MATCH |
 | `Type.FunctionRequiredParameters` | Y | Y | function |  |  |
 | `Type.FunctionReturn` | Y | Y | function |  |  |
-| `Type.Is` | Y | Y | function | q119 q120 q396 q1190 q1217 | MATCH |
+| `Type.Is` | Y | Y | function | q119 q120 q396 q1190 q1217 q1222 q1225 | MATCH |
 | `Type.IsNullable` | Y | Y | function |  |  |
 | `Type.IsOpenRecord` | Y | Y | function |  |  |
 | `Type.ListItem` | Y | Y | function |  |  |
