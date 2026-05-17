@@ -1271,3 +1271,7 @@ q1269	Value.RemoveMetadata
 q1270	Value.Metadata Value.ReplaceMetadata
 q1271	Value.As
 q1272	Type.Is Value.ReplaceType Value.Type
+q1273	Splitter.SplitTextByPositions
+q1274	Splitter.SplitTextByRanges
+q1275	Combiner.CombineTextByRanges
+q1276	Function.InvokeAfter

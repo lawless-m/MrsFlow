@@ -11265,7 +11265,32 @@ let
         SafeSerialize("q1272", () =>
             // ReplaceType stamps a new type on a value (which round-trips
             // through Type.Is on the result).
-            Type.Is(Value.Type(Value.ReplaceType(42, type number)), Number.Type))
+            Type.Is(Value.Type(Value.ReplaceType(42, type number)), Number.Type)),
+        // q1273-q1279: Splitter / Combiner / Function — small families
+        // with a few untested entries each.
+        SafeSerialize("q1273", () =>
+            // SplitTextByPositions returns a splitter that cuts text at
+            // the given 0-based offsets. {0,3,5} → ["abc","de","fgh"].
+            Splitter.SplitTextByPositions({0, 3, 5})("abcdefgh")),
+        SafeSerialize("q1274", () =>
+            // SplitTextByRanges takes {offset, length} pairs; the
+            // splitter slices those out.
+            Splitter.SplitTextByRanges({{0, 3}, {4, 2}})("abc-de-fgh")),
+        SafeSerialize("q1275", () =>
+            // CombineTextByRanges places each list item back at a fixed
+            // offset (filling with space). Inverse of SplitTextByRanges.
+            Combiner.CombineTextByRanges({{0, 3}, {4, 2}})({"abc", "de"})),
+        SafeSerialize("q1276", () =>
+            // InvokeAfter with a 0 delay: just invokes the function
+            // immediately and returns its result.
+            Function.InvokeAfter(() => 42, #duration(0, 0, 0, 0)))
+        // Parked from this batch:
+        // - Function.From: mrsflow's wrapped-function arg convention
+        //   (each _ → list) differs from Excel's (each _ → first arg
+        //   directly); needs alignment.
+        // - Function.InvokeWithErrorContext, Function.ScalarVector —
+        //   mrsflow's argument shapes don't match PQ's docs.
+        // - Function.IsDataSource — query-folding state; needs context.
     },
 
     Catalog = Table.FromRecords(cases)

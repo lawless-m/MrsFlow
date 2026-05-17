@@ -36,7 +36,7 @@ Source: q1167.mrsflow.out.
 | ByteOrder | 3 | 3 | 3 | 3 | 0 | 0 | 0 | 0 |
 | Certificate | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Character | 3 | 3 | 3 | 3 | 0 | 0 | 2 | 0 |
-| Combiner | 5 | 5 | 5 | 5 | 0 | 0 | 4 | 0 |
+| Combiner | 5 | 5 | 5 | 5 | 0 | 0 | 5 | 0 |
 | CommonDataService | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Comparer | 4 | 4 | 4 | 4 | 0 | 0 | 4 | 0 |
 | Compression | 8 | 8 | 8 | 8 | 0 | 0 | 0 | 0 |
@@ -65,7 +65,7 @@ Source: q1167.mrsflow.out.
 | Fabric | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | File | 2 | 1 | 2 | 1 | 0 | 1 | 1 | 1 |
 | Folder | 2 | 2 | 2 | 2 | 0 | 0 | 1 | 0 |
-| Function | 7 | 7 | 6 | 6 | 1 | 0 | 1 | 0 |
+| Function | 7 | 7 | 6 | 6 | 1 | 0 | 2 | 0 |
 | Geography | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
 | GeographyPoint | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Geometry | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
@@ -135,7 +135,7 @@ Source: q1167.mrsflow.out.
 | SharePoint | 3 | 3 | 0 | 0 | 3 | 0 | 0 | 0 |
 | Single | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
 | Soda | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
-| Splitter | 10 | 10 | 10 | 10 | 0 | 0 | 8 | 0 |
+| Splitter | 10 | 10 | 10 | 10 | 0 | 0 | 10 | 0 |
 | Sql | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
 | SqlExpression | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
 | Sybase | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
@@ -155,7 +155,7 @@ Source: q1167.mrsflow.out.
 | WebAction | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | WebMethod | 7 | 7 | 7 | 7 | 0 | 0 | 0 | 0 |
 | Xml | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| **TOTAL** | 860 | 856 | 720 | 716 | 140 | 4 | 414 | 19 |
+| **TOTAL** | 860 | 856 | 720 | 716 | 140 | 4 | 418 | 19 |
 
 ## Per-name detail
 
@@ -247,7 +247,7 @@ Source: q1167.mrsflow.out.
 | `Combiner.CombineTextByEachDelimiter` | Y | Y | function | q378 | MATCH |
 | `Combiner.CombineTextByLengths` | Y | Y | function | q379 | MATCH |
 | `Combiner.CombineTextByPositions` | Y | Y | function | q380 | MATCH |
-| `Combiner.CombineTextByRanges` | Y | Y | function |  |  |
+| `Combiner.CombineTextByRanges` | Y | Y | function | q1275 | MATCH |
 | `CommonDataService.Database` | Y |  | missing |  |  |
 | `Comparer.Equals` | Y | Y | function | q126 | MATCH |
 | `Comparer.FromCulture` | Y | Y | function | q127 q384 q1120 | MATCH |
@@ -438,7 +438,7 @@ Source: q1167.mrsflow.out.
 | `Folder.Files` | Y | Y | function |  |  |
 | `Function.From` | Y | Y | function |  |  |
 | `Function.Invoke` | Y | Y | function | q391 q392 q393 q394 q395 | MATCH |
-| `Function.InvokeAfter` | Y | Y | function |  |  |
+| `Function.InvokeAfter` | Y | Y | function | q1276 | MATCH |
 | `Function.InvokeWithErrorContext` | Y | Y | function |  |  |
 | `Function.IsDataSource` | Y | Y | function |  |  |
 | `Function.ScalarVector` | Y | Y | function |  |  |
@@ -757,8 +757,8 @@ Source: q1167.mrsflow.out.
 | `Splitter.SplitTextByDelimiter` | Y | Y | function | q95 q372 q373 q436 q437 q439 | MATCH |
 | `Splitter.SplitTextByEachDelimiter` | Y | Y | function | q97 q98 q374 | MATCH |
 | `Splitter.SplitTextByLengths` | Y | Y | function | q99 q375 q440 | MATCH |
-| `Splitter.SplitTextByPositions` | Y | Y | function |  |  |
-| `Splitter.SplitTextByRanges` | Y | Y | function |  |  |
+| `Splitter.SplitTextByPositions` | Y | Y | function | q1273 | MATCH |
+| `Splitter.SplitTextByRanges` | Y | Y | function | q1274 | MATCH |
 | `Splitter.SplitTextByRepeatedLengths` | Y | Y | function | q175 | MATCH |
 | `Splitter.SplitTextByWhitespace` | Y | Y | function | q100 | MATCH |
 | `Sql.Database` | Y | Y | function |  |  |
