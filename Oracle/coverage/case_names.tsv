@@ -1297,3 +1297,15 @@ q1295	Number.Mod Table.FromRecords Table.MatchesAllRows
 q1296	Table.FromRecords Table.MatchesAnyRows
 q1297	Table.AlternateRows Table.FromRecords
 q1298	Table.FromRecords Table.Range
+q1299	Table.ApproximateRowCount Table.FromRecords
+q1300	Table.FromRecords Table.InsertRows
+q1301	Table.FromRecords Table.PositionOfAny
+q1302	Table.FromRecords Table.PrefixColumns
+q1303	Table.FromRecords Table.RemoveFirstN
+q1304	Table.FromRecords Table.RemoveLastN
+q1305	Table.FromRecords Table.RemoveRows
+q1306	Table.FromRecords Table.Repeat
+q1307	Table.FromRecords Table.SingleRow
+q1308	Table.FromRecords Table.ToColumns
+q1309	Table.FromRecords Table.ToRecords
+q1310	Table.FromRecords Table.Transpose

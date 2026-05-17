@@ -11409,7 +11409,65 @@ let
             // Range — extract a window of rows starting at offset, count.
             Table.Range(
                 Table.FromRecords({[a=1],[a=2],[a=3],[a=4],[a=5]}),
-                1, 2))
+                1, 2)),
+        // q1299-q1310: more Table read-only ops.
+        SafeSerialize("q1299", () =>
+            // ApproximateRowCount — for an in-memory table this is the
+            // exact count.
+            Table.ApproximateRowCount(
+                Table.FromRecords({[a=1],[a=2],[a=3],[a=4]}))),
+        SafeSerialize("q1300", () =>
+            // InsertRows — insert one or more rows at offset.
+            Table.InsertRows(
+                Table.FromRecords({[a=1],[a=4]}),
+                1, {[a=2],[a=3]})),
+        SafeSerialize("q1301", () =>
+            // PositionOfAny — index of first row matching any of the
+            // supplied row-records.
+            Table.PositionOfAny(
+                Table.FromRecords({[a=1],[a=2],[a=3]}),
+                {[a=2]})),
+        SafeSerialize("q1302", () =>
+            // PrefixColumns prefixes every column name with `<prefix>.`.
+            Table.PrefixColumns(
+                Table.FromRecords({[a=1,b=2]}),
+                "x")),
+        SafeSerialize("q1303", () =>
+            // RemoveFirstN drops the first N rows.
+            Table.RemoveFirstN(
+                Table.FromRecords({[a=1],[a=2],[a=3],[a=4]}), 2)),
+        SafeSerialize("q1304", () =>
+            // RemoveLastN drops the last N rows.
+            Table.RemoveLastN(
+                Table.FromRecords({[a=1],[a=2],[a=3],[a=4]}), 2)),
+        SafeSerialize("q1305", () =>
+            // RemoveRows drops a range of rows by offset+count.
+            Table.RemoveRows(
+                Table.FromRecords({[a=1],[a=2],[a=3],[a=4],[a=5]}),
+                1, 2)),
+        SafeSerialize("q1306", () =>
+            // Repeat replicates the table N times (vertical stack).
+            Table.Repeat(
+                Table.FromRecords({[a=1],[a=2]}), 3)),
+        SafeSerialize("q1307", () =>
+            // SingleRow on a 1-row table returns that row as a record.
+            Table.SingleRow(
+                Table.FromRecords({[a=42, b="x"]}))),
+        SafeSerialize("q1308", () =>
+            // ToColumns transposes a table into a list of columns
+            // (each column being a list of cell values).
+            Table.ToColumns(
+                Table.FromRecords({[a=1,b=10],[a=2,b=20],[a=3,b=30]}))),
+        SafeSerialize("q1309", () =>
+            // ToRecords yields the row-list back out — round-trips
+            // through Table.FromRecords/Table.ToRecords.
+            Table.ToRecords(
+                Table.FromRecords({[a=1,b=2],[a=3,b=4]}))),
+        SafeSerialize("q1310", () =>
+            // Transpose swaps rows and columns. Column names of the
+            // result are auto-generated.
+            Table.Transpose(
+                Table.FromRecords({[a=1,b=2,c=3],[a=4,b=5,c=6]})))
     },
 
     Catalog = Table.FromRecords(cases)
