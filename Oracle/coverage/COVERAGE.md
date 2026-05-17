@@ -49,18 +49,18 @@ Source: q1167.mrsflow.out.
 | Date | 58 | 58 | 58 | 58 | 0 | 0 | 58 | 0 |
 | DateTime | 26 | 26 | 26 | 26 | 0 | 0 | 16 | 0 |
 | DateTimeZone | 16 | 16 | 16 | 16 | 0 | 0 | 10 | 0 |
-| Day | 8 | 8 | 8 | 8 | 0 | 0 | 6 | 0 |
+| Day | 8 | 8 | 8 | 8 | 0 | 0 | 7 | 0 |
 | DB2 | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Decimal | 2 | 2 | 2 | 2 | 0 | 0 | 1 | 0 |
 | Diagnostics | 3 | 3 | 3 | 3 | 0 | 0 | 0 | 0 |
 | DirectQueryCapabilities | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
-| Double | 2 | 2 | 2 | 2 | 0 | 0 | 1 | 0 |
+| Double | 2 | 2 | 2 | 2 | 0 | 0 | 2 | 0 |
 | Duration | 13 | 13 | 13 | 13 | 0 | 0 | 12 | 0 |
 | Embedded | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Error | 1 | 1 | 1 | 1 | 0 | 0 | 1 | 0 |
 | Excel | 4 | 4 | 3 | 3 | 1 | 0 | 1 | 0 |
 | Exchange | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
-| Expression | 3 | 3 | 3 | 3 | 0 | 0 | 1 | 1 |
+| Expression | 3 | 3 | 3 | 3 | 0 | 0 | 3 | 1 |
 | ExtraValues | 4 | 4 | 4 | 4 | 0 | 0 | 0 | 0 |
 | Fabric | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | File | 2 | 1 | 2 | 1 | 0 | 1 | 1 | 1 |
@@ -155,7 +155,7 @@ Source: q1167.mrsflow.out.
 | WebAction | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | WebMethod | 7 | 7 | 7 | 7 | 0 | 0 | 0 | 0 |
 | Xml | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| **TOTAL** | 860 | 856 | 720 | 716 | 140 | 4 | 510 | 19 |
+| **TOTAL** | 860 | 856 | 720 | 716 | 140 | 4 | 514 | 19 |
 
 ## Per-name detail
 
@@ -202,7 +202,7 @@ Source: q1167.mrsflow.out.
 | `Binary.View` | Y | Y | function |  |  |
 | `Binary.ViewError` | Y | Y | function |  |  |
 | `Binary.ViewFunction` | Y | Y | function |  |  |
-| `BinaryEncoding.Base64` | Y | Y | constant | q1226 | MATCH |
+| `BinaryEncoding.Base64` | Y | Y | constant | q1226 q1380 | MATCH |
 | `BinaryEncoding.Hex` | Y | Y | constant |  |  |
 | `BinaryEncoding.Type` | Y | Y | constant |  |  |
 | `BinaryFormat.7BitEncodedSignedInteger` | Y | Y | function | q1177 | DIFF |
@@ -388,7 +388,7 @@ Source: q1167.mrsflow.out.
 | `DateTimeZone.ZoneMinutes` | Y | Y | function | q1262 | MATCH |
 | `Day.Friday` | Y | Y | constant | q1227 | MATCH |
 | `Day.Monday` | Y | Y | constant | q1227 | MATCH |
-| `Day.Saturday` | Y | Y | constant |  |  |
+| `Day.Saturday` | Y | Y | constant | q1381 | MATCH |
 | `Day.Sunday` | Y | Y | constant | q1227 | MATCH |
 | `Day.Thursday` | Y | Y | constant | q1227 | MATCH |
 | `Day.Tuesday` | Y | Y | constant | q1227 | MATCH |
@@ -401,7 +401,7 @@ Source: q1167.mrsflow.out.
 | `Diagnostics.CorrelationId` | Y | Y | function |  |  |
 | `Diagnostics.Trace` | Y | Y | function |  |  |
 | `DirectQueryCapabilities.From` | Y |  | missing |  |  |
-| `Double.From` | Y | Y | function |  |  |
+| `Double.From` | Y | Y | function | q1377 | MATCH |
 | `Double.Type` | Y | Y | constant | q1281 | MATCH |
 | `Duration.Days` | Y | Y | function | q79 q608 q609 q1078 | MATCH |
 | `Duration.From` | Y | Y | function | q218 q1074 | MATCH |
@@ -424,9 +424,9 @@ Source: q1167.mrsflow.out.
 | `Excel.ShapeTable` | Y | Y | function |  |  |
 | `Excel.Workbook` | Y | Y | function |  |  |
 | `Exchange.Contents` | Y |  | missing |  |  |
-| `Expression.Constant` | Y | Y | function |  |  |
+| `Expression.Constant` | Y | Y | function | q1378 | MATCH |
 | `Expression.Evaluate` | Y | Y | function | q401 q402 q403 q404 q405 q1167 q1184 | MIXED |
-| `Expression.Identifier` | Y | Y | function |  |  |
+| `Expression.Identifier` | Y | Y | function | q1379 | MATCH |
 | `ExtraValues.Error` | Y | Y | constant |  |  |
 | `ExtraValues.Ignore` | Y | Y | constant |  |  |
 | `ExtraValues.List` | Y | Y | constant |  |  |

@@ -1375,3 +1375,8 @@ q1373	DateTime.IsInPreviousNSeconds DateTime.LocalNow
 q1374	DateTime.IsInNextHour DateTime.LocalNow
 q1375	DateTime.IsInPreviousHour DateTime.LocalNow
 q1376	Type.Is
+q1377	Double.From
+q1378	Expression.Constant
+q1379	Expression.Identifier
+q1380	BinaryEncoding.Base64
+q1381	Day.Saturday

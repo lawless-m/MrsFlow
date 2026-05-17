@@ -11825,7 +11825,32 @@ let
         // input has to land in a 1-minute or 1-second window — too
         // tight given LocalNow can drift between engines.
         SafeSerialize("q1376", () =>
-            Type.Is(type datetime, DateTime.Type))
+            Type.Is(type datetime, DateTime.Type)),
+        // q1377-q1388: mixed batch — Double.From, Expression.Constant/
+        // Identifier (pure functions), and constant clutches for the
+        // .Type names not yet picked up by the scanner.
+        SafeSerialize("q1377", () =>
+            // Double.From — coerce to f64.
+            Double.From("3.14")),
+        SafeSerialize("q1378", () =>
+            // Expression.Constant — quote a value into an M source expr.
+            { Expression.Constant("hello"),
+              Expression.Constant(42),
+              Expression.Constant(true) }),
+        SafeSerialize("q1379", () =>
+            // Expression.Identifier — quote an identifier for M source.
+            { Expression.Identifier("Foo.Bar"),
+              Expression.Identifier("plain") }),
+        // .Type-value lists, BinaryOccurrence/BufferMode/ByteOrder/
+        // ExtraValues/Compression constant lists parked: either Type
+        // values fail Json.FromValue serialisation in both engines, or
+        // mrsflow's ordinals diverge from Excel (already known).
+        SafeSerialize("q1380", () =>
+            // BinaryEncoding.Hex — scanner missed earlier.
+            { BinaryEncoding.Base64, BinaryEncoding.Hex }),
+        SafeSerialize("q1381", () =>
+            // Day.Saturday — scanner missed earlier (it ends the list).
+            { Day.Saturday, Day.Sunday })
     },
 
     Catalog = Table.FromRecords(cases)
