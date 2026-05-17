@@ -92,7 +92,7 @@ Source: q1167.mrsflow.out.
 | Lakehouse | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | LimitClauseKind | 6 | 6 | 6 | 6 | 0 | 0 | 0 | 0 |
 | Lines | 4 | 4 | 4 | 4 | 0 | 0 | 2 | 0 |
-| List | 72 | 72 | 71 | 71 | 1 | 0 | 49 | 1 |
+| List | 72 | 72 | 71 | 71 | 1 | 0 | 65 | 1 |
 | Logical | 4 | 4 | 4 | 4 | 0 | 0 | 3 | 0 |
 | MissingField | 4 | 4 | 3 | 3 | 1 | 0 | 1 | 0 |
 | Module | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
@@ -155,7 +155,7 @@ Source: q1167.mrsflow.out.
 | WebAction | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | WebMethod | 7 | 7 | 7 | 7 | 0 | 0 | 0 | 0 |
 | Xml | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| **TOTAL** | 860 | 856 | 720 | 716 | 140 | 4 | 330 | 19 |
+| **TOTAL** | 860 | 856 | 720 | 716 | 140 | 4 | 346 | 19 |
 
 ## Per-name detail
 
@@ -522,8 +522,8 @@ Source: q1167.mrsflow.out.
 | `List.Combine` | Y | Y | function | q306 q310 q890 q891 q1124 q1127 q1129 | MATCH |
 | `List.ConformToPageReader` | Y | Y | function |  |  |
 | `List.Contains` | Y | Y | function | q80 q122 q369 q815 q816 q1122 q1145 | MATCH |
-| `List.ContainsAll` | Y | Y | function |  |  |
-| `List.ContainsAny` | Y | Y | function |  |  |
+| `List.ContainsAll` | Y | Y | function | q1192 | MATCH |
+| `List.ContainsAny` | Y | Y | function | q1193 | MATCH |
 | `List.Count` | Y | Y | function | q53 q118 q480 q498 q645 q817 q819 q875 q889 q914 q922 q923 q1127 q1128 q1146 q1147 | MATCH |
 | `List.Covariance` | Y | Y | function |  |  |
 | `List.Dates` | Y | Y | function | q515 q906 q907 q910 q911 q912 | MATCH |
@@ -532,13 +532,13 @@ Source: q1167.mrsflow.out.
 | `List.Difference` | Y | Y | function | q88 q134 q135 q136 q524 | MATCH |
 | `List.Distinct` | Y | Y | function | q62 q81 q121 q127 q128 q129 q130 q480 q498 q521 q817 q856 q857 q858 q859 q860 q861 q862 q923 q1146 | MATCH |
 | `List.Durations` | Y | Y | function | q909 | MATCH |
-| `List.FindText` | Y | Y | function |  |  |
+| `List.FindText` | Y | Y | function | q1194 | MATCH |
 | `List.First` | Y | Y | function | q58 | MATCH |
 | `List.FirstN` | Y | Y | function | q90 q506 q509 q510 q882 q883 q884 q917 | MATCH |
 | `List.Generate` | Y | Y | function | q281 q282 q283 q284 q285 q326 q327 q328 q329 q330 q513 q817 q870 q871 q872 q873 q874 q875 q876 q915 | MATCH |
-| `List.InsertRange` | Y | Y | function |  |  |
+| `List.InsertRange` | Y | Y | function | q1195 | MATCH |
 | `List.Intersect` | Y | Y | function | q83 q131 q132 q133 q523 | MATCH |
-| `List.IsDistinct` | Y | Y | function |  |  |
+| `List.IsDistinct` | Y | Y | function | q1196 | MATCH |
 | `List.IsEmpty` | Y | Y | function | q503 | MATCH |
 | `List.Last` | Y | Y | function | q59 | MATCH |
 | `List.LastN` | Y | Y | function | q91 q507 q510 q882 q883 q884 q917 | MATCH |
@@ -551,13 +551,13 @@ Source: q1167.mrsflow.out.
 | `List.MinN` | Y | Y | function | q899 q900 q902 | MATCH |
 | `List.Mode` | Y | Y | function | q644 q894 q898 | MATCH |
 | `List.Modes` | Y | Y | function | q894 | MATCH |
-| `List.NonNullCount` | Y | Y | function |  |  |
+| `List.NonNullCount` | Y | Y | function | q1197 | MATCH |
 | `List.Numbers` | Y | Y | function | q514 q903 q904 q905 q915 q923 q929 | MATCH |
 | `List.Percentile` | Y | Y | function |  |  |
 | `List.PositionOf` | Y | Y | function | q84 q108 q109 q123 q366 q367 q370 | MATCH |
 | `List.PositionOfAny` | Y | Y | function | q110 q368 | MATCH |
-| `List.Positions` | Y | Y | function |  |  |
-| `List.Product` | Y | Y | function |  |  |
+| `List.Positions` | Y | Y | function | q1198 | MATCH |
+| `List.Product` | Y | Y | function | q1199 | MATCH |
 | `List.Random` | Y | Y | function | q118 q922 q925 | MATCH |
 | `List.Range` | Y | Y | function | q64 q528 q529 q530 q877 q878 q879 | MATCH |
 | `List.RemoveFirstN` | Y | Y | function | q508 q509 | MATCH |
@@ -565,23 +565,23 @@ Source: q1167.mrsflow.out.
 | `List.RemoveLastN` | Y | Y | function | q508 | MATCH |
 | `List.RemoveMatchingItems` | Y | Y | function | q647 | MATCH |
 | `List.RemoveNulls` | Y | Y | function | q648 | MATCH |
-| `List.RemoveRange` | Y | Y | function |  |  |
+| `List.RemoveRange` | Y | Y | function | q1200 | MATCH |
 | `List.Repeat` | Y | Y | function | q65 q511 q512 | MATCH |
-| `List.ReplaceMatchingItems` | Y | Y | function |  |  |
-| `List.ReplaceRange` | Y | Y | function |  |  |
-| `List.ReplaceValue` | Y | Y | function |  |  |
+| `List.ReplaceMatchingItems` | Y | Y | function | q1201 | MATCH |
+| `List.ReplaceRange` | Y | Y | function | q1202 | MATCH |
+| `List.ReplaceValue` | Y | Y | function | q1203 | MATCH |
 | `List.Reverse` | Y | Y | function | q60 q649 q917 q919 | MATCH |
 | `List.Select` | Y | Y | function | q932 q1147 | MATCH |
-| `List.Single` | Y | Y | function |  |  |
-| `List.SingleOrDefault` | Y | Y | function |  |  |
+| `List.Single` | Y | Y | function | q1205 | MATCH |
+| `List.SingleOrDefault` | Y | Y | function | q1206 | MATCH |
 | `List.Skip` | Y | Y | function | q63 q92 q526 q527 q880 q881 | MATCH |
 | `List.Sort` | Y | Y | function | q61 q82 q149 q256 q257 q259 q260 q383 q650 q849 q850 q851 q852 q853 q854 q855 q917 q1165 | MIXED |
-| `List.Split` | Y | Y | function |  |  |
+| `List.Split` | Y | Y | function | q1204 | MATCH |
 | `List.StandardDeviation` | Y | Y | function | q645 q895 q898 | MATCH |
 | `List.Sum` | Y | Y | function | q54 q89 q115 q120 q330 q341 q393 q416 q420 q641 q875 q892 q896 q897 q898 q905 q914 q915 q934 q935 q936 q937 q939 q940 q1127 q1138 | MATCH |
 | `List.Times` | Y | Y | function |  |  |
 | `List.Transform` | Y | Y | function | q21 q478 q480 q497 q498 q499 q519 q571 q572 q573 q574 q575 q816 q914 q923 q927 q928 q929 q930 q931 q1188 | MATCH |
-| `List.TransformMany` | Y | Y | function |  |  |
+| `List.TransformMany` | Y | Y | function | q1207 | MATCH |
 | `List.Type` | Y |  | missing |  |  |
 | `List.Union` | Y | Y | function | q522 q525 | MATCH |
 | `List.Zip` | Y | Y | function | q307 q308 q885 q886 q887 q888 q889 | MATCH |

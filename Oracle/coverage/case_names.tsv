@@ -1190,3 +1190,19 @@ q1188	Binary.Split Binary.ToList List.Transform
 q1189	Binary.ToList
 q1190	Type.Is
 q1191	Binary.Compress Binary.Decompress Binary.ToList
+q1192	List.ContainsAll
+q1193	List.ContainsAny
+q1194	List.FindText
+q1195	List.InsertRange
+q1196	List.IsDistinct
+q1197	List.NonNullCount
+q1198	List.Positions
+q1199	List.Product
+q1200	List.RemoveRange
+q1201	List.ReplaceMatchingItems
+q1202	List.ReplaceRange
+q1203	List.ReplaceValue
+q1204	List.Split
+q1205	List.Single
+q1206	List.SingleOrDefault
+q1207	List.TransformMany

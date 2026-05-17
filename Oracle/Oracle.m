@@ -10957,7 +10957,61 @@ let
             // Round-trip via Compression.GZip too.
             Binary.ToList(Binary.Decompress(
                 Binary.Compress(#binary({5, 4, 3, 2, 1}), Compression.GZip),
-                Compression.GZip)))
+                Compression.GZip))),
+        // q1192-q1207: List family — implemented but untested.
+        // Parked from this batch:
+        // - ConformToPageReader (folding hook), DateTimeZones
+        //   (system-dependent), Covariance/Percentile (numeric precision
+        //   diff risk; will revisit with tolerant comparator).
+        // - List.Alternate: mrsflow's offset handling diverges from
+        //   PQ. mrsflow returns [1] for offset=1, [] for offset=0
+        //   where Excel returns the proper alternating slice. Known
+        //   divergence; needs its own fix + case.
+        SafeSerialize("q1192", () =>
+            // True if list contains all values.
+            List.ContainsAll({1, 2, 3, 4, 5}, {2, 4})),
+        SafeSerialize("q1193", () =>
+            // True if list contains any of the values.
+            List.ContainsAny({1, 2, 3}, {7, 8, 2})),
+        SafeSerialize("q1194", () =>
+            // FindText returns the elements whose text-form contains
+            // the substring.
+            List.FindText({"apple", "banana", "apricot", "cherry"}, "ap")),
+        SafeSerialize("q1195", () =>
+            List.InsertRange({1, 2, 5}, 2, {3, 4})),
+        SafeSerialize("q1196", () =>
+            List.IsDistinct({1, 2, 3, 4})),
+        SafeSerialize("q1197", () =>
+            List.NonNullCount({1, null, 2, null, 3, null})),
+        SafeSerialize("q1198", () =>
+            // 0-based positions of every element.
+            List.Positions({10, 20, 30, 40})),
+        SafeSerialize("q1199", () =>
+            List.Product({2, 3, 4})),
+        SafeSerialize("q1200", () =>
+            // Remove range starting at index 1, count 2.
+            List.RemoveRange({1, 2, 3, 4, 5}, 1, 2)),
+        SafeSerialize("q1201", () =>
+            // ReplaceMatchingItems with {{old, new}, ...} pairs.
+            List.ReplaceMatchingItems({1, 2, 3, 2, 1}, {{1, 10}, {2, 20}})),
+        SafeSerialize("q1202", () =>
+            // Replace a 2-element range starting at index 1 with one item.
+            List.ReplaceRange({1, 2, 3, 4, 5}, 1, 2, {99})),
+        SafeSerialize("q1203", () =>
+            List.ReplaceValue({1, 2, 3, 2, 1}, 2, 99, Replacer.ReplaceValue)),
+        SafeSerialize("q1204", () =>
+            // Split a list into sublists of size 3.
+            List.Split({1, 2, 3, 4, 5, 6, 7, 8}, 3)),
+        SafeSerialize("q1205", () =>
+            // Single — only element of a 1-element list.
+            List.Single({42})),
+        SafeSerialize("q1206", () =>
+            // SingleOrDefault — null for empty, single element otherwise.
+            { List.SingleOrDefault({}), List.SingleOrDefault({7}) }),
+        SafeSerialize("q1207", () =>
+            // TransformMany — for each item, generate a list and project
+            // pairs. Equivalent to a flat-map / SQL CROSS APPLY.
+            List.TransformMany({1, 2, 3}, each {10, 20}, (x, y) => x * y))
     },
 
     Catalog = Table.FromRecords(cases)
