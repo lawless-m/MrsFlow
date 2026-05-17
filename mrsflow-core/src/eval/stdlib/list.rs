@@ -380,7 +380,7 @@ fn transform(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         let v = invoke_builtin_callback(f, vec![item.clone()])?;
         out.push(v);
     }
-    Ok(Value::List(out))
+    Ok(Value::list_of(out))
 }
 
 
@@ -396,7 +396,7 @@ fn select(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             other => return Err(type_mismatch("logical (from predicate)", &other)),
         }
     }
-    Ok(Value::List(out))
+    Ok(Value::list_of(out))
 }
 
 
@@ -463,9 +463,9 @@ fn zip(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             .iter()
             .map(|l| l.get(i).cloned().unwrap_or(Value::Null))
             .collect();
-        out.push(Value::List(row));
+        out.push(Value::list_of(row));
     }
-    Ok(Value::List(out))
+    Ok(Value::list_of(out))
 }
 
 
@@ -478,7 +478,7 @@ fn remove_first_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
                     "List.RemoveFirstN: count must be a non-negative integer".into(),
                 ));
             }
-            Ok(Value::List(list.iter().skip(*n as usize).cloned().collect()))
+            Ok(Value::list_of(list.iter().skip(*n as usize).cloned().collect()))
         }
         Some(Value::Function(f)) => {
             // skip-while: drop while predicate true, then keep rest
@@ -490,9 +490,9 @@ fn remove_first_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
                     break;
                 }
             }
-            Ok(Value::List(list[start..].to_vec()))
+            Ok(Value::list_of(list[start..].to_vec()))
         }
-        Some(Value::Null) | None => Ok(Value::List(list.iter().skip(1).cloned().collect())),
+        Some(Value::Null) | None => Ok(Value::list_of(list.iter().skip(1).cloned().collect())),
         Some(other) => Err(type_mismatch("number or function", other)),
     }
 }
@@ -514,7 +514,7 @@ fn remove_items(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             out.push(v.clone());
         }
     }
-    Ok(Value::List(out))
+    Ok(Value::list_of(out))
 }
 
 
@@ -559,7 +559,7 @@ fn numbers(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     for i in 0..count {
         out.push(Value::Number(start + (i as f64) * increment));
     }
-    Ok(Value::List(out))
+    Ok(Value::list_of(out))
 }
 
 
@@ -637,7 +637,7 @@ fn sort(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             Value::Number(n) if (*n == 0.0 || *n == 1.0) => {
                 let descending = *n == 1.0;
                 let out = sort_numeric_or_text(list, "List.Sort", descending)?;
-                return Ok(Value::List(out));
+                return Ok(Value::list_of(out));
             }
             Value::Function(f) => {
                 // List.Sort accepts both shapes:
@@ -665,7 +665,7 @@ fn sort(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
                         }
                     });
                     if let Some(e) = sort_err { return Err(e); }
-                    return Ok(Value::List(keyed.into_iter().map(|(_, v)| v).collect()));
+                    return Ok(Value::list_of(keyed.into_iter().map(|(_, v)| v).collect()));
                 }
                 out.sort_by(|a, b| {
                     if sort_err.is_some() {
@@ -697,7 +697,7 @@ fn sort(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
                 if let Some(e) = sort_err {
                     return Err(e);
                 }
-                return Ok(Value::List(out));
+                return Ok(Value::list_of(out));
             }
             other => {
                 return Err(MError::Other(format!(
@@ -710,7 +710,7 @@ fn sort(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     // No comparer arg → delegate to the shared numeric/text sorter,
     // which already handles null < everything for PQ compatibility.
     let out = sort_numeric_or_text(list, "List.Sort", false)?;
-    Ok(Value::List(out))
+    Ok(Value::list_of(out))
 }
 
 
@@ -718,7 +718,7 @@ fn reverse(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     let mut out = list.clone();
     out.reverse();
-    Ok(Value::List(out))
+    Ok(Value::list_of(out))
 }
 
 
@@ -727,7 +727,7 @@ fn first_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     match &args[1] {
         Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => {
             let count = *n as usize;
-            Ok(Value::List(list.iter().take(count).cloned().collect()))
+            Ok(Value::list_of(list.iter().take(count).cloned().collect()))
         }
         Value::Function(f) => {
             // take-while: stop on first false
@@ -739,7 +739,7 @@ fn first_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
                     break;
                 }
             }
-            Ok(Value::List(out))
+            Ok(Value::list_of(out))
         }
         other => Err(type_mismatch("non-negative integer or function", other)),
     }
@@ -764,7 +764,7 @@ fn last_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             let count = *n as usize;
             let len = list.len();
             let start = len.saturating_sub(count);
-            Ok(Value::List(list[start..].to_vec()))
+            Ok(Value::list_of(list[start..].to_vec()))
         }
         Some(Value::Function(f)) => {
             // take-from-end-while: scan from end, keep while predicate true
@@ -776,12 +776,12 @@ fn last_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
                     break;
                 }
             }
-            Ok(Value::List(list[start..].to_vec()))
+            Ok(Value::list_of(list[start..].to_vec()))
         }
         Some(Value::Null) | None => {
             let len = list.len();
             let start = len.saturating_sub(1);
-            Ok(Value::List(list[start..].to_vec()))
+            Ok(Value::list_of(list[start..].to_vec()))
         }
         Some(other) => Err(type_mismatch("non-negative integer or function", other)),
     }
@@ -840,7 +840,7 @@ fn remove_matching_items(args: &[Value], _host: &dyn IoHost) -> Result<Value, ME
             out.push(v.clone());
         }
     }
-    Ok(Value::List(out))
+    Ok(Value::list_of(out))
 }
 
 
@@ -860,7 +860,7 @@ fn distinct(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             out.push(v.clone());
         }
     }
-    Ok(Value::List(out))
+    Ok(Value::list_of(out))
 }
 
 
@@ -869,10 +869,10 @@ fn skip(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     // PQ: omitted countOrCondition defaults to 1.
     let arg1 = args.get(1).cloned().unwrap_or(Value::Number(1.0));
     match &arg1 {
-        Value::Null => Ok(Value::List(list.iter().skip(1).cloned().collect())),
+        Value::Null => Ok(Value::list_of(list.iter().skip(1).cloned().collect())),
         Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => {
             let count = *n as usize;
-            Ok(Value::List(list.iter().skip(count).cloned().collect()))
+            Ok(Value::list_of(list.iter().skip(count).cloned().collect()))
         }
         Value::Function(f) => {
             // skip-while: drop while predicate true, then keep rest
@@ -884,7 +884,7 @@ fn skip(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
                     break;
                 }
             }
-            Ok(Value::List(list[start..].to_vec()))
+            Ok(Value::list_of(list[start..].to_vec()))
         }
         other => Err(type_mismatch("non-negative integer or function", other)),
     }
@@ -900,7 +900,7 @@ fn combine(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             other => return Err(type_mismatch("list (in list)", other)),
         }
     }
-    Ok(Value::List(out))
+    Ok(Value::list_of(out))
 }
 
 
@@ -998,7 +998,7 @@ fn occurrence_result(mode: Occurrence, matches: &[usize]) -> Value {
     match mode {
         Occurrence::First => Value::Number(matches.first().copied().map(|i| i as f64).unwrap_or(-1.0)),
         Occurrence::Last => Value::Number(matches.last().copied().map(|i| i as f64).unwrap_or(-1.0)),
-        Occurrence::All => Value::List(matches.iter().map(|&i| Value::Number(i as f64)).collect()),
+        Occurrence::All => Value::list_of(matches.iter().map(|&i| Value::Number(i as f64)).collect()),
     }
 }
 
@@ -1105,7 +1105,7 @@ fn find_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
                 out.push(v.clone());
             }
     }
-    Ok(Value::List(out))
+    Ok(Value::list_of(out))
 }
 
 fn position_of_any(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
@@ -1130,7 +1130,7 @@ fn position_of_any(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> 
 
 fn positions(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
-    Ok(Value::List((0..list.len()).map(|i| Value::Number(i as f64)).collect()))
+    Ok(Value::list_of((0..list.len()).map(|i| Value::Number(i as f64)).collect()))
 }
 
 fn range(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
@@ -1146,7 +1146,7 @@ fn range(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     };
     let end = (offset + count).min(list.len());
     let start = offset.min(list.len());
-    Ok(Value::List(list[start..end].to_vec()))
+    Ok(Value::list_of(list[start..end].to_vec()))
 }
 
 fn remove_last_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
@@ -1154,7 +1154,7 @@ fn remove_last_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     match args.get(1) {
         Some(Value::Number(n)) if n.fract() == 0.0 && *n >= 0.0 => {
             let keep = list.len().saturating_sub(*n as usize);
-            Ok(Value::List(list[..keep].to_vec()))
+            Ok(Value::list_of(list[..keep].to_vec()))
         }
         Some(Value::Function(f)) => {
             // drop tail items while predicate true, scan from end
@@ -1166,11 +1166,11 @@ fn remove_last_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
                     break;
                 }
             }
-            Ok(Value::List(list[..keep].to_vec()))
+            Ok(Value::list_of(list[..keep].to_vec()))
         }
         Some(Value::Null) | None => {
             let keep = list.len().saturating_sub(1);
-            Ok(Value::List(list[..keep].to_vec()))
+            Ok(Value::list_of(list[..keep].to_vec()))
         }
         Some(other) => Err(type_mismatch("non-negative integer or function", other)),
     }
@@ -1178,7 +1178,7 @@ fn remove_last_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 
 fn remove_nulls(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
-    Ok(Value::List(list.iter().filter(|v| !matches!(v, Value::Null)).cloned().collect()))
+    Ok(Value::list_of(list.iter().filter(|v| !matches!(v, Value::Null)).cloned().collect()))
 }
 
 fn remove_range(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
@@ -1198,7 +1198,7 @@ fn remove_range(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     if end < list.len() {
         out.extend_from_slice(&list[end..]);
     }
-    Ok(Value::List(out))
+    Ok(Value::list_of(out))
 }
 
 fn insert_range(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
@@ -1215,7 +1215,7 @@ fn insert_range(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     out.extend_from_slice(&list[..offset]);
     out.extend_from_slice(values);
     out.extend_from_slice(&list[offset..]);
-    Ok(Value::List(out))
+    Ok(Value::list_of(out))
 }
 
 fn replace_matching_items(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
@@ -1243,7 +1243,7 @@ fn replace_matching_items(args: &[Value], _host: &dyn IoHost) -> Result<Value, M
             out.push(v.clone());
         }
     }
-    Ok(Value::List(out))
+    Ok(Value::list_of(out))
 }
 
 fn replace_range(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
@@ -1267,7 +1267,7 @@ fn replace_range(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     if end < list.len() {
         out.extend_from_slice(&list[end..]);
     }
-    Ok(Value::List(out))
+    Ok(Value::list_of(out))
 }
 
 fn replace_value(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
@@ -1284,7 +1284,7 @@ fn replace_value(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
         )?;
         out.push(r);
     }
-    Ok(Value::List(out))
+    Ok(Value::list_of(out))
 }
 
 fn repeat(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
@@ -1297,7 +1297,7 @@ fn repeat(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     for _ in 0..count {
         out.extend_from_slice(list);
     }
-    Ok(Value::List(out))
+    Ok(Value::list_of(out))
 }
 
 fn times(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
@@ -1306,7 +1306,7 @@ fn times(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
         other => return Err(type_mismatch("non-negative integer (count)", other)),
     };
-    Ok(Value::List(vec![value.clone(); count]))
+    Ok(Value::list_of(vec![value.clone(); count]))
 }
 
 /// Power BI engine hook for paged data sources — "intended for internal
@@ -1351,7 +1351,7 @@ fn alternate(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             out.push(v.clone());
         }
     }
-    Ok(Value::List(out))
+    Ok(Value::list_of(out))
 }
 
 fn split(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
@@ -1362,14 +1362,14 @@ fn split(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     };
     let chunks: Vec<Value> = list
         .chunks(page)
-        .map(|c| Value::List(c.to_vec()))
+        .map(|c| Value::list_of(c.to_vec()))
         .collect();
-    Ok(Value::List(chunks))
+    Ok(Value::list_of(chunks))
 }
 
 fn buffer(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
-    Ok(Value::List(list.clone()))
+    Ok(Value::list_of(list.clone()))
 }
 
 fn difference(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
@@ -1391,14 +1391,14 @@ fn difference(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         .filter(|(i, _)| remaining[*i])
         .map(|(_, v)| v.clone())
         .collect();
-    Ok(Value::List(out))
+    Ok(Value::list_of(out))
 }
 
 fn intersect(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let lists = expect_list(&args[0])?;
     let criteria = equation_criteria_fn(args, 1, "List.Intersect")?;
     if lists.is_empty() {
-        return Ok(Value::List(Vec::new()));
+        return Ok(Value::list_of(Vec::new()));
     }
     let sublists: Vec<&Vec<Value>> = lists.iter().map(|v| expect_list(v)).collect::<Result<_, _>>()?;
     let first = sublists[0];
@@ -1418,7 +1418,7 @@ fn intersect(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         }
         out.push(v.clone());
     }
-    Ok(Value::List(out))
+    Ok(Value::list_of(out))
 }
 
 fn dates(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
@@ -1441,7 +1441,7 @@ fn dates(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         cur = cur.checked_add_signed(step)
             .ok_or_else(|| MError::Other("List.Dates: result out of range".into()))?;
     }
-    Ok(Value::List(out))
+    Ok(Value::list_of(out))
 }
 
 fn datetimes(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
@@ -1464,7 +1464,7 @@ fn datetimes(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         cur = cur.checked_add_signed(step)
             .ok_or_else(|| MError::Other("List.DateTimes: result out of range".into()))?;
     }
-    Ok(Value::List(out))
+    Ok(Value::list_of(out))
 }
 
 fn datetimezones(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
@@ -1487,7 +1487,7 @@ fn datetimezones(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         cur = cur.checked_add_signed(step)
             .ok_or_else(|| MError::Other("List.DateTimeZones: result out of range".into()))?;
     }
-    Ok(Value::List(out))
+    Ok(Value::list_of(out))
 }
 
 fn durations(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
@@ -1510,7 +1510,7 @@ fn durations(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         cur = cur.checked_add(&step)
             .ok_or_else(|| MError::Other("List.Durations: result out of range".into()))?;
     }
-    Ok(Value::List(out))
+    Ok(Value::list_of(out))
 }
 
 fn transform_many(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
@@ -1527,7 +1527,7 @@ fn transform_many(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
                 super::super::type_name(other)
             ))),
         };
-        for inner_item in inner_list {
+        for inner_item in inner_list.iter().cloned() {
             let mapped = invoke_callback_with_host(
                 result_fn,
                 vec![item.clone(), inner_item],
@@ -1536,7 +1536,7 @@ fn transform_many(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
             out.push(mapped);
         }
     }
-    Ok(Value::List(out))
+    Ok(Value::list_of(out))
 }
 
 fn generate(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
@@ -1569,7 +1569,7 @@ fn generate(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     if iters >= 100_000 {
         return Err(MError::Other("List.Generate: exceeded 100000 iteration cap".into()));
     }
-    Ok(Value::List(out))
+    Ok(Value::list_of(out))
 }
 
 fn numbers_only(list: &[Value], ctx: &str) -> Result<Vec<f64>, MError> {
@@ -1651,7 +1651,7 @@ fn modes(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let list = expect_list(&args[0])?;
     let criteria = equation_criteria_fn(args, 1, "List.Modes")?;
     if list.is_empty() {
-        return Ok(Value::List(Vec::new()));
+        return Ok(Value::list_of(Vec::new()));
     }
     let mut tally: Vec<(Value, usize)> = Vec::new();
     for v in list {
@@ -1672,7 +1672,7 @@ fn modes(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         .filter(|(_, c)| *c == max)
         .map(|(v, _)| v)
         .collect();
-    Ok(Value::List(out))
+    Ok(Value::list_of(out))
 }
 
 fn product(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
@@ -1744,7 +1744,7 @@ fn max_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     // PQ: MaxN/MinN drop nulls before picking top-N (an all-null list
     // returns empty, not [null]).
     let sorted = sort_numeric_or_text(list, "List.MaxN", true)?;
-    Ok(Value::List(
+    Ok(Value::list_of(
         sorted.into_iter().filter(|v| !matches!(v, Value::Null)).take(n).collect()
     ))
 }
@@ -1756,7 +1756,7 @@ fn min_n(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         other => return Err(type_mismatch("non-negative integer", other)),
     };
     let sorted = sort_numeric_or_text(list, "List.MinN", false)?;
-    Ok(Value::List(
+    Ok(Value::list_of(
         sorted.into_iter().filter(|v| !matches!(v, Value::Null)).take(n).collect()
     ))
 }
@@ -1866,7 +1866,7 @@ fn random(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     } else {
         (0..count).map(|_| Value::Number(rand::random::<f64>())).collect()
     };
-    Ok(Value::List(out))
+    Ok(Value::list_of(out))
 }
 
 fn union_(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
@@ -1882,6 +1882,6 @@ fn union_(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             out.push(x.clone());
         }
     }
-    Ok(Value::List(out))
+    Ok(Value::list_of(out))
 }
 

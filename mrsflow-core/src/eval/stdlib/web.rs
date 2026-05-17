@@ -147,7 +147,7 @@ fn parse_options(r: &Record, host: &dyn IoHost) -> Result<Options, MError> {
             },
             "ManualStatusHandling" => match v {
                 Value::List(xs) => {
-                    for x in xs {
+                    for x in xs.iter().cloned() {
                         let x = force_value(x, host)?;
                         match x {
                             Value::Number(n) => {

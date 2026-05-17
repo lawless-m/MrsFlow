@@ -777,12 +777,12 @@ fn impl_factory_group(args: &[Value], host: &dyn IoHost) -> Result<Value, MError
     };
     let mut offset = 0;
     let mut out: Vec<Value> = Vec::with_capacity(formats.len());
-    for fmt in &formats {
+    for fmt in formats.iter() {
         let (val, consumed) = parse_with_size(fmt, &b[offset..], host)?;
         out.push(val);
         offset += consumed;
     }
-    Ok(Value::List(out))
+    Ok(Value::list_of(out))
 }
 
 fn parse_group_sz(
@@ -797,12 +797,12 @@ fn parse_group_sz(
     };
     let mut offset = 0;
     let mut out: Vec<Value> = Vec::with_capacity(formats.len());
-    for fmt in &formats {
+    for fmt in formats.iter() {
         let (val, consumed) = parse_with_size(fmt, &b[offset..], host)?;
         out.push(val);
         offset += consumed;
     }
-    Ok((Value::List(out), offset))
+    Ok((Value::list_of(out), offset))
 }
 
 // --- BinaryFormat.List(format, [countOrEnd]) ---
@@ -861,7 +861,7 @@ fn impl_factory_list(args: &[Value], host: &dyn IoHost) -> Result<Value, MError>
             }
         }
     }
-    Ok(Value::List(out))
+    Ok(Value::list_of(out))
 }
 
 fn parse_list_sz(
@@ -899,7 +899,7 @@ fn parse_list_sz(
             }
         }
     }
-    Ok((Value::List(out), offset))
+    Ok((Value::list_of(out), offset))
 }
 
 // --- BinaryFormat.Choice(keyFormat, chooser) ---

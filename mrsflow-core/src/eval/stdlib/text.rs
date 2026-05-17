@@ -670,7 +670,7 @@ fn chars_from_arg(v: &Value, ctx: &'static str) -> Result<Vec<char>, MError> {
         Value::Text(s) => Ok(s.chars().collect()),
         Value::List(xs) => {
             let mut out = Vec::new();
-            for x in xs {
+            for x in xs.iter() {
                 match x {
                     Value::Text(s) => {
                         let mut it = s.chars();
@@ -887,7 +887,7 @@ fn select(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 
 fn to_list(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
-    Ok(Value::List(text.chars().map(|c| Value::Text(c.to_string())).collect()))
+    Ok(Value::list_of(text.chars().map(|c| Value::Text(c.to_string())).collect()))
 }
 
 
@@ -899,7 +899,7 @@ fn split_any(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         .split(|c: char| seps.contains(&c))
         .map(|s| Value::Text(s.to_string()))
         .collect();
-    Ok(Value::List(parts))
+    Ok(Value::list_of(parts))
 }
 
 
@@ -931,7 +931,7 @@ fn occurrence_result(mode: Occurrence, matches: &[usize]) -> Value {
     match mode {
         Occurrence::First => Value::Number(matches.first().copied().map(|i| i as f64).unwrap_or(-1.0)),
         Occurrence::Last => Value::Number(matches.last().copied().map(|i| i as f64).unwrap_or(-1.0)),
-        Occurrence::All => Value::List(matches.iter().map(|&i| Value::Number(i as f64)).collect()),
+        Occurrence::All => Value::list_of(matches.iter().map(|&i| Value::Number(i as f64)).collect()),
     }
 }
 
@@ -1294,6 +1294,6 @@ fn split(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     } else {
         text.split(sep).map(|s| Value::Text(s.to_string())).collect()
     };
-    Ok(Value::List(parts))
+    Ok(Value::list_of(parts))
 }
 

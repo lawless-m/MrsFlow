@@ -25,6 +25,12 @@ pub mod profile {
     use std::sync::atomic::{AtomicU64, Ordering};
     pub static LIST_CLONES: AtomicU64 = AtomicU64::new(0);
     pub static LIST_TOTAL_LEN: AtomicU64 = AtomicU64::new(0);
+    // `list-make-mut` is the count of times an Rc<Vec<Value>> had to be
+    // cloned because refcount > 1 (the actual O(N) cost). With shared
+    // Rc, LIST_CLONES counts every Rc::clone; LIST_MAKE_MUT counts only
+    // the ones that triggered a deep copy.
+    pub static LIST_MAKE_MUT: AtomicU64 = AtomicU64::new(0);
+    pub static LIST_MAKE_MUT_TOTAL_LEN: AtomicU64 = AtomicU64::new(0);
     // Size buckets: 0, 1, 2-3, 4-7, 8-15, ..., 16384-32767, 32768+
     pub static LIST_CLONE_BUCKETS: [AtomicU64; 16] = [
         AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0),
@@ -49,6 +55,10 @@ pub mod profile {
     // sharing the forced value via Rc is the fix.
     pub static FORCE_HITS: AtomicU64 = AtomicU64::new(0);
     pub static FORCE_LIST_HITS: AtomicU64 = AtomicU64::new(0);
+    pub fn bump_list_make_mut(len: usize) {
+        LIST_MAKE_MUT.fetch_add(1, Ordering::Relaxed);
+        LIST_MAKE_MUT_TOTAL_LEN.fetch_add(len as u64, Ordering::Relaxed);
+    }
     pub fn bump_list(len: usize) {
         LIST_CLONES.fetch_add(1, Ordering::Relaxed);
         LIST_TOTAL_LEN.fetch_add(len as u64, Ordering::Relaxed);
@@ -77,11 +87,13 @@ pub mod profile {
         BINARY_CLONES.fetch_add(1, Ordering::Relaxed);
         BINARY_TOTAL_BYTES.fetch_add(len as u64, Ordering::Relaxed);
     }
-    pub fn snapshot() -> [(&'static str, u64); 12] {
+    pub fn snapshot() -> [(&'static str, u64); 14] {
         [
-            ("list-clones", LIST_CLONES.load(Ordering::Relaxed)),
+            ("list-clones (Rc bumps)", LIST_CLONES.load(Ordering::Relaxed)),
             ("list-total-items-cloned", LIST_TOTAL_LEN.load(Ordering::Relaxed)),
             ("list-clone-max-len", LIST_CLONE_MAX_LEN.load(Ordering::Relaxed)),
+            ("list-make-mut (true O(N) copies)", LIST_MAKE_MUT.load(Ordering::Relaxed)),
+            ("list-make-mut-total-len", LIST_MAKE_MUT_TOTAL_LEN.load(Ordering::Relaxed)),
             ("record-clones", RECORD_CLONES.load(Ordering::Relaxed)),
             ("text-clones", TEXT_CLONES.load(Ordering::Relaxed)),
             ("binary-clones", BINARY_CLONES.load(Ordering::Relaxed)),
@@ -128,7 +140,11 @@ pub enum Value {
     Time(chrono::NaiveTime),
     Duration(chrono::Duration),
     Binary(Vec<u8>),
-    List(Vec<Value>),
+    /// Element storage is `Rc<Vec<Value>>` so cloning a `Value::List` is a
+    /// refcount bump rather than an O(N) deep copy. Mutating ops use
+    /// `Rc::make_mut` to get an exclusive view (clones the Vec only when
+    /// the refcount is > 1). Use `Value::list_of(vec)` to construct.
+    List(std::rc::Rc<Vec<Value>>),
     /// Records preserve insertion order per spec — `Vec` not `HashMap`.
     /// The `env` field keeps the per-record thunk env alive so sibling-field
     /// references resolve correctly when fields are forced after the record
@@ -179,6 +195,12 @@ impl Clone for Value {
                 Value::Binary(b.clone())
             }
             Value::List(xs) => {
+                // `Rc::clone` is a refcount bump — no element copy. We
+                // still count the call so we can see whether the hot
+                // paths really do share backing storage after this
+                // change (`list-clones` should drop dramatically) while
+                // `list-total-items-cloned` may stay the same if some
+                // path still does `Rc::make_mut` or rebuilds the Vec.
                 #[cfg(feature = "profile-clones")]
                 profile::bump_list(xs.len());
                 Value::List(xs.clone())
@@ -528,6 +550,42 @@ pub enum FilterScalar {
 }
 
 impl Value {
+    /// Construct a `Value::List` from an owned `Vec<Value>`. Equivalent to
+    /// `Value::List(Rc::new(vec))` but reads better at construction sites.
+    pub fn list_of(items: Vec<Value>) -> Self {
+        Value::List(std::rc::Rc::new(items))
+    }
+
+    /// Take ownership of the inner Vec of a `Value::List`. If we hold the
+    /// only reference this is a zero-copy unwrap; otherwise the Vec is
+    /// cloned. Use this when the caller is about to mutate the list and
+    /// wants the M-level copy-on-write semantics.
+    #[cfg(feature = "profile-clones")]
+    pub fn into_list_vec(self) -> Option<Vec<Value>> {
+        match self {
+            Value::List(rc) => {
+                let len = rc.len();
+                match std::rc::Rc::try_unwrap(rc) {
+                    Ok(v) => Some(v),
+                    Err(rc) => {
+                        profile::bump_list_make_mut(len);
+                        Some((*rc).clone())
+                    }
+                }
+            }
+            _ => None,
+        }
+    }
+    #[cfg(not(feature = "profile-clones"))]
+    pub fn into_list_vec(self) -> Option<Vec<Value>> {
+        match self {
+            Value::List(rc) => {
+                Some(std::rc::Rc::try_unwrap(rc).unwrap_or_else(|rc| (*rc).clone()))
+            }
+            _ => None,
+        }
+    }
+
     /// Coerce a `Value::Decimal` (or `Number`) to f64, lossily. Used at
     /// the Number↔Decimal boundary where preserving precision isn't
     /// possible (Decimal × Number arithmetic, comparison vs Number,

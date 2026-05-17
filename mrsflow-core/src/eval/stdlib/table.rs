@@ -656,7 +656,7 @@ fn column_names(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         .into_iter()
         .map(Value::Text)
         .collect();
-    Ok(Value::List(names))
+    Ok(Value::list_of(names))
 }
 
 
@@ -1478,7 +1478,7 @@ fn to_records(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     for row in 0..n {
         out.push(row_to_record(&table, row)?);
     }
-    Ok(Value::List(out))
+    Ok(Value::list_of(out))
 }
 
 
@@ -1555,9 +1555,9 @@ fn distinct(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
                     // is the natural generalisation.
                     let mut col_idxs: Vec<usize> = Vec::with_capacity(parts.len());
                     let mut per_col_cmps: Vec<(usize, Closure)> = Vec::new();
-                    for p in parts {
-                        let pair = match p {
-                            Value::List(xs) => xs,
+                    for p in parts.iter() {
+                        let pair: &Vec<Value> = match p {
+                            Value::List(xs) => xs.as_ref(),
                             other => return Err(type_mismatch(
                                 "list (column, comparer) pair",
                                 other,
@@ -1600,7 +1600,7 @@ fn distinct(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
                 _ => {
                     // Plain list of column names (multi-col tuple dedup).
                     let mut col_idxs: Vec<usize> = Vec::with_capacity(parts.len());
-                    for p in parts {
+                    for p in parts.iter() {
                         match p {
                             Value::Text(s) => {
                                 let idx = names.iter().position(|n| n == s).ok_or_else(|| {
@@ -1772,7 +1772,7 @@ fn column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     for row in 0..n {
         out.push(cell_to_value(&table, col_idx, row)?);
     }
-    Ok(Value::List(out))
+    Ok(Value::list_of(out))
 }
 
 
@@ -2058,7 +2058,7 @@ fn transform_column_types(args: &[Value], _host: &dyn IoHost) -> Result<Value, M
     // Auto-wrap single `{name, type}` pair to match Power Query leniency.
     let owned: Vec<Value>;
     let transforms: &[Value] = if is_single_col_type_pair(transforms) {
-        owned = vec![Value::List(transforms.to_vec())];
+        owned = vec![Value::list_of(transforms.to_vec())];
         &owned
     } else {
         transforms
@@ -2259,7 +2259,7 @@ fn transform_columns(args: &[Value], host: &dyn IoHost) -> Result<Value, MError>
     // `{{name, fn}, ...}` (list of pairs). Auto-wrap the single-pair form.
     let owned: Vec<Value>;
     let transforms: &[Value] = if is_single_col_fn_pair(transforms) {
-        owned = vec![Value::List(transforms.to_vec())];
+        owned = vec![Value::list_of(transforms.to_vec())];
         &owned
     } else {
         transforms
@@ -2552,7 +2552,7 @@ fn expand_list_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MErro
                     new_row[col_idx] = Value::Null;
                     out_rows.push(new_row);
                 } else {
-                    for item in items {
+                    for item in items.iter() {
                         let mut new_row = row.clone();
                         new_row[col_idx] = item.clone();
                         out_rows.push(new_row);
@@ -2888,7 +2888,7 @@ fn pivot(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
             let cell = match (matches.len(), aggregation) {
                 (0, _) => Value::Null,
                 (_, Some(f)) => {
-                    invoke_callback_with_host(f, vec![Value::List(matches)], host)?
+                    invoke_callback_with_host(f, vec![Value::list_of(matches)], host)?
                 }
                 // No aggregator: PQ's default is the last matching value.
                 (_, None) => matches.pop().unwrap(),
@@ -3129,7 +3129,7 @@ fn parse_join_key_columns(v: &Value, role: &str) -> Result<Vec<String>, MError> 
                 )));
             }
             let mut cols = Vec::with_capacity(items.len());
-            for item in items {
+            for item in items.iter() {
                 match item {
                     Value::Text(s) => cols.push(s.clone()),
                     other => {
@@ -3547,7 +3547,7 @@ fn transform_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
         let record = row_to_record(&table, row)?;
         out.push(invoke_callback_with_host(transform, vec![record], host)?);
     }
-    Ok(Value::List(out))
+    Ok(Value::list_of(out))
 }
 
 
@@ -4009,7 +4009,7 @@ fn occurrence_result(mode: Occurrence, matches: &[usize]) -> Value {
     match mode {
         Occurrence::First => Value::Number(matches.first().copied().map(|i| i as f64).unwrap_or(-1.0)),
         Occurrence::Last => Value::Number(matches.last().copied().map(|i| i as f64).unwrap_or(-1.0)),
-        Occurrence::All => Value::List(matches.iter().map(|&i| Value::Number(i as f64)).collect()),
+        Occurrence::All => Value::list_of(matches.iter().map(|&i| Value::Number(i as f64)).collect()),
     }
 }
 
@@ -4060,7 +4060,7 @@ fn position_of_any(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> 
 fn keys(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     // v1: we don't track key metadata — return an empty list.
     let _ = expect_table(&args[0])?;
-    Ok(Value::List(Vec::new()))
+    Ok(Value::list_of(Vec::new()))
 }
 
 fn columns_of_type(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
@@ -4093,7 +4093,7 @@ fn columns_of_type(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> 
     let _ = declared_types;
     let _ = targets;
     let _ = names;
-    Ok(Value::List(out))
+    Ok(Value::list_of(out))
 }
 
 
@@ -4379,7 +4379,7 @@ fn split_at(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let (head, tail) = rows.split_at(split);
     let head_tbl = values_to_table(&names, head)?;
     let tail_tbl = values_to_table(&names, tail)?;
-    Ok(Value::List(vec![
+    Ok(Value::list_of(vec![
         Value::Table(head_tbl),
         Value::Table(tail_tbl),
     ]))
@@ -4604,7 +4604,7 @@ fn aggregate_table_column(args: &[Value], host: &dyn IoHost) -> Result<Value, ME
                     }
                     let agg_result = invoke_callback_with_host(
                         &s.agg,
-                        vec![Value::List(col_values)],
+                        vec![Value::list_of(col_values)],
                         host,
                     )?;
                     new_row.push(agg_result);
@@ -4921,9 +4921,9 @@ fn replace_error_values(args: &[Value], _host: &dyn IoHost) -> Result<Value, MEr
         other => return Err(type_mismatch("list of {col, substitute} pairs", other)),
     };
     let (names, mut rows) = table_to_rows(&table)?;
-    for p in pairs {
-        let inner = match p {
-            Value::List(xs) if xs.len() == 2 => xs,
+    for p in pairs.iter() {
+        let inner: &Vec<Value> = match p {
+            Value::List(xs) if xs.len() == 2 => xs.as_ref(),
             other => return Err(type_mismatch("2-element list (col, substitute)", other)),
         };
         let col_name = expect_text(&inner[0])?.to_string();
@@ -4964,7 +4964,7 @@ fn combine_columns(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     for row in rows {
         let mut new_row: Vec<Value> = keep.iter().map(|&i| row[i].clone()).collect();
         let source_values: Vec<Value> = src_indices.iter().map(|&i| row[i].clone()).collect();
-        let combined = invoke_callback_with_host(combiner, vec![Value::List(source_values)], host)?;
+        let combined = invoke_callback_with_host(combiner, vec![Value::list_of(source_values)], host)?;
         new_row.push(combined);
         out_rows.push(new_row);
     }
@@ -5144,8 +5144,8 @@ fn split_column(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     for row in &rows {
         let cell = row[src_idx].clone();
         let result = invoke_callback_with_host(splitter, vec![cell], host)?;
-        let parts = match result {
-            Value::List(xs) => xs,
+        let parts: Vec<Value> = match result {
+            Value::List(xs) => std::rc::Rc::try_unwrap(xs).unwrap_or_else(|rc| (*rc).clone()),
             other => return Err(type_mismatch("list (splitter result)", &other)),
         };
         max_width = max_width.max(parts.len());
@@ -5205,7 +5205,7 @@ fn split_column(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
                         }
                         _ => {
                             let tail = split_row.split_off(width - 1);
-                            split_row.push(Value::List(tail));
+                            split_row.push(Value::list_of(tail));
                         }
                     }
                 }
@@ -5302,7 +5302,7 @@ fn from_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let col_lists: Vec<&Vec<Value>> = cols
         .iter()
         .map(|v| match v {
-            Value::List(xs) => Ok(xs),
+            Value::List(xs) => Ok(xs.as_ref()),
             other => Err(type_mismatch("list (column)", other)),
         })
         .collect::<Result<_, _>>()?;
@@ -5366,7 +5366,8 @@ fn from_list(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
             Some(s) => {
                 let result = invoke_callback_with_host(s, vec![item.clone()], host)?;
                 match result {
-                    Value::List(xs) => xs,
+                    Value::List(xs) => std::rc::Rc::try_unwrap(xs)
+                        .unwrap_or_else(|rc| (*rc).clone()),
                     other => return Err(type_mismatch("list (splitter result)", &other)),
                 }
             }
@@ -5393,7 +5394,7 @@ fn from_list(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
                     // as a list. Spec is "the remaining values become a single
                     // list value in the last column".
                     let tail = row.split_off(names.len() - 1);
-                    row.push(Value::List(tail));
+                    row.push(Value::list_of(tail));
                 }
             }
         }
@@ -5439,9 +5440,9 @@ fn to_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         for r in 0..n_rows {
             col.push(cell_to_value(&table, c, r)?);
         }
-        out.push(Value::List(col));
+        out.push(Value::list_of(col));
     }
-    Ok(Value::List(out))
+    Ok(Value::list_of(out))
 }
 
 fn to_list(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
@@ -5460,7 +5461,7 @@ fn to_list(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
             cells.push(cell_to_value(&table, c, r)?);
         }
         let joined = match combiner {
-            Some(cb) => invoke_callback_with_host(cb, vec![Value::List(cells)], host)?,
+            Some(cb) => invoke_callback_with_host(cb, vec![Value::list_of(cells)], host)?,
             None => {
                 // Default: comma-join text-coerced cells.
                 let strs: Vec<String> = cells
@@ -5481,14 +5482,14 @@ fn to_list(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
         };
         out.push(joined);
     }
-    Ok(Value::List(out))
+    Ok(Value::list_of(out))
 }
 
 fn to_rows_value(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let (_, rows) = table_to_rows(&table)?;
-    let out: Vec<Value> = rows.into_iter().map(Value::List).collect();
-    Ok(Value::List(out))
+    let out: Vec<Value> = rows.into_iter().map(Value::list_of).collect();
+    Ok(Value::list_of(out))
 }
 
 /// Returns the (PowerQuery-style) type name for a cell value, e.g.
@@ -5668,9 +5669,9 @@ fn profile(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
         None | Some(Value::Null) => Vec::new(),
         Some(Value::List(xs)) => {
             let mut out = Vec::with_capacity(xs.len());
-            for v in xs {
-                let triple = match v {
-                    Value::List(t) => t,
+            for v in xs.iter() {
+                let triple: &Vec<Value> = match v {
+                    Value::List(t) => t.as_ref(),
                     other => return Err(type_mismatch("list (aggregate triple)", other)),
                 };
                 if triple.len() != 3 {
@@ -5730,7 +5731,7 @@ fn profile(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
             let cell = match applies {
                 Value::Logical(true) => invoke_callback_with_host(
                     &e.agg,
-                    vec![Value::List(col_values.clone())],
+                    vec![Value::list_of(col_values.clone())],
                     host,
                 )?,
                 Value::Logical(false) => Value::Null,
@@ -5976,7 +5977,7 @@ fn split(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     for chunk in rows.chunks(page_size) {
         out.push(Value::Table(values_to_table(&names, chunk)?));
     }
-    Ok(Value::List(out))
+    Ok(Value::list_of(out))
 }
 
 fn buffer(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
@@ -6015,19 +6016,19 @@ fn partition(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
         .into_iter()
         .map(|b| values_to_table(&names, &b).map(Value::Table))
         .collect::<Result<_, _>>()?;
-    Ok(Value::List(out))
+    Ok(Value::list_of(out))
 }
 
 fn partition_key(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     // v1: no partition key tracking.
     let _ = expect_table(&args[0])?;
-    Ok(Value::List(Vec::new()))
+    Ok(Value::list_of(Vec::new()))
 }
 
 fn partition_values(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     // v1: no partition key tracking.
     let _ = expect_table(&args[0])?;
-    Ok(Value::List(Vec::new()))
+    Ok(Value::list_of(Vec::new()))
 }
 
 fn identity_passthrough(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {

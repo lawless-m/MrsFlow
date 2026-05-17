@@ -383,7 +383,7 @@ fn split_by_nothing_impl(args: &[Value], _host: &dyn IoHost) -> Result<Value, ME
     // Identity-wrap: returns a singleton list containing the input unchanged.
     // Unlike the other Splitter.* functions, this one accepts any value type
     // (it's how Table.FromList puts a list of arbitrary values into a table).
-    Ok(Value::List(vec![args[0].clone()]))
+    Ok(Value::list_of(vec![args[0].clone()]))
 }
 
 fn split_text_by_delimiter_impl(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
@@ -400,7 +400,7 @@ fn split_text_by_delimiter_impl(args: &[Value], _host: &dyn IoHost) -> Result<Va
     } else {
         text.split(delim).map(|s| Value::Text(s.to_string())).collect()
     };
-    Ok(Value::List(parts))
+    Ok(Value::list_of(parts))
 }
 
 fn split_text_by_any_delimiter_impl(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
@@ -411,7 +411,7 @@ fn split_text_by_any_delimiter_impl(args: &[Value], _host: &dyn IoHost) -> Resul
         _ => 0,
     };
     if delims.is_empty() {
-        return Ok(Value::List(vec![Value::Text(text.to_string())]));
+        return Ok(Value::list_of(vec![Value::Text(text.to_string())]));
     }
     let parts: Vec<String> = if qs_n == 1 {
         csv_split_any(text, &delims)
@@ -443,7 +443,7 @@ fn split_text_by_any_delimiter_impl(args: &[Value], _host: &dyn IoHost) -> Resul
         parts.push(buf);
         parts
     };
-    Ok(Value::List(parts.into_iter().map(Value::Text).collect()))
+    Ok(Value::list_of(parts.into_iter().map(Value::Text).collect()))
 }
 
 /// Sweep `text` left-to-right tracking double-quote state; collect byte
@@ -547,7 +547,7 @@ fn split_text_by_each_delimiter_impl(args: &[Value], _host: &dyn IoHost) -> Resu
             }
         }
         parts.push(rest);
-        return Ok(Value::List(parts.into_iter().map(Value::Text).collect()));
+        return Ok(Value::list_of(parts.into_iter().map(Value::Text).collect()));
     }
 
     // Reverse mode: walk delims right-to-left, cut on each delimiter's
@@ -571,7 +571,7 @@ fn split_text_by_each_delimiter_impl(args: &[Value], _host: &dyn IoHost) -> Resu
     let mut parts: Vec<String> = Vec::with_capacity(tail_parts.len() + 1);
     parts.push(rest);
     parts.extend(tail_parts.into_iter().rev());
-    Ok(Value::List(parts.into_iter().map(Value::Text).collect()))
+    Ok(Value::list_of(parts.into_iter().map(Value::Text).collect()))
 }
 
 fn split_text_by_lengths_impl(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
@@ -604,7 +604,7 @@ fn split_text_by_lengths_impl(args: &[Value], _host: &dyn IoHost) -> Result<Valu
             parts.push(Value::Text(chunk));
             idx += n;
         }
-        return Ok(Value::List(parts));
+        return Ok(Value::list_of(parts));
     }
     // Reverse: anchor at end of text and consume lengths right-to-left.
     // Empirically (PQ via Oracle q99): {3,2} reverse on "abcdefg" gives
@@ -626,7 +626,7 @@ fn split_text_by_lengths_impl(args: &[Value], _host: &dyn IoHost) -> Result<Valu
         parts.push(Value::Text(chunk));
         idx += n;
     }
-    Ok(Value::List(parts))
+    Ok(Value::list_of(parts))
 }
 
 fn split_text_by_positions_impl(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
@@ -657,7 +657,7 @@ fn split_text_by_positions_impl(args: &[Value], _host: &dyn IoHost) -> Result<Va
         let chunk: String = chars[start..end].iter().collect();
         parts.push(Value::Text(chunk));
     }
-    Ok(Value::List(parts))
+    Ok(Value::list_of(parts))
 }
 
 fn split_text_by_ranges_impl(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
@@ -690,7 +690,7 @@ fn split_text_by_ranges_impl(args: &[Value], _host: &dyn IoHost) -> Result<Value
         let chunk: String = chars[start..end].iter().collect();
         parts.push(Value::Text(chunk));
     }
-    Ok(Value::List(parts))
+    Ok(Value::list_of(parts))
 }
 
 fn split_text_by_character_transition_impl(
@@ -716,7 +716,7 @@ fn split_text_by_character_transition_impl(
         buf.push(chars[i]);
     }
     parts.push(buf);
-    Ok(Value::List(parts.into_iter().map(Value::Text).collect()))
+    Ok(Value::list_of(parts.into_iter().map(Value::Text).collect()))
 }
 
 fn split_text_by_repeated_lengths_impl(
@@ -740,7 +740,7 @@ fn split_text_by_repeated_lengths_impl(
         parts.push(Value::Text(chunk));
         i = end;
     }
-    Ok(Value::List(parts))
+    Ok(Value::list_of(parts))
 }
 
 fn split_text_by_whitespace_impl(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
@@ -754,7 +754,7 @@ fn split_text_by_whitespace_impl(args: &[Value], _host: &dyn IoHost) -> Result<V
             .split_whitespace()
             .map(|s| Value::Text(s.to_string()))
             .collect();
-        return Ok(Value::List(parts));
+        return Ok(Value::list_of(parts));
     }
     // Csv-aware: whitespace runs separate fields only when scanned outside
     // a double-quoted region. Inside "...", `""` is an escaped quote.
@@ -806,5 +806,5 @@ fn split_text_by_whitespace_impl(args: &[Value], _host: &dyn IoHost) -> Result<V
     if !buf.is_empty() {
         parts.push(buf);
     }
-    Ok(Value::List(parts.into_iter().map(Value::Text).collect()))
+    Ok(Value::list_of(parts.into_iter().map(Value::Text).collect()))
 }

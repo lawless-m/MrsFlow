@@ -126,7 +126,7 @@ fn field_names(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         .iter()
         .map(|(n, _)| Value::Text(n.clone()))
         .collect();
-    Ok(Value::List(names))
+    Ok(Value::list_of(names))
 }
 
 
@@ -140,7 +140,7 @@ fn field_values(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
         .iter()
         .map(|(_, v)| super::super::force(v.clone(), &mut |e, env| super::super::evaluate(e, env, host)))
         .collect();
-    Ok(Value::List(values?))
+    Ok(Value::list_of(values?))
 }
 
 
@@ -336,7 +336,7 @@ fn rename_fields(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             .map(parse_rename_pair)
             .collect::<Result<_, _>>()?
     } else {
-        vec![parse_rename_pair(&Value::List(raw.clone()))?]
+        vec![parse_rename_pair(&Value::list_of(raw.clone()))?]
     };
     let mut fields = record.fields.clone();
     for (old, new) in pairs {
@@ -488,7 +488,7 @@ fn to_list(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
             })
         })
         .collect();
-    Ok(Value::List(values?))
+    Ok(Value::list_of(values?))
 }
 
 
@@ -520,7 +520,7 @@ fn transform_fields(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> 
     let pair_values: Vec<&Vec<Value>> = if raw.iter().all(|v| matches!(v, Value::List(_))) {
         raw.iter()
             .map(|v| match v {
-                Value::List(xs) => Ok(xs),
+                Value::List(xs) => Ok(xs.as_ref()),
                 other => Err(type_mismatch("list (pair)", other)),
             })
             .collect::<Result<_, _>>()?

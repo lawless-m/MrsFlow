@@ -341,7 +341,7 @@ pub fn evaluate(ast: &Expr, env: &Env, host: &dyn IoHost) -> Result<Value, MErro
                     }
                 }
             }
-            Ok(Value::List(values))
+            Ok(Value::list_of(values))
         }
 
         // --- Record literal: each field is a thunk in a shared env so
@@ -390,7 +390,7 @@ pub fn evaluate(ast: &Expr, env: &Env, host: &dyn IoHost) -> Result<Value, MErro
                         for r in 0..n_rows {
                             out.push(stdlib::table::cell_to_value(table, i, r)?);
                         }
-                        Ok(Value::List(out))
+                        Ok(Value::list_of(out))
                     }
                     None => {
                         if *optional {
@@ -1020,11 +1020,14 @@ pub fn deep_force(value: Value, host: &dyn IoHost) -> Result<Value, MError> {
     let value = force(value, &mut |e, env| evaluate(e, env, host))?;
     match value {
         Value::List(items) => {
-            let forced: Result<Vec<Value>, MError> = items
+            // Take ownership cheaply if we hold the only ref; else clone.
+            let items_vec: Vec<Value> = std::rc::Rc::try_unwrap(items)
+                .unwrap_or_else(|rc| (*rc).clone());
+            let forced: Result<Vec<Value>, MError> = items_vec
                 .into_iter()
                 .map(|v| deep_force(v, host))
                 .collect();
-            Ok(Value::List(forced?))
+            Ok(Value::list_of(forced?))
         }
         Value::Record(record) => {
             let fields: Result<Vec<(String, Value)>, MError> = record
@@ -1154,9 +1157,24 @@ fn apply_binary(op: BinaryOp, lv: Value, rv: Value, host: &dyn IoHost) -> Result
             match (lv, rv) {
                 (Value::Text(l), Value::Text(r)) => Ok(Value::Text(l + &r)),
                 (Value::List(l), Value::List(r)) => {
-                    let mut out = l;
-                    out.extend(r);
-                    Ok(Value::List(out))
+                    // `l` is `Rc<Vec<Value>>`. If we own the only reference
+                    // (typical when `acc` is single-use), extend in place via
+                    // `Rc::make_mut` which returns `&mut Vec<Value>` without
+                    // cloning. With refcount > 1, make_mut clones the Vec —
+                    // unavoidable to preserve M's value semantics for the
+                    // other reference.
+                    let mut l_rc = l;
+                    let l_vec: &mut Vec<Value> = std::rc::Rc::make_mut(&mut l_rc);
+                    // Same for r: try to take ownership cheaply, else clone.
+                    match std::rc::Rc::try_unwrap(r) {
+                        Ok(r_vec) => l_vec.extend(r_vec),
+                        Err(r_rc) => {
+                            #[cfg(feature = "profile-clones")]
+                            value::profile::bump_list_make_mut(r_rc.len());
+                            l_vec.extend(r_rc.iter().cloned());
+                        }
+                    }
+                    Ok(Value::List(l_rc))
                 }
                 // PQ `&` on records merges fields; on key collision the RHS
                 // value wins. Order: LHS fields in original order, then any

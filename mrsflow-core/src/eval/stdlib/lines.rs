@@ -54,7 +54,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
 
 fn from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
-    Ok(Value::List(split_lines(text, false)))
+    Ok(Value::list_of(split_lines(text, false)))
 }
 
 fn to_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
@@ -83,7 +83,7 @@ fn from_binary(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = std::str::from_utf8(bytes)
         .map_err(|e| MError::Other(format!("Lines.FromBinary: invalid UTF-8: {e}")))?;
     let include_seps = matches!(args.get(2), Some(Value::Logical(true)));
-    Ok(Value::List(split_lines(text, include_seps)))
+    Ok(Value::list_of(split_lines(text, include_seps)))
 }
 
 fn to_binary(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {

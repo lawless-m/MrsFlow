@@ -110,9 +110,9 @@ fn parse_column_specs(v: &Value) -> Result<Vec<ColumnSpec>, MError> {
         other => return Err(type_mismatch("list of column specs", other)),
     };
     let mut out: Vec<ColumnSpec> = Vec::with_capacity(outer.len());
-    for entry in outer {
-        let parts = match entry {
-            Value::List(xs) => xs,
+    for entry in outer.iter() {
+        let parts: &Vec<Value> = match entry {
+            Value::List(xs) => xs.as_ref(),
             other => return Err(type_mismatch("list (column spec)", other)),
         };
         if parts.len() < 2 || parts.len() > 3 {

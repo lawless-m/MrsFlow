@@ -136,7 +136,7 @@ fn from_literal(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     match &args[0] {
         Value::List(xs) => {
             let mut out = Vec::with_capacity(xs.len());
-            for v in xs {
+            for v in xs.iter() {
                 match v {
                     Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 && *n <= 255.0 => {
                         out.push(*n as u8);
@@ -163,7 +163,7 @@ fn to_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 
 fn to_list(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let bytes = expect_binary(&args[0])?;
-    Ok(Value::List(bytes.iter().map(|b| Value::Number(*b as f64)).collect()))
+    Ok(Value::list_of(bytes.iter().map(|b| Value::Number(*b as f64)).collect()))
 }
 
 fn range(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
@@ -214,7 +214,7 @@ fn split(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         .chunks(page_size)
         .map(|c| Value::Binary(c.to_vec()))
         .collect();
-    Ok(Value::List(out))
+    Ok(Value::list_of(out))
 }
 
 fn infer_content_type(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {

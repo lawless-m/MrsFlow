@@ -332,7 +332,7 @@ fn json_to_value(j: serde_json::Value) -> Value {
         }
         serde_json::Value::String(s) => Value::Text(s),
         serde_json::Value::Array(xs) => {
-            Value::List(xs.into_iter().map(json_to_value).collect())
+            Value::list_of(xs.into_iter().map(json_to_value).collect())
         }
         serde_json::Value::Object(map) => {
             // serde_json's `preserve_order` feature keeps insertion order,

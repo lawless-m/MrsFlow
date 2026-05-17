@@ -224,7 +224,7 @@ fn expression(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 
 fn lineage(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     // v1: no fold lineage tracking.
-    Ok(Value::List(Vec::new()))
+    Ok(Value::list_of(Vec::new()))
 }
 
 fn traits(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
@@ -262,7 +262,7 @@ fn firewall(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 fn alternates(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    Ok(Value::List(vec![args[0].clone()]))
+    Ok(Value::list_of(vec![args[0].clone()]))
 }
 
 // --- Slice #171: metadata ---

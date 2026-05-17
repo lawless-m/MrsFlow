@@ -177,7 +177,7 @@ fn table_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 
 fn table_keys(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let _ = expect_type(&args[0])?;
-    Ok(Value::List(Vec::new()))
+    Ok(Value::list_of(Vec::new()))
 }
 
 fn table_row(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
@@ -356,7 +356,7 @@ fn facets(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 
 fn table_partition_key(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let _ = expect_type(&args[0])?;
-    Ok(Value::List(Vec::new()))
+    Ok(Value::list_of(Vec::new()))
 }
 
 fn identity_passthrough(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {

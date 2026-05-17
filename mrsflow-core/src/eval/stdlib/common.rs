@@ -145,9 +145,9 @@ pub(super) fn expect_text_list(v: &Value, ctx: &str) -> Result<Vec<String>, MErr
 pub(super) fn expect_list_of_lists(v: &Value, ctx: &str) -> Result<Vec<Vec<Value>>, MError> {
     let xs = expect_list(v)?;
     let mut out = Vec::with_capacity(xs.len());
-    for x in xs {
+    for x in xs.iter() {
         match x {
-            Value::List(inner) => out.push(inner.clone()),
+            Value::List(inner) => out.push((**inner).clone()),
             other => {
                 return Err(MError::Other(format!(
                     "{}: expected list of lists, got {}",

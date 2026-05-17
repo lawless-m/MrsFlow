@@ -2357,7 +2357,7 @@ where
     T: for<'a> tokio_postgres::types::FromSql<'a>,
 {
     match row.try_get::<_, Option<Vec<Option<T>>>>(col) {
-        Ok(Some(xs)) => Value::List(xs.into_iter().map(|opt| opt.map(&f).unwrap_or(Value::Null)).collect()),
+        Ok(Some(xs)) => Value::list_of(xs.into_iter().map(|opt| opt.map(&f).unwrap_or(Value::Null)).collect()),
         Ok(None) => Value::Null,
         Err(e) => Value::Text(format!("<array decode error: {e}>")),
     }
@@ -2375,7 +2375,7 @@ fn json_value_to_m(j: serde_json::Value) -> Value {
         }
         serde_json::Value::String(s) => Value::Text(s),
         serde_json::Value::Array(xs) => {
-            Value::List(xs.into_iter().map(json_value_to_m).collect())
+            Value::list_of(xs.into_iter().map(json_value_to_m).collect())
         }
         serde_json::Value::Object(map) => {
             let fields = map
