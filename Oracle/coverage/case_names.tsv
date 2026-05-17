@@ -1318,3 +1318,8 @@ q1316	Table.FromRecords Table.ReplaceRows
 q1317	Table.FromRecords Table.TransformColumnNames Text.Upper
 q1318	Table.FromRecords Table.TransformRows
 q1319	Table.AddJoinColumn Table.FromRecords
+q1320	Table.FromRecords Table.Partition
+q1321	Combiner.CombineTextByDelimiter Table.FromRecords Table.ToList
+q1322	Table.FromRecords Table.SelectRowsWithErrors
+q1323	Table.FromRecords Table.StopFolding
+q1324	List.Sum Table.AggregateTableColumn Table.FromRecords

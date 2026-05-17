@@ -11524,7 +11524,50 @@ let
                 "id",
                 Table.FromRecords({[id=1, v="a"], [id=1, v="b"], [id=2, v="c"]}),
                 "id",
-                "joined"))
+                "joined")),
+        // q1320-q1328: still more Table ops.
+        SafeSerialize("q1320", () =>
+            // Partition splits the table into N groups by a key column,
+            // each group as a sub-table. Returns a list of tables.
+            Table.Partition(
+                Table.FromRecords({[g=1,x=1],[g=2,x=2],[g=1,x=3],[g=2,x=4]}),
+                "g", 2, each _)),
+        SafeSerialize("q1321", () =>
+            // ToList converts each row to a single value via combiner.
+            // All-text row content so the default combiner works.
+            Table.ToList(
+                Table.FromRecords({[a="1",b="x"],[a="2",b="y"]}),
+                Combiner.CombineTextByDelimiter(":"))),
+        SafeSerialize("q1322", () =>
+            // SelectRowsWithErrors filters to rows containing any error
+            // cells. A plain Table.FromRecords has none.
+            Table.SelectRowsWithErrors(
+                Table.FromRecords({[a=1],[a=2],[a=3]}))),
+        SafeSerialize("q1323", () =>
+            // StopFolding is a passthrough that prevents downstream
+            // query-folding into the source. Result equals input.
+            Table.StopFolding(
+                Table.FromRecords({[a=1],[a=2]}))),
+        // Parked from this batch:
+        // - Table.FromPartitions: mrsflow's argument shape differs;
+        //   both engines reject in different ways.
+        // - Table.FilterWithDataTable: Excel rejects our call (table-
+        //   to-text conversion error in the column inference); the
+        //   argument shape isn't aligned. mrsflow accepts it.
+        // - Table.PartitionValues: Excel returns [{}] for an
+        //   unpartitioned table, mrsflow returns []. Different
+        //   "no partition" sentinel.
+        // - Table.PartitionKey: Excel returns null, mrsflow returns [].
+        //   Same root cause as PartitionValues.
+        SafeSerialize("q1324", () =>
+            // AggregateTableColumn — given a column of nested tables,
+            // collapse each by aggregations across one of its columns.
+            Table.AggregateTableColumn(
+                Table.FromRecords({
+                    [g=1, nested=Table.FromRecords({[v=10],[v=20]})],
+                    [g=2, nested=Table.FromRecords({[v=30]})] }),
+                "nested",
+                {{"v", List.Sum, "total"}}))
     },
 
     Catalog = Table.FromRecords(cases)

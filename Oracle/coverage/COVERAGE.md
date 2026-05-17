@@ -139,7 +139,7 @@ Source: q1167.mrsflow.out.
 | Sql | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
 | SqlExpression | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
 | Sybase | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
-| Table | 114 | 114 | 113 | 113 | 1 | 0 | 91 | 0 |
+| Table | 114 | 114 | 113 | 113 | 1 | 0 | 96 | 0 |
 | Tables | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Teradata | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Text | 42 | 42 | 42 | 42 | 0 | 0 | 41 | 2 |
@@ -155,7 +155,7 @@ Source: q1167.mrsflow.out.
 | WebAction | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | WebMethod | 7 | 7 | 7 | 7 | 0 | 0 | 0 | 0 |
 | Xml | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| **TOTAL** | 860 | 856 | 720 | 716 | 140 | 4 | 457 | 19 |
+| **TOTAL** | 860 | 856 | 720 | 716 | 140 | 4 | 462 | 19 |
 
 ## Per-name detail
 
@@ -243,7 +243,7 @@ Source: q1167.mrsflow.out.
 | `Character.FromNumber` | Y | Y | function | q531 q533 q534 q535 | MATCH |
 | `Character.ToNumber` | Y | Y | function | q532 q533 q534 q535 q570 | MATCH |
 | `Character.Type` | Y | Y | constant |  |  |
-| `Combiner.CombineTextByDelimiter` | Y | Y | function | q101 q102 q376 q377 q438 | MATCH |
+| `Combiner.CombineTextByDelimiter` | Y | Y | function | q101 q102 q376 q377 q438 q1321 | MATCH |
 | `Combiner.CombineTextByEachDelimiter` | Y | Y | function | q378 | MATCH |
 | `Combiner.CombineTextByLengths` | Y | Y | function | q379 | MATCH |
 | `Combiner.CombineTextByPositions` | Y | Y | function | q380 | MATCH |
@@ -578,7 +578,7 @@ Source: q1167.mrsflow.out.
 | `List.Sort` | Y | Y | function | q61 q82 q149 q256 q257 q259 q260 q383 q650 q849 q850 q851 q852 q853 q854 q855 q917 q1165 | MIXED |
 | `List.Split` | Y | Y | function | q1204 | MATCH |
 | `List.StandardDeviation` | Y | Y | function | q645 q895 q898 | MATCH |
-| `List.Sum` | Y | Y | function | q54 q89 q115 q120 q330 q341 q393 q416 q420 q641 q875 q892 q896 q897 q898 q905 q914 q915 q934 q935 q936 q937 q939 q940 q1127 q1138 | MATCH |
+| `List.Sum` | Y | Y | function | q54 q89 q115 q120 q330 q341 q393 q416 q420 q641 q875 q892 q896 q897 q898 q905 q914 q915 q934 q935 q936 q937 q939 q940 q1127 q1138 q1324 | MATCH |
 | `List.Times` | Y | Y | function |  |  |
 | `List.Transform` | Y | Y | function | q21 q478 q480 q497 q498 q499 q519 q571 q572 q573 q574 q575 q816 q914 q923 q927 q928 q929 q930 q931 q1188 | MATCH |
 | `List.TransformMany` | Y | Y | function | q1207 | MATCH |
@@ -772,7 +772,7 @@ Source: q1167.mrsflow.out.
 | `Table.AddJoinColumn` | Y | Y | function | q1319 | MATCH |
 | `Table.AddKey` | Y | Y | function |  |  |
 | `Table.AddRankColumn` | Y | Y | function | q113 q114 | MATCH |
-| `Table.AggregateTableColumn` | Y | Y | function |  |  |
+| `Table.AggregateTableColumn` | Y | Y | function | q1324 | MATCH |
 | `Table.AlternateRows` | Y | Y | function | q1297 | MATCH |
 | `Table.ApproximateRowCount` | Y | Y | function | q1299 | MATCH |
 | `Table.Buffer` | Y | Y | function | q343 q345 | MATCH |
@@ -803,7 +803,7 @@ Source: q1167.mrsflow.out.
 | `Table.FromColumns` | Y | Y | function | q1021 q1022 | MATCH |
 | `Table.FromList` | Y | Y | function | q1020 | MATCH |
 | `Table.FromPartitions` | Y | Y | function |  |  |
-| `Table.FromRecords` | Y | Y | function | q934 q935 q936 q937 q938 q939 q940 q941 q942 q943 q944 q945 q946 q947 q948 q949 q950 q951 q952 q953 q954 q955 q956 q957 q958 q959 q960 q961 q962 q963 q964 q965 q966 q967 q968 q969 q970 q971 q972 q973 q974 q975 q976 q977 q978 q979 q980 q981 q982 q983 q984 q985 q986 q987 q988 q989 q990 q991 q992 q993 q994 q995 q996 q997 q998 q999 q1000 q1001 q1002 q1003 q1004 q1005 q1006 q1007 q1008 q1009 q1010 q1011 q1012 q1013 q1014 q1015 q1016 q1017 q1018 q1024 q1025 q1026 q1027 q1028 q1029 q1031 q1032 q1033 q1034 q1035 q1036 q1037 q1038 q1039 q1040 q1041 q1042 q1043 q1044 q1045 q1132 q1133 q1134 q1136 q1137 q1138 q1139 q1140 q1141 q1142 q1143 q1157 q1168 q1287 q1288 q1289 q1290 q1291 q1292 q1293 q1294 q1295 q1296 q1297 q1298 q1299 q1300 q1301 q1302 q1303 q1304 q1305 q1306 q1307 q1308 q1309 q1310 q1311 q1312 q1313 q1314 q1315 q1316 q1317 q1318 q1319 | MATCH |
+| `Table.FromRecords` | Y | Y | function | q934 q935 q936 q937 q938 q939 q940 q941 q942 q943 q944 q945 q946 q947 q948 q949 q950 q951 q952 q953 q954 q955 q956 q957 q958 q959 q960 q961 q962 q963 q964 q965 q966 q967 q968 q969 q970 q971 q972 q973 q974 q975 q976 q977 q978 q979 q980 q981 q982 q983 q984 q985 q986 q987 q988 q989 q990 q991 q992 q993 q994 q995 q996 q997 q998 q999 q1000 q1001 q1002 q1003 q1004 q1005 q1006 q1007 q1008 q1009 q1010 q1011 q1012 q1013 q1014 q1015 q1016 q1017 q1018 q1024 q1025 q1026 q1027 q1028 q1029 q1031 q1032 q1033 q1034 q1035 q1036 q1037 q1038 q1039 q1040 q1041 q1042 q1043 q1044 q1045 q1132 q1133 q1134 q1136 q1137 q1138 q1139 q1140 q1141 q1142 q1143 q1157 q1168 q1287 q1288 q1289 q1290 q1291 q1292 q1293 q1294 q1295 q1296 q1297 q1298 q1299 q1300 q1301 q1302 q1303 q1304 q1305 q1306 q1307 q1308 q1309 q1310 q1311 q1312 q1313 q1314 q1315 q1316 q1317 q1318 q1319 q1320 q1321 q1322 q1323 q1324 | MATCH |
 | `Table.FromRows` | Y | Y | function | q24 q1019 q1023 q1024 | MATCH |
 | `Table.FromValue` | Y | Y | function | q117 | MATCH |
 | `Table.FuzzyGroup` | Y | Y | function | q338 | MATCH |
@@ -825,7 +825,7 @@ Source: q1167.mrsflow.out.
 | `Table.Min` | Y | Y | function | q638 | MATCH |
 | `Table.MinN` | Y | Y | function |  |  |
 | `Table.NestedJoin` | Y | Y | function | q28 q424 q429 q430 q990 q991 q992 q993 q994 q995 q996 q1139 | MATCH |
-| `Table.Partition` | Y | Y | function |  |  |
+| `Table.Partition` | Y | Y | function | q1320 | MATCH |
 | `Table.PartitionKey` | Y | Y | function |  |  |
 | `Table.PartitionValues` | Y | Y | function |  |  |
 | `Table.Pivot` | Y | Y | function | q263 q264 q265 q976 q977 q978 q982 | MATCH |
@@ -856,16 +856,16 @@ Source: q1167.mrsflow.out.
 | `Table.Schema` | Y | Y | function | q291 q292 q295 | MATCH |
 | `Table.SelectColumns` | Y | Y | function | q13 q15 q430 q634 q635 | MATCH |
 | `Table.SelectRows` | Y | Y | function | q14 q15 q591 q592 q593 q594 q595 q948 q949 q950 q951 q952 q953 q954 q1141 q1166 | MATCH |
-| `Table.SelectRowsWithErrors` | Y | Y | function |  |  |
+| `Table.SelectRowsWithErrors` | Y | Y | function | q1322 | MATCH |
 | `Table.SingleRow` | Y | Y | function | q1307 | MATCH |
 | `Table.Skip` | Y | Y | function | q94 | MATCH |
 | `Table.Sort` | Y | Y | function | q145 q146 q147 q148 q258 q586 q587 q588 q589 q590 q941 q942 q943 q944 q945 q946 q947 | MATCH |
 | `Table.Split` | Y | Y | function | q1313 | MATCH |
 | `Table.SplitAt` | Y | Y | function | q1312 | MATCH |
 | `Table.SplitColumn` | Y | Y | function | q436 q437 q439 q440 | MATCH |
-| `Table.StopFolding` | Y | Y | function |  |  |
+| `Table.StopFolding` | Y | Y | function | q1323 | MATCH |
 | `Table.ToColumns` | Y | Y | function | q1308 | MATCH |
-| `Table.ToList` | Y | Y | function |  |  |
+| `Table.ToList` | Y | Y | function | q1321 | MATCH |
 | `Table.ToRecords` | Y | Y | function | q1309 | MATCH |
 | `Table.ToRows` | Y | Y | function | q1024 | MATCH |
 | `Table.TransformColumnNames` | Y | Y | function | q1317 | MATCH |
