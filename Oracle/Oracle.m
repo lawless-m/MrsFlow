@@ -11283,14 +11283,66 @@ let
         SafeSerialize("q1276", () =>
             // InvokeAfter with a 0 delay: just invokes the function
             // immediately and returns its result.
-            Function.InvokeAfter(() => 42, #duration(0, 0, 0, 0)))
-        // Parked from this batch:
+            Function.InvokeAfter(() => 42, #duration(0, 0, 0, 0))),
+        // Parked from batch 10:
         // - Function.From: mrsflow's wrapped-function arg convention
         //   (each _ → list) differs from Excel's (each _ → first arg
         //   directly); needs alignment.
         // - Function.InvokeWithErrorContext, Function.ScalarVector —
         //   mrsflow's argument shapes don't match PQ's docs.
         // - Function.IsDataSource — query-folding state; needs context.
+        //
+        // q1277-q1286: round-trips of `.Type` constants via Type.Is,
+        // each packed into a list so the coverage scanner registers
+        // both `Foo.Type` AND `Bar.Type` (the scanner needs each name
+        // to be followed by `,` or `.` or `(`; bare-in-parens doesn't
+        // count). Most of these are also separately tested via the
+        // Type.Is(type X, X.Type) idiom earlier — these batches
+        // ensure the scanner sees them.
+        SafeSerialize("q1277", () =>
+            // Any.Type — special "top" type that every value satisfies.
+            { Type.Is(42, Any.Type),
+              Type.Is("x", Any.Type),
+              Type.Is(null, Any.Type) }),
+        SafeSerialize("q1278", () =>
+            // Logical.Type, Null.Type — probe via Type.Is.
+            { Type.Is(true, Logical.Type),
+              Type.Is(null, Null.Type),
+              Type.Is(42, Logical.Type) }),
+        SafeSerialize("q1279", () =>
+            // Duration.Type round-trip.
+            { Type.Is(#duration(1, 0, 0, 0), Duration.Type),
+              Type.Is(42, Duration.Type) }),
+        SafeSerialize("q1280", () =>
+            // Date.Type, DateTime.Type via list.
+            { Type.Is(#date(2024, 1, 1), Date.Type),
+              Type.Is(#datetime(2024, 1, 1, 0, 0, 0), DateTime.Type) }),
+        SafeSerialize("q1281", () =>
+            // Number subtypes — Int*.Type, Double.Type. Each Type.Is
+            // probe answers true (PQ treats these as facets of Number).
+            { Type.Is(42, Int8.Type),
+              Type.Is(42, Int16.Type),
+              Type.Is(42, Int32.Type),
+              Type.Is(42, Int64.Type) }),
+        SafeSerialize("q1282", () =>
+            // Single (f32) and Double (f64).
+            { Type.Is(3.14, Single.Type),
+              Type.Is(3.14, Double.Type) }),
+        SafeSerialize("q1283", () =>
+            // Decimal.Type and Percentage.Type.
+            { Type.Is(3.14, Decimal.Type),
+              Type.Is(3.14, Percentage.Type) }),
+        SafeSerialize("q1284", () =>
+            // Currency.Type and Byte.Type.
+            { Type.Is(3.14, Currency.Type),
+              Type.Is(42, Byte.Type) }),
+        SafeSerialize("q1285", () =>
+            // Character.Type — single-char text.
+            { Type.Is("a", Character.Type),
+              Type.Is("ab", Character.Type) }),
+        SafeSerialize("q1286", () =>
+            // Byte.From converts a number to a byte (0..255).
+            { Byte.From(42), Byte.From(255) })
     },
 
     Catalog = Table.FromRecords(cases)

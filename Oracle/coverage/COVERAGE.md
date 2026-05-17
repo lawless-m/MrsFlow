@@ -32,7 +32,7 @@ Source: q1167.mrsflow.out.
 | BinaryFormat | 22 | 22 | 22 | 22 | 0 | 0 | 19 | 13 |
 | BinaryOccurrence | 4 | 4 | 4 | 4 | 0 | 0 | 0 | 0 |
 | BufferMode | 3 | 3 | 3 | 3 | 0 | 0 | 0 | 0 |
-| Byte | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
+| Byte | 2 | 2 | 2 | 2 | 0 | 0 | 2 | 0 |
 | ByteOrder | 3 | 3 | 3 | 3 | 0 | 0 | 0 | 0 |
 | Certificate | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Character | 3 | 3 | 3 | 3 | 0 | 0 | 2 | 0 |
@@ -46,7 +46,7 @@ Source: q1167.mrsflow.out.
 | Culture | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Currency | 2 | 2 | 2 | 2 | 0 | 0 | 1 | 0 |
 | DataLake | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
-| Date | 58 | 58 | 58 | 58 | 0 | 0 | 31 | 0 |
+| Date | 58 | 58 | 58 | 58 | 0 | 0 | 32 | 0 |
 | DateTime | 26 | 26 | 26 | 26 | 0 | 0 | 7 | 0 |
 | DateTimeZone | 16 | 16 | 16 | 16 | 0 | 0 | 10 | 0 |
 | Day | 8 | 8 | 8 | 8 | 0 | 0 | 6 | 0 |
@@ -54,7 +54,7 @@ Source: q1167.mrsflow.out.
 | Decimal | 2 | 2 | 2 | 2 | 0 | 0 | 1 | 0 |
 | Diagnostics | 3 | 3 | 3 | 3 | 0 | 0 | 0 | 0 |
 | DirectQueryCapabilities | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
-| Double | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
+| Double | 2 | 2 | 2 | 2 | 0 | 0 | 1 | 0 |
 | Duration | 13 | 13 | 13 | 13 | 0 | 0 | 12 | 0 |
 | Embedded | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Error | 1 | 1 | 1 | 1 | 0 | 0 | 1 | 0 |
@@ -93,7 +93,7 @@ Source: q1167.mrsflow.out.
 | LimitClauseKind | 6 | 6 | 6 | 6 | 0 | 0 | 0 | 0 |
 | Lines | 4 | 4 | 4 | 4 | 0 | 0 | 2 | 0 |
 | List | 72 | 72 | 71 | 71 | 1 | 0 | 65 | 1 |
-| Logical | 4 | 4 | 4 | 4 | 0 | 0 | 3 | 0 |
+| Logical | 4 | 4 | 4 | 4 | 0 | 0 | 4 | 0 |
 | MissingField | 4 | 4 | 3 | 3 | 1 | 0 | 2 | 0 |
 | Module | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | MySQL | 2 | 1 | 2 | 1 | 0 | 1 | 0 | 0 |
@@ -111,7 +111,7 @@ Source: q1167.mrsflow.out.
 | Parquet | 1 | 0 | 1 | 0 | 0 | 1 | 0 | 0 |
 | Password | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Pdf | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
-| Percentage | 2 | 2 | 2 | 2 | 0 | 0 | 1 | 0 |
+| Percentage | 2 | 2 | 2 | 2 | 0 | 0 | 2 | 0 |
 | PercentileMode | 5 | 5 | 4 | 4 | 1 | 0 | 0 | 0 |
 | PostgreSQL | 2 | 1 | 2 | 1 | 0 | 1 | 0 | 0 |
 | PowerPlatform | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
@@ -155,7 +155,7 @@ Source: q1167.mrsflow.out.
 | WebAction | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | WebMethod | 7 | 7 | 7 | 7 | 0 | 0 | 0 | 0 |
 | Xml | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| **TOTAL** | 860 | 856 | 720 | 716 | 140 | 4 | 418 | 19 |
+| **TOTAL** | 860 | 856 | 720 | 716 | 140 | 4 | 424 | 19 |
 
 ## Per-name detail
 
@@ -234,8 +234,8 @@ Source: q1167.mrsflow.out.
 | `BufferMode.Delayed` | Y | Y | constant |  |  |
 | `BufferMode.Eager` | Y | Y | constant |  |  |
 | `BufferMode.Type` | Y | Y | constant |  |  |
-| `Byte.From` | Y | Y | function |  |  |
-| `Byte.Type` | Y | Y | constant |  |  |
+| `Byte.From` | Y | Y | function | q1286 | MATCH |
+| `Byte.Type` | Y | Y | constant | q1284 | MATCH |
 | `ByteOrder.BigEndian` | Y | Y | constant |  |  |
 | `ByteOrder.LittleEndian` | Y | Y | constant |  |  |
 | `ByteOrder.Type` | Y | Y | constant |  |  |
@@ -340,7 +340,7 @@ Source: q1167.mrsflow.out.
 | `Date.StartOfYear` | Y | Y | function | q1249 | MATCH |
 | `Date.ToRecord` | Y | Y | function | q1253 | MATCH |
 | `Date.ToText` | Y | Y | function | q3 q4 q5 q6 q181 q182 | MATCH |
-| `Date.Type` | Y | Y | constant |  |  |
+| `Date.Type` | Y | Y | constant | q1280 | MATCH |
 | `Date.WeekOfMonth` | Y | Y | function | q441 | MATCH |
 | `Date.WeekOfYear` | Y | Y | function | q442 q1064 | MATCH |
 | `Date.Year` | Y | Y | function | q75 q1073 | MATCH |
@@ -402,7 +402,7 @@ Source: q1167.mrsflow.out.
 | `Diagnostics.Trace` | Y | Y | function |  |  |
 | `DirectQueryCapabilities.From` | Y |  | missing |  |  |
 | `Double.From` | Y | Y | function |  |  |
-| `Double.Type` | Y | Y | constant |  |  |
+| `Double.Type` | Y | Y | constant | q1281 | MATCH |
 | `Duration.Days` | Y | Y | function | q79 q608 q609 q1078 | MATCH |
 | `Duration.From` | Y | Y | function | q218 q1074 | MATCH |
 | `Duration.FromText` | Y | Y | function | q217 | MATCH |
@@ -588,7 +588,7 @@ Source: q1167.mrsflow.out.
 | `Logical.From` | Y | Y | function | q456 q460 | MATCH |
 | `Logical.FromText` | Y | Y | function | q457 q458 | MATCH |
 | `Logical.ToText` | Y | Y | function | q459 | MATCH |
-| `Logical.Type` | Y | Y | constant |  |  |
+| `Logical.Type` | Y | Y | constant | q1278 | MATCH |
 | `MissingField.Error` | Y | Y | constant | q1230 | MATCH |
 | `MissingField.Ignore` | Y | Y | constant | q1055 | MATCH |
 | `MissingField.Type` | Y |  | missing |  |  |
@@ -671,7 +671,7 @@ Source: q1167.mrsflow.out.
 | `Password.Type` | Y |  | missing |  |  |
 | `Pdf.Tables` | Y |  | missing |  |  |
 | `Percentage.From` | Y | Y | function | q461 q462 q464 q465 | MATCH |
-| `Percentage.Type` | Y | Y | constant |  |  |
+| `Percentage.Type` | Y | Y | constant | q1283 | MATCH |
 | `PercentileMode.ExcelExc` | Y | Y | constant |  |  |
 | `PercentileMode.ExcelInc` | Y | Y | constant |  |  |
 | `PercentileMode.SqlCont` | Y | Y | constant |  |  |
@@ -956,7 +956,7 @@ Source: q1167.mrsflow.out.
 | `Type.FunctionParameters` | Y | Y | function | q398 | MATCH |
 | `Type.FunctionRequiredParameters` | Y | Y | function |  |  |
 | `Type.FunctionReturn` | Y | Y | function |  |  |
-| `Type.Is` | Y | Y | function | q119 q120 q396 q1190 q1217 q1222 q1225 q1233 q1238 q1239 q1254 q1257 q1272 | MATCH |
+| `Type.Is` | Y | Y | function | q119 q120 q396 q1190 q1217 q1222 q1225 q1233 q1238 q1239 q1254 q1257 q1272 q1277 q1278 q1279 q1280 q1281 q1282 q1283 q1284 q1285 | MATCH |
 | `Type.IsNullable` | Y | Y | function | q1237 | MATCH |
 | `Type.IsOpenRecord` | Y | Y | function | q1240 q1241 q1242 | MATCH |
 | `Type.ListItem` | Y | Y | function | q1239 | MATCH |

@@ -1275,3 +1275,13 @@ q1273	Splitter.SplitTextByPositions
 q1274	Splitter.SplitTextByRanges
 q1275	Combiner.CombineTextByRanges
 q1276	Function.InvokeAfter
+q1277	Type.Is
+q1278	Logical.Type Type.Is
+q1279	Type.Is
+q1280	Date.Type Type.Is
+q1281	Double.Type Type.Is
+q1282	Type.Is
+q1283	Percentage.Type Type.Is
+q1284	Byte.Type Type.Is
+q1285	Type.Is
+q1286	Byte.From

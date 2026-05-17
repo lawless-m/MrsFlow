@@ -28,7 +28,7 @@ Counts come from `COVERAGE.md`; refresh both via `render.ps1`.
 | BinaryFormat | Tested | 22 / 22 | Declarative parser-combinator framework for binary streams ("Wireshark in M" — describe a wire format, get a typed parser). |
 | BinaryOccurrence | Implemented | 4 / 4 | Occurrence constants (optional / repeating / required) used by BinaryFormat. |
 | BufferMode | Implemented | 3 / 3 | Buffer eagerness mode (Eager / Delayed) for *.Buffer. |
-| Byte | Implemented | 2 / 2 | Byte-typed numeric (0–255) conversion + type companion. |
+| Byte | Tested | 2 / 2 | Byte-typed numeric (0–255) conversion + type companion. |
 | ByteOrder | Implemented | 3 / 3 | Big / little endian constants used by BinaryFormat. |
 | Certificate | Untouched | 0 / 1 | Certificate type-record companion. |
 | Character | Tested | 3 / 3 | Character-codepoint conversion (FromNumber / ToNumber). |
@@ -50,7 +50,7 @@ Counts come from `COVERAGE.md`; refresh both via `render.ps1`.
 | Decimal | Tested | 2 / 2 | Decimal-typed numeric (high-precision) operations. |
 | Diagnostics | Implemented | 3 / 3 | Tracing primitives (Diagnostics.Trace, ActivityId). |
 | DirectQueryCapabilities | Untouched | 0 / 1 | Connector folding-capability advertisement. |
-| Double | Implemented | 2 / 2 | Double-precision float type companion. |
+| Double | Tested | 2 / 2 | Double-precision float type companion. |
 | Duration | Tested | 13 / 13 | Duration (timespan) operations and arithmetic. |
 | Embedded | Untouched | 0 / 1 | Embedded-value support. |
 | Error | Tested | 1 / 1 | Error-record introspection. |
