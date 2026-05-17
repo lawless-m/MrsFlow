@@ -1386,3 +1386,6 @@ q1384	Int32.From
 q1385	Guid.From
 q1386	Lines.FromBinary Text.ToBinary
 q1387	Uri.Parts
+q1388	List.Percentile
+q1389	List.Percentile
+q1390	List.Percentile

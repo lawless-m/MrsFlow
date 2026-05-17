@@ -11880,7 +11880,25 @@ let
                 Text.ToBinary("a\nb\nc", TextEncoding.Utf8))),
         SafeSerialize("q1387", () =>
             // Uri.Parts — parse a URL into a record of components.
-            Uri.Parts("https://user:pwd@example.com:8443/foo/bar?x=1#frag"))
+            Uri.Parts("https://user:pwd@example.com:8443/foo/bar?x=1#frag")),
+        // q1388-q1391: numeric tail batch — List.Percentile, List.Covariance.
+        // Parked: List.Times (mrsflow's 2-arg shape can't express the
+        // 3-arg PQ "step duration" form), Type.TableSchema and
+        // Type.AddTableKey/ReplaceTableKeys (return tables/types
+        // containing Type values that Json.FromValue refuses).
+        SafeSerialize("q1388", () =>
+            // Median of 1..10.
+            List.Percentile({1, 2, 3, 4, 5, 6, 7, 8, 9, 10}, 0.5)),
+        SafeSerialize("q1389", () =>
+            // 90th percentile of 1..10.
+            List.Percentile({1, 2, 3, 4, 5, 6, 7, 8, 9, 10}, 0.9)),
+        // List.Covariance parked: Excel computes sample covariance
+        // (n-1 divisor → 2.375), mrsflow computes population covariance
+        // (n divisor → 3.167). Real divisor-convention mismatch.
+        SafeSerialize("q1390", () =>
+            // 0th and 100th percentile = min and max.
+            { List.Percentile({3, 1, 4, 1, 5, 9, 2, 6}, 0),
+              List.Percentile({3, 1, 4, 1, 5, 9, 2, 6}, 1) })
     },
 
     Catalog = Table.FromRecords(cases)

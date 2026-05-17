@@ -92,7 +92,7 @@ Source: q1167.mrsflow.out.
 | Lakehouse | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | LimitClauseKind | 6 | 6 | 6 | 6 | 0 | 0 | 0 | 0 |
 | Lines | 4 | 4 | 4 | 4 | 0 | 0 | 3 | 0 |
-| List | 72 | 72 | 71 | 71 | 1 | 0 | 65 | 1 |
+| List | 72 | 72 | 71 | 71 | 1 | 0 | 66 | 1 |
 | Logical | 4 | 4 | 4 | 4 | 0 | 0 | 4 | 0 |
 | MissingField | 4 | 4 | 3 | 3 | 1 | 0 | 2 | 0 |
 | Module | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
@@ -155,7 +155,7 @@ Source: q1167.mrsflow.out.
 | WebAction | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | WebMethod | 7 | 7 | 7 | 7 | 0 | 0 | 0 | 0 |
 | Xml | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| **TOTAL** | 860 | 856 | 720 | 716 | 140 | 4 | 520 | 19 |
+| **TOTAL** | 860 | 856 | 720 | 716 | 140 | 4 | 521 | 19 |
 
 ## Per-name detail
 
@@ -553,7 +553,7 @@ Source: q1167.mrsflow.out.
 | `List.Modes` | Y | Y | function | q894 | MATCH |
 | `List.NonNullCount` | Y | Y | function | q1197 | MATCH |
 | `List.Numbers` | Y | Y | function | q514 q903 q904 q905 q915 q923 q929 | MATCH |
-| `List.Percentile` | Y | Y | function |  |  |
+| `List.Percentile` | Y | Y | function | q1388 q1389 q1390 | MATCH |
 | `List.PositionOf` | Y | Y | function | q84 q108 q109 q123 q366 q367 q370 | MATCH |
 | `List.PositionOfAny` | Y | Y | function | q110 q368 | MATCH |
 | `List.Positions` | Y | Y | function | q1198 | MATCH |
