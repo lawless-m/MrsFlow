@@ -46,7 +46,7 @@ Source: q1167.mrsflow.out.
 | Culture | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Currency | 2 | 2 | 2 | 2 | 0 | 0 | 1 | 0 |
 | DataLake | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
-| Date | 58 | 58 | 58 | 58 | 0 | 0 | 20 | 0 |
+| Date | 58 | 58 | 58 | 58 | 0 | 0 | 31 | 0 |
 | DateTime | 26 | 26 | 26 | 26 | 0 | 0 | 5 | 0 |
 | DateTimeZone | 16 | 16 | 16 | 16 | 0 | 0 | 5 | 0 |
 | Day | 8 | 8 | 8 | 8 | 0 | 0 | 6 | 0 |
@@ -155,7 +155,7 @@ Source: q1167.mrsflow.out.
 | WebAction | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | WebMethod | 7 | 7 | 7 | 7 | 0 | 0 | 0 | 0 |
 | Xml | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| **TOTAL** | 860 | 856 | 720 | 716 | 140 | 4 | 386 | 19 |
+| **TOTAL** | 860 | 856 | 720 | 716 | 140 | 4 | 397 | 19 |
 
 ## Per-name detail
 
@@ -296,11 +296,11 @@ Source: q1167.mrsflow.out.
 | `Date.DayOfWeekName` | Y | Y | function | q313 q445 | MATCH |
 | `Date.DayOfYear` | Y | Y | function | q314 q620 | MATCH |
 | `Date.DaysInMonth` | Y | Y | function | q315 q619 | MATCH |
-| `Date.EndOfDay` | Y | Y | function |  |  |
-| `Date.EndOfMonth` | Y | Y | function |  |  |
-| `Date.EndOfQuarter` | Y | Y | function |  |  |
+| `Date.EndOfDay` | Y | Y | function | q1244 | MATCH |
+| `Date.EndOfMonth` | Y | Y | function | q1246 | MATCH |
+| `Date.EndOfQuarter` | Y | Y | function | q1248 | MATCH |
 | `Date.EndOfWeek` | Y | Y | function | q444 | MATCH |
-| `Date.EndOfYear` | Y | Y | function |  |  |
+| `Date.EndOfYear` | Y | Y | function | q1250 | MATCH |
 | `Date.From` | Y | Y | function | q1065 | MATCH |
 | `Date.FromText` | Y | Y | function | q446 q447 q448 q449 q450 q1071 | MATCH |
 | `Date.IsInCurrentDay` | Y | Y | function |  |  |
@@ -331,14 +331,14 @@ Source: q1167.mrsflow.out.
 | `Date.IsInYearToDate` | Y | Y | function |  |  |
 | `Date.IsLeapYear` | Y | Y | function | q618 | MATCH |
 | `Date.Month` | Y | Y | function | q76 q1073 | MATCH |
-| `Date.MonthName` | Y | Y | function |  |  |
-| `Date.QuarterOfYear` | Y | Y | function |  |  |
-| `Date.StartOfDay` | Y | Y | function |  |  |
-| `Date.StartOfMonth` | Y | Y | function |  |  |
-| `Date.StartOfQuarter` | Y | Y | function |  |  |
+| `Date.MonthName` | Y | Y | function | q1251 | MATCH |
+| `Date.QuarterOfYear` | Y | Y | function | q1252 | MATCH |
+| `Date.StartOfDay` | Y | Y | function | q1243 | MATCH |
+| `Date.StartOfMonth` | Y | Y | function | q1245 | MATCH |
+| `Date.StartOfQuarter` | Y | Y | function | q1247 | MATCH |
 | `Date.StartOfWeek` | Y | Y | function | q443 | MATCH |
-| `Date.StartOfYear` | Y | Y | function |  |  |
-| `Date.ToRecord` | Y | Y | function |  |  |
+| `Date.StartOfYear` | Y | Y | function | q1249 | MATCH |
+| `Date.ToRecord` | Y | Y | function | q1253 | MATCH |
 | `Date.ToText` | Y | Y | function | q3 q4 q5 q6 q181 q182 | MATCH |
 | `Date.Type` | Y | Y | constant |  |  |
 | `Date.WeekOfMonth` | Y | Y | function | q441 | MATCH |
@@ -956,7 +956,7 @@ Source: q1167.mrsflow.out.
 | `Type.FunctionParameters` | Y | Y | function | q398 | MATCH |
 | `Type.FunctionRequiredParameters` | Y | Y | function |  |  |
 | `Type.FunctionReturn` | Y | Y | function |  |  |
-| `Type.Is` | Y | Y | function | q119 q120 q396 q1190 q1217 q1222 q1225 q1233 q1238 q1239 | MATCH |
+| `Type.Is` | Y | Y | function | q119 q120 q396 q1190 q1217 q1222 q1225 q1233 q1238 q1239 q1254 | MATCH |
 | `Type.IsNullable` | Y | Y | function | q1237 | MATCH |
 | `Type.IsOpenRecord` | Y | Y | function | q1240 q1241 q1242 | MATCH |
 | `Type.ListItem` | Y | Y | function | q1239 | MATCH |

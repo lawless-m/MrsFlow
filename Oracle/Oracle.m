@@ -11152,7 +11152,48 @@ let
             Type.IsOpenRecord(Type.OpenRecord(type [a = number]))),
         SafeSerialize("q1242", () =>
             // Type.ClosedRecord — convert open → closed.
-            Type.IsOpenRecord(Type.ClosedRecord(type [a = number, ...])))
+            Type.IsOpenRecord(Type.ClosedRecord(type [a = number, ...]))),
+        // q1243-q1254: Date family — implemented but untested. All
+        // fixed-input (no Date.IsIn*/system-clock dependencies).
+        SafeSerialize("q1243", () =>
+            // Date.StartOfDay on a date returns the date as a datetime
+            // at 00:00:00.
+            Date.StartOfDay(#date(2024, 3, 15))),
+        SafeSerialize("q1244", () =>
+            // Date.EndOfDay returns end-of-day datetime.
+            Date.EndOfDay(#date(2024, 3, 15))),
+        SafeSerialize("q1245", () =>
+            // First day of the date's month.
+            Date.StartOfMonth(#date(2024, 3, 15))),
+        SafeSerialize("q1246", () =>
+            // Last day of the date's month.
+            Date.EndOfMonth(#date(2024, 3, 15))),
+        SafeSerialize("q1247", () =>
+            // First day of the date's quarter.
+            Date.StartOfQuarter(#date(2024, 6, 15))),
+        SafeSerialize("q1248", () =>
+            // Last day of the date's quarter.
+            Date.EndOfQuarter(#date(2024, 6, 15))),
+        SafeSerialize("q1249", () =>
+            // First day of the date's year.
+            Date.StartOfYear(#date(2024, 6, 15))),
+        SafeSerialize("q1250", () =>
+            // Last day of the date's year.
+            Date.EndOfYear(#date(2024, 6, 15))),
+        SafeSerialize("q1251", () =>
+            // Locale-default month name.
+            Date.MonthName(#date(2024, 3, 15))),
+        SafeSerialize("q1252", () =>
+            // 1..4 for Q1..Q4.
+            { Date.QuarterOfYear(#date(2024, 1, 1)),
+              Date.QuarterOfYear(#date(2024, 5, 1)),
+              Date.QuarterOfYear(#date(2024, 8, 1)),
+              Date.QuarterOfYear(#date(2024, 11, 1)) }),
+        SafeSerialize("q1253", () =>
+            // Splits date into [Year, Month, Day].
+            Date.ToRecord(#date(2024, 3, 15))),
+        SafeSerialize("q1254", () =>
+            Type.Is(type date, Date.Type))
     },
 
     Catalog = Table.FromRecords(cases)

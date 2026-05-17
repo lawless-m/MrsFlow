@@ -1241,3 +1241,15 @@ q1239	Type.Is Type.ListItem
 q1240	Type.IsOpenRecord
 q1241	Type.IsOpenRecord Type.OpenRecord
 q1242	Type.ClosedRecord Type.IsOpenRecord
+q1243	Date.StartOfDay
+q1244	Date.EndOfDay
+q1245	Date.StartOfMonth
+q1246	Date.EndOfMonth
+q1247	Date.StartOfQuarter
+q1248	Date.EndOfQuarter
+q1249	Date.StartOfYear
+q1250	Date.EndOfYear
+q1251	Date.MonthName
+q1252	Date.QuarterOfYear
+q1253	Date.ToRecord
+q1254	Type.Is
