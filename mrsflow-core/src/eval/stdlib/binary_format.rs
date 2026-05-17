@@ -651,12 +651,18 @@ fn impl_factory_byte_order(args: &[Value], host: &dyn IoHost) -> Result<Value, M
         Value::Number(n) => *n as i32,
         other => return Err(type_mismatch("number (byteOrder)", other)),
     };
-    let bytes_to_pass: Vec<u8> = if order == 0 {
-        b.iter().rev().cloned().collect()
+    // Reverse only the prefix the inner combinator consumes — reversing
+    // the whole buffer would change which bytes the inner reads when the
+    // caller passes a slice larger than the combinator needs (which is
+    // typical when chunking a wire format).
+    let inner_v = Value::Function(inner.clone());
+    let (_, consumed) = parse_with_size(&inner_v, b, host)?;
+    let prefix: Vec<u8> = if order == 0 {
+        b[..consumed].iter().rev().cloned().collect()
     } else {
-        b.to_vec()
+        b[..consumed].to_vec()
     };
-    invoke_callback_with_host(&inner, vec![Value::Binary(bytes_to_pass)], host)
+    invoke_callback_with_host(&inner, vec![Value::Binary(prefix)], host)
 }
 
 fn parse_byte_order_sz(

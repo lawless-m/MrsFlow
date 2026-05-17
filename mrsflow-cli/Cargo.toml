@@ -83,3 +83,7 @@ path = "src/main.rs"
 [dev-dependencies]
 arrow = { version = "53", default-features = false, features = ["ipc"] }
 parquet = { version = "53", default-features = false, features = ["arrow", "snap"] }
+# Used as a decoding oracle by tests/png_decoder.rs — Rust-side decode
+# of the same PngSuite file, compared byte-by-byte against the M
+# decoder's output.
+image = { version = "0.25", default-features = false, features = ["png"] }
