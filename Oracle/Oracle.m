@@ -11108,7 +11108,51 @@ let
             { MissingField.Error, MissingField.UseNull }),
         SafeSerialize("q1231", () =>
             // Occurrence.Last — solo, since First/All ordinals diverge.
-            { Occurrence.Last })
+            { Occurrence.Last }),
+        // q1232-q1244: Duration / Time / Type functions —
+        // implemented but untested.
+        SafeSerialize("q1232", () =>
+            // Duration.ToRecord splits a duration into [Days, Hours, Minutes, Seconds].
+            Duration.ToRecord(#duration(1, 2, 3, 4))),
+        SafeSerialize("q1233", () =>
+            // Duration.Type — round-trip via Type.Is.
+            Type.Is(type duration, Duration.Type)),
+        SafeSerialize("q1234", () =>
+            // Time.StartOfHour: 14:35:42 → 14:00:00.
+            Time.StartOfHour(#time(14, 35, 42))),
+        // Time.EndOfHour parked: Excel returns 14:59:59.9999999,
+        // mrsflow rounds to 14:59:59. Needs sub-second handling.
+        SafeSerialize("q1235", () =>
+            // Time.FromText parses HH:MM:SS.
+            Time.FromText("09:15:30")),
+        SafeSerialize("q1236", () =>
+            // Time.ToRecord splits a time into [Hour, Minute, Second].
+            Time.ToRecord(#time(9, 15, 30))),
+        // Time.Type parked: mrsflow's `type time` primitive
+        // is unrecognised; needs its own fix.
+        SafeSerialize("q1237", () =>
+            // Type.IsNullable on `nullable number` → true; on `number` → false.
+            { Type.IsNullable(type nullable number),
+              Type.IsNullable(type number) }),
+        SafeSerialize("q1238", () =>
+            // Type.NonNullable strips the nullable wrapper.
+            Type.Is(type number,
+                Type.NonNullable(type nullable number))),
+        SafeSerialize("q1239", () =>
+            // Type.ListItem returns the element type of a list type.
+            Type.Is(type number,
+                Type.ListItem(type {number}))),
+        SafeSerialize("q1240", () =>
+            // Type.IsOpenRecord — open record type vs closed.
+            { Type.IsOpenRecord(type [a = number, ...]),
+              Type.IsOpenRecord(type [a = number]) }),
+        SafeSerialize("q1241", () =>
+            // Type.OpenRecord — convert closed → open. The resulting
+            // type should report as open.
+            Type.IsOpenRecord(Type.OpenRecord(type [a = number]))),
+        SafeSerialize("q1242", () =>
+            // Type.ClosedRecord — convert open → closed.
+            Type.IsOpenRecord(Type.ClosedRecord(type [a = number, ...])))
     },
 
     Catalog = Table.FromRecords(cases)

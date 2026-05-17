@@ -1230,3 +1230,14 @@ q1228	JoinKind.FullOuter JoinKind.Inner JoinKind.LeftAnti JoinKind.LeftOuter Joi
 q1229	JoinSide.Left
 q1230	MissingField.Error
 q1231	
+q1232	Duration.ToRecord
+q1233	Type.Is
+q1234	Time.StartOfHour
+q1235	Time.FromText
+q1236	Time.ToRecord
+q1237	Type.IsNullable
+q1238	Type.Is Type.NonNullable
+q1239	Type.Is Type.ListItem
+q1240	Type.IsOpenRecord
+q1241	Type.IsOpenRecord Type.OpenRecord
+q1242	Type.ClosedRecord Type.IsOpenRecord

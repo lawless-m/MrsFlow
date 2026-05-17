@@ -55,7 +55,7 @@ Source: q1167.mrsflow.out.
 | Diagnostics | 3 | 3 | 3 | 3 | 0 | 0 | 0 | 0 |
 | DirectQueryCapabilities | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Double | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| Duration | 13 | 13 | 13 | 13 | 0 | 0 | 11 | 0 |
+| Duration | 13 | 13 | 13 | 13 | 0 | 0 | 12 | 0 |
 | Embedded | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Error | 1 | 1 | 1 | 1 | 0 | 0 | 1 | 0 |
 | Excel | 4 | 4 | 3 | 3 | 1 | 0 | 1 | 0 |
@@ -144,10 +144,10 @@ Source: q1167.mrsflow.out.
 | Teradata | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Text | 42 | 42 | 42 | 42 | 0 | 0 | 41 | 2 |
 | TextEncoding | 7 | 7 | 6 | 6 | 1 | 0 | 0 | 0 |
-| Time | 10 | 10 | 10 | 10 | 0 | 0 | 5 | 0 |
+| Time | 10 | 10 | 10 | 10 | 0 | 0 | 8 | 0 |
 | TimeZone | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | TraceLevel | 6 | 6 | 5 | 5 | 1 | 0 | 0 | 0 |
-| Type | 25 | 25 | 24 | 24 | 1 | 0 | 3 | 0 |
+| Type | 25 | 25 | 24 | 24 | 1 | 0 | 9 | 0 |
 | Uri | 5 | 5 | 5 | 5 | 0 | 0 | 0 | 0 |
 | Value | 27 | 27 | 26 | 26 | 1 | 0 | 4 | 0 |
 | Variable | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
@@ -155,7 +155,7 @@ Source: q1167.mrsflow.out.
 | WebAction | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | WebMethod | 7 | 7 | 7 | 7 | 0 | 0 | 0 | 0 |
 | Xml | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| **TOTAL** | 860 | 856 | 720 | 716 | 140 | 4 | 376 | 19 |
+| **TOTAL** | 860 | 856 | 720 | 716 | 140 | 4 | 386 | 19 |
 
 ## Per-name detail
 
@@ -409,7 +409,7 @@ Source: q1167.mrsflow.out.
 | `Duration.Hours` | Y | Y | function | q608 q609 q1078 | MATCH |
 | `Duration.Minutes` | Y | Y | function | q608 q1078 | MATCH |
 | `Duration.Seconds` | Y | Y | function | q608 | MATCH |
-| `Duration.ToRecord` | Y | Y | function |  |  |
+| `Duration.ToRecord` | Y | Y | function | q1232 | MATCH |
 | `Duration.TotalDays` | Y | Y | function | q607 q609 q1078 | MATCH |
 | `Duration.TotalHours` | Y | Y | function | q607 q609 q1078 | MATCH |
 | `Duration.TotalMinutes` | Y | Y | function | q455 q607 q1078 | MATCH |
@@ -933,12 +933,12 @@ Source: q1167.mrsflow.out.
 | `TextEncoding.Windows` | Y | Y | constant |  |  |
 | `Time.EndOfHour` | Y | Y | function |  |  |
 | `Time.From` | Y | Y | function | q452 q1077 | MATCH |
-| `Time.FromText` | Y | Y | function |  |  |
+| `Time.FromText` | Y | Y | function | q1235 | MATCH |
 | `Time.Hour` | Y | Y | function | q451 | MATCH |
 | `Time.Minute` | Y | Y | function | q451 | MATCH |
 | `Time.Second` | Y | Y | function | q451 | MATCH |
-| `Time.StartOfHour` | Y | Y | function |  |  |
-| `Time.ToRecord` | Y | Y | function |  |  |
+| `Time.StartOfHour` | Y | Y | function | q1234 | MATCH |
+| `Time.ToRecord` | Y | Y | function | q1236 | MATCH |
 | `Time.ToText` | Y | Y | function | q162 q453 | MATCH |
 | `Time.Type` | Y | Y | constant |  |  |
 | `TimeZone.Current` | Y | Y | function |  |  |
@@ -949,19 +949,19 @@ Source: q1167.mrsflow.out.
 | `TraceLevel.Verbose` | Y | Y | constant |  |  |
 | `TraceLevel.Warning` | Y | Y | constant |  |  |
 | `Type.AddTableKey` | Y | Y | function |  |  |
-| `Type.ClosedRecord` | Y | Y | function |  |  |
+| `Type.ClosedRecord` | Y | Y | function | q1242 | MATCH |
 | `Type.Facets` | Y | Y | function |  |  |
 | `Type.ForFunction` | Y | Y | function |  |  |
 | `Type.ForRecord` | Y | Y | function |  |  |
 | `Type.FunctionParameters` | Y | Y | function | q398 | MATCH |
 | `Type.FunctionRequiredParameters` | Y | Y | function |  |  |
 | `Type.FunctionReturn` | Y | Y | function |  |  |
-| `Type.Is` | Y | Y | function | q119 q120 q396 q1190 q1217 q1222 q1225 | MATCH |
-| `Type.IsNullable` | Y | Y | function |  |  |
-| `Type.IsOpenRecord` | Y | Y | function |  |  |
-| `Type.ListItem` | Y | Y | function |  |  |
-| `Type.NonNullable` | Y | Y | function |  |  |
-| `Type.OpenRecord` | Y | Y | function |  |  |
+| `Type.Is` | Y | Y | function | q119 q120 q396 q1190 q1217 q1222 q1225 q1233 q1238 q1239 | MATCH |
+| `Type.IsNullable` | Y | Y | function | q1237 | MATCH |
+| `Type.IsOpenRecord` | Y | Y | function | q1240 q1241 q1242 | MATCH |
+| `Type.ListItem` | Y | Y | function | q1239 | MATCH |
+| `Type.NonNullable` | Y | Y | function | q1238 | MATCH |
+| `Type.OpenRecord` | Y | Y | function | q1241 | MATCH |
 | `Type.RecordFields` | Y | Y | function | q397 | MATCH |
 | `Type.ReplaceFacets` | Y | Y | function |  |  |
 | `Type.ReplaceTableKeys` | Y | Y | function |  |  |
