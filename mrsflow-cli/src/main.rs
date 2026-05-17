@@ -122,7 +122,7 @@ fn main() {
     // Windows default isn't enough for non-trivial M; run main on a
     // worker thread with a fat stack.
     let handle = std::thread::Builder::new()
-        .stack_size(512 * 1024 * 1024)
+        .stack_size(64 * 1024 * 1024)  // see eval::evaluate If/Let trampoline
         .spawn(real_main)
         .expect("spawn worker thread");
     match handle.join() {

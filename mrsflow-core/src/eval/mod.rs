@@ -165,31 +165,49 @@ pub fn evaluate(ast: &Expr, env: &Env, host: &dyn IoHost) -> Result<Value, MErro
             apply_binary(*op, lv, rv, host)
         }
 
-        // --- Conditional ---
-        Expr::If {
-            cond,
-            then_branch,
-            else_branch,
-        } => {
-            let c = evaluate(cond, env, host)?;
-            match c {
-                Value::Logical(true) => evaluate(then_branch, env, host),
-                Value::Logical(false) => evaluate(else_branch, env, host),
-                other => Err(MError::TypeMismatch {
-                    expected: "logical",
-                    found: type_name(&other),
-                }),
+        // --- Conditional and Let-binding (trampolined) ---
+        //
+        // Both `if .. then .. else <inner>` and `let .. in <inner>` are
+        // tail-position. Without trampolining, an `if A else if B else if
+        // C ...` chain or a nested `let .. in let .. in ...` blows the
+        // Rust stack on real M code (PNG-decode filter dispatch, large
+        // PQ queries with sequential bindings).
+        //
+        // We loop here, draining nested If/Let, until we hit something
+        // else — then fall through to a single recursive `evaluate` call.
+        // This collapses the chain to one stack frame regardless of depth.
+        Expr::If { .. } | Expr::Let { .. } => {
+            let mut cur: &Expr = ast;
+            let mut owned_env: Option<Env> = None;
+            loop {
+                let env_ref: &Env = owned_env.as_ref().unwrap_or(env);
+                match cur {
+                    Expr::If { cond, then_branch, else_branch } => {
+                        let c = evaluate(cond, env_ref, host)?;
+                        cur = match c {
+                            Value::Logical(true) => then_branch,
+                            Value::Logical(false) => else_branch,
+                            other => return Err(MError::TypeMismatch {
+                                expected: "logical",
+                                found: type_name(&other),
+                            }),
+                        };
+                    }
+                    Expr::Let { bindings, body } => {
+                        let lazy: Vec<(String, Expr)> = bindings
+                            .iter()
+                            .map(|(name, expr)| (name.clone(), expr.clone()))
+                            .collect();
+                        owned_env = Some(env_ref.extend_lazy(lazy));
+                        cur = body;
+                    }
+                    _ => {
+                        // Hit a non-tail-trampolinable node: one final
+                        // recursive call with the accumulated env.
+                        return evaluate(cur, env_ref, host);
+                    }
+                }
             }
-        }
-
-        // --- Let with lazy mutual-recursive bindings ---
-        Expr::Let { bindings, body } => {
-            let lazy: Vec<(String, Expr)> = bindings
-                .iter()
-                .map(|(name, expr)| (name.clone(), expr.clone()))
-                .collect();
-            let new_env = env.extend_lazy(lazy);
-            evaluate(body, &new_env, host)
         }
 
         // --- Function literal: capture current env in a closure. Type
