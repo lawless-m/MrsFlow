@@ -11587,7 +11587,36 @@ let
             Uri.Combine("https://example.com/foo/", "bar")),
         SafeSerialize("q1327", () =>
             // Uri.EscapeDataString — percent-encode reserved chars.
-            Uri.EscapeDataString("a b/c?d"))
+            Uri.EscapeDataString("a b/c?d")),
+        // q1328-q1334: Type family — pick the introspection functions
+        // whose results are scalars/lists/records (not Type values
+        // themselves), since Type-value serialisation differs between
+        // engines. Skipped: Type.Is(value, type) probes — Excel and
+        // mrsflow disagree on Type.Is's argument shape (Excel requires
+        // both args to be types).
+        SafeSerialize("q1328", () =>
+            // Required parameter count of a 2-required-1-optional fn.
+            Type.FunctionRequiredParameters(
+                type function (a as number, b as number, optional c as number) as number)),
+        SafeSerialize("q1329", () =>
+            // ForRecord builds a record-type from field name → type record;
+            // Type.IsOpenRecord on the result returns a boolean.
+            Type.IsOpenRecord(
+                Type.ForRecord([a = [Type = type number, Optional = false]], true))),
+        SafeSerialize("q1330", () =>
+            // TableKeys on a key-less table-type → empty list.
+            Type.TableKeys(type table [a = number, b = text])),
+        // Parked:
+        // - Type.TablePartitionKey: Excel returns null, mrsflow []
+        // - Type.Facets: Excel populates a record-of-nulls, mrsflow {}
+        SafeSerialize("q1331", () =>
+            // Type.IsOpenRecord probe against a Type.ForRecord with
+            // isOpen=false.
+            Type.IsOpenRecord(
+                Type.ForRecord([a = [Type = type number, Optional = false]], false))),
+        SafeSerialize("q1332", () =>
+            // Same probe but with an empty Type.ForRecord.
+            Type.IsOpenRecord(Type.ForRecord([], false)))
     },
 
     Catalog = Table.FromRecords(cases)

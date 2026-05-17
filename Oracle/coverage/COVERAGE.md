@@ -147,7 +147,7 @@ Source: q1167.mrsflow.out.
 | Time | 10 | 10 | 10 | 10 | 0 | 0 | 8 | 0 |
 | TimeZone | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | TraceLevel | 6 | 6 | 5 | 5 | 1 | 0 | 0 | 0 |
-| Type | 25 | 25 | 24 | 24 | 1 | 0 | 9 | 0 |
+| Type | 25 | 25 | 24 | 24 | 1 | 0 | 12 | 0 |
 | Uri | 5 | 5 | 5 | 5 | 0 | 0 | 2 | 0 |
 | Value | 27 | 27 | 26 | 26 | 1 | 0 | 14 | 0 |
 | Variable | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
@@ -155,7 +155,7 @@ Source: q1167.mrsflow.out.
 | WebAction | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | WebMethod | 7 | 7 | 7 | 7 | 0 | 0 | 0 | 0 |
 | Xml | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| **TOTAL** | 860 | 856 | 720 | 716 | 140 | 4 | 469 | 19 |
+| **TOTAL** | 860 | 856 | 720 | 716 | 140 | 4 | 472 | 19 |
 
 ## Per-name detail
 
@@ -952,13 +952,13 @@ Source: q1167.mrsflow.out.
 | `Type.ClosedRecord` | Y | Y | function | q1242 | MATCH |
 | `Type.Facets` | Y | Y | function |  |  |
 | `Type.ForFunction` | Y | Y | function |  |  |
-| `Type.ForRecord` | Y | Y | function |  |  |
+| `Type.ForRecord` | Y | Y | function | q1329 q1331 q1332 | MATCH |
 | `Type.FunctionParameters` | Y | Y | function | q398 | MATCH |
-| `Type.FunctionRequiredParameters` | Y | Y | function |  |  |
+| `Type.FunctionRequiredParameters` | Y | Y | function | q1328 | MATCH |
 | `Type.FunctionReturn` | Y | Y | function |  |  |
 | `Type.Is` | Y | Y | function | q119 q120 q396 q1190 q1217 q1222 q1225 q1233 q1238 q1239 q1254 q1257 q1272 q1277 q1278 q1279 q1280 q1281 q1282 q1283 q1284 q1285 | MATCH |
 | `Type.IsNullable` | Y | Y | function | q1237 | MATCH |
-| `Type.IsOpenRecord` | Y | Y | function | q1240 q1241 q1242 | MATCH |
+| `Type.IsOpenRecord` | Y | Y | function | q1240 q1241 q1242 q1329 q1331 q1332 | MATCH |
 | `Type.ListItem` | Y | Y | function | q1239 | MATCH |
 | `Type.NonNullable` | Y | Y | function | q1238 | MATCH |
 | `Type.OpenRecord` | Y | Y | function | q1241 | MATCH |
@@ -967,7 +967,7 @@ Source: q1167.mrsflow.out.
 | `Type.ReplaceTableKeys` | Y | Y | function |  |  |
 | `Type.ReplaceTablePartitionKey` | Y | Y | function |  |  |
 | `Type.TableColumn` | Y | Y | function |  |  |
-| `Type.TableKeys` | Y | Y | function |  |  |
+| `Type.TableKeys` | Y | Y | function | q1330 | MATCH |
 | `Type.TablePartitionKey` | Y | Y | function |  |  |
 | `Type.TableRow` | Y | Y | function |  |  |
 | `Type.TableSchema` | Y | Y | function |  |  |
