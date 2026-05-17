@@ -1323,3 +1323,6 @@ q1321	Combiner.CombineTextByDelimiter Table.FromRecords Table.ToList
 q1322	Table.FromRecords Table.SelectRowsWithErrors
 q1323	Table.FromRecords Table.StopFolding
 q1324	List.Sum Table.AggregateTableColumn Table.FromRecords
+q1325	TextEncoding.Ascii TextEncoding.BigEndianUnicode TextEncoding.Unicode TextEncoding.Utf16 TextEncoding.Utf8
+q1326	Uri.Combine
+q1327	Uri.EscapeDataString

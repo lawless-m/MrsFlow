@@ -11567,7 +11567,27 @@ let
                     [g=1, nested=Table.FromRecords({[v=10],[v=20]})],
                     [g=2, nested=Table.FromRecords({[v=30]})] }),
                 "nested",
-                {{"v", List.Sum, "total"}}))
+                {{"v", List.Sum, "total"}})),
+        // Parked from this batch — mrsflow constant ordinals or value
+        // shapes diverge from Excel:
+        // - ExtraValues constants ([0,1,2] in mrsflow, [1,2,0] in Excel)
+        // - WebMethod constants (number ordinals in mrsflow, "GET"/"POST"
+        //   text in Excel — different *kind* not just different number)
+        // - PercentileMode constants
+        // - LimitClauseKind constants
+        // - Uri.BuildQueryString (Excel omits leading "?", mrsflow includes)
+        SafeSerialize("q1325", () =>
+            // TextEncoding constants — Windows codepage numbers. All
+            // match between engines.
+            { TextEncoding.Utf8, TextEncoding.Ascii,
+              TextEncoding.Unicode, TextEncoding.BigEndianUnicode,
+              TextEncoding.Utf16, TextEncoding.Windows }),
+        SafeSerialize("q1326", () =>
+            // Uri.Combine — base + relative.
+            Uri.Combine("https://example.com/foo/", "bar")),
+        SafeSerialize("q1327", () =>
+            // Uri.EscapeDataString — percent-encode reserved chars.
+            Uri.EscapeDataString("a b/c?d"))
     },
 
     Catalog = Table.FromRecords(cases)

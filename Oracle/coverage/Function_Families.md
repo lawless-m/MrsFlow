@@ -144,7 +144,7 @@ Counts come from `COVERAGE.md`; refresh both via `render.ps1`.
 | TimeZone | Implemented | 1 / 1 | TimeZone.Current — host timezone probe. |
 | TraceLevel | Partial | 5 / 6 | Diagnostics.Trace level enum. |
 | Type | Partial | 24 / 25 | Type-value construction and introspection (Type.Is, RecordFields, TableSchema, etc.). |
-| Uri | Implemented | 5 / 5 | URI parsing / building. |
+| Uri | Tested | 5 / 5 | URI parsing / building. |
 | Value | Partial | 26 / 27 | Generic value introspection (Compare, Equals, Is, NativeQuery, Metadata). |
 | Variable | Implemented | 2 / 2 | Variable.Value / .ValueOrDefault — env probe. |
 | Web | Implemented | 4 / 4 | HTTP-fetching connector (Web.Contents, Web.Headers, Web.Page). |

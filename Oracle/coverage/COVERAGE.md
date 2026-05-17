@@ -143,19 +143,19 @@ Source: q1167.mrsflow.out.
 | Tables | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Teradata | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Text | 42 | 42 | 42 | 42 | 0 | 0 | 41 | 2 |
-| TextEncoding | 7 | 7 | 6 | 6 | 1 | 0 | 0 | 0 |
+| TextEncoding | 7 | 7 | 6 | 6 | 1 | 0 | 5 | 0 |
 | Time | 10 | 10 | 10 | 10 | 0 | 0 | 8 | 0 |
 | TimeZone | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | TraceLevel | 6 | 6 | 5 | 5 | 1 | 0 | 0 | 0 |
 | Type | 25 | 25 | 24 | 24 | 1 | 0 | 9 | 0 |
-| Uri | 5 | 5 | 5 | 5 | 0 | 0 | 0 | 0 |
+| Uri | 5 | 5 | 5 | 5 | 0 | 0 | 2 | 0 |
 | Value | 27 | 27 | 26 | 26 | 1 | 0 | 14 | 0 |
 | Variable | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
 | Web | 4 | 4 | 4 | 4 | 0 | 0 | 0 | 0 |
 | WebAction | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | WebMethod | 7 | 7 | 7 | 7 | 0 | 0 | 0 | 0 |
 | Xml | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| **TOTAL** | 860 | 856 | 720 | 716 | 140 | 4 | 462 | 19 |
+| **TOTAL** | 860 | 856 | 720 | 716 | 140 | 4 | 469 | 19 |
 
 ## Per-name detail
 
@@ -924,12 +924,12 @@ Source: q1167.mrsflow.out.
 | `Text.TrimStart` | Y | Y | function | q563 q564 q801 q804 | MATCH |
 | `Text.Type` | Y | Y | constant |  |  |
 | `Text.Upper` | Y | Y | function | q31 q392 q402 q566 q567 q568 q569 q805 q806 q807 q808 q809 q810 q811 q815 q864 q927 q1054 q1317 | MATCH |
-| `TextEncoding.Ascii` | Y | Y | constant |  |  |
-| `TextEncoding.BigEndianUnicode` | Y | Y | constant |  |  |
+| `TextEncoding.Ascii` | Y | Y | constant | q1325 | MATCH |
+| `TextEncoding.BigEndianUnicode` | Y | Y | constant | q1325 | MATCH |
 | `TextEncoding.Type` | Y |  | missing |  |  |
-| `TextEncoding.Unicode` | Y | Y | constant |  |  |
-| `TextEncoding.Utf16` | Y | Y | constant |  |  |
-| `TextEncoding.Utf8` | Y | Y | constant |  |  |
+| `TextEncoding.Unicode` | Y | Y | constant | q1325 | MATCH |
+| `TextEncoding.Utf16` | Y | Y | constant | q1325 | MATCH |
+| `TextEncoding.Utf8` | Y | Y | constant | q1325 | MATCH |
 | `TextEncoding.Windows` | Y | Y | constant |  |  |
 | `Time.EndOfHour` | Y | Y | function |  |  |
 | `Time.From` | Y | Y | function | q452 q1077 | MATCH |
@@ -974,8 +974,8 @@ Source: q1167.mrsflow.out.
 | `Type.Type` | Y |  | missing |  |  |
 | `Type.Union` | Y | Y | function |  |  |
 | `Uri.BuildQueryString` | Y | Y | function |  |  |
-| `Uri.Combine` | Y | Y | function |  |  |
-| `Uri.EscapeDataString` | Y | Y | function |  |  |
+| `Uri.Combine` | Y | Y | function | q1326 | MATCH |
+| `Uri.EscapeDataString` | Y | Y | function | q1327 | MATCH |
 | `Uri.Parts` | Y | Y | function |  |  |
 | `Uri.Type` | Y | Y | constant |  |  |
 | `Value.Add` | Y | Y | function | q1263 | MATCH |
