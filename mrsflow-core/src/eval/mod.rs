@@ -25,6 +25,7 @@ pub use value::{
     BuiltinFn, Closure, FnBody, LazyOdbcState, MError, Record, Table, TableRepr, ThunkState, TypeRep, Value,
 };
 
+use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::parser::{BinaryOp, Expr, ListItem, Param, UnaryOp};
@@ -35,6 +36,9 @@ use crate::parser::{BinaryOp, Expr, ListItem, Param, UnaryOp};
 /// Stub: returns `MError::NotImplemented` until slice-1 fills in literal /
 /// identifier / operator / `if` / `let` evaluation.
 pub fn evaluate(ast: &Expr, env: &Env, host: &dyn IoHost) -> Result<Value, MError> {
+    #[cfg(feature = "depth-probe")]
+    let _g = depth_probe::enter(ast);
+
     match ast {
         // --- Literals ---
         Expr::NumberLit(s) => Ok(Value::Number(parse_number_literal(s)?)),
@@ -1031,6 +1035,95 @@ fn error_to_record(err: MError) -> Value {
     }
 }
 
+// --- depth-probe (feature `depth-probe`) -----------------------------
+//
+// Bump a thread-local counter on each `evaluate` entry; print a one-liner
+// when the depth hits a new power of two; abort when it crosses
+// THRESHOLD. The abort message names the Expr variant that was at the
+// top of the recursion when we tripped — that's the call site to
+// investigate.
+#[cfg(feature = "depth-probe")]
+mod depth_probe {
+    use super::Expr;
+    use std::cell::Cell;
+
+    const THRESHOLD: usize = 8000;
+
+    thread_local! {
+        static DEPTH: Cell<usize> = const { Cell::new(0) };
+        static MAX_SEEN: Cell<usize> = const { Cell::new(0) };
+    }
+
+    pub(super) struct Guard;
+
+    impl Drop for Guard {
+        fn drop(&mut self) {
+            DEPTH.with(|c| c.set(c.get() - 1));
+        }
+    }
+
+    pub(super) fn enter(ast: &Expr) -> Guard {
+        let d = DEPTH.with(|c| {
+            let n = c.get() + 1;
+            c.set(n);
+            n
+        });
+        let prev_max = MAX_SEEN.with(|c| c.get());
+        if d > prev_max && d.is_power_of_two() {
+            MAX_SEEN.with(|c| c.set(d));
+            let detail = match ast {
+                Expr::Identifier(name) => format!("Identifier({name})"),
+                Expr::Invoke { target, args } => {
+                    let tname = match target.as_ref() {
+                        Expr::Identifier(n) => n.as_str(),
+                        _ => "<non-ident>",
+                    };
+                    format!("Invoke({tname}, {} args)", args.len())
+                }
+                _ => kind(ast).to_string(),
+            };
+            eprintln!("depth={d:>6} at {detail}");
+        }
+        if d > THRESHOLD {
+            let detail = match ast {
+                Expr::Identifier(name) => format!("Identifier({name})"),
+                _ => kind(ast).to_string(),
+            };
+            eprintln!("DEPTH OVERFLOW at {d}; node = {detail}");
+            std::process::abort();
+        }
+        Guard
+    }
+
+    fn kind(ast: &Expr) -> &'static str {
+        match ast {
+            Expr::NumberLit(_) => "NumberLit",
+            Expr::TextLit(_) => "TextLit",
+            Expr::LogicalLit(_) => "LogicalLit",
+            Expr::NullLit => "NullLit",
+            Expr::Identifier(_) => "Identifier",
+            Expr::Unary(..) => "Unary",
+            Expr::Binary(..) => "Binary",
+            Expr::If { .. } => "If",
+            Expr::Let { .. } => "Let",
+            Expr::Record(_) => "Record",
+            Expr::List(_) => "List",
+            Expr::Function { .. } => "Function",
+            Expr::Each(_) => "Each",
+            Expr::Invoke { .. } => "Invoke",
+            Expr::FieldAccess { .. } => "FieldAccess",
+            Expr::ItemAccess { .. } => "ItemAccess",
+            Expr::Try { .. } => "Try",
+            Expr::Error(_) => "Error",
+            Expr::Section { .. } => "Section",
+            Expr::ListType(_) => "ListType",
+            Expr::RecordType { .. } => "RecordType",
+            Expr::TableType(_) => "TableType",
+            Expr::FunctionType { .. } => "FunctionType",
+        }
+    }
+}
+
 /// Recursively force every thunk in a value tree. Internal thunks aren't
 /// part of the user-visible value model — `value_dump`-style serializers
 /// must walk and force lists/records before printing.
@@ -1403,86 +1496,209 @@ pub fn force<F>(value: Value, evaluator: &mut F) -> Result<Value, MError>
 where
     F: FnMut(&Expr, &Env) -> Result<Value, MError>,
 {
-    let thunk_state = match &value {
-        Value::Thunk(state) => Rc::clone(state),
-        _ => return Ok(value),
-    };
+    // Iterative force. The recursive original blew the stack on
+    // record-state accumulators (e.g. Otsu in Render.m): each iteration's
+    // `[Vals = s[Vals], ...]` creates a thunk whose body forces the
+    // previous record's Vals thunk, chaining N levels deep across N
+    // accumulator iterations.
+    //
+    // Three sources of recursion we collapse here:
+    //   1. force(force(...)) — chained thunks: the result of forcing one
+    //      is itself a thunk. Loop, don't recurse.
+    //   2. The body of a Pending thunk that's just `<ident>` or
+    //      `<ident>[<field>]?` or `<ident>{<index>}?` — common shapes in
+    //      lazy let/record bindings. Inline these without re-entering the
+    //      evaluator.
+    //   3. Otherwise, call back into the evaluator (still recursive in
+    //      Rust, but bounded by the *one* expr's structural depth, not
+    //      by the data chain depth).
+    //
+    // `pending` is the stack of thunks we've started forcing; once we
+    // resolve to a non-thunk value, we walk it back writing Forced(v).
+    let mut current = value;
+    let mut pending: Vec<Rc<RefCell<ThunkState>>> = Vec::new();
 
-    // Fast path: already forced. Also catch the in-progress sentinel —
-    // re-entering force on a thunk that's currently evaluating means a
-    // cycle (e.g. `[X = X]` accessed via `[X = X][X]`).
-    {
-        let borrowed = thunk_state.borrow();
-        match &*borrowed {
-            ThunkState::Forced(v) => {
-                #[cfg(feature = "profile-clones")]
-                {
-                    use self::value::profile;
-                    use std::sync::atomic::Ordering;
-                    profile::FORCE_HITS.fetch_add(1, Ordering::Relaxed);
-                    if let Value::List(_) = v {
-                        profile::FORCE_LIST_HITS.fetch_add(1, Ordering::Relaxed);
-                    }
+    loop {
+        let thunk_state = match current {
+            Value::Thunk(state) => state,
+            non_thunk => {
+                // Resolved. Write back into every in-flight thunk.
+                for ts in pending.into_iter().rev() {
+                    *ts.borrow_mut() = ThunkState::Forced(non_thunk.clone());
                 }
-                return Ok(v.clone());
+                return Ok(non_thunk);
             }
-            ThunkState::Forcing => {
+        };
+
+        // Inspect state. Borrow scopes are tight so we never hold one
+        // across a call that might re-enter the same thunk.
+        enum Action {
+            Skip(Value),
+            Cycle,
+            Pending(Expr, Env),
+            Native(Rc<dyn Fn() -> Result<Value, MError>>),
+        }
+        let action = {
+            let borrowed = thunk_state.borrow();
+            match &*borrowed {
+                ThunkState::Forced(v) => {
+                    #[cfg(feature = "profile-clones")]
+                    {
+                        use self::value::profile;
+                        use std::sync::atomic::Ordering;
+                        profile::FORCE_HITS.fetch_add(1, Ordering::Relaxed);
+                        if let Value::List(_) = v {
+                            profile::FORCE_LIST_HITS.fetch_add(1, Ordering::Relaxed);
+                        }
+                    }
+                    Action::Skip(v.clone())
+                }
+                ThunkState::Forcing => Action::Cycle,
+                ThunkState::Pending { expr, env } => {
+                    let env = env.upgrade().ok_or_else(|| {
+                        MError::Other("thunk's environment was dropped before forcing".into())
+                    })?;
+                    Action::Pending(expr.clone(), env)
+                }
+                ThunkState::Native(f) => Action::Native(Rc::clone(f)),
+            }
+        };
+
+        match action {
+            Action::Skip(v) => {
+                // Memoised. No write-back needed for this state — but if
+                // we have pending in-flight thunks above this one, the
+                // resolved value propagates up via the non-thunk branch.
+                current = v;
+                continue;
+            }
+            Action::Cycle => {
                 return Err(MError::Other(
                     "cyclic reference: thunk forced while already evaluating".into(),
                 ));
             }
-            _ => {}
-        }
-    }
+            Action::Pending(expr, env) => {
+                // Mark Forcing and stash for post-resolution write-back.
+                *thunk_state.borrow_mut() = ThunkState::Forcing;
+                pending.push(thunk_state);
 
-    // Native — host-supplied callback (e.g. Odbc.DataSource's lazy table
-    // fetch). Pull the Rc out first so we drop the borrow before invoking
-    // the callback; otherwise a re-entrant force could double-borrow.
-    let native = {
-        let borrowed = thunk_state.borrow();
-        match &*borrowed {
-            ThunkState::Native(f) => Some(Rc::clone(f)),
-            _ => None,
-        }
-    };
-    if let Some(f) = native {
-        *thunk_state.borrow_mut() = ThunkState::Forcing;
-        let result = match f() {
-            Ok(v) => v,
-            Err(e) => {
-                // Restore something sane so a retry doesn't see Forcing.
-                // We don't have the original closure any more, but a
-                // re-force would just re-error; leave Forcing in place.
-                return Err(e);
+                // Inline-evaluate common simple bodies to avoid recursing
+                // into the evaluator. These match the shapes lazy
+                // let/record bindings most often take when they reference
+                // a sibling-via-parent: `someName`, `obj[field]`,
+                // `obj{index}`. Anything else falls through to the
+                // recursive evaluator.
+                match force_chain_step(&expr, &env)? {
+                    Some(v) => {
+                        current = v;
+                        continue;
+                    }
+                    None => {
+                        current = evaluator(&expr, &env)?;
+                        continue;
+                    }
+                }
             }
-        };
-        let result = force(result, evaluator)?;
-        *thunk_state.borrow_mut() = ThunkState::Forced(result.clone());
-        return Ok(result);
-    }
-
-    // Pending — extract the captured expr/env and evaluate.
-    let (expr, env_weak) = {
-        let borrowed = thunk_state.borrow();
-        match &*borrowed {
-            ThunkState::Pending { expr, env } => (expr.clone(), env.clone()),
-            ThunkState::Native(_) | ThunkState::Forced(_) | ThunkState::Forcing => {
-                unreachable!("just handled above")
+            Action::Native(f) => {
+                *thunk_state.borrow_mut() = ThunkState::Forcing;
+                pending.push(thunk_state);
+                current = f()?;
+                continue;
             }
         }
-    };
-    let env = env_weak.upgrade().ok_or_else(|| {
-        MError::Other("thunk's environment was dropped before forcing".into())
-    })?;
+    }
+}
 
-    // Mark in-progress so a re-entrant force on this same thunk raises
-    // a cycle error instead of recursing into Pending → expr → … → here.
-    *thunk_state.borrow_mut() = ThunkState::Forcing;
-    let result = evaluator(&expr, &env)?;
-    let result = force(result, evaluator)?; // chained thunks
-
-    *thunk_state.borrow_mut() = ThunkState::Forced(result.clone());
-    Ok(result)
+/// One step in a force chain — collapses the dominant lazy-binding
+/// shapes (`name`, `name[field]`, `name{lit}`) into env lookup + record
+/// or list indexing without re-entering the evaluator. That's the lever
+/// that keeps N-deep thunk chains (e.g. record-state accumulators) from
+/// growing the Rust call stack N frames.
+///
+/// `Ok(Some(v))` means the body matched a known shape and produced `v`;
+/// the caller continues its outer loop with `v` as the new current value
+/// (which may itself be a thunk to drill).
+///
+/// `Ok(None)` means the body was something more involved (arithmetic,
+/// function call, if/let, …); the caller falls back to a normal
+/// `evaluator(&expr, &env)` call.
+fn force_chain_step(expr: &Expr, env: &Env) -> Result<Option<Value>, MError> {
+    match expr {
+        // Plain identifier — env lookup, no force (force happens in the
+        // outer loop).
+        Expr::Identifier(name) => match env.lookup(name) {
+            Some(v) => Ok(Some(v)),
+            None => Err(MError::NameNotInScope(name.clone())),
+        },
+        // `<ident>[field]` or `<ident>[field]?`. Resolve the ident, do
+        // the field lookup; return the field's raw value (which may be
+        // a thunk — the outer loop will drill).
+        Expr::FieldAccess { target, field, optional } => {
+            let target_v = match target.as_ref() {
+                Expr::Identifier(name) => env
+                    .lookup(name)
+                    .ok_or_else(|| MError::NameNotInScope(name.clone()))?,
+                _ => return Ok(None),
+            };
+            // The target may itself be a thunk. Don't recurse — return
+            // None so the caller falls back to the recursive evaluator,
+            // which knows how to handle that. (In the common record-
+            // accumulator case the target is already a non-thunk Record
+            // because closure parameters bind eagerly.)
+            let record = match &target_v {
+                Value::Record(r) => r,
+                _ => return Ok(None),
+            };
+            match record.fields.iter().find(|(n, _)| n == field) {
+                Some((_, v)) => Ok(Some(v.clone())),
+                None => {
+                    if *optional {
+                        Ok(Some(Value::Null))
+                    } else {
+                        Err(MError::Other(format!("field not found: {field}")))
+                    }
+                }
+            }
+        }
+        // `<ident>{index_literal}` — only with a numeric literal index,
+        // since handling a general index expression would require
+        // evaluating it (recursing). Lazy let/record bindings rarely use
+        // computed indexes, so the literal-only case covers the bulk.
+        Expr::ItemAccess { target, index, optional } => {
+            let target_v = match target.as_ref() {
+                Expr::Identifier(name) => env
+                    .lookup(name)
+                    .ok_or_else(|| MError::NameNotInScope(name.clone()))?,
+                _ => return Ok(None),
+            };
+            let idx = match index.as_ref() {
+                Expr::NumberLit(s) => parse_number_literal(s)?,
+                _ => return Ok(None),
+            };
+            if idx.fract() != 0.0 || idx < 0.0 {
+                return Ok(None);
+            }
+            let i = idx as usize;
+            let list = match &target_v {
+                Value::List(xs) => xs.clone(),
+                _ => return Ok(None),
+            };
+            if i >= list.len() {
+                if *optional {
+                    Ok(Some(Value::Null))
+                } else {
+                    Err(MError::Other(format!(
+                        "list index out of bounds: {} (len {})",
+                        i,
+                        list.len()
+                    )))
+                }
+            } else {
+                Ok(Some(list[i].clone()))
+            }
+        }
+        _ => Ok(None),
+    }
 }
 
 #[cfg(test)]

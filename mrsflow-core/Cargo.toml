@@ -13,6 +13,10 @@ workspace = true
 # Bump per-variant clone counters from value::Value's Clone impl. Off by
 # default — flip on only to investigate where copies are happening.
 profile-clones = []
+# Track recursion depth of the tree-walking evaluator. Prints a one-liner
+# on each new power-of-two depth and aborts past THRESHOLD with the Expr
+# variant at the top of the stack. Use to find unbounded-by-input recursion.
+depth-probe = []
 
 [dependencies]
 unicode-general-category = "1"

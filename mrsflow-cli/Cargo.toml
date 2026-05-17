@@ -14,6 +14,8 @@ default = []
 # Forward to mrsflow-core. Build with `--features profile-clones` to get
 # a summary of Value clone counts on stderr after each --sexpr eval.
 profile-clones = ["mrsflow-core/profile-clones"]
+# Forward depth-probe.
+depth-probe = ["mrsflow-core/depth-probe"]
 # Pulls in the `odbc-api` crate. Requires libodbc / unixODBC (`libodbc-dev`
 # on Debian) at build and runtime. Off by default so the workspace builds
 # cleanly without an ODBC driver manager present.
