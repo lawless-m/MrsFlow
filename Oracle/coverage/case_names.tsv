@@ -1163,3 +1163,22 @@ q1161	DateTimeZone.ToText
 q1162	DateTimeZone.ToText
 q1163	DateTimeZone.FromText DateTimeZone.ToText
 q1164	DateTimeZone.ToText
+q1165	List.Sort Record.FieldNames Text.Combine
+q1166	Table.RowCount Table.SelectRows
+q1167	Expression.Evaluate File.Contents Text.FromBinary
+q1168	Table.FromRecords Table.Join
+q1169	JoinAlgorithm.Dynamic JoinAlgorithm.PairwiseHash JoinAlgorithm.SortMerge Value.Is
+q1170	BinaryFormat.Byte BinaryFormat.UnsignedInteger16 BinaryFormat.UnsignedInteger32
+q1171	BinaryFormat.SignedInteger16 BinaryFormat.SignedInteger32
+q1172	BinaryFormat.Double BinaryFormat.Single
+q1173	BinaryFormat.Null
+q1174	Binary.ToText BinaryFormat.Binary
+q1175	BinaryFormat.Text
+q1176	BinaryFormat.ByteOrder BinaryFormat.UnsignedInteger32
+q1177	BinaryFormat.7BitEncodedSignedInteger BinaryFormat.7BitEncodedUnsignedInteger
+q1178	BinaryFormat.Byte BinaryFormat.Record BinaryFormat.UnsignedInteger16
+q1179	BinaryFormat.Byte BinaryFormat.Group
+q1180	BinaryFormat.Byte BinaryFormat.List
+q1181	BinaryFormat.Byte BinaryFormat.Choice
+q1182	BinaryFormat.Length BinaryFormat.Text
+q1183	BinaryFormat.Byte BinaryFormat.Transform

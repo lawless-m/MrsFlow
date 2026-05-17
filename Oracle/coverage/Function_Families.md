@@ -25,7 +25,7 @@ Counts come from `COVERAGE.md`; refresh both via `render.ps1`.
 | AzureStorage | Untouched | 0 / 5 | Azure Blob / Table / Data Lake storage connector. |
 | Binary | Tested | 18 / 18 | Binary value operations (length, slice, encode, base64, compression). |
 | BinaryEncoding | Implemented | 3 / 3 | Base64 / Hex encoding constants for Binary.FromText / ToText. |
-| BinaryFormat | Implemented | 22 / 22 | Declarative parser-combinator framework for binary streams ("Wireshark in M" — describe a wire format, get a typed parser). |
+| BinaryFormat | Tested | 22 / 22 | Declarative parser-combinator framework for binary streams ("Wireshark in M" — describe a wire format, get a typed parser). |
 | BinaryOccurrence | Implemented | 4 / 4 | Occurrence constants (optional / repeating / required) used by BinaryFormat. |
 | BufferMode | Implemented | 3 / 3 | Buffer eagerness mode (Eager / Delayed) for *.Buffer. |
 | Byte | Implemented | 2 / 2 | Byte-typed numeric (0–255) conversion + type companion. |
@@ -59,7 +59,7 @@ Counts come from `COVERAGE.md`; refresh both via `render.ps1`.
 | Expression | Tested | 3 / 3 | Expression evaluation primitives (Expression.Evaluate — run M-as-text against an env). |
 | ExtraValues | Implemented | 4 / 4 | Csv ragged-row handling enum. |
 | Fabric | Untouched | 0 / 1 | Microsoft Fabric (workspace) connector. |
-| File | Implemented | 2 / 1 | File reader (File.Contents, File.Modified). |
+| File | Tested | 2 / 1 | File reader (File.Contents, File.Modified). |
 | Folder | Tested | 2 / 2 | Folder enumeration (Folder.Contents, Folder.Files). |
 | Function | Partial | 6 / 7 | Function-value introspection and invocation primitives. |
 | Geography | Untouched | 0 / 2 | Geography (lat/lon) WKT conversion. |
@@ -80,7 +80,7 @@ Counts come from `COVERAGE.md`; refresh both via `render.ps1`.
 | Int64 | Tested | 2 / 2 | 64-bit signed integer numeric type. |
 | Int8 | Implemented | 2 / 2 | 8-bit signed integer numeric type. |
 | ItemExpression | Untouched | 0 / 2 | Query-folding helper for per-item expressions inside List.* projections. |
-| JoinAlgorithm | Implemented | 8 / 8 | Table.NestedJoin algorithm hint (Hash / SortMerge / etc.). |
+| JoinAlgorithm | Tested | 8 / 8 | Table.NestedJoin algorithm hint (Hash / SortMerge / etc.). |
 | JoinKind | Tested | 9 / 9 | Table.Join / NestedJoin kind (Inner / LeftOuter / FullOuter / etc.). |
 | JoinSide | Implemented | 3 / 3 | Join-side enum for asymmetric joins. |
 | Json | Tested | 2 / 2 | JSON parser / serialiser (Json.Document, Json.FromValue). |
