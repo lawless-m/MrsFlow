@@ -12410,6 +12410,13 @@ let
         // Repeating reuses All's 2.
         SafeSerialize("q1517", () =>
             { Occurrence.Required, Occurrence.Repeating }),
+        // q1518: enum-family `.Type` ascription rejects non-Type input
+        // with the same coercion error Excel raises (mrsflow had been
+        // accepting any value because the .Type constants were bound
+        // to TypeRep::Number etc., not TypeRep::Type). SafeSerialize's
+        // outer try-wrapper formats both engines' ERROR text uniformly.
+        SafeSerialize("q1518", () =>
+            Type.Is(0, BinaryEncoding.Type)),
         // q1460: Binary.ViewFunction rejects non-function input with PQ's
         // exact coercion-error wording.
         SafeSerialize("q1460", () =>

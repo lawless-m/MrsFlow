@@ -1504,3 +1504,4 @@ q1514	Geometry.ToWellKnownText GeometryPoint.From
 q1515	Excel.ShapeTable Table.FromRecords Table.RowCount
 q1516	Excel.Workbook Value.Is
 q1517	Occurrence.Repeating Occurrence.Required
+q1518	BinaryEncoding.Type Type.Is

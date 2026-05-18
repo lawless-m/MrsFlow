@@ -139,46 +139,51 @@ pub fn root_env() -> Env {
         ("Type.Type",     TypeRep::Type),
         ("None.Type",     TypeRep::Null),
         ("Password.Type", TypeRep::Text),
-        // Enum-family `.Type` companions. PQ exposes each enum's `.Type`
-        // as the type-value for its underlying representation (most are
-        // numeric; Character.Type is text, Uri.Type is text). They appear
-        // in Type.Is / Type.IsNullable probes and as type annotations.
-        ("BinaryEncoding.Type",     TypeRep::Number),
-        ("BinaryOccurrence.Type",   TypeRep::Number),
-        ("BufferMode.Type",         TypeRep::Number),
+        // Enum-family `.Type` companions. PQ treats each as the *type
+        // of the enum itself* (a Type-of-types), not as an alias for
+        // the underlying numeric/text representation. So
+        // `Type.Is(0, BinaryEncoding.Type)` raises the coercion error
+        // "We cannot convert the value 0 to type Type." in Excel —
+        // because BinaryEncoding.Type is itself a Type-value and only
+        // Type-typed values pass the type-position check there.
+        //
+        // Byte.Type is the odd one out: it ascribes to NamedNumeric,
+        // not Type, because Byte is a real numeric subtype (you can
+        // `let x as Byte.Type = 42 in x`) — matching PQ.
+        ("BinaryEncoding.Type",     TypeRep::Type),
+        ("BinaryOccurrence.Type",   TypeRep::Type),
+        ("BufferMode.Type",         TypeRep::Type),
         ("Byte.Type",               TypeRep::NamedNumeric("Byte.Type")),
-        ("ByteOrder.Type",          TypeRep::Number),
-        ("Character.Type",          TypeRep::Text),
-        ("Compression.Type",        TypeRep::Number),
-        ("CsvStyle.Type",           TypeRep::Number),
-        ("Day.Type",                TypeRep::Number),
-        ("ExtraValues.Type",        TypeRep::Number),
-        ("GroupKind.Type",          TypeRep::Number),
-        ("JoinAlgorithm.Type",      TypeRep::Number),
-        ("JoinKind.Type",           TypeRep::Number),
-        ("JoinSide.Type",           TypeRep::Number),
-        ("LimitClauseKind.Type",    TypeRep::Number),
-        ("Precision.Type",          TypeRep::Number),
-        ("QuoteStyle.Type",         TypeRep::Number),
-        ("RoundingMode.Type",       TypeRep::Number),
-        ("Uri.Type",                TypeRep::Text),
-        ("WebMethod.Type",          TypeRep::Text),
+        ("ByteOrder.Type",          TypeRep::Type),
+        ("Character.Type",          TypeRep::Type),
+        ("Compression.Type",        TypeRep::Type),
+        ("CsvStyle.Type",           TypeRep::Type),
+        ("Day.Type",                TypeRep::Type),
+        ("ExtraValues.Type",        TypeRep::Type),
+        ("GroupKind.Type",          TypeRep::Type),
+        ("JoinAlgorithm.Type",      TypeRep::Type),
+        ("JoinKind.Type",           TypeRep::Type),
+        ("JoinSide.Type",           TypeRep::Type),
+        ("LimitClauseKind.Type",    TypeRep::Type),
+        ("Precision.Type",          TypeRep::Type),
+        ("QuoteStyle.Type",         TypeRep::Type),
+        ("RoundingMode.Type",       TypeRep::Type),
+        ("Uri.Type",                TypeRep::Type),
+        ("WebMethod.Type",          TypeRep::Type),
         // Enum families that Excel exposes a `.Type` companion for, but
-        // mrsflow had been omitting. All numeric (the family's constants
-        // are number ordinals) except ODataOmitValues, which PQ keys by
-        // lowercase text.
-        ("MissingField.Type",       TypeRep::Number),
-        ("Occurrence.Type",         TypeRep::Number),
-        ("ODataOmitValues.Type",    TypeRep::Text),
-        ("Order.Type",              TypeRep::Number),
-        ("PercentileMode.Type",     TypeRep::Number),
-        ("RankKind.Type",           TypeRep::Number),
-        ("RelativePosition.Type",   TypeRep::Number),
-        ("SapBusinessWarehouseExecutionMode.Type", TypeRep::Number),
-        ("SapHanaDistribution.Type", TypeRep::Number),
-        ("SapHanaRangeOperator.Type", TypeRep::Number),
-        ("TextEncoding.Type",       TypeRep::Number),
-        ("TraceLevel.Type",         TypeRep::Number),
+        // mrsflow had been omitting.
+        ("MissingField.Type",       TypeRep::Type),
+        ("Occurrence.Type",         TypeRep::Type),
+        ("ODataOmitValues.Type",    TypeRep::Type),
+        ("Order.Type",              TypeRep::Type),
+        ("PercentileMode.Type",     TypeRep::Type),
+        ("RankKind.Type",           TypeRep::Type),
+        ("RelativePosition.Type",   TypeRep::Type),
+        ("SapBusinessWarehouseExecutionMode.Type", TypeRep::Type),
+        ("SapHanaDistribution.Type", TypeRep::Type),
+        ("SapHanaRangeOperator.Type", TypeRep::Type),
+        ("TextEncoding.Type",       TypeRep::Type),
+        ("TraceLevel.Type",         TypeRep::Type),
         // Connector-side identity types. mrsflow doesn't implement the
         // underlying connectors, so the `.Type` exists only so name
         // lookup and Type.Is probes don't fail.

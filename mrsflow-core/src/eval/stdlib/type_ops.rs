@@ -72,6 +72,26 @@ fn is(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     // PQ idiom: when the value is itself a type-value, Type.Is performs
     // a type-subtype check (e.g. `each Type.Is(_, type number)` where `_`
     // is a column's type). Otherwise it's a value-vs-type conformance test.
+    //
+    // Special case: when target is the meta-type `type type` (the type
+    // of types), Excel rejects non-Type values with a coercion error
+    // rather than returning false — most enum families' `.Type`
+    // companions are bound to TypeRep::Type, so this gate fires for
+    // `Type.Is(0, BinaryEncoding.Type)` and friends.
+    if matches!(t, super::super::value::TypeRep::Type)
+        && !matches!(&args[0], Value::Type(_))
+    {
+        let rendered = match &args[0] {
+            Value::Null => "null".to_string(),
+            Value::Number(n) => format!("{n}"),
+            Value::Text(s) => format!("\"{s}\""),
+            Value::Logical(b) => if *b { "true".into() } else { "false".into() },
+            _ => "(value)".into(),
+        };
+        return Err(MError::Other(format!(
+            "We cannot convert the value {rendered} to type Type."
+        )));
+    }
     let result = match &args[0] {
         Value::Type(a) => super::super::type_is_subtype(a, t),
         v => super::super::type_conforms(v, t),

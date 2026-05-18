@@ -27,7 +27,7 @@ Source: q1167.mrsflow.out.
 | AzureDataExplorer | 3 | 3 | 0 | 0 | 3 | 0 | 0 | 0 |
 | AzureStorage | 5 | 5 | 0 | 0 | 5 | 0 | 0 | 0 |
 | Binary | 18 | 18 | 18 | 18 | 0 | 0 | 18 | 0 |
-| BinaryEncoding | 3 | 3 | 3 | 3 | 0 | 0 | 2 | 0 |
+| BinaryEncoding | 3 | 3 | 3 | 3 | 0 | 0 | 3 | 0 |
 | BinaryFormat | 22 | 22 | 22 | 22 | 0 | 0 | 22 | 2 |
 | BinaryOccurrence | 4 | 4 | 4 | 4 | 0 | 0 | 3 | 0 |
 | BufferMode | 3 | 3 | 3 | 3 | 0 | 0 | 2 | 0 |
@@ -46,7 +46,7 @@ Source: q1167.mrsflow.out.
 | Currency | 2 | 2 | 2 | 2 | 0 | 0 | 2 | 0 |
 | DataLake | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
 | Date | 58 | 58 | 58 | 58 | 0 | 0 | 58 | 0 |
-| DateTime | 26 | 26 | 26 | 26 | 0 | 0 | 21 | 0 |
+| DateTime | 26 | 26 | 26 | 26 | 0 | 0 | 21 | 3 |
 | DateTimeZone | 16 | 16 | 16 | 16 | 0 | 0 | 16 | 0 |
 | Day | 8 | 8 | 8 | 8 | 0 | 0 | 7 | 0 |
 | DB2 | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
@@ -154,7 +154,7 @@ Source: q1167.mrsflow.out.
 | WebAction | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | WebMethod | 7 | 7 | 7 | 7 | 0 | 0 | 6 | 0 |
 | Xml | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| **TOTAL** | 858 | 854 | 771 | 767 | 87 | 4 | 694 | 9 |
+| **TOTAL** | 858 | 854 | 771 | 767 | 87 | 4 | 695 | 12 |
 
 ## Per-name detail
 
@@ -203,7 +203,7 @@ Source: q1167.mrsflow.out.
 | `Binary.ViewFunction` | Y | Y | function | q1460 | MATCH |
 | `BinaryEncoding.Base64` | Y | Y | constant | q8 q9 q346 q347 q349 q354 q1226 q1380 | MATCH |
 | `BinaryEncoding.Hex` | Y | Y | constant | q347 q348 q350 q351 q352 q353 q354 q355 q1174 q1226 q1380 | MATCH |
-| `BinaryEncoding.Type` | Y | Y | constant |  |  |
+| `BinaryEncoding.Type` | Y | Y | constant | q1518 | MATCH |
 | `BinaryFormat.7BitEncodedSignedInteger` | Y | Y | function | q1177 | MATCH |
 | `BinaryFormat.7BitEncodedUnsignedInteger` | Y | Y | function | q1177 | MATCH |
 | `BinaryFormat.Binary` | Y | Y | function | q1174 | MATCH |
@@ -352,19 +352,19 @@ Source: q1167.mrsflow.out.
 | `DateTime.IsInCurrentHour` | Y | Y | function | q1469 | MATCH |
 | `DateTime.IsInCurrentMinute` | Y | Y | function | q1469 | MATCH |
 | `DateTime.IsInCurrentSecond` | Y | Y | function |  |  |
-| `DateTime.IsInNextHour` | Y | Y | function | q1374 | MATCH |
+| `DateTime.IsInNextHour` | Y | Y | function | q1374 | DIFF |
 | `DateTime.IsInNextMinute` | Y | Y | function |  |  |
 | `DateTime.IsInNextNHours` | Y | Y | function | q1368 | MATCH |
 | `DateTime.IsInNextNMinutes` | Y | Y | function | q1369 | MATCH |
 | `DateTime.IsInNextNSeconds` | Y | Y | function | q1370 | MATCH |
 | `DateTime.IsInNextSecond` | Y | Y | function |  |  |
-| `DateTime.IsInPreviousHour` | Y | Y | function | q1375 | MATCH |
+| `DateTime.IsInPreviousHour` | Y | Y | function | q1375 | DIFF |
 | `DateTime.IsInPreviousMinute` | Y | Y | function |  |  |
 | `DateTime.IsInPreviousNHours` | Y | Y | function | q1371 | MATCH |
 | `DateTime.IsInPreviousNMinutes` | Y | Y | function | q1372 | MATCH |
 | `DateTime.IsInPreviousNSeconds` | Y | Y | function | q1373 | MATCH |
 | `DateTime.IsInPreviousSecond` | Y | Y | function |  |  |
-| `DateTime.LocalNow` | Y | Y | function | q1333 q1334 q1335 q1336 q1337 q1338 q1339 q1340 q1344 q1345 q1346 q1347 q1348 q1349 q1350 q1351 q1352 q1353 q1354 q1355 q1356 q1357 q1358 q1359 q1360 q1361 q1362 q1363 q1364 q1365 q1366 q1367 q1368 q1369 q1370 q1371 q1372 q1373 q1374 q1375 q1469 | MATCH |
+| `DateTime.LocalNow` | Y | Y | function | q1333 q1334 q1335 q1336 q1337 q1338 q1339 q1340 q1344 q1345 q1346 q1347 q1348 q1349 q1350 q1351 q1352 q1353 q1354 q1355 q1356 q1357 q1358 q1359 q1360 q1361 q1362 q1363 q1364 q1365 q1366 q1367 q1368 q1369 q1370 q1371 q1372 q1373 q1374 q1375 q1469 | MIXED |
 | `DateTime.Time` | Y | Y | function | q1073 | MATCH |
 | `DateTime.ToRecord` | Y | Y | function | q1256 | MATCH |
 | `DateTime.ToText` | Y | Y | function | q160 q161 q183 q184 q611 q612 q613 q614 q615 q1070 | MATCH |
@@ -953,7 +953,7 @@ Source: q1167.mrsflow.out.
 | `Type.FunctionParameters` | Y | Y | function | q398 | MATCH |
 | `Type.FunctionRequiredParameters` | Y | Y | function | q1328 | MATCH |
 | `Type.FunctionReturn` | Y | Y | function | q1477 | MATCH |
-| `Type.Is` | Y | Y | function | q119 q120 q396 q1095 q1096 q1097 q1101 q1190 q1217 q1222 q1225 q1233 q1238 q1239 q1254 q1257 q1272 q1277 q1278 q1279 q1280 q1281 q1282 q1283 q1284 q1285 q1376 q1447 q1448 | MATCH |
+| `Type.Is` | Y | Y | function | q119 q120 q396 q1095 q1096 q1097 q1101 q1190 q1217 q1222 q1225 q1233 q1238 q1239 q1254 q1257 q1272 q1277 q1278 q1279 q1280 q1281 q1282 q1283 q1284 q1285 q1376 q1447 q1448 q1518 | MATCH |
 | `Type.IsNullable` | Y | Y | function | q1237 q1477 q1486 q1492 q1493 q1494 q1498 q1499 | MATCH |
 | `Type.IsOpenRecord` | Y | Y | function | q1240 q1241 q1242 q1329 q1331 q1332 q1476 q1487 | MATCH |
 | `Type.ListItem` | Y | Y | function | q1239 | MATCH |
