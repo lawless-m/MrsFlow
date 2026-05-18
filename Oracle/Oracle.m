@@ -11976,7 +11976,11 @@ let
         // 32-bit float, so 3.14 → 3.140000104904175. Previously parked
         // (mrsflow kept full f64 precision).
         SafeSerialize("q1408", () =>
-            Single.From(3.14))
+            Single.From(3.14)),
+        // q1409: Binary.From("...") — base64-decodes the text input.
+        // Previously parked (mrsflow returned raw UTF-8 bytes).
+        SafeSerialize("q1409", () =>
+            Binary.ToList(Binary.From("SGVsbG8=")))
     },
 
     Catalog = Table.FromRecords(cases)

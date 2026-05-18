@@ -73,7 +73,9 @@ fn length(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 fn from(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     match &args[0] {
         Value::Binary(b) => Ok(Value::Binary(b.clone())),
-        Value::Text(s) => Ok(Value::Binary(s.as_bytes().to_vec())),
+        // PQ Binary.From("...") base64-decodes the text — same as Binary.FromText
+        // with default encoding. Raw UTF-8 round-trip is the wrong semantic.
+        Value::Text(s) => base64_decode(s).map(Value::Binary),
         Value::Null => Ok(Value::Null),
         other => Err(type_mismatch("text/binary/null", other)),
     }
