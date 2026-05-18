@@ -126,7 +126,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
             ],
             percentage_from,
         ),
-        ("Single.From", one("value"), from),
+        ("Single.From", one("value"), single_from),
         (
             "Number.FromText",
             vec![
@@ -523,6 +523,14 @@ fn from(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             .map(Value::Number)
             .map_err(|_| MError::Other(format!("Number.From: cannot parse {s:?}"))),
         other => Err(type_mismatch("text/number/logical/null", other)),
+    }
+}
+
+/// Single.From — round through f32 to match Excel's 32-bit precision.
+fn single_from(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+    match from(args, host)? {
+        Value::Number(n) if n.is_finite() => Ok(Value::Number(n as f32 as f64)),
+        other => Ok(other),
     }
 }
 

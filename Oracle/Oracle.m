@@ -11971,7 +11971,12 @@ let
         // alone as the cycle length; correct cycle is count+repeatInterval).
         SafeSerialize("q1407", () =>
             { List.Alternate({1,2,3,4,5,6,7}, 1),
-              List.Alternate({1,2,3,4,5,6}, 1, 1, 1) })
+              List.Alternate({1,2,3,4,5,6}, 1, 1, 1) }),
+        // q1408: Single.From — f32-lossy precision. Excel rounds through
+        // 32-bit float, so 3.14 → 3.140000104904175. Previously parked
+        // (mrsflow kept full f64 precision).
+        SafeSerialize("q1408", () =>
+            Single.From(3.14))
     },
 
     Catalog = Table.FromRecords(cases)
