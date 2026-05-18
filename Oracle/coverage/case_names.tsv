@@ -1495,3 +1495,9 @@ q1505	Table.FilterWithDataTable Table.FromRecords Table.RowCount
 q1506	Html.Table Table.RowCount Text.ToBinary TextEncoding.Utf8
 q1507	Html.Table Table.RowCount Text.ToBinary TextEncoding.Utf8
 q1508	Culture.Current Text.Length
+q1509	Geography.FromWellKnownText
+q1510	GeographyPoint.From
+q1511	Geometry.FromWellKnownText
+q1512	GeometryPoint.From
+q1513	Geography.ToWellKnownText GeographyPoint.From
+q1514	Geometry.ToWellKnownText GeometryPoint.From

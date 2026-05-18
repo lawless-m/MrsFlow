@@ -235,6 +235,12 @@ Function.InvokeWithErrorContext
 Function.IsDataSource
 Function.ScalarVector
 Function.Type
+Geography.FromWellKnownText
+Geography.ToWellKnownText
+GeographyPoint.From
+Geometry.FromWellKnownText
+Geometry.ToWellKnownText
+GeometryPoint.From
 GroupKind.Global
 GroupKind.Local
 GroupKind.Type

@@ -44,6 +44,7 @@ mod error_ops;
 mod json;
 mod file;
 mod excel;
+mod geo;
 mod web;
 mod csv;
 mod folder;
@@ -620,6 +621,7 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         json::bindings(),
         file::bindings(),
         excel::bindings(),
+        geo::bindings(),
         web::bindings(),
         csv::bindings(),
         folder::bindings(),

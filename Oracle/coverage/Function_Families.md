@@ -61,10 +61,10 @@ Counts come from `COVERAGE.md`; refresh both via `render.ps1`.
 | File | Tested | 2 / 1 | File reader (File.Contents, File.Modified). |
 | Folder | Tested | 2 / 2 | Folder enumeration (Folder.Contents, Folder.Files). |
 | Function | Tested | 7 / 7 | Function-value introspection and invocation primitives. |
-| Geography | Untouched | 0 / 2 | Geography (lat/lon) WKT conversion. |
-| GeographyPoint | Untouched | 0 / 1 | Geography point constructor. |
-| Geometry | Untouched | 0 / 2 | Geometry (planar) WKT conversion. |
-| GeometryPoint | Untouched | 0 / 1 | Geometry point constructor. |
+| Geography | Tested | 2 / 2 | Geography (lat/lon) WKT conversion. |
+| GeographyPoint | Tested | 1 / 1 | Geography point constructor. |
+| Geometry | Tested | 2 / 2 | Geometry (planar) WKT conversion. |
+| GeometryPoint | Tested | 1 / 1 | Geometry point constructor. |
 | Graph | Untouched | 0 / 1 | Microsoft Graph entity-graph navigation. |
 | GroupKind | Tested | 3 / 3 | Table.Group kind (Global / Local). |
 | Guid | Tested | 2 / 2 | GUID type companion. |

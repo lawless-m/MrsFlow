@@ -12375,6 +12375,23 @@ let
         // doesn't auto-invoke — instead Culture.Current is exposed as
         // a constant Text in the env, matching the value Excel resolves.
         SafeSerialize("q1508", () => Text.Length(Culture.Current) > 0),
+        // q1509-q1514: Geography / Geometry POINT round-trips. WKT
+        // (Well-Known Text) is the standard text encoding. Geography
+        // uses "POINT(longitude latitude)" — geographic coords; Geometry
+        // uses "POINT(x y)" — planar coords. The .From constructors
+        // mirror the same field order.
+        SafeSerialize("q1509", () =>
+            Geography.FromWellKnownText("POINT(-122.349 47.651)")),
+        SafeSerialize("q1510", () =>
+            GeographyPoint.From(47.651, -122.349)),
+        SafeSerialize("q1511", () =>
+            Geometry.FromWellKnownText("POINT(10 20)")),
+        SafeSerialize("q1512", () =>
+            GeometryPoint.From(10, 20)),
+        SafeSerialize("q1513", () =>
+            Geography.ToWellKnownText(GeographyPoint.From(47.651, -122.349))),
+        SafeSerialize("q1514", () =>
+            Geometry.ToWellKnownText(GeometryPoint.From(10, 20))),
         // q1460: Binary.ViewFunction rejects non-function input with PQ's
         // exact coercion-error wording.
         SafeSerialize("q1460", () =>

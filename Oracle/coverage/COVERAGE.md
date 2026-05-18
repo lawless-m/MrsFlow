@@ -65,10 +65,10 @@ Source: q1167.mrsflow.out.
 | File | 2 | 1 | 2 | 1 | 0 | 1 | 1 | 1 |
 | Folder | 2 | 2 | 2 | 2 | 0 | 0 | 1 | 0 |
 | Function | 7 | 7 | 7 | 7 | 0 | 0 | 5 | 0 |
-| Geography | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
-| GeographyPoint | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
-| Geometry | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
-| GeometryPoint | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
+| Geography | 2 | 2 | 2 | 2 | 0 | 0 | 2 | 0 |
+| GeographyPoint | 1 | 1 | 1 | 1 | 0 | 0 | 1 | 0 |
+| Geometry | 2 | 2 | 2 | 2 | 0 | 0 | 2 | 0 |
+| GeometryPoint | 1 | 1 | 1 | 1 | 0 | 0 | 1 | 0 |
 | Graph | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | GroupKind | 3 | 3 | 3 | 3 | 0 | 0 | 2 | 0 |
 | Guid | 2 | 2 | 2 | 2 | 0 | 0 | 1 | 0 |
@@ -154,7 +154,7 @@ Source: q1167.mrsflow.out.
 | WebAction | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | WebMethod | 7 | 7 | 7 | 7 | 0 | 0 | 6 | 0 |
 | Xml | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| **TOTAL** | 858 | 854 | 763 | 759 | 95 | 4 | 684 | 9 |
+| **TOTAL** | 858 | 854 | 769 | 765 | 89 | 4 | 690 | 9 |
 
 ## Per-name detail
 
@@ -441,12 +441,12 @@ Source: q1167.mrsflow.out.
 | `Function.IsDataSource` | Y | Y | function | q1450 | MATCH |
 | `Function.ScalarVector` | Y | Y | function |  |  |
 | `Function.Type` | Y | Y | constant | q1448 | MATCH |
-| `Geography.FromWellKnownText` | Y |  | missing |  |  |
-| `Geography.ToWellKnownText` | Y |  | missing |  |  |
-| `GeographyPoint.From` | Y |  | missing |  |  |
-| `Geometry.FromWellKnownText` | Y |  | missing |  |  |
-| `Geometry.ToWellKnownText` | Y |  | missing |  |  |
-| `GeometryPoint.From` | Y |  | missing |  |  |
+| `Geography.FromWellKnownText` | Y | Y | function | q1509 | MATCH |
+| `Geography.ToWellKnownText` | Y | Y | function | q1513 | MATCH |
+| `GeographyPoint.From` | Y | Y | function | q1510 q1513 | MATCH |
+| `Geometry.FromWellKnownText` | Y | Y | function | q1511 | MATCH |
+| `Geometry.ToWellKnownText` | Y | Y | function | q1514 | MATCH |
+| `GeometryPoint.From` | Y | Y | function | q1512 q1514 | MATCH |
 | `Graph.Nodes` | Y |  | missing |  |  |
 | `GroupKind.Global` | Y | Y | constant | q89 q936 q1430 | MATCH |
 | `GroupKind.Local` | Y | Y | constant | q115 q936 q1430 | MATCH |
