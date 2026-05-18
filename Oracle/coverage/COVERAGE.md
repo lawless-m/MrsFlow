@@ -46,7 +46,7 @@ Source: q1167.mrsflow.out.
 | Currency | 2 | 2 | 2 | 2 | 0 | 0 | 2 | 0 |
 | DataLake | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
 | Date | 58 | 58 | 58 | 58 | 0 | 0 | 58 | 0 |
-| DateTime | 26 | 26 | 26 | 26 | 0 | 0 | 21 | 3 |
+| DateTime | 26 | 26 | 26 | 26 | 0 | 0 | 21 | 0 |
 | DateTimeZone | 16 | 16 | 16 | 16 | 0 | 0 | 16 | 0 |
 | Day | 8 | 8 | 8 | 8 | 0 | 0 | 7 | 0 |
 | DB2 | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
@@ -138,7 +138,7 @@ Source: q1167.mrsflow.out.
 | Sql | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
 | SqlExpression | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
 | Sybase | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
-| Table | 114 | 114 | 114 | 114 | 0 | 0 | 107 | 0 |
+| Table | 114 | 114 | 114 | 114 | 0 | 0 | 108 | 0 |
 | Tables | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Teradata | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Text | 42 | 42 | 42 | 42 | 0 | 0 | 42 | 2 |
@@ -154,7 +154,7 @@ Source: q1167.mrsflow.out.
 | WebAction | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | WebMethod | 7 | 7 | 7 | 7 | 0 | 0 | 6 | 0 |
 | Xml | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| **TOTAL** | 858 | 854 | 776 | 772 | 82 | 4 | 700 | 12 |
+| **TOTAL** | 858 | 854 | 776 | 772 | 82 | 4 | 701 | 9 |
 
 ## Per-name detail
 
@@ -349,8 +349,8 @@ Source: q1167.mrsflow.out.
 | `DateTime.From` | Y | Y | function | q1067 q1068 q1072 | MATCH |
 | `DateTime.FromFileTime` | Y | Y | function | q1255 | MATCH |
 | `DateTime.FromText` | Y | Y | function | q1072 q1452 | MATCH |
-| `DateTime.IsInCurrentHour` | Y | Y | function | q1469 | DIFF |
-| `DateTime.IsInCurrentMinute` | Y | Y | function | q1469 | DIFF |
+| `DateTime.IsInCurrentHour` | Y | Y | function | q1469 | MATCH |
+| `DateTime.IsInCurrentMinute` | Y | Y | function | q1469 | MATCH |
 | `DateTime.IsInCurrentSecond` | Y | Y | function |  |  |
 | `DateTime.IsInNextHour` | Y | Y | function | q1374 | MATCH |
 | `DateTime.IsInNextMinute` | Y | Y | function |  |  |
@@ -364,7 +364,7 @@ Source: q1167.mrsflow.out.
 | `DateTime.IsInPreviousNMinutes` | Y | Y | function | q1372 | MATCH |
 | `DateTime.IsInPreviousNSeconds` | Y | Y | function | q1373 | MATCH |
 | `DateTime.IsInPreviousSecond` | Y | Y | function |  |  |
-| `DateTime.LocalNow` | Y | Y | function | q1333 q1334 q1335 q1336 q1337 q1338 q1339 q1340 q1344 q1345 q1346 q1347 q1348 q1349 q1350 q1351 q1352 q1353 q1354 q1355 q1356 q1357 q1358 q1359 q1360 q1361 q1362 q1363 q1364 q1365 q1366 q1367 q1368 q1369 q1370 q1371 q1372 q1373 q1374 q1375 q1469 | MIXED |
+| `DateTime.LocalNow` | Y | Y | function | q1333 q1334 q1335 q1336 q1337 q1338 q1339 q1340 q1344 q1345 q1346 q1347 q1348 q1349 q1350 q1351 q1352 q1353 q1354 q1355 q1356 q1357 q1358 q1359 q1360 q1361 q1362 q1363 q1364 q1365 q1366 q1367 q1368 q1369 q1370 q1371 q1372 q1373 q1374 q1375 q1469 | MATCH |
 | `DateTime.Time` | Y | Y | function | q1073 | MATCH |
 | `DateTime.ToRecord` | Y | Y | function | q1256 | MATCH |
 | `DateTime.ToText` | Y | Y | function | q160 q161 q183 q184 q611 q612 q613 q614 q615 q1070 | MATCH |
@@ -767,7 +767,7 @@ Source: q1167.mrsflow.out.
 | `Table.AddFuzzyClusterColumn` | Y | Y | function |  |  |
 | `Table.AddIndexColumn` | Y | Y | function | q621 q622 q623 q624 q625 q962 q963 q964 q965 q966 q967 q968 | MATCH |
 | `Table.AddJoinColumn` | Y | Y | function | q1319 | MATCH |
-| `Table.AddKey` | Y | Y | function |  |  |
+| `Table.AddKey` | Y | Y | function | q1530 | MATCH |
 | `Table.AddRankColumn` | Y | Y | function | q113 q114 | MATCH |
 | `Table.AggregateTableColumn` | Y | Y | function | q1324 | MATCH |
 | `Table.AlternateRows` | Y | Y | function | q1297 | MATCH |
@@ -800,7 +800,7 @@ Source: q1167.mrsflow.out.
 | `Table.FromColumns` | Y | Y | function | q1021 q1022 | MATCH |
 | `Table.FromList` | Y | Y | function | q1020 | MATCH |
 | `Table.FromPartitions` | Y | Y | function |  |  |
-| `Table.FromRecords` | Y | Y | function | q934 q935 q936 q937 q938 q939 q940 q941 q942 q943 q944 q945 q946 q947 q948 q949 q950 q951 q952 q953 q954 q955 q956 q957 q958 q959 q960 q961 q962 q963 q964 q965 q966 q967 q968 q969 q970 q971 q972 q973 q974 q975 q976 q977 q978 q979 q980 q981 q982 q983 q984 q985 q986 q987 q988 q989 q990 q991 q992 q993 q994 q995 q996 q997 q998 q999 q1000 q1001 q1002 q1003 q1004 q1005 q1006 q1007 q1008 q1009 q1010 q1011 q1012 q1013 q1014 q1015 q1016 q1017 q1018 q1024 q1025 q1026 q1027 q1028 q1029 q1031 q1032 q1033 q1034 q1035 q1036 q1037 q1038 q1039 q1040 q1041 q1042 q1043 q1044 q1045 q1132 q1133 q1134 q1136 q1137 q1138 q1139 q1140 q1141 q1142 q1143 q1157 q1168 q1287 q1288 q1289 q1290 q1291 q1292 q1293 q1294 q1295 q1296 q1297 q1298 q1299 q1300 q1301 q1302 q1303 q1304 q1305 q1306 q1307 q1308 q1309 q1310 q1311 q1312 q1313 q1314 q1315 q1316 q1317 q1318 q1319 q1320 q1321 q1322 q1323 q1324 q1411 q1412 q1413 q1495 q1500 q1501 q1502 q1503 q1505 q1515 | MATCH |
+| `Table.FromRecords` | Y | Y | function | q934 q935 q936 q937 q938 q939 q940 q941 q942 q943 q944 q945 q946 q947 q948 q949 q950 q951 q952 q953 q954 q955 q956 q957 q958 q959 q960 q961 q962 q963 q964 q965 q966 q967 q968 q969 q970 q971 q972 q973 q974 q975 q976 q977 q978 q979 q980 q981 q982 q983 q984 q985 q986 q987 q988 q989 q990 q991 q992 q993 q994 q995 q996 q997 q998 q999 q1000 q1001 q1002 q1003 q1004 q1005 q1006 q1007 q1008 q1009 q1010 q1011 q1012 q1013 q1014 q1015 q1016 q1017 q1018 q1024 q1025 q1026 q1027 q1028 q1029 q1031 q1032 q1033 q1034 q1035 q1036 q1037 q1038 q1039 q1040 q1041 q1042 q1043 q1044 q1045 q1132 q1133 q1134 q1136 q1137 q1138 q1139 q1140 q1141 q1142 q1143 q1157 q1168 q1287 q1288 q1289 q1290 q1291 q1292 q1293 q1294 q1295 q1296 q1297 q1298 q1299 q1300 q1301 q1302 q1303 q1304 q1305 q1306 q1307 q1308 q1309 q1310 q1311 q1312 q1313 q1314 q1315 q1316 q1317 q1318 q1319 q1320 q1321 q1322 q1323 q1324 q1411 q1412 q1413 q1495 q1500 q1501 q1502 q1503 q1505 q1515 q1530 | MATCH |
 | `Table.FromRows` | Y | Y | function | q24 q1019 q1023 q1024 | MATCH |
 | `Table.FromValue` | Y | Y | function | q117 | MATCH |
 | `Table.FuzzyGroup` | Y | Y | function | q338 | MATCH |
@@ -849,7 +849,7 @@ Source: q1167.mrsflow.out.
 | `Table.ReplaceRows` | Y | Y | function | q1316 | MATCH |
 | `Table.ReplaceValue` | Y | Y | function | q166 q167 q168 q190 q601 q602 q603 q604 q1004 q1005 q1006 q1007 q1010 q1132 q1133 q1134 q1142 | MATCH |
 | `Table.ReverseRows` | Y | Y | function | q74 | MATCH |
-| `Table.RowCount` | Y | Y | function | q70 q292 q343 q417 q419 q430 q585 q636 q639 q934 q937 q1031 q1141 q1143 q1149 q1166 q1495 q1500 q1501 q1502 q1505 q1506 q1507 q1515 | MATCH |
+| `Table.RowCount` | Y | Y | function | q70 q292 q343 q417 q419 q430 q585 q636 q639 q934 q937 q1031 q1141 q1143 q1149 q1166 q1495 q1500 q1501 q1502 q1505 q1506 q1507 q1515 q1530 | MATCH |
 | `Table.Schema` | Y | Y | function | q291 q292 q295 | MATCH |
 | `Table.SelectColumns` | Y | Y | function | q13 q15 q430 q634 q635 | MATCH |
 | `Table.SelectRows` | Y | Y | function | q14 q15 q591 q592 q593 q594 q595 q948 q949 q950 q951 q952 q953 q954 q1141 q1166 | MATCH |

@@ -1516,3 +1516,4 @@ q1526	ItemExpression.Item
 q1527	RowExpression.Row
 q1528	RowExpression.Column
 q1529	RowExpression.Column
+q1530	Table.AddKey Table.FromRecords Table.RowCount

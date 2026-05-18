@@ -12453,6 +12453,14 @@ let
         // q1529: nested check — RowExpression.Column's MemberName.
         SafeSerialize("q1529", () =>
             RowExpression.Column("CustomerName")[MemberName]),
+        // q1530: Table.AddKey is a row-preserving passthrough (the
+        // table data itself doesn't change). mrsflow doesn't yet track
+        // key metadata across operations, so the deeper Table.Keys probe
+        // is deferred — see commit log for the design sketch.
+        SafeSerialize("q1530", () =>
+            Table.RowCount(Table.AddKey(
+                Table.FromRecords({[a=1, b="x"],[a=2, b="y"]}),
+                {"a"}, true))),
         // q1460: Binary.ViewFunction rejects non-function input with PQ's
         // exact coercion-error wording.
         SafeSerialize("q1460", () =>
