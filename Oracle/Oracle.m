@@ -12035,7 +12035,40 @@ let
             { Order.Ascending, Order.Descending }),
         SafeSerialize("q1425", () =>
             { PercentileMode.ExcelInc, PercentileMode.ExcelExc,
-              PercentileMode.SqlCont, PercentileMode.SqlDisc })
+              PercentileMode.SqlCont, PercentileMode.SqlDisc }),
+        // q1426-q1438: more enum-constant list round-trips. Probing this
+        // batch uncovered three more ordinal fixes (GroupKind reversed,
+        // RankKind Dense/Ordinal swap, Precision reversed) — applied in
+        // the same commit. LimitClauseKind/ODataOmitValues/RelativePosition
+        // skipped: mrsflow doesn't know some of those constant names yet.
+        SafeSerialize("q1426", () =>
+            { JoinKind.Inner, JoinKind.LeftOuter, JoinKind.RightOuter,
+              JoinKind.FullOuter, JoinKind.LeftAnti, JoinKind.RightAnti,
+              JoinKind.LeftSemi, JoinKind.RightSemi }),
+        SafeSerialize("q1427", () =>
+            { JoinSide.Left, JoinSide.Right }),
+        SafeSerialize("q1428", () =>
+            { JoinAlgorithm.Dynamic, JoinAlgorithm.PairwiseHash,
+              JoinAlgorithm.SortMerge, JoinAlgorithm.LeftHash,
+              JoinAlgorithm.RightHash, JoinAlgorithm.LeftIndex,
+              JoinAlgorithm.RightIndex }),
+        SafeSerialize("q1429", () =>
+            { MissingField.Error, MissingField.Ignore, MissingField.UseNull }),
+        SafeSerialize("q1430", () =>
+            { GroupKind.Global, GroupKind.Local }),
+        SafeSerialize("q1431", () =>
+            { CsvStyle.QuoteAfterDelimiter, CsvStyle.QuoteAlways }),
+        SafeSerialize("q1432", () =>
+            { QuoteStyle.None, QuoteStyle.Csv }),
+        SafeSerialize("q1433", () =>
+            { RankKind.Competition, RankKind.Dense, RankKind.Ordinal }),
+        // LimitClauseKind / ODataOmitValues / RelativePosition skipped:
+        // mrsflow doesn't know some of those constant names yet.
+        SafeSerialize("q1437", () =>
+            { Precision.Decimal, Precision.Double }),
+        SafeSerialize("q1438", () =>
+            { Day.Sunday, Day.Monday, Day.Tuesday, Day.Wednesday,
+              Day.Thursday, Day.Friday, Day.Saturday })
     },
 
     Catalog = Table.FromRecords(cases)

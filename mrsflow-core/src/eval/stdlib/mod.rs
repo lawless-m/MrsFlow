@@ -192,8 +192,8 @@ pub fn root_env() -> Env {
     // Global (default) groups across the whole table; Local only folds
     // consecutive rows with equal keys into the same group.
     for (name, n) in [
-        ("GroupKind.Global", 0.0),
-        ("GroupKind.Local",  1.0),
+        ("GroupKind.Global", 1.0),
+        ("GroupKind.Local",  0.0),
     ] {
         env = env.extend(name.to_string(), Value::Number(n));
     }
@@ -243,8 +243,8 @@ pub fn root_env() -> Env {
     // Modified    (3344, not implemented yet — rejected at runtime).
     for (name, n) in [
         ("RankKind.Competition", 0.0),
-        ("RankKind.Ordinal",     1.0),
-        ("RankKind.Dense",       2.0),
+        ("RankKind.Dense",       1.0),
+        ("RankKind.Ordinal",     2.0),
     ] {
         env = env.extend(name.to_string(), Value::Number(n));
     }
@@ -388,8 +388,8 @@ pub fn root_env() -> Env {
 
     // Precision.* — Decimal / Double precision hint for numeric typing.
     for (name, n) in [
-        ("Precision.Decimal", 0.0),
-        ("Precision.Double",  1.0),
+        ("Precision.Decimal", 1.0),
+        ("Precision.Double",  0.0),
     ] {
         env = env.extend(name.to_string(), Value::Number(n));
     }

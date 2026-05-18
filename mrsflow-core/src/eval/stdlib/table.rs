@@ -5788,10 +5788,10 @@ fn group(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
         Some(Value::Number(n)) => {
             let k = *n as i64;
             match k {
-                0 => false,
-                1 => true,
+                0 => true,   // GroupKind.Local
+                1 => false,  // GroupKind.Global
                 _ => return Err(MError::Other(format!(
-                    "Table.Group: groupKind must be GroupKind.Global (0) or GroupKind.Local (1), got {k}"
+                    "Table.Group: groupKind must be GroupKind.Local (0) or GroupKind.Global (1), got {k}"
                 ))),
             }
         }
@@ -5882,7 +5882,7 @@ fn add_rank_column(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let new_col = expect_text(&args[1])?.to_string();
     let crit = &args[2];
-    // options.RankKind: 0 Competition (default) / 1 Ordinal / 2 Dense.
+    // options.RankKind: 0 Competition (default) / 1 Dense / 2 Ordinal.
     // Modified (3) is documented in M but not implemented here.
     let rank_kind: i64 = match args.get(3) {
         None | Some(Value::Null) => 0,
@@ -5962,9 +5962,9 @@ fn add_rank_column(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
             dense_rank += 1;
         }
         rank_per_row[*orig_idx] = match rank_kind {
-            0 => competition_rank,
-            1 => i + 1,
-            2 => dense_rank,
+            0 => competition_rank,  // Competition (1224)
+            1 => dense_rank,        // Dense (1223)
+            2 => i + 1,             // Ordinal (1234)
             _ => unreachable!(),
         };
         prev = Some(val);
