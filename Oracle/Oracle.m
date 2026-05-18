@@ -11953,7 +11953,10 @@ let
               Value.NullableEquals(null, 1),
               Value.NullableEquals(1, null),
               Value.NullableEquals(1, 1),
-              Value.NullableEquals(1, 2) })
+              Value.NullableEquals(1, 2) }),
+        // q1404: Uri.BuildQueryString — no leading "?".
+        SafeSerialize("q1404", () =>
+            Uri.BuildQueryString([key1 = "v1", key2 = "v 2"]))
     },
 
     Catalog = Table.FromRecords(cases)

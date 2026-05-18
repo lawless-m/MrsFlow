@@ -148,14 +148,14 @@ Source: q1167.mrsflow.out.
 | TimeZone | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | TraceLevel | 6 | 6 | 5 | 5 | 1 | 0 | 4 | 0 |
 | Type | 25 | 25 | 24 | 24 | 1 | 0 | 12 | 0 |
-| Uri | 5 | 5 | 5 | 5 | 0 | 0 | 3 | 0 |
+| Uri | 5 | 5 | 5 | 5 | 0 | 0 | 4 | 0 |
 | Value | 27 | 27 | 26 | 26 | 1 | 0 | 15 | 0 |
 | Variable | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
 | Web | 4 | 4 | 4 | 4 | 0 | 0 | 0 | 0 |
 | WebAction | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | WebMethod | 7 | 7 | 7 | 7 | 0 | 0 | 0 | 0 |
 | Xml | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| **TOTAL** | 860 | 856 | 720 | 716 | 140 | 4 | 551 | 19 |
+| **TOTAL** | 860 | 856 | 720 | 716 | 140 | 4 | 552 | 19 |
 
 ## Per-name detail
 
@@ -973,7 +973,7 @@ Source: q1167.mrsflow.out.
 | `Type.TableSchema` | Y | Y | function |  |  |
 | `Type.Type` | Y |  | missing |  |  |
 | `Type.Union` | Y | Y | function |  |  |
-| `Uri.BuildQueryString` | Y | Y | function |  |  |
+| `Uri.BuildQueryString` | Y | Y | function | q1404 | MATCH |
 | `Uri.Combine` | Y | Y | function | q1326 | MATCH |
 | `Uri.EscapeDataString` | Y | Y | function | q1327 | MATCH |
 | `Uri.Parts` | Y | Y | function | q1387 | MATCH |

@@ -140,7 +140,8 @@ fn build_query_string(args: &[Value], _host: &dyn IoHost) -> Result<Value, MErro
     if record.fields.is_empty() {
         return Ok(Value::Text(String::new()));
     }
-    let mut out = String::from("?");
+    // PQ omits the leading "?"; the caller composes it with the base URL.
+    let mut out = String::new();
     for (i, (k, v)) in record.fields.iter().enumerate() {
         if i > 0 {
             out.push('&');
