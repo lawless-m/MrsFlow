@@ -99,7 +99,7 @@ Source: q1167.mrsflow.out.
 | None | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | Null | 1 | 1 | 1 | 1 | 0 | 0 | 1 | 0 |
 | Number | 49 | 49 | 49 | 49 | 0 | 0 | 48 | 0 |
-| Occurrence | 7 | 7 | 5 | 5 | 2 | 0 | 4 | 0 |
+| Occurrence | 7 | 7 | 7 | 7 | 0 | 0 | 6 | 0 |
 | OData | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | ODataOmitValues | 2 | 2 | 2 | 2 | 0 | 0 | 1 | 0 |
 | Odbc | 3 | 3 | 3 | 3 | 0 | 0 | 1 | 0 |
@@ -154,7 +154,7 @@ Source: q1167.mrsflow.out.
 | WebAction | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | WebMethod | 7 | 7 | 7 | 7 | 0 | 0 | 6 | 0 |
 | Xml | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| **TOTAL** | 858 | 854 | 769 | 765 | 89 | 4 | 692 | 9 |
+| **TOTAL** | 858 | 854 | 771 | 767 | 87 | 4 | 694 | 9 |
 
 ## Per-name detail
 
@@ -648,8 +648,8 @@ Source: q1167.mrsflow.out.
 | `Occurrence.First` | Y | Y | constant | q84 q123 q370 q494 q823 q1423 | MATCH |
 | `Occurrence.Last` | Y | Y | constant | q108 q820 q824 q827 q1231 q1423 | MATCH |
 | `Occurrence.Optional` | Y | Y | constant | q1423 | MATCH |
-| `Occurrence.Repeating` | Y |  | missing |  |  |
-| `Occurrence.Required` | Y |  | missing |  |  |
+| `Occurrence.Repeating` | Y | Y | constant | q1517 | MATCH |
+| `Occurrence.Required` | Y | Y | constant | q1517 | MATCH |
 | `Occurrence.Type` | Y | Y | constant |  |  |
 | `OData.Feed` | Y |  | missing |  |  |
 | `ODataOmitValues.Nulls` | Y | Y | constant | q1442 | MATCH |

@@ -242,15 +242,23 @@ pub fn root_env() -> Env {
         env = env.extend(name.to_string(), Value::Number(n));
     }
 
-    // Occurrence.* constants — *.PositionOf / *.PositionOfAny occurrence arg.
-    // First (default) returns the first match index (or -1); Last returns
-    // the last; All returns a list of every match index. Optional is an
-    // alias for First (Excel exposes both names with ordinal 0).
+    // Occurrence.* constants — overloaded across two PQ contexts:
+    //   1. *.PositionOf / *.PositionOfAny occurrence arg: First (default,
+    //      0) returns the first match index; Last (1) the last; All (2)
+    //      a list of every match index. Optional (0) is an alias for
+    //      First.
+    //   2. Connector schema cardinality hints: Required (1) means at
+    //      least one match, Repeating (2) means zero-or-more. The
+    //      ordinals overlap with Last/All because PQ treats the
+    //      constants as numeric aliases — nothing here needs to know
+    //      which "context" the caller meant.
     for (name, n) in [
-        ("Occurrence.First",    0.0),
-        ("Occurrence.Last",     1.0),
-        ("Occurrence.All",      2.0),
-        ("Occurrence.Optional", 0.0),
+        ("Occurrence.First",     0.0),
+        ("Occurrence.Last",      1.0),
+        ("Occurrence.All",       2.0),
+        ("Occurrence.Optional",  0.0),
+        ("Occurrence.Required",  1.0),
+        ("Occurrence.Repeating", 2.0),
     ] {
         env = env.extend(name.to_string(), Value::Number(n));
     }

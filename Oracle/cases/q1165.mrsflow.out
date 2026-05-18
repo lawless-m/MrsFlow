@@ -428,6 +428,8 @@ Occurrence.All
 Occurrence.First
 Occurrence.Last
 Occurrence.Optional
+Occurrence.Repeating
+Occurrence.Required
 Occurrence.Type
 Odbc.DataSource
 Odbc.InferOptions

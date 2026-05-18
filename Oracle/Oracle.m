@@ -12404,6 +12404,12 @@ let
         SafeSerialize("q1516", () =>
             let r = try Excel.Workbook(#binary({1,2,3,4})) in
                 if r[HasError] then [HasError=true, Reason=r[Error][Reason]] else [HasError=false, IsTable=Value.Is(r[Value], type table)]),
+        // q1517: Occurrence.Required (1) / Occurrence.Repeating (2)
+        // are connector-cardinality-hint constants. PQ overloads the
+        // ordinal slots with Last/All — Required reuses Last's 1,
+        // Repeating reuses All's 2.
+        SafeSerialize("q1517", () =>
+            { Occurrence.Required, Occurrence.Repeating }),
         // q1460: Binary.ViewFunction rejects non-function input with PQ's
         // exact coercion-error wording.
         SafeSerialize("q1460", () =>

@@ -95,7 +95,7 @@ Counts come from `COVERAGE.md`; refresh both via `render.ps1`.
 | None | Implemented | 1 / 1 | None type companion (uninhabited). |
 | Null | Tested | 1 / 1 | Null type companion. |
 | Number | Tested | 49 / 49 | Number value operations: arithmetic, rounding, formatting, parsing, bitwise. |
-| Occurrence | Partial | 5 / 7 | Text/List PositionOf occurrence enum (First / Last / All) + BinaryFormat reuse. |
+| Occurrence | Tested | 7 / 7 | Text/List PositionOf occurrence enum (First / Last / All) + BinaryFormat reuse. |
 | OData | Untouched | 0 / 1 | OData v3/v4 feed connector. |
 | ODataOmitValues | Tested | 2 / 2 | OData null-handling enum. |
 | Odbc | Tested | 3 / 3 | Generic ODBC connector. mrsflow has a real implementation with lazy/folded queries. |
