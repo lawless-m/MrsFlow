@@ -70,10 +70,19 @@ $namesSb = [System.Text.StringBuilder]::new()
 foreach ($q in $allCases) {
     $src = [System.IO.File]::ReadAllText((Join-Path $casesDir ($q + '.m')))
     $hit = [System.Collections.Generic.List[string]]::new()
+    # Heuristic: a name "appears" when followed by one of these
+    # delimiters. `(`/`.`/`,` catch call/member/list-mid positions;
+    # `)`/`}`/` `/end-of-string catch trailing positions like
+    # `{a, b, Foo.Bar}` or `f(Foo.Bar)`.
     foreach ($n in $sortedNames) {
-        if ($src.Contains($n + '(') -or
-            $src.Contains($n + '.') -or
-            $src.Contains($n + ',')) {
+        $found = $src.Contains($n + '(') -or
+                 $src.Contains($n + '.') -or
+                 $src.Contains($n + ',') -or
+                 $src.Contains($n + ')') -or
+                 $src.Contains($n + '}') -or
+                 $src.Contains($n + ' ') -or
+                 $src.EndsWith($n)
+        if ($found) {
             [void]$hit.Add($n)
             $src = $src.Replace($n, '')   # strip so shorter prefixes don't double-count
         }

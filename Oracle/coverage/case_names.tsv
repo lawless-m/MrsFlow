@@ -6,8 +6,8 @@ q4	Date.ToText
 q5	Date.ToText
 q6	Date.ToText
 q7	Table.PromoteHeaders
-q8	Text.FromBinary Text.ToBinary
-q9	Binary.ToText Text.ToBinary
+q8	BinaryEncoding.Base64 Text.FromBinary Text.ToBinary
+q9	Binary.ToText BinaryEncoding.Base64 Text.ToBinary
 q10	Csv.Document Text.ToBinary
 q11	Folder.Contents
 q12	Excel.CurrentWorkbook
@@ -16,7 +16,7 @@ q14	Odbc.DataSource Table.SelectRows
 q15	Odbc.DataSource Table.SelectColumns Table.SelectRows
 q16	Table.RenameColumns
 q17	Table.RemoveColumns
-q18	Table.TransformColumnTypes
+q18	Int64.Type Table.TransformColumnTypes
 q19	Table.AddColumn
 q20	Text.Replace
 q21	List.Transform
@@ -24,9 +24,9 @@ q22	Table.ColumnNames
 q23	Json.Document
 q24	Table.FromRows
 q25	Text.Contains
-q26	Table.TransformColumns
+q26	Int64.Type Table.TransformColumns
 q27	Text.From
-q28	Table.ExpandTableColumn Table.NestedJoin
+q28	JoinKind.LeftOuter Table.ExpandTableColumn Table.NestedJoin
 q29	Table.Combine
 q30	Text.Length
 q31	Text.Upper
@@ -93,65 +93,65 @@ q91	List.LastN
 q92	List.Skip
 q93	Table.FirstN
 q94	Table.Skip
-q95	Splitter.SplitTextByDelimiter
-q96	Splitter.SplitTextByAnyDelimiter
+q95	QuoteStyle.Csv Splitter.SplitTextByDelimiter
+q96	QuoteStyle.Csv Splitter.SplitTextByAnyDelimiter
 q97	Splitter.SplitTextByEachDelimiter
 q98	QuoteStyle.None Splitter.SplitTextByEachDelimiter
 q99	Splitter.SplitTextByLengths
-q100	Splitter.SplitTextByWhitespace
-q101	Combiner.CombineTextByDelimiter
-q102	Combiner.CombineTextByDelimiter
-q103	Record.SelectFields
-q104	Record.SelectFields
-q105	Record.RemoveFields
-q106	Record.RenameFields
-q107	Record.TransformFields
-q108	List.PositionOf
-q109	List.PositionOf
-q110	List.PositionOfAny
-q111	Table.PositionOf
-q112	Text.PositionOfAny
+q100	QuoteStyle.Csv Splitter.SplitTextByWhitespace
+q101	Combiner.CombineTextByDelimiter QuoteStyle.Csv
+q102	Combiner.CombineTextByDelimiter QuoteStyle.Csv
+q103	MissingField.Ignore Record.SelectFields
+q104	MissingField.UseNull Record.SelectFields
+q105	MissingField.Ignore Record.RemoveFields
+q106	MissingField.Ignore Record.RenameFields
+q107	MissingField.UseNull Record.TransformFields
+q108	List.PositionOf Occurrence.Last
+q109	List.PositionOf Occurrence.All
+q110	List.PositionOfAny Occurrence.All
+q111	Occurrence.All Table.PositionOf
+q112	Occurrence.All Text.PositionOfAny
 q113	Table.AddRankColumn
 q114	Table.AddRankColumn
-q115	List.Sum Table.Group
+q115	GroupKind.Local List.Sum Table.Group
 q116	Table.Join
 q117	Table.FromValue
 q118	List.Count List.Random
 q119	Type.Is
 q120	List.Sum Table.Profile Type.Is
-q121	List.Distinct
-q122	List.Contains
-q123	List.PositionOf Occurrence.First
+q121	Comparer.OrdinalIgnoreCase List.Distinct
+q122	Comparer.OrdinalIgnoreCase List.Contains
+q123	Comparer.OrdinalIgnoreCase List.PositionOf Occurrence.First
 q124	Comparer.Ordinal
 q125	Comparer.OrdinalIgnoreCase
 q126	Comparer.Equals Comparer.OrdinalIgnoreCase
 q127	Comparer.FromCulture List.Distinct
 q128	List.Distinct Text.Lower
 q129	List.Distinct Text.Lower Value.Compare
-q130	List.Distinct
+q130	Comparer.OrdinalIgnoreCase List.Distinct
 q131	List.Intersect Text.Lower
 q132	List.Intersect Text.Lower Value.Compare
-q133	List.Intersect
+q133	Comparer.OrdinalIgnoreCase List.Intersect
 q134	List.Difference Text.Lower
 q135	List.Difference Text.Lower Value.Compare
-q136	List.Difference
+q136	Comparer.OrdinalIgnoreCase List.Difference
 q137	Table.Distinct Text.Lower
 q138	Table.Distinct Text.Lower Value.Compare
 q139	Table.Distinct
-q140	Table.Distinct
+q140	Comparer.OrdinalIgnoreCase Table.Distinct
 q141	Text.Lower Value.Equals
 q142	Text.Lower Value.Compare Value.Equals
-q143	Value.Equals
+q143	Comparer.OrdinalIgnoreCase Value.Equals
 q144	Value.Equals
 q145	Table.Sort Text.Lower Value.Compare
 q146	Table.Sort
-q147	Table.Sort
-q148	Order.Ascending Table.Sort
+q147	Order.Descending Table.Sort
+q148	Comparer.OrdinalIgnoreCase Order.Ascending Table.Sort
 q149	List.Sort Value.Compare
 q150	Table.Distinct
 q151	Table.Distinct
 q152	Table.Distinct
-q153	Table.Distinct
+q153	Comparer.OrdinalIgnoreCase Table.Distinct
 q154	Number.ToText
 q155	Number.ToText
 q156	Number.ToText
@@ -224,7 +224,7 @@ q222	Date.AddYears
 q223	Date.AddYears
 q224	Date.AddDays
 q225	Date.AddQuarters
-q226	Table.AddColumn
+q226	Int64.Type Table.AddColumn
 q227	Table.AddColumn
 q228	Table.AddColumn Text.From
 q229	Date.AddDays Table.AddColumn
@@ -258,17 +258,17 @@ q256	List.Sort
 q257	List.Sort
 q258	Table.Sort
 q259	List.Sort
-q260	List.Sort
+q260	Comparer.OrdinalIgnoreCase List.Sort
 q261	Table.Unpivot
 q262	Table.UnpivotOtherColumns
 q263	Table.Pivot
-q264	Table.Pivot
+q264	List.Sum Table.Pivot
 q265	Table.Pivot Table.UnpivotOtherColumns
-q266	Json.FromValue Text.FromBinary
-q267	Json.FromValue Text.FromBinary
-q268	Json.FromValue Text.FromBinary
-q269	Json.FromValue Text.FromBinary
-q270	Json.FromValue Text.FromBinary
+q266	Json.FromValue Text.FromBinary TextEncoding.Utf8
+q267	Json.FromValue Text.FromBinary TextEncoding.Utf8
+q268	Json.FromValue Text.FromBinary TextEncoding.Utf8
+q269	Json.FromValue Text.FromBinary TextEncoding.Utf8
+q270	Json.FromValue Text.FromBinary TextEncoding.Utf8
 q271	Text.From
 q272	Text.From
 q273	Text.From
@@ -276,7 +276,7 @@ q274	Text.From
 q275	Text.From
 q276	
 q277	Decimal.From
-q278	Number.IsNaN
+q278	Number.IsNaN Number.NaN
 q279	Number.IsOdd
 q280	Decimal.From
 q281	List.Generate
@@ -289,10 +289,10 @@ q287	Record.Combine
 q288	Record.Combine
 q289	Record.Combine
 q290	Record.Combine Record.Field
-q291	Table.Schema Table.TransformColumnTypes
-q292	Table.RowCount Table.Schema Table.TransformColumnTypes
-q293	Table.ColumnsOfType Table.TransformColumnTypes
-q294	Table.ColumnsOfType Table.TransformColumnTypes
+q291	Int64.Type Table.Schema Table.TransformColumnTypes
+q292	Int64.Type Table.RowCount Table.Schema Table.TransformColumnTypes
+q293	Int64.Type Table.ColumnsOfType Table.TransformColumnTypes
+q294	Int64.Type Table.ColumnsOfType Table.TransformColumnTypes
 q295	Table.ColumnNames Table.Schema
 q296	Lines.FromText
 q297	Lines.FromText
@@ -344,51 +344,51 @@ q342	List.Buffer
 q343	Table.Buffer Table.RowCount
 q344	List.Buffer
 q345	Table.Buffer Table.ColumnNames
-q346	Binary.FromText Binary.Length
-q347	Binary.FromText Binary.ToText
-q348	Binary.FromText Binary.Range Binary.ToText
-q349	Binary.FromText Binary.Length
-q350	Binary.ToText Text.ToBinary
-q351	Binary.FromList Binary.ToText
-q352	Binary.FromList Binary.ToText
-q353	Binary.FromList Binary.ToText
-q354	Binary.FromList Binary.FromText Binary.ToText
-q355	Binary.FromList Binary.ToText
+q346	Binary.FromText Binary.Length BinaryEncoding.Base64
+q347	Binary.FromText Binary.ToText BinaryEncoding.Base64 BinaryEncoding.Hex
+q348	Binary.FromText Binary.Range Binary.ToText BinaryEncoding.Hex
+q349	Binary.FromText Binary.Length BinaryEncoding.Base64
+q350	Binary.ToText BinaryEncoding.Hex Text.ToBinary TextEncoding.Utf8
+q351	Binary.FromList Binary.ToText BinaryEncoding.Hex
+q352	Binary.FromList Binary.ToText BinaryEncoding.Hex
+q353	Binary.FromList Binary.ToText BinaryEncoding.Hex
+q354	Binary.FromList Binary.FromText Binary.ToText BinaryEncoding.Base64 BinaryEncoding.Hex
+q355	Binary.FromList Binary.ToText BinaryEncoding.Hex
 q356	Number.Round
 q357	Number.Round
 q358	Number.RoundUp
 q359	Number.RoundDown
-q360	Number.Round
+q360	Number.Round RoundingMode.AwayFromZero RoundingMode.ToEven
 q361	Text.PadStart
 q362	Text.PadEnd
 q363	Text.Repeat
 q364	Text.PadStart
 q365	Text.Repeat
 q366	List.PositionOf
-q367	List.PositionOf
+q367	List.PositionOf Occurrence.All
 q368	List.PositionOfAny
 q369	List.Contains
-q370	List.PositionOf Occurrence.First
+q370	Comparer.OrdinalIgnoreCase List.PositionOf Occurrence.First
 q371	Splitter.SplitByNothing
 q372	Splitter.SplitTextByDelimiter
-q373	Splitter.SplitTextByDelimiter
+q373	QuoteStyle.Csv Splitter.SplitTextByDelimiter
 q374	Splitter.SplitTextByEachDelimiter
 q375	Splitter.SplitTextByLengths
 q376	Combiner.CombineTextByDelimiter
-q377	Combiner.CombineTextByDelimiter
+q377	Combiner.CombineTextByDelimiter QuoteStyle.Csv
 q378	Combiner.CombineTextByEachDelimiter
 q379	Combiner.CombineTextByLengths
 q380	Combiner.CombineTextByPositions
 q381	Comparer.Ordinal
 q382	Comparer.OrdinalIgnoreCase
-q383	List.Sort
+q383	Comparer.OrdinalIgnoreCase List.Sort
 q384	Comparer.FromCulture
 q385	Comparer.Ordinal
 q386	Value.Equals
 q387	Value.Equals
 q388	Value.Compare
 q389	Value.Compare
-q390	Value.Compare
+q390	Comparer.Ordinal Comparer.OrdinalIgnoreCase Value.Compare
 q391	Function.Invoke
 q392	Function.Invoke Text.Upper
 q393	Function.Invoke List.Sum
@@ -414,11 +414,11 @@ q412	Record.ToList
 q413	Record.FromTable
 q414	Record.ToTable
 q415	Record.FieldNames Record.FieldValues Record.FromList Record.ToList
-q416	List.Sum Table.Group
-q417	Table.Group Table.RowCount
+q416	Int64.Type List.Sum Table.Group
+q417	Int64.Type Table.Group Table.RowCount
 q418	Table.Group
-q419	Table.Group Table.RowCount
-q420	List.Sum Table.Group
+q419	Int64.Type Table.Group Table.RowCount
+q420	Int64.Type List.Sum Table.Group
 q421	Table.Join
 q422	Table.Join
 q423	Table.Join
@@ -429,21 +429,21 @@ q427	Table.Join
 q428	Table.Join
 q429	Table.ColumnNames Table.NestedJoin
 q430	Table.AddColumn Table.NestedJoin Table.RowCount Table.SelectColumns
-q431	Table.TransformColumnTypes
+q431	Int64.Type Table.TransformColumnTypes
 q432	Table.TransformColumnTypes
 q433	Table.TransformColumnTypes
-q434	Table.TransformColumnTypes
+q434	Int64.Type Table.TransformColumnTypes
 q435	Table.TransformColumnTypes
 q436	Splitter.SplitTextByDelimiter Table.SplitColumn
 q437	Splitter.SplitTextByDelimiter Table.SplitColumn
 q438	Combiner.CombineTextByDelimiter Table.CombineColumns
-q439	Splitter.SplitTextByDelimiter Table.SplitColumn
+q439	QuoteStyle.Csv Splitter.SplitTextByDelimiter Table.SplitColumn
 q440	Splitter.SplitTextByLengths Table.SplitColumn
 q441	Date.WeekOfMonth
-q442	Date.WeekOfYear
-q443	Date.StartOfWeek
-q444	Date.EndOfWeek
-q445	Date.DayOfWeek Date.DayOfWeekName
+q442	Date.WeekOfYear Day.Monday
+q443	Date.StartOfWeek Day.Monday Day.Sunday
+q444	Date.EndOfWeek Day.Monday Day.Sunday
+q445	Date.DayOfWeek Date.DayOfWeekName Day.Monday Day.Sunday
 q446	Date.FromText
 q447	Date.FromText
 q448	Date.FromText
@@ -461,17 +461,17 @@ q459	Logical.ToText
 q460	Logical.From
 q461	Percentage.From
 q462	Percentage.From
-q463	Value.Is
+q463	Percentage.Type Value.Is
 q464	Percentage.From
 q465	Percentage.From
 q466	Currency.From
 q467	Currency.From
-q468	Value.Is
+q468	Currency.Type Value.Is
 q469	Currency.From
 q470	Currency.From
 q471	Decimal.From
-q472	Decimal.From Value.Is
-q473	Decimal.From Value.Is
+q472	Decimal.From Decimal.Type Double.Type Value.Is
+q473	Decimal.From Decimal.Type Value.Is
 q474	Decimal.From
 q475	Int64.From
 q476	Number.Random
@@ -490,10 +490,10 @@ q488	Text.RemoveRange
 q489	Text.Range
 q490	Text.Insert Text.Range
 q491	Text.PositionOf
-q492	Text.PositionOf
-q493	Text.PositionOfAny
-q494	Occurrence.First Text.PositionOf
-q495	Text.Contains Text.EndsWith Text.StartsWith
+q492	Occurrence.All Text.PositionOf
+q493	Occurrence.All Text.PositionOfAny
+q494	Comparer.OrdinalIgnoreCase Occurrence.First Text.PositionOf
+q495	Comparer.OrdinalIgnoreCase Text.Contains Text.EndsWith Text.StartsWith
 q496	Text.Length Text.NewGuid
 q497	List.Transform Text.Length Text.NewGuid Text.Split
 q498	List.Count List.Distinct List.Transform Text.NewGuid
@@ -519,11 +519,11 @@ q517	List.AnyTrue
 q518	List.AllTrue List.AnyTrue
 q519	List.AllTrue List.Transform
 q520	List.AllTrue List.AnyTrue
-q521	List.Distinct
+q521	Comparer.OrdinalIgnoreCase List.Distinct
 q522	List.Union
 q523	List.Intersect
-q524	List.Difference
-q525	List.Union
+q524	Comparer.OrdinalIgnoreCase List.Difference
+q525	Comparer.Ordinal List.Union
 q526	List.Skip
 q527	List.Skip
 q528	List.Range
@@ -534,15 +534,15 @@ q532	Character.ToNumber
 q533	Character.FromNumber Character.ToNumber
 q534	Character.FromNumber Character.ToNumber
 q535	Character.FromNumber Character.ToNumber
-q536	Json.FromValue Text.FromBinary
-q537	Json.FromValue Text.FromBinary
-q538	Json.FromValue Text.FromBinary
-q539	Json.FromValue Text.FromBinary
-q540	Json.FromValue Text.FromBinary
+q536	Json.FromValue Text.FromBinary TextEncoding.Utf8
+q537	Json.FromValue Text.FromBinary TextEncoding.Utf8
+q538	Json.FromValue Text.FromBinary TextEncoding.Utf8
+q539	Json.FromValue Text.FromBinary TextEncoding.Utf8
+q540	Json.FromValue Text.FromBinary TextEncoding.Utf8
 q541	Number.Abs Number.Sign
 q542	Number.Sqrt
 q543	Number.Power
-q544	Number.Exp Number.Ln Number.Log10
+q544	Number.E Number.Exp Number.Ln Number.Log10
 q545	Number.Ln Number.Log10
 q546	Number.Cos Number.Sin Number.Tan
 q547	Number.Acos Number.Asin Number.Atan
@@ -551,9 +551,9 @@ q549	Number.Acos Number.Asin Number.Tan
 q550	Number.Abs Number.Cos Number.Power Number.Sin
 q551	Number.PI Number.Round
 q552	Number.PI Number.Round
-q553	Number.Round
-q554	
-q555	Number.Round Number.Sin
+q553	Number.PI Number.Round
+q554	Number.PI
+q555	Number.PI Number.Round Number.Sin
 q556	Number.BitwiseAnd
 q557	Number.BitwiseOr
 q558	Number.BitwiseXor
@@ -569,25 +569,25 @@ q567	Text.Lower Text.Upper
 q568	Text.Lower Text.Upper
 q569	Text.Length Text.Lower Text.Upper
 q570	Character.ToNumber Text.Length
-q571	List.Transform
+q571	List.Transform Number.Sqrt
 q572	List.Transform
 q573	List.Transform
 q574	List.Transform
 q575	List.Transform
 q576	Record.RemoveFields
 q577	Record.RenameFields
-q578	Record.TransformFields
+q578	Record.TransformFields Text.From
 q579	Record.RemoveFields Record.RenameFields Record.TransformFields
 q580	Record.RemoveFields Record.RenameFields Record.TransformFields
 q581	Table.Distinct
 q582	Table.Distinct
 q583	Table.Distinct
-q584	Table.Distinct
+q584	Comparer.OrdinalIgnoreCase Table.Distinct
 q585	Table.Distinct Table.RowCount
 q586	Table.Sort
-q587	Table.Sort
-q588	Table.Sort
-q589	Table.Sort
+q587	Order.Descending Table.Sort
+q588	Order.Ascending Table.Sort
+q589	Order.Ascending Order.Descending Table.Sort
 q590	Table.Sort
 q591	Table.SelectRows
 q592	Table.SelectRows
@@ -648,19 +648,19 @@ q646	List.RemoveItems
 q647	List.RemoveMatchingItems
 q648	List.RemoveNulls
 q649	List.Reverse
-q650	List.Sort
+q650	List.Sort Order.Descending
 q651	Text.Length
 q652	Text.Start
 q653	Text.End
 q654	Text.Middle
 q655	Text.At
-q656	Number.Round
-q657	Number.Round
-q658	Number.Round
-q659	Number.Round
-q660	Number.Round
-q661	Number.NaN Number.NegativeInfinity Number.PositiveInfinity Number.Round
-q662	Number.Round
+q656	Number.Round RoundingMode.AwayFromZero
+q657	Number.Round RoundingMode.ToEven
+q658	Number.Round RoundingMode.AwayFromZero RoundingMode.Down RoundingMode.ToEven RoundingMode.TowardZero RoundingMode.Up
+q659	Number.Round RoundingMode.AwayFromZero
+q660	Number.Round RoundingMode.AwayFromZero RoundingMode.Down RoundingMode.ToEven
+q661	Number.NaN Number.NegativeInfinity Number.PositiveInfinity Number.Round RoundingMode.AwayFromZero RoundingMode.ToEven
+q662	Number.Round RoundingMode.AwayFromZero RoundingMode.Down RoundingMode.ToEven RoundingMode.TowardZero RoundingMode.Up
 q663	Number.Mod
 q664	Number.Mod
 q665	Number.Mod
@@ -683,12 +683,12 @@ q681	Number.Power
 q682	Number.Power
 q683	Number.Power
 q684	Number.Sqrt
-q685	Number.Sqrt
+q685	Number.NaN Number.NegativeInfinity Number.PositiveInfinity Number.Sqrt
 q686	Number.Ln
-q687	Number.Ln Number.Log10
+q687	Number.Ln Number.Log10 Number.NaN Number.NegativeInfinity Number.PositiveInfinity
 q688	Number.Log
 q689	Number.Exp
-q690	Number.Exp Number.Ln Number.Power Number.Sqrt
+q690	Number.Exp Number.Ln Number.NaN Number.NegativeInfinity Number.PositiveInfinity Number.Power Number.Sqrt
 q691	Number.ToText
 q692	Number.ToText
 q693	Number.ToText
@@ -746,9 +746,9 @@ q744	Number.FromText
 q745	Number.FromText
 q746	Number.FromText
 q747	Number.Sign
-q748	Number.Sign
+q748	Number.NaN Number.NegativeInfinity Number.PositiveInfinity Number.Sign
 q749	Number.Abs
-q750	Number.Abs
+q750	Number.Abs Number.NaN Number.NegativeInfinity Number.PositiveInfinity
 q751	Number.Abs Number.Sign
 q752	Number.Abs Number.Sign
 q753	Number.Abs Number.Mod Number.Power Number.Round Number.Sign Number.Sqrt
@@ -759,13 +759,13 @@ q757	Number.BitwiseShiftLeft Number.BitwiseShiftRight
 q758	Number.BitwiseAnd Number.BitwiseOr Number.BitwiseShiftRight Number.BitwiseXor
 q759	Number.BitwiseAnd Number.BitwiseNot Number.BitwiseShiftLeft Number.NaN Number.PositiveInfinity
 q760	Number.BitwiseAnd Number.BitwiseNot Number.BitwiseOr Number.BitwiseShiftLeft Number.BitwiseShiftRight Number.BitwiseXor
-q761	Text.Replace
+q761	Comparer.Ordinal Comparer.OrdinalIgnoreCase Text.Replace
 q762	Text.Replace
 q763	Text.Replace
 q764	Text.Replace
 q765	Text.Replace
 q766	Text.Replace
-q767	Text.Lower Text.Replace Value.Compare
+q767	List.Distinct List.Sort Text.Lower Text.Replace Value.Compare
 q768	Text.Split
 q769	Text.Split
 q770	Text.Split
@@ -811,21 +811,21 @@ q809	Text.Lower Text.Upper
 q810	Text.Lower Text.Upper
 q811	Text.Lower Text.Upper
 q812	Text.Lower
-q813	Text.Length Text.NewGuid Text.PositionOf Text.Range Text.Replace
+q813	Occurrence.All Text.Length Text.NewGuid Text.PositionOf Text.Range Text.Replace
 q814	Text.Length Text.NewGuid
 q815	List.Contains Text.Lower Text.NewGuid Text.Range Text.Upper
 q816	List.AllTrue List.Contains List.Transform Text.NewGuid Text.ToList
 q817	List.Count List.Distinct List.Generate Text.NewGuid
 q818	Text.NewGuid
 q819	List.Count Text.Length Text.NewGuid Text.Split
-q820	Text.PositionOf
-q821	Text.PositionOf
-q822	Text.PositionOf
-q823	Occurrence.All Occurrence.First Text.PositionOf
-q824	Text.PositionOfAny
+q820	Occurrence.All Occurrence.Last Text.PositionOf
+q821	Occurrence.All Text.PositionOf
+q822	Occurrence.All Text.PositionOf
+q823	Comparer.OrdinalIgnoreCase Occurrence.All Occurrence.First Text.PositionOf
+q824	Occurrence.All Occurrence.Last Text.PositionOfAny
 q825	Text.PositionOfAny
 q826	Text.PositionOf Text.PositionOfAny
-q827	Text.PositionOf Text.PositionOfAny
+q827	Occurrence.All Occurrence.Last Text.PositionOf Text.PositionOfAny
 q828	Text.Format
 q829	Text.Format
 q830	Text.Format
@@ -849,13 +849,13 @@ q847	Text.Reverse
 q848	Text.Length
 q849	List.Sort
 q850	List.Sort Value.Compare
-q851	List.Sort Order.Descending
+q851	List.Sort Order.Ascending Order.Descending
 q852	List.Sort Number.Abs Number.Round Text.Length
 q853	List.Sort
 q854	List.Sort Text.Lower Value.Compare
 q855	List.Sort
 q856	List.Distinct
-q857	Comparer.OrdinalIgnoreCase List.Distinct
+q857	Comparer.Ordinal Comparer.OrdinalIgnoreCase List.Distinct
 q858	List.Distinct Text.Lower
 q859	List.Distinct
 q860	List.Distinct
@@ -927,23 +927,23 @@ q925	List.Random Number.RandomBetween
 q926	Number.Random Number.RandomBetween
 q927	List.Transform Text.Upper
 q928	List.Transform Text.From
-q929	List.Numbers List.Transform
+q929	List.Generate List.Numbers List.Transform
 q930	List.Transform
 q931	List.Transform
 q932	List.Select
-q933	List.RemoveItems
+q933	Comparer.OrdinalIgnoreCase List.RemoveItems
 q934	List.Sum Table.FromRecords Table.Group Table.RowCount
 q935	List.Sum Table.FromRecords Table.Group
-q936	List.Sum Table.FromRecords Table.Group
+q936	GroupKind.Global GroupKind.Local List.Sum Table.FromRecords Table.Group
 q937	List.Average List.Sum Table.FromRecords Table.Group Table.RowCount
 q938	Table.FromRecords Table.Group
 q939	List.Sum Table.FromRecords Table.Group
 q940	List.Sum Table.FromRecords Table.Group
 q941	Table.FromRecords Table.Sort
-q942	Order.Descending Table.FromRecords Table.Sort
-q943	Table.FromRecords Table.Sort
+q942	Order.Ascending Order.Descending Table.FromRecords Table.Sort
+q943	Order.Ascending Order.Descending Table.FromRecords Table.Sort
 q944	Table.FromRecords Table.Sort
-q945	Table.FromRecords Table.Sort
+q945	Order.Descending Table.FromRecords Table.Sort
 q946	Table.FromRecords Table.Sort Text.Lower Value.Compare
 q947	Table.FromRecords Table.Sort
 q948	Table.FromRecords Table.SelectRows
@@ -956,7 +956,7 @@ q954	Table.FromRecords Table.SelectRows
 q955	Table.AddColumn Table.FromRecords Text.From
 q956	Number.Mod Table.AddColumn Table.FromRecords Text.From
 q957	Table.AddColumn Table.FromRecords
-q958	Table.AddColumn Table.FromRecords
+q958	Json.FromValue Table.AddColumn Table.FromRecords
 q959	Table.AddColumn Table.FromRecords
 q960	Table.AddColumn Table.FromRecords
 q961	Table.AddColumn Table.FromRecords
@@ -975,26 +975,26 @@ q973	Table.ExpandTableColumn Table.FromRecords
 q974	Table.ExpandRecordColumn Table.FromRecords
 q975	Table.ExpandRecordColumn Table.FromRecords
 q976	Table.FromRecords Table.Pivot
-q977	Table.FromRecords Table.Pivot
+q977	List.Sum Table.FromRecords Table.Pivot
 q978	Table.FromRecords Table.Pivot
 q979	Table.FromRecords Table.Unpivot
 q980	Table.FromRecords Table.Unpivot
 q981	Table.FromRecords Table.UnpivotOtherColumns
 q982	Table.FromRecords Table.Pivot Table.Unpivot
-q983	Table.FromRecords Table.Join
-q984	Table.FromRecords Table.Join
-q985	Table.FromRecords Table.Join
-q986	Table.FromRecords Table.Join
-q987	Table.FromRecords Table.Join
-q988	Table.FromRecords Table.Join
-q989	Table.FromRecords Table.Join
-q990	Table.FromRecords Table.NestedJoin
-q991	Table.FromRecords Table.NestedJoin
-q992	Table.ExpandTableColumn Table.FromRecords Table.NestedJoin
-q993	Table.FromRecords Table.NestedJoin
-q994	Table.FromRecords Table.NestedJoin
-q995	Table.FromRecords Table.NestedJoin
-q996	Table.FromRecords Table.NestedJoin
+q983	JoinKind.Inner Table.FromRecords Table.Join
+q984	JoinKind.FullOuter JoinKind.LeftOuter JoinKind.RightOuter Table.FromRecords Table.Join
+q985	JoinKind.LeftAnti JoinKind.RightAnti Table.FromRecords Table.Join
+q986	JoinKind.Inner Table.FromRecords Table.Join
+q987	JoinKind.Inner JoinKind.LeftOuter Table.FromRecords Table.Join
+q988	JoinKind.Inner JoinKind.LeftOuter Table.FromRecords Table.Join
+q989	JoinKind.Inner Table.FromRecords Table.Join
+q990	JoinKind.Inner Table.FromRecords Table.NestedJoin
+q991	JoinKind.LeftOuter Table.FromRecords Table.NestedJoin
+q992	JoinKind.Inner Table.ExpandTableColumn Table.FromRecords Table.Join Table.NestedJoin
+q993	JoinKind.LeftOuter Table.FromRecords Table.NestedJoin
+q994	JoinKind.LeftOuter Table.FromRecords Table.NestedJoin
+q995	JoinKind.LeftAnti JoinKind.RightAnti Table.FromRecords Table.NestedJoin
+q996	JoinKind.FullOuter JoinKind.RightOuter Table.FromRecords Table.NestedJoin
 q997	Table.FillDown Table.FromRecords
 q998	Table.FillDown Table.FromRecords
 q999	Table.FillDown Table.FromRecords
@@ -1032,7 +1032,7 @@ q1030	Table.RemoveRowsWithErrors
 q1031	Table.AddColumn Table.FromRecords Table.RemoveRowsWithErrors Table.RowCount
 q1032	Table.Distinct Table.FromRecords
 q1033	Table.Distinct Table.FromRecords
-q1034	Table.Distinct Table.FromRecords
+q1034	Comparer.OrdinalIgnoreCase Table.Distinct Table.FromRecords
 q1035	Table.Distinct Table.FromRecords
 q1036	Table.Distinct Table.FromRecords
 q1037	Table.Distinct Table.FromRecords Text.Lower
@@ -1049,7 +1049,7 @@ q1047	Record.AddField
 q1048	Record.AddField
 q1049	Record.Combine
 q1050	Record.RenameFields
-q1051	Record.SelectFields
+q1051	MissingField.Error MissingField.Ignore MissingField.UseNull Record.SelectFields
 q1052	Record.FieldOrDefault
 q1053	Record.TransformFields Text.From
 q1054	Record.TransformFields Text.Upper
@@ -1062,7 +1062,7 @@ q1060	Date.AddYears
 q1061	Date.AddMonths
 q1062	Date.AddDays
 q1063	Date.AddYears
-q1064	Date.WeekOfYear
+q1064	Date.WeekOfYear Day.Monday Day.Sunday
 q1065	Date.From
 q1066	
 q1067	DateTime.From
@@ -1070,7 +1070,7 @@ q1068	DateTime.From
 q1069	DateTimeZone.RemoveZone DateTimeZone.SwitchZone DateTimeZone.ToUtc
 q1070	DateTime.ToText
 q1071	Date.FromText
-q1072	DateTime.FromText
+q1072	DateTime.From DateTime.FromText
 q1073	Date.Day Date.Month Date.Year DateTime.Date DateTime.Time
 q1074	Duration.From
 q1075	
@@ -1086,20 +1086,20 @@ q1084	Json.Document
 q1085	Json.Document Json.FromValue
 q1086	Json.Document
 q1087	Json.FromValue
-q1088	Csv.Document Text.ToBinary
-q1089	Csv.Document Text.ToBinary
-q1090	Csv.Document Text.ToBinary
-q1091	Csv.Document Text.ToBinary
-q1092	Csv.Document Text.ToBinary
+q1088	Csv.Document Text.ToBinary TextEncoding.Utf8
+q1089	Csv.Document Text.ToBinary TextEncoding.Utf8
+q1090	Csv.Document QuoteStyle.None Text.ToBinary TextEncoding.Utf8
+q1091	Csv.Document Text.ToBinary TextEncoding.Utf8
+q1092	Csv.Document Text.ToBinary TextEncoding.Utf8
 q1093	Lines.FromText
 q1094	Lines.ToText
-q1095	Value.Is
-q1096	Value.Is
-q1097	Value.Is
+q1095	Type.Is Value.Is
+q1096	Type.Is Value.Is
+q1097	Type.Is Value.Is
 q1098	Value.Compare
 q1099	Value.Compare
 q1100	Value.Is Value.Type
-q1101	
+q1101	Type.Is
 q1102	
 q1103	
 q1104	
@@ -1115,12 +1115,12 @@ q1113
 q1114	
 q1115	
 q1116	Text.Contains
-q1117	Text.Contains
-q1118	Text.EndsWith Text.StartsWith
+q1117	Comparer.OrdinalIgnoreCase Text.Contains
+q1118	Comparer.OrdinalIgnoreCase Text.EndsWith Text.StartsWith
 q1119	Comparer.Ordinal Comparer.OrdinalIgnoreCase
 q1120	Comparer.FromCulture
-q1121	Text.PositionOf
-q1122	List.Contains
+q1121	Comparer.OrdinalIgnoreCase Text.PositionOf
+q1122	Comparer.OrdinalIgnoreCase List.Contains
 q1123	
 q1124	List.Combine
 q1125	
@@ -1134,10 +1134,10 @@ q1132	Replacer.ReplaceValue Table.FromRecords Table.ReplaceValue
 q1133	Replacer.ReplaceText Table.FromRecords Table.ReplaceValue
 q1134	Replacer.ReplaceValue Table.FromRecords Table.ReplaceValue
 q1135	Replacer.ReplaceText Text.Replace
-q1136	Table.AddColumn Table.FromRecords Table.RemoveRowsWithErrors Table.ReplaceErrorValues
+q1136	Replacer.ReplaceValue Table.AddColumn Table.FromRecords Table.RemoveRowsWithErrors Table.ReplaceErrorValues
 q1137	Table.AddColumn Table.ColumnNames Table.ExpandRecordColumn Table.FromRecords Table.ReplaceErrorValues
-q1138	List.Sum Table.AddColumn Table.FromRecords Table.Group Table.ReplaceErrorValues
-q1139	Table.AddColumn Table.ExpandTableColumn Table.FromRecords Table.NestedJoin Table.ReplaceErrorValues
+q1138	Int64.Type List.Sum Table.AddColumn Table.FromRecords Table.Group Table.ReplaceErrorValues
+q1139	JoinKind.Inner Table.AddColumn Table.ExpandTableColumn Table.FromRecords Table.NestedJoin Table.ReplaceErrorValues
 q1140	Table.AddColumn Table.FillDown Table.FromRecords Table.ReplaceErrorValues
 q1141	Number.Mod Table.AddColumn Table.FromRecords Table.ReplaceErrorValues Table.RowCount Table.SelectRows
 q1142	Replacer.ReplaceValue Table.AddColumn Table.FromRecords Table.ReplaceErrorValues Table.ReplaceValue
@@ -1153,9 +1153,9 @@ q1151	Text.From
 q1152	Number.ToText
 q1153	Json.FromValue
 q1154	Text.From
-q1155	Json.Document Json.FromValue Text.FromBinary
+q1155	Json.Document Json.FromValue Text.FromBinary TextEncoding.Utf8
 q1156	Json.FromValue Text.From
-q1157	Json.FromValue Table.AddColumn Table.FromRecords Text.From
+q1157	Json.FromValue Number.ToText Table.AddColumn Table.FromRecords Text.From
 q1158	DateTimeZone.ToText
 q1159	DateTimeZone.ToText
 q1160	DateTimeZone.ToText
@@ -1165,31 +1165,31 @@ q1163	DateTimeZone.FromText DateTimeZone.ToText
 q1164	DateTimeZone.ToText
 q1165	List.Sort Record.FieldNames Text.Combine
 q1166	Table.RowCount Table.SelectRows
-q1167	Expression.Evaluate File.Contents Text.FromBinary
-q1168	Table.FromRecords Table.Join
+q1167	Expression.Evaluate File.Contents Text.FromBinary TextEncoding.Utf8
+q1168	JoinKind.LeftSemi JoinKind.RightSemi Table.FromRecords Table.Join
 q1169	JoinAlgorithm.Dynamic JoinAlgorithm.PairwiseHash JoinAlgorithm.SortMerge Value.Is
 q1170	BinaryFormat.Byte BinaryFormat.UnsignedInteger16 BinaryFormat.UnsignedInteger32
 q1171	BinaryFormat.SignedInteger16 BinaryFormat.SignedInteger32
 q1172	BinaryFormat.Double BinaryFormat.Single
 q1173	BinaryFormat.Null
-q1174	Binary.ToText BinaryFormat.Binary
+q1174	Binary.ToText BinaryEncoding.Hex BinaryFormat.Binary
 q1175	BinaryFormat.Text
-q1176	BinaryFormat.ByteOrder BinaryFormat.UnsignedInteger32
+q1176	BinaryFormat.ByteOrder BinaryFormat.UnsignedInteger32 ByteOrder.BigEndian
 q1177	BinaryFormat.7BitEncodedSignedInteger BinaryFormat.7BitEncodedUnsignedInteger
 q1178	BinaryFormat.Byte BinaryFormat.Record BinaryFormat.UnsignedInteger16
 q1179	BinaryFormat.Byte BinaryFormat.Group
 q1180	BinaryFormat.Byte BinaryFormat.List
-q1181	BinaryFormat.Byte BinaryFormat.Choice
-q1182	BinaryFormat.Length BinaryFormat.Text
+q1181	BinaryFormat.Byte BinaryFormat.Choice BinaryFormat.Null
+q1182	BinaryFormat.Byte BinaryFormat.Length BinaryFormat.Text
 q1183	BinaryFormat.Byte BinaryFormat.Transform
-q1184	Expression.Evaluate File.Contents Text.FromBinary
+q1184	Expression.Evaluate File.Contents Text.FromBinary TextEncoding.Utf8
 q1185	Binary.ApproximateLength
 q1186	Binary.Buffer Binary.ToList
-q1187	Binary.Compress Binary.Decompress Binary.ToList
+q1187	Binary.Compress Binary.Decompress Binary.ToList Compression.Deflate
 q1188	Binary.Split Binary.ToList List.Transform
 q1189	Binary.ToList
-q1190	Type.Is
-q1191	Binary.Compress Binary.Decompress Binary.ToList
+q1190	Binary.Type Type.Is
+q1191	Binary.Compress Binary.Decompress Binary.ToList Compression.GZip
 q1192	List.ContainsAll
 q1193	List.ContainsAny
 q1194	List.FindText
@@ -1201,7 +1201,7 @@ q1199	List.Product
 q1200	List.RemoveRange
 q1201	List.ReplaceMatchingItems
 q1202	List.ReplaceRange
-q1203	List.ReplaceValue
+q1203	List.ReplaceValue Replacer.ReplaceValue
 q1204	List.Split
 q1205	List.Single
 q1206	List.SingleOrDefault
@@ -1215,7 +1215,7 @@ q1213	Number.RoundAwayFromZero
 q1214	Number.RoundTowardZero
 q1215	Number.Sinh
 q1216	Number.Tanh
-q1217	Type.Is
+q1217	Number.Type Type.Is
 q1218	Text.AfterDelimiter
 q1219	Text.BeforeDelimiter
 q1220	Text.BetweenDelimiters
@@ -1223,15 +1223,15 @@ q1221	Text.Clean
 q1222	Text.InferNumberType Type.Is
 q1223	Text.ReplaceRange
 q1224	Text.Select
-q1225	Type.Is
-q1226	BinaryEncoding.Base64
-q1227	Day.Friday Day.Monday Day.Sunday Day.Thursday Day.Tuesday Day.Wednesday
-q1228	JoinKind.FullOuter JoinKind.Inner JoinKind.LeftAnti JoinKind.LeftOuter JoinKind.LeftSemi JoinKind.RightAnti JoinKind.RightOuter
-q1229	JoinSide.Left
-q1230	MissingField.Error
-q1231	
+q1225	Text.Type Type.Is
+q1226	BinaryEncoding.Base64 BinaryEncoding.Hex
+q1227	Day.Friday Day.Monday Day.Saturday Day.Sunday Day.Thursday Day.Tuesday Day.Wednesday
+q1228	JoinKind.FullOuter JoinKind.Inner JoinKind.LeftAnti JoinKind.LeftOuter JoinKind.LeftSemi JoinKind.RightAnti JoinKind.RightOuter JoinKind.RightSemi
+q1229	JoinSide.Left JoinSide.Right
+q1230	MissingField.Error MissingField.UseNull
+q1231	Occurrence.Last
 q1232	Duration.ToRecord
-q1233	Type.Is
+q1233	Duration.Type Type.Is
 q1234	Time.StartOfHour
 q1235	Time.FromText
 q1236	Time.ToRecord
@@ -1252,10 +1252,10 @@ q1250	Date.EndOfYear
 q1251	Date.MonthName
 q1252	Date.QuarterOfYear
 q1253	Date.ToRecord
-q1254	Type.Is
+q1254	Date.Type Type.Is
 q1255	DateTime.FromFileTime
 q1256	DateTime.ToRecord
-q1257	Type.Is
+q1257	DateTime.Type Type.Is
 q1258	DateTimeZone.From
 q1259	DateTimeZone.FromFileTime
 q1260	DateTimeZone.ToRecord
@@ -1270,20 +1270,20 @@ q1268	Value.Metadata
 q1269	Value.RemoveMetadata
 q1270	Value.Metadata Value.ReplaceMetadata
 q1271	Value.As
-q1272	Type.Is Value.ReplaceType Value.Type
+q1272	Number.Type Type.Is Value.ReplaceType Value.Type
 q1273	Splitter.SplitTextByPositions
 q1274	Splitter.SplitTextByRanges
 q1275	Combiner.CombineTextByRanges
 q1276	Function.InvokeAfter
-q1277	Type.Is
-q1278	Logical.Type Type.Is
-q1279	Type.Is
-q1280	Date.Type Type.Is
-q1281	Double.Type Type.Is
-q1282	Type.Is
-q1283	Percentage.Type Type.Is
-q1284	Byte.Type Type.Is
-q1285	Type.Is
+q1277	Any.Type Type.Is
+q1278	Logical.Type Null.Type Type.Is
+q1279	Duration.Type Type.Is
+q1280	Date.Type DateTime.Type Type.Is
+q1281	Double.Type Int16.Type Int32.Type Int64.Type Int8.Type Type.Is
+q1282	Double.Type Single.Type Type.Is
+q1283	Decimal.Type Percentage.Type Type.Is
+q1284	Byte.Type Currency.Type Type.Is
+q1285	Character.Type Type.Is
 q1286	Byte.From
 q1287	Table.ContainsAll Table.FromRecords
 q1288	Table.ContainsAny Table.FromRecords
@@ -1323,7 +1323,7 @@ q1321	Combiner.CombineTextByDelimiter Table.FromRecords Table.ToList
 q1322	Table.FromRecords Table.SelectRowsWithErrors
 q1323	Table.FromRecords Table.StopFolding
 q1324	List.Sum Table.AggregateTableColumn Table.FromRecords
-q1325	TextEncoding.Ascii TextEncoding.BigEndianUnicode TextEncoding.Unicode TextEncoding.Utf16 TextEncoding.Utf8
+q1325	TextEncoding.Ascii TextEncoding.BigEndianUnicode TextEncoding.Unicode TextEncoding.Utf16 TextEncoding.Utf8 TextEncoding.Windows
 q1326	Uri.Combine
 q1327	Uri.EscapeDataString
 q1328	Type.FunctionRequiredParameters
@@ -1374,17 +1374,17 @@ q1372	DateTime.IsInPreviousNMinutes DateTime.LocalNow
 q1373	DateTime.IsInPreviousNSeconds DateTime.LocalNow
 q1374	DateTime.IsInNextHour DateTime.LocalNow
 q1375	DateTime.IsInPreviousHour DateTime.LocalNow
-q1376	Type.Is
+q1376	DateTime.Type Type.Is
 q1377	Double.From
 q1378	Expression.Constant
 q1379	Expression.Identifier
-q1380	BinaryEncoding.Base64
-q1381	Day.Saturday
+q1380	BinaryEncoding.Base64 BinaryEncoding.Hex
+q1381	Day.Saturday Day.Sunday
 q1382	Int8.From
 q1383	Int16.From
 q1384	Int32.From
 q1385	Guid.From
-q1386	Lines.FromBinary Text.ToBinary
+q1386	Lines.FromBinary Text.ToBinary TextEncoding.Utf8
 q1387	Uri.Parts
 q1388	List.Percentile
 q1389	List.Percentile
@@ -1392,15 +1392,15 @@ q1390	List.Percentile
 q1391	DateTimeZone.UtcNow DateTimeZone.ZoneHours
 q1392	DateTimeZone.FixedUtcNow DateTimeZone.ZoneHours
 q1393	
-q1394	Compression.Brotli Compression.Deflate Compression.GZip Compression.LZ4 Compression.None Compression.Snappy
-q1395	RoundingMode.AwayFromZero RoundingMode.Down RoundingMode.ToEven RoundingMode.TowardZero
-q1396	TraceLevel.Critical TraceLevel.Error TraceLevel.Information TraceLevel.Verbose
-q1397	BinaryOccurrence.Optional BinaryOccurrence.Repeating
-q1398	BufferMode.Delayed
-q1399	ByteOrder.BigEndian
-q1400	ExtraValues.Error ExtraValues.Ignore
-q1401	PercentileMode.ExcelExc PercentileMode.ExcelInc PercentileMode.SqlCont
-q1402	LimitClauseKind.AnsiSql2008 LimitClauseKind.Limit LimitClauseKind.LimitOffset LimitClauseKind.None
+q1394	Compression.Brotli Compression.Deflate Compression.GZip Compression.LZ4 Compression.None Compression.Snappy Compression.Zstandard
+q1395	RoundingMode.AwayFromZero RoundingMode.Down RoundingMode.ToEven RoundingMode.TowardZero RoundingMode.Up
+q1396	TraceLevel.Critical TraceLevel.Error TraceLevel.Information TraceLevel.Verbose TraceLevel.Warning
+q1397	BinaryOccurrence.Optional BinaryOccurrence.Repeating BinaryOccurrence.Required
+q1398	BufferMode.Delayed BufferMode.Eager
+q1399	ByteOrder.BigEndian ByteOrder.LittleEndian
+q1400	ExtraValues.Error ExtraValues.Ignore ExtraValues.List
+q1401	PercentileMode.ExcelExc PercentileMode.ExcelInc PercentileMode.SqlCont PercentileMode.SqlDisc
+q1402	LimitClauseKind.AnsiSql2008 LimitClauseKind.Limit LimitClauseKind.LimitOffset LimitClauseKind.None LimitClauseKind.Top
 q1403	Value.NullableEquals
 q1404	Uri.BuildQueryString
 q1405	Binary.ToList Lines.ToBinary
@@ -1414,38 +1414,38 @@ q1412	Table.FromRecords Table.PartitionKey
 q1413	Table.FromRecords Table.PartitionValues
 q1414	Type.TablePartitionKey
 q1415	Type.Facets
-q1416	Compression.Deflate Compression.GZip Compression.None
-q1417	BinaryOccurrence.Optional BinaryOccurrence.Required
-q1418	BufferMode.Eager
-q1419	ByteOrder.LittleEndian
-q1420	ExtraValues.Error ExtraValues.List
-q1421	TraceLevel.Critical TraceLevel.Error TraceLevel.Information TraceLevel.Warning
-q1422	RoundingMode.AwayFromZero RoundingMode.Down RoundingMode.TowardZero RoundingMode.Up
-q1423	Occurrence.All Occurrence.First Occurrence.Last
-q1424	Order.Ascending
-q1425	PercentileMode.ExcelExc PercentileMode.ExcelInc PercentileMode.SqlCont
-q1426	JoinKind.FullOuter JoinKind.Inner JoinKind.LeftAnti JoinKind.LeftOuter JoinKind.LeftSemi JoinKind.RightAnti JoinKind.RightOuter
-q1427	JoinSide.Left
-q1428	JoinAlgorithm.Dynamic JoinAlgorithm.LeftHash JoinAlgorithm.LeftIndex JoinAlgorithm.PairwiseHash JoinAlgorithm.RightHash JoinAlgorithm.SortMerge
-q1429	MissingField.Error MissingField.Ignore
-q1430	GroupKind.Global
-q1431	CsvStyle.QuoteAfterDelimiter
-q1432	QuoteStyle.None
-q1433	RankKind.Competition RankKind.Dense
-q1437	Precision.Decimal
-q1438	Day.Friday Day.Monday Day.Sunday Day.Thursday Day.Tuesday Day.Wednesday
-q1439	LimitClauseKind.Limit LimitClauseKind.LimitOffset LimitClauseKind.None LimitClauseKind.Top
-q1440	WebMethod.Delete WebMethod.Get WebMethod.Head WebMethod.Post WebMethod.Put
-q1441	RelativePosition.FromStart
-q1442	
-q1443	SapHanaDistribution.All SapHanaDistribution.Connection SapHanaDistribution.Off
-q1444	SapHanaRangeOperator.Equals SapHanaRangeOperator.GreaterThan SapHanaRangeOperator.LessThan SapHanaRangeOperator.LessThanOrEquals SapHanaRangeOperator.NotEquals
-q1445	SapBusinessWarehouseExecutionMode.BasXml SapBusinessWarehouseExecutionMode.BasXmlGzip
-q1446	Compression.LZ4 Compression.Snappy
-q1447	Type.Is
-q1448	Type.Is
+q1416	Compression.Brotli Compression.Deflate Compression.GZip Compression.None
+q1417	BinaryOccurrence.Optional BinaryOccurrence.Repeating BinaryOccurrence.Required
+q1418	BufferMode.Delayed BufferMode.Eager
+q1419	ByteOrder.BigEndian ByteOrder.LittleEndian
+q1420	ExtraValues.Error ExtraValues.Ignore ExtraValues.List
+q1421	TraceLevel.Critical TraceLevel.Error TraceLevel.Information TraceLevel.Verbose TraceLevel.Warning
+q1422	RoundingMode.AwayFromZero RoundingMode.Down RoundingMode.ToEven RoundingMode.TowardZero RoundingMode.Up
+q1423	Occurrence.All Occurrence.First Occurrence.Last Occurrence.Optional
+q1424	Order.Ascending Order.Descending
+q1425	PercentileMode.ExcelExc PercentileMode.ExcelInc PercentileMode.SqlCont PercentileMode.SqlDisc
+q1426	JoinKind.FullOuter JoinKind.Inner JoinKind.LeftAnti JoinKind.LeftOuter JoinKind.LeftSemi JoinKind.RightAnti JoinKind.RightOuter JoinKind.RightSemi
+q1427	JoinSide.Left JoinSide.Right
+q1428	JoinAlgorithm.Dynamic JoinAlgorithm.LeftHash JoinAlgorithm.LeftIndex JoinAlgorithm.PairwiseHash JoinAlgorithm.RightHash JoinAlgorithm.RightIndex JoinAlgorithm.SortMerge
+q1429	MissingField.Error MissingField.Ignore MissingField.UseNull
+q1430	GroupKind.Global GroupKind.Local
+q1431	CsvStyle.QuoteAfterDelimiter CsvStyle.QuoteAlways
+q1432	QuoteStyle.Csv QuoteStyle.None
+q1433	RankKind.Competition RankKind.Dense RankKind.Ordinal
+q1437	Precision.Decimal Precision.Double
+q1438	Day.Friday Day.Monday Day.Saturday Day.Sunday Day.Thursday Day.Tuesday Day.Wednesday
+q1439	LimitClauseKind.AnsiSql2008 LimitClauseKind.Limit LimitClauseKind.LimitOffset LimitClauseKind.None LimitClauseKind.Top
+q1440	WebMethod.Delete WebMethod.Get WebMethod.Head WebMethod.Patch WebMethod.Post WebMethod.Put
+q1441	RelativePosition.FromEnd RelativePosition.FromStart
+q1442	ODataOmitValues.Nulls
+q1443	SapHanaDistribution.All SapHanaDistribution.Connection SapHanaDistribution.Off SapHanaDistribution.Statement
+q1444	SapHanaRangeOperator.Equals SapHanaRangeOperator.GreaterThan SapHanaRangeOperator.GreaterThanOrEquals SapHanaRangeOperator.LessThan SapHanaRangeOperator.LessThanOrEquals SapHanaRangeOperator.NotEquals
+q1445	SapBusinessWarehouseExecutionMode.BasXml SapBusinessWarehouseExecutionMode.BasXmlGzip SapBusinessWarehouseExecutionMode.DataStream
+q1446	Compression.LZ4 Compression.Snappy Compression.Zstandard
+q1447	Binary.Type Date.Type Logical.Type Number.Type Text.Type Time.Type Type.Is
+q1448	Any.Type DateTimeZone.Type Duration.Type Function.Type List.Type Record.Type Table.Type Type.Is
 q1449	Character.FromNumber Character.ToNumber
-q1450	Function.IsDataSource
+q1450	Function.IsDataSource Text.Upper
 q1451	Logical.From Logical.FromText Logical.ToText
 q1452	DateTime.FromText Duration.FromText
 q1453	Json.Document Json.FromValue
@@ -1477,7 +1477,7 @@ q1485	Type.TableSchema Value.Is
 q1486	Type.IsNullable Type.TableColumn
 q1487	Type.IsOpenRecord Type.TableRow
 q1488	Value.Optimize
-q1489	Value.Is Value.ViewFunction
+q1489	Text.Upper Value.Is Value.ViewFunction
 q1491	Function.From Text.Upper Value.Is
 q1492	Type.ForFunction Type.IsNullable
 q1493	Type.AddTableKey Type.IsNullable

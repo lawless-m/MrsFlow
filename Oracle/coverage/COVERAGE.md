@@ -24,38 +24,38 @@ Source: q1167.mrsflow.out.
 | AdobeAnalytics | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | AdoDotNet | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
 | AnalysisServices | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
-| Any | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
+| Any | 1 | 1 | 1 | 1 | 0 | 0 | 1 | 0 |
 | AzureDataExplorer | 3 | 3 | 0 | 0 | 3 | 0 | 0 | 0 |
 | AzureStorage | 5 | 5 | 0 | 0 | 5 | 0 | 0 | 0 |
-| Binary | 18 | 18 | 18 | 18 | 0 | 0 | 17 | 0 |
-| BinaryEncoding | 3 | 3 | 3 | 3 | 0 | 0 | 1 | 0 |
+| Binary | 18 | 18 | 18 | 18 | 0 | 0 | 18 | 0 |
+| BinaryEncoding | 3 | 3 | 3 | 3 | 0 | 0 | 2 | 0 |
 | BinaryFormat | 22 | 22 | 22 | 22 | 0 | 0 | 22 | 2 |
 | BinaryOccurrence | 4 | 4 | 4 | 4 | 0 | 0 | 3 | 0 |
 | BufferMode | 3 | 3 | 3 | 3 | 0 | 0 | 2 | 0 |
 | Byte | 2 | 2 | 2 | 2 | 0 | 0 | 2 | 0 |
 | ByteOrder | 3 | 3 | 3 | 3 | 0 | 0 | 2 | 0 |
 | Certificate | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
-| Character | 3 | 3 | 3 | 3 | 0 | 0 | 2 | 0 |
+| Character | 3 | 3 | 3 | 3 | 0 | 0 | 3 | 0 |
 | Combiner | 5 | 5 | 5 | 5 | 0 | 0 | 5 | 0 |
 | CommonDataService | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Comparer | 4 | 4 | 4 | 4 | 0 | 0 | 4 | 0 |
-| Compression | 8 | 8 | 8 | 8 | 0 | 0 | 6 | 0 |
+| Compression | 8 | 8 | 8 | 8 | 0 | 0 | 7 | 0 |
 | Csv | 1 | 1 | 1 | 1 | 0 | 0 | 1 | 0 |
-| CsvStyle | 3 | 3 | 3 | 3 | 0 | 0 | 1 | 0 |
+| CsvStyle | 3 | 3 | 3 | 3 | 0 | 0 | 2 | 0 |
 | Cube | 16 | 16 | 0 | 0 | 16 | 0 | 0 | 0 |
 | Culture | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
-| Currency | 2 | 2 | 2 | 2 | 0 | 0 | 1 | 0 |
+| Currency | 2 | 2 | 2 | 2 | 0 | 0 | 2 | 0 |
 | DataLake | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
 | Date | 58 | 58 | 58 | 58 | 0 | 0 | 58 | 0 |
-| DateTime | 26 | 26 | 26 | 26 | 0 | 0 | 20 | 0 |
-| DateTimeZone | 16 | 16 | 16 | 16 | 0 | 0 | 15 | 0 |
+| DateTime | 26 | 26 | 26 | 26 | 0 | 0 | 21 | 0 |
+| DateTimeZone | 16 | 16 | 16 | 16 | 0 | 0 | 16 | 0 |
 | Day | 8 | 8 | 8 | 8 | 0 | 0 | 7 | 0 |
 | DB2 | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
-| Decimal | 2 | 2 | 2 | 2 | 0 | 0 | 1 | 0 |
+| Decimal | 2 | 2 | 2 | 2 | 0 | 0 | 2 | 0 |
 | Diagnostics | 3 | 3 | 3 | 3 | 0 | 0 | 3 | 0 |
 | DirectQueryCapabilities | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Double | 2 | 2 | 2 | 2 | 0 | 0 | 2 | 0 |
-| Duration | 13 | 13 | 13 | 13 | 0 | 0 | 12 | 0 |
+| Duration | 13 | 13 | 13 | 13 | 0 | 0 | 13 | 0 |
 | Embedded | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Error | 1 | 1 | 1 | 1 | 0 | 0 | 1 | 0 |
 | Excel | 4 | 4 | 3 | 3 | 1 | 0 | 1 | 0 |
@@ -65,13 +65,13 @@ Source: q1167.mrsflow.out.
 | Fabric | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | File | 2 | 1 | 2 | 1 | 0 | 1 | 1 | 1 |
 | Folder | 2 | 2 | 2 | 2 | 0 | 0 | 1 | 0 |
-| Function | 7 | 7 | 7 | 7 | 0 | 0 | 4 | 0 |
+| Function | 7 | 7 | 7 | 7 | 0 | 0 | 5 | 0 |
 | Geography | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
 | GeographyPoint | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Geometry | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
 | GeometryPoint | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Graph | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
-| GroupKind | 3 | 3 | 3 | 3 | 0 | 0 | 1 | 0 |
+| GroupKind | 3 | 3 | 3 | 3 | 0 | 0 | 2 | 0 |
 | Guid | 2 | 2 | 1 | 1 | 1 | 0 | 1 | 0 |
 | Hdfs | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
 | HdInsight | 3 | 3 | 0 | 0 | 3 | 0 | 0 | 0 |
@@ -79,30 +79,30 @@ Source: q1167.mrsflow.out.
 | Identity | 3 | 3 | 0 | 0 | 3 | 0 | 0 | 0 |
 | IdentityProvider | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
 | Informix | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
-| Int16 | 2 | 2 | 2 | 2 | 0 | 0 | 1 | 0 |
-| Int32 | 2 | 2 | 2 | 2 | 0 | 0 | 1 | 0 |
-| Int64 | 2 | 2 | 2 | 2 | 0 | 0 | 1 | 0 |
-| Int8 | 2 | 2 | 2 | 2 | 0 | 0 | 1 | 0 |
+| Int16 | 2 | 2 | 2 | 2 | 0 | 0 | 2 | 0 |
+| Int32 | 2 | 2 | 2 | 2 | 0 | 0 | 2 | 0 |
+| Int64 | 2 | 2 | 2 | 2 | 0 | 0 | 2 | 0 |
+| Int8 | 2 | 2 | 2 | 2 | 0 | 0 | 2 | 0 |
 | ItemExpression | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
-| JoinAlgorithm | 8 | 8 | 8 | 8 | 0 | 0 | 6 | 0 |
-| JoinKind | 9 | 9 | 9 | 9 | 0 | 0 | 7 | 0 |
-| JoinSide | 3 | 3 | 3 | 3 | 0 | 0 | 1 | 0 |
+| JoinAlgorithm | 8 | 8 | 8 | 8 | 0 | 0 | 7 | 0 |
+| JoinKind | 9 | 9 | 9 | 9 | 0 | 0 | 8 | 0 |
+| JoinSide | 3 | 3 | 3 | 3 | 0 | 0 | 2 | 0 |
 | Json | 2 | 2 | 2 | 2 | 0 | 0 | 2 | 0 |
 | Kusto | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
 | Lakehouse | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | LimitClauseKind | 6 | 6 | 6 | 6 | 0 | 0 | 5 | 0 |
 | Lines | 4 | 4 | 4 | 4 | 0 | 0 | 4 | 0 |
-| List | 72 | 72 | 72 | 72 | 0 | 0 | 70 | 1 |
+| List | 72 | 72 | 72 | 72 | 0 | 0 | 71 | 1 |
 | Logical | 4 | 4 | 4 | 4 | 0 | 0 | 4 | 0 |
-| MissingField | 4 | 4 | 3 | 3 | 1 | 0 | 2 | 0 |
+| MissingField | 4 | 4 | 3 | 3 | 1 | 0 | 3 | 0 |
 | Module | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | MySQL | 2 | 1 | 2 | 1 | 0 | 1 | 0 | 0 |
 | None | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
-| Null | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
-| Number | 49 | 49 | 49 | 49 | 0 | 0 | 46 | 0 |
-| Occurrence | 7 | 7 | 4 | 4 | 3 | 0 | 3 | 0 |
+| Null | 1 | 1 | 1 | 1 | 0 | 0 | 1 | 0 |
+| Number | 49 | 49 | 49 | 49 | 0 | 0 | 48 | 0 |
+| Occurrence | 7 | 7 | 4 | 4 | 3 | 0 | 4 | 0 |
 | OData | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
-| ODataOmitValues | 2 | 2 | 1 | 1 | 1 | 0 | 0 | 0 |
+| ODataOmitValues | 2 | 2 | 1 | 1 | 1 | 0 | 1 | 0 |
 | Odbc | 3 | 3 | 3 | 3 | 0 | 0 | 1 | 0 |
 | Office | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | OleDb | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
@@ -112,39 +112,39 @@ Source: q1167.mrsflow.out.
 | Password | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | Pdf | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Percentage | 2 | 2 | 2 | 2 | 0 | 0 | 2 | 0 |
-| PercentileMode | 5 | 5 | 4 | 4 | 1 | 0 | 3 | 0 |
+| PercentileMode | 5 | 5 | 4 | 4 | 1 | 0 | 4 | 0 |
 | PostgreSQL | 2 | 1 | 2 | 1 | 0 | 1 | 0 | 0 |
 | PowerPlatform | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
-| Precision | 3 | 3 | 3 | 3 | 0 | 0 | 1 | 0 |
+| Precision | 3 | 3 | 3 | 3 | 0 | 0 | 2 | 0 |
 | Progress | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
-| QuoteStyle | 3 | 3 | 3 | 3 | 0 | 0 | 1 | 0 |
-| RankKind | 4 | 4 | 3 | 3 | 1 | 0 | 2 | 0 |
+| QuoteStyle | 3 | 3 | 3 | 3 | 0 | 0 | 2 | 0 |
+| RankKind | 4 | 4 | 3 | 3 | 1 | 0 | 3 | 0 |
 | RData | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
-| Record | 18 | 18 | 18 | 18 | 0 | 0 | 17 | 1 |
-| RelativePosition | 3 | 3 | 2 | 2 | 1 | 0 | 1 | 0 |
+| Record | 18 | 18 | 18 | 18 | 0 | 0 | 18 | 1 |
+| RelativePosition | 3 | 3 | 2 | 2 | 1 | 0 | 2 | 0 |
 | Replacer | 2 | 2 | 2 | 2 | 0 | 0 | 2 | 0 |
 | Resource | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | RoundingMode | 6 | 6 | 6 | 6 | 0 | 0 | 5 | 0 |
 | RowExpression | 3 | 3 | 0 | 0 | 3 | 0 | 0 | 0 |
 | Salesforce | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
 | SapBusinessWarehouse | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
-| SapBusinessWarehouseExecutionMode | 4 | 4 | 3 | 3 | 1 | 0 | 2 | 0 |
+| SapBusinessWarehouseExecutionMode | 4 | 4 | 3 | 3 | 1 | 0 | 3 | 0 |
 | SapHana | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
-| SapHanaDistribution | 5 | 5 | 4 | 4 | 1 | 0 | 3 | 0 |
-| SapHanaRangeOperator | 7 | 7 | 6 | 6 | 1 | 0 | 5 | 0 |
+| SapHanaDistribution | 5 | 5 | 4 | 4 | 1 | 0 | 4 | 0 |
+| SapHanaRangeOperator | 7 | 7 | 6 | 6 | 1 | 0 | 6 | 0 |
 | SharePoint | 3 | 3 | 0 | 0 | 3 | 0 | 0 | 0 |
-| Single | 2 | 2 | 2 | 2 | 0 | 0 | 1 | 0 |
+| Single | 2 | 2 | 2 | 2 | 0 | 0 | 2 | 0 |
 | Soda | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Splitter | 10 | 10 | 10 | 10 | 0 | 0 | 10 | 0 |
 | Sql | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
 | SqlExpression | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
 | Sybase | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
-| Table | 114 | 114 | 114 | 114 | 0 | 0 | 106 | 0 |
+| Table | 114 | 114 | 114 | 114 | 0 | 0 | 107 | 0 |
 | Tables | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Teradata | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
-| Text | 42 | 42 | 42 | 42 | 0 | 0 | 41 | 2 |
-| TextEncoding | 7 | 7 | 6 | 6 | 1 | 0 | 5 | 0 |
-| Time | 10 | 10 | 10 | 10 | 0 | 0 | 9 | 0 |
+| Text | 42 | 42 | 42 | 42 | 0 | 0 | 42 | 2 |
+| TextEncoding | 7 | 7 | 6 | 6 | 1 | 0 | 6 | 1 |
+| Time | 10 | 10 | 10 | 10 | 0 | 0 | 10 | 0 |
 | TimeZone | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | TraceLevel | 6 | 6 | 5 | 5 | 1 | 0 | 5 | 0 |
 | Type | 25 | 25 | 25 | 25 | 0 | 0 | 24 | 0 |
@@ -153,9 +153,9 @@ Source: q1167.mrsflow.out.
 | Variable | 2 | 2 | 2 | 2 | 0 | 0 | 2 | 0 |
 | Web | 4 | 4 | 4 | 4 | 0 | 0 | 0 | 0 |
 | WebAction | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
-| WebMethod | 7 | 7 | 7 | 7 | 0 | 0 | 5 | 0 |
+| WebMethod | 7 | 7 | 7 | 7 | 0 | 0 | 6 | 0 |
 | Xml | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| **TOTAL** | 860 | 856 | 744 | 740 | 116 | 4 | 640 | 8 |
+| **TOTAL** | 860 | 856 | 744 | 740 | 116 | 4 | 682 | 9 |
 
 ## Per-name detail
 
@@ -175,7 +175,7 @@ Source: q1167.mrsflow.out.
 | `AdoDotNet.Query` | Y |  | missing |  |  |
 | `AnalysisServices.Database` | Y |  | missing |  |  |
 | `AnalysisServices.Databases` | Y |  | missing |  |  |
-| `Any.Type` | Y | Y | constant |  |  |
+| `Any.Type` | Y | Y | constant | q1277 q1448 | MATCH |
 | `AzureDataExplorer.Contents` | Y |  | missing |  |  |
 | `AzureDataExplorer.Databases` | Y |  | missing |  |  |
 | `AzureDataExplorer.KqlDatabase` | Y |  | missing |  |  |
@@ -198,17 +198,17 @@ Source: q1167.mrsflow.out.
 | `Binary.Split` | Y | Y | function | q1188 | MATCH |
 | `Binary.ToList` | Y | Y | function | q1186 q1187 q1188 q1189 q1191 q1405 q1409 | MATCH |
 | `Binary.ToText` | Y | Y | function | q9 q347 q348 q350 q351 q352 q353 q354 q355 q1174 | MATCH |
-| `Binary.Type` | Y | Y | constant |  |  |
+| `Binary.Type` | Y | Y | constant | q1190 q1447 | MATCH |
 | `Binary.View` | Y | Y | function | q1458 q1460 | MATCH |
 | `Binary.ViewError` | Y | Y | function | q1459 | MATCH |
 | `Binary.ViewFunction` | Y | Y | function | q1460 | MATCH |
-| `BinaryEncoding.Base64` | Y | Y | constant | q1226 q1380 | MATCH |
-| `BinaryEncoding.Hex` | Y | Y | constant |  |  |
+| `BinaryEncoding.Base64` | Y | Y | constant | q8 q9 q346 q347 q349 q354 q1226 q1380 | MATCH |
+| `BinaryEncoding.Hex` | Y | Y | constant | q347 q348 q350 q351 q352 q353 q354 q355 q1174 q1226 q1380 | MATCH |
 | `BinaryEncoding.Type` | Y | Y | constant |  |  |
 | `BinaryFormat.7BitEncodedSignedInteger` | Y | Y | function | q1177 | MATCH |
 | `BinaryFormat.7BitEncodedUnsignedInteger` | Y | Y | function | q1177 | MATCH |
 | `BinaryFormat.Binary` | Y | Y | function | q1174 | MATCH |
-| `BinaryFormat.Byte` | Y | Y | function | q1170 q1178 q1179 q1180 q1181 q1183 | MIXED |
+| `BinaryFormat.Byte` | Y | Y | function | q1170 q1178 q1179 q1180 q1181 q1182 q1183 | MIXED |
 | `BinaryFormat.ByteOrder` | Y | Y | function | q1176 | MATCH |
 | `BinaryFormat.Choice` | Y | Y | function | q1181 | MATCH |
 | `BinaryFormat.Decimal` | Y | Y | function | q1341 | MATCH |
@@ -216,7 +216,7 @@ Source: q1167.mrsflow.out.
 | `BinaryFormat.Group` | Y | Y | function | q1179 | DIFF |
 | `BinaryFormat.Length` | Y | Y | function | q1182 | MATCH |
 | `BinaryFormat.List` | Y | Y | function | q1180 | MATCH |
-| `BinaryFormat.Null` | Y | Y | function | q1173 | MATCH |
+| `BinaryFormat.Null` | Y | Y | function | q1173 q1181 | MATCH |
 | `BinaryFormat.Record` | Y | Y | function | q1178 | MATCH |
 | `BinaryFormat.SignedInteger16` | Y | Y | function | q1171 | MATCH |
 | `BinaryFormat.SignedInteger32` | Y | Y | function | q1171 | MATCH |
@@ -228,21 +228,21 @@ Source: q1167.mrsflow.out.
 | `BinaryFormat.UnsignedInteger32` | Y | Y | function | q1170 q1176 | MATCH |
 | `BinaryFormat.UnsignedInteger64` | Y | Y | function | q1343 | MATCH |
 | `BinaryOccurrence.Optional` | Y | Y | constant | q1397 q1417 | MATCH |
-| `BinaryOccurrence.Repeating` | Y | Y | constant | q1397 | MATCH |
-| `BinaryOccurrence.Required` | Y | Y | constant | q1417 | MATCH |
+| `BinaryOccurrence.Repeating` | Y | Y | constant | q1397 q1417 | MATCH |
+| `BinaryOccurrence.Required` | Y | Y | constant | q1397 q1417 | MATCH |
 | `BinaryOccurrence.Type` | Y | Y | constant |  |  |
-| `BufferMode.Delayed` | Y | Y | constant | q1398 | MATCH |
-| `BufferMode.Eager` | Y | Y | constant | q1418 | MATCH |
+| `BufferMode.Delayed` | Y | Y | constant | q1398 q1418 | MATCH |
+| `BufferMode.Eager` | Y | Y | constant | q1398 q1418 | MATCH |
 | `BufferMode.Type` | Y | Y | constant |  |  |
 | `Byte.From` | Y | Y | function | q1286 | MATCH |
 | `Byte.Type` | Y | Y | constant | q1284 | MATCH |
-| `ByteOrder.BigEndian` | Y | Y | constant | q1399 | MATCH |
-| `ByteOrder.LittleEndian` | Y | Y | constant | q1419 | MATCH |
+| `ByteOrder.BigEndian` | Y | Y | constant | q1176 q1399 q1419 | MATCH |
+| `ByteOrder.LittleEndian` | Y | Y | constant | q1399 q1419 | MATCH |
 | `ByteOrder.Type` | Y | Y | constant |  |  |
 | `Certificate.Type` | Y |  | missing |  |  |
 | `Character.FromNumber` | Y | Y | function | q531 q533 q534 q535 q1449 | MATCH |
 | `Character.ToNumber` | Y | Y | function | q532 q533 q534 q535 q570 q1449 | MATCH |
-| `Character.Type` | Y | Y | constant |  |  |
+| `Character.Type` | Y | Y | constant | q1285 | MATCH |
 | `Combiner.CombineTextByDelimiter` | Y | Y | function | q101 q102 q376 q377 q438 q1321 | MATCH |
 | `Combiner.CombineTextByEachDelimiter` | Y | Y | function | q378 | MATCH |
 | `Combiner.CombineTextByLengths` | Y | Y | function | q379 | MATCH |
@@ -251,19 +251,19 @@ Source: q1167.mrsflow.out.
 | `CommonDataService.Database` | Y |  | missing |  |  |
 | `Comparer.Equals` | Y | Y | function | q126 | MATCH |
 | `Comparer.FromCulture` | Y | Y | function | q127 q384 q1120 | MATCH |
-| `Comparer.Ordinal` | Y | Y | function | q124 q381 q385 q1119 | MATCH |
-| `Comparer.OrdinalIgnoreCase` | Y | Y | function | q125 q126 q382 q857 q1119 | MATCH |
-| `Compression.Brotli` | Y | Y | constant | q1394 | MATCH |
-| `Compression.Deflate` | Y | Y | constant | q1394 q1416 | MATCH |
-| `Compression.GZip` | Y | Y | constant | q1394 q1416 | MATCH |
+| `Comparer.Ordinal` | Y | Y | function | q124 q381 q385 q390 q525 q761 q857 q1119 | MATCH |
+| `Comparer.OrdinalIgnoreCase` | Y | Y | function | q121 q122 q123 q125 q126 q130 q133 q136 q140 q143 q148 q153 q260 q370 q382 q383 q390 q494 q495 q521 q524 q584 q761 q823 q857 q933 q1034 q1117 q1118 q1119 q1121 q1122 | MATCH |
+| `Compression.Brotli` | Y | Y | constant | q1394 q1416 | MATCH |
+| `Compression.Deflate` | Y | Y | constant | q1187 q1394 q1416 | MATCH |
+| `Compression.GZip` | Y | Y | constant | q1191 q1394 q1416 | MATCH |
 | `Compression.LZ4` | Y | Y | constant | q1394 q1446 | MATCH |
 | `Compression.None` | Y | Y | constant | q1394 q1416 | MATCH |
 | `Compression.Snappy` | Y | Y | constant | q1394 q1446 | MATCH |
 | `Compression.Type` | Y | Y | constant |  |  |
-| `Compression.Zstandard` | Y | Y | constant |  |  |
+| `Compression.Zstandard` | Y | Y | constant | q1394 q1446 | MATCH |
 | `Csv.Document` | Y | Y | function | q10 q236 q237 q238 q239 q240 q1088 q1089 q1090 q1091 q1092 | MATCH |
 | `CsvStyle.QuoteAfterDelimiter` | Y | Y | constant | q1431 | MATCH |
-| `CsvStyle.QuoteAlways` | Y | Y | constant |  |  |
+| `CsvStyle.QuoteAlways` | Y | Y | constant | q1431 | MATCH |
 | `CsvStyle.Type` | Y | Y | constant |  |  |
 | `Cube.AddAndExpandDimensionColumn` | Y |  | missing |  |  |
 | `Cube.AddMeasureColumn` | Y |  | missing |  |  |
@@ -283,7 +283,7 @@ Source: q1167.mrsflow.out.
 | `Cube.Transform` | Y |  | missing |  |  |
 | `Culture.Current` | Y |  | missing |  |  |
 | `Currency.From` | Y | Y | function | q466 q467 q469 q470 | MATCH |
-| `Currency.Type` | Y | Y | constant |  |  |
+| `Currency.Type` | Y | Y | constant | q468 q1284 | MATCH |
 | `DataLake.Contents` | Y |  | missing |  |  |
 | `DataLake.Files` | Y |  | missing |  |  |
 | `Date.AddDays` | Y | Y | function | q78 q224 q229 q606 q616 q1062 q1333 q1334 q1335 q1336 q1338 q1340 q1344 q1345 q1350 q1351 q1352 q1353 q1354 q1355 q1356 q1357 q1358 q1359 q1360 q1361 q1362 q1363 q1364 q1365 q1366 q1367 | MATCH |
@@ -340,14 +340,14 @@ Source: q1167.mrsflow.out.
 | `Date.StartOfYear` | Y | Y | function | q1249 q1357 q1366 | MATCH |
 | `Date.ToRecord` | Y | Y | function | q1253 | MATCH |
 | `Date.ToText` | Y | Y | function | q3 q4 q5 q6 q181 q182 | MATCH |
-| `Date.Type` | Y | Y | constant | q1280 | MATCH |
+| `Date.Type` | Y | Y | constant | q1254 q1280 q1447 | MATCH |
 | `Date.WeekOfMonth` | Y | Y | function | q441 | MATCH |
 | `Date.WeekOfYear` | Y | Y | function | q442 q1064 | MATCH |
 | `Date.Year` | Y | Y | function | q75 q1073 | MATCH |
 | `DateTime.AddZone` | Y | Y | function | q1461 | MATCH |
 | `DateTime.Date` | Y | Y | function | q1073 q1333 q1334 q1335 q1336 q1337 q1338 q1339 q1340 q1344 q1345 q1346 q1347 q1348 q1349 q1350 q1351 q1352 q1353 q1354 q1355 q1356 q1357 q1358 q1359 q1360 q1361 q1362 q1363 q1364 q1365 q1366 q1367 | MATCH |
 | `DateTime.FixedLocalNow` | Y | Y | function | q1467 | MATCH |
-| `DateTime.From` | Y | Y | function | q1067 q1068 | MATCH |
+| `DateTime.From` | Y | Y | function | q1067 q1068 q1072 | MATCH |
 | `DateTime.FromFileTime` | Y | Y | function | q1255 | MATCH |
 | `DateTime.FromText` | Y | Y | function | q1072 q1452 | MATCH |
 | `DateTime.IsInCurrentHour` | Y | Y | function | q1469 | MATCH |
@@ -369,7 +369,7 @@ Source: q1167.mrsflow.out.
 | `DateTime.Time` | Y | Y | function | q1073 | MATCH |
 | `DateTime.ToRecord` | Y | Y | function | q1256 | MATCH |
 | `DateTime.ToText` | Y | Y | function | q160 q161 q183 q184 q611 q612 q613 q614 q615 q1070 | MATCH |
-| `DateTime.Type` | Y | Y | constant |  |  |
+| `DateTime.Type` | Y | Y | constant | q1257 q1280 q1376 | MATCH |
 | `DateTimeZone.FixedLocalNow` | Y | Y | function | q1467 | MATCH |
 | `DateTimeZone.FixedUtcNow` | Y | Y | function | q1392 | MATCH |
 | `DateTimeZone.From` | Y | Y | function | q1258 | MATCH |
@@ -382,27 +382,27 @@ Source: q1167.mrsflow.out.
 | `DateTimeZone.ToRecord` | Y | Y | function | q1260 | MATCH |
 | `DateTimeZone.ToText` | Y | Y | function | q185 q1158 q1159 q1160 q1161 q1162 q1163 q1164 | MATCH |
 | `DateTimeZone.ToUtc` | Y | Y | function | q1069 | MATCH |
-| `DateTimeZone.Type` | Y | Y | constant |  |  |
+| `DateTimeZone.Type` | Y | Y | constant | q1448 | MATCH |
 | `DateTimeZone.UtcNow` | Y | Y | function | q1391 | MATCH |
 | `DateTimeZone.ZoneHours` | Y | Y | function | q1261 q1391 q1392 | MATCH |
 | `DateTimeZone.ZoneMinutes` | Y | Y | function | q1262 | MATCH |
 | `Day.Friday` | Y | Y | constant | q1227 q1438 | MATCH |
-| `Day.Monday` | Y | Y | constant | q1227 q1438 | MATCH |
-| `Day.Saturday` | Y | Y | constant | q1381 | MATCH |
-| `Day.Sunday` | Y | Y | constant | q1227 q1438 | MATCH |
+| `Day.Monday` | Y | Y | constant | q442 q443 q444 q445 q1064 q1227 q1438 | MATCH |
+| `Day.Saturday` | Y | Y | constant | q1227 q1381 q1438 | MATCH |
+| `Day.Sunday` | Y | Y | constant | q443 q444 q445 q1064 q1227 q1381 q1438 | MATCH |
 | `Day.Thursday` | Y | Y | constant | q1227 q1438 | MATCH |
 | `Day.Tuesday` | Y | Y | constant | q1227 q1438 | MATCH |
 | `Day.Type` | Y | Y | constant |  |  |
 | `Day.Wednesday` | Y | Y | constant | q1227 q1438 | MATCH |
 | `DB2.Database` | Y |  | missing |  |  |
 | `Decimal.From` | Y | Y | function | q277 q280 q471 q472 q473 q474 | MATCH |
-| `Decimal.Type` | Y | Y | constant |  |  |
+| `Decimal.Type` | Y | Y | constant | q472 q473 q1283 | MATCH |
 | `Diagnostics.ActivityId` | Y | Y | function | q1468 | MATCH |
 | `Diagnostics.CorrelationId` | Y | Y | function | q1468 | MATCH |
 | `Diagnostics.Trace` | Y | Y | function | q1470 | MATCH |
 | `DirectQueryCapabilities.From` | Y |  | missing |  |  |
 | `Double.From` | Y | Y | function | q1377 | MATCH |
-| `Double.Type` | Y | Y | constant | q1281 | MATCH |
+| `Double.Type` | Y | Y | constant | q472 q1281 q1282 | MATCH |
 | `Duration.Days` | Y | Y | function | q79 q608 q609 q1078 | MATCH |
 | `Duration.From` | Y | Y | function | q218 q1074 | MATCH |
 | `Duration.FromText` | Y | Y | function | q217 q1452 | MATCH |
@@ -415,7 +415,7 @@ Source: q1167.mrsflow.out.
 | `Duration.TotalMinutes` | Y | Y | function | q455 q607 q1078 | MATCH |
 | `Duration.TotalSeconds` | Y | Y | function | q219 q607 q608 | MATCH |
 | `Duration.ToText` | Y | Y | function | q216 | MATCH |
-| `Duration.Type` | Y | Y | constant |  |  |
+| `Duration.Type` | Y | Y | constant | q1233 q1279 q1448 | MATCH |
 | `Embedded.Value` | Y |  | missing |  |  |
 | `Error.Record` | Y | Y | function | q209 | MATCH |
 | `EvalFile` | Y |  | missing |  |  |
@@ -428,8 +428,8 @@ Source: q1167.mrsflow.out.
 | `Expression.Evaluate` | Y | Y | function | q401 q402 q403 q404 q405 q1167 q1184 | MIXED |
 | `Expression.Identifier` | Y | Y | function | q1379 | MATCH |
 | `ExtraValues.Error` | Y | Y | constant | q1400 q1420 | MATCH |
-| `ExtraValues.Ignore` | Y | Y | constant | q1400 | MATCH |
-| `ExtraValues.List` | Y | Y | constant | q1420 | MATCH |
+| `ExtraValues.Ignore` | Y | Y | constant | q1400 q1420 | MATCH |
+| `ExtraValues.List` | Y | Y | constant | q1400 q1420 | MATCH |
 | `ExtraValues.Type` | Y | Y | constant |  |  |
 | `Fabric.Warehouse` | Y |  | missing |  |  |
 | `File.Contents` | Y | Y | function | q1167 q1184 | MIXED |
@@ -442,7 +442,7 @@ Source: q1167.mrsflow.out.
 | `Function.InvokeWithErrorContext` | Y | Y | function |  |  |
 | `Function.IsDataSource` | Y | Y | function | q1450 | MATCH |
 | `Function.ScalarVector` | Y | Y | function |  |  |
-| `Function.Type` | Y | Y | constant |  |  |
+| `Function.Type` | Y | Y | constant | q1448 | MATCH |
 | `Geography.FromWellKnownText` | Y |  | missing |  |  |
 | `Geography.ToWellKnownText` | Y |  | missing |  |  |
 | `GeographyPoint.From` | Y |  | missing |  |  |
@@ -450,8 +450,8 @@ Source: q1167.mrsflow.out.
 | `Geometry.ToWellKnownText` | Y |  | missing |  |  |
 | `GeometryPoint.From` | Y |  | missing |  |  |
 | `Graph.Nodes` | Y |  | missing |  |  |
-| `GroupKind.Global` | Y | Y | constant | q89 q1430 | MATCH |
-| `GroupKind.Local` | Y | Y | constant |  |  |
+| `GroupKind.Global` | Y | Y | constant | q89 q936 q1430 | MATCH |
+| `GroupKind.Local` | Y | Y | constant | q115 q936 q1430 | MATCH |
 | `GroupKind.Type` | Y | Y | constant |  |  |
 | `Guid.From` | Y | Y | function | q1385 | MATCH |
 | `Guid.Type` | Y |  | missing |  |  |
@@ -468,13 +468,13 @@ Source: q1167.mrsflow.out.
 | `IdentityProvider.Type` | Y |  | missing |  |  |
 | `Informix.Database` | Y |  | missing |  |  |
 | `Int16.From` | Y | Y | function | q1383 | MATCH |
-| `Int16.Type` | Y | Y | constant |  |  |
+| `Int16.Type` | Y | Y | constant | q1281 | MATCH |
 | `Int32.From` | Y | Y | function | q1384 | MATCH |
-| `Int32.Type` | Y | Y | constant |  |  |
+| `Int32.Type` | Y | Y | constant | q1281 | MATCH |
 | `Int64.From` | Y | Y | function | q475 | MATCH |
-| `Int64.Type` | Y | Y | constant |  |  |
+| `Int64.Type` | Y | Y | constant | q18 q26 q226 q291 q292 q293 q294 q416 q417 q419 q420 q431 q434 q1138 q1281 | MATCH |
 | `Int8.From` | Y | Y | function | q1382 | MATCH |
-| `Int8.Type` | Y | Y | constant |  |  |
+| `Int8.Type` | Y | Y | constant | q1281 | MATCH |
 | `Invoked FunctionEvalFile` | Y |  | missing |  |  |
 | `ItemExpression.From` | Y |  | missing |  |  |
 | `ItemExpression.Item` | Y |  | missing |  |  |
@@ -483,31 +483,31 @@ Source: q1167.mrsflow.out.
 | `JoinAlgorithm.LeftIndex` | Y | Y | constant | q1428 | MATCH |
 | `JoinAlgorithm.PairwiseHash` | Y | Y | constant | q1169 q1428 | MATCH |
 | `JoinAlgorithm.RightHash` | Y | Y | constant | q1428 | MATCH |
-| `JoinAlgorithm.RightIndex` | Y | Y | constant |  |  |
+| `JoinAlgorithm.RightIndex` | Y | Y | constant | q1428 | MATCH |
 | `JoinAlgorithm.SortMerge` | Y | Y | constant | q1169 q1428 | MATCH |
 | `JoinAlgorithm.Type` | Y | Y | constant |  |  |
-| `JoinKind.FullOuter` | Y | Y | constant | q1228 q1426 | MATCH |
-| `JoinKind.Inner` | Y | Y | constant | q339 q340 q1228 q1426 | MATCH |
-| `JoinKind.LeftAnti` | Y | Y | constant | q1228 q1426 | MATCH |
-| `JoinKind.LeftOuter` | Y | Y | constant | q1228 q1426 | MATCH |
-| `JoinKind.LeftSemi` | Y | Y | constant | q1228 q1426 | MATCH |
-| `JoinKind.RightAnti` | Y | Y | constant | q1228 q1426 | MATCH |
-| `JoinKind.RightOuter` | Y | Y | constant | q1228 q1426 | MATCH |
-| `JoinKind.RightSemi` | Y | Y | constant |  |  |
+| `JoinKind.FullOuter` | Y | Y | constant | q984 q996 q1228 q1426 | MATCH |
+| `JoinKind.Inner` | Y | Y | constant | q339 q340 q983 q986 q987 q988 q989 q990 q992 q1139 q1228 q1426 | MATCH |
+| `JoinKind.LeftAnti` | Y | Y | constant | q985 q995 q1228 q1426 | MATCH |
+| `JoinKind.LeftOuter` | Y | Y | constant | q28 q984 q987 q988 q991 q993 q994 q1228 q1426 | MATCH |
+| `JoinKind.LeftSemi` | Y | Y | constant | q1168 q1228 q1426 | MATCH |
+| `JoinKind.RightAnti` | Y | Y | constant | q985 q995 q1228 q1426 | MATCH |
+| `JoinKind.RightOuter` | Y | Y | constant | q984 q996 q1228 q1426 | MATCH |
+| `JoinKind.RightSemi` | Y | Y | constant | q1168 q1228 q1426 | MATCH |
 | `JoinKind.Type` | Y | Y | constant |  |  |
 | `JoinSide.Left` | Y | Y | constant | q1229 q1427 | MATCH |
-| `JoinSide.Right` | Y | Y | constant |  |  |
+| `JoinSide.Right` | Y | Y | constant | q1229 q1427 | MATCH |
 | `JoinSide.Type` | Y | Y | constant |  |  |
 | `Json.Document` | Y | Y | function | q23 q251 q252 q253 q254 q255 q1081 q1082 q1083 q1084 q1085 q1086 q1155 q1453 | MATCH |
-| `Json.FromValue` | Y | Y | function | q266 q267 q268 q269 q270 q536 q537 q538 q539 q540 q1085 q1087 q1153 q1155 q1156 q1157 q1453 | MATCH |
+| `Json.FromValue` | Y | Y | function | q266 q267 q268 q269 q270 q536 q537 q538 q539 q540 q958 q1085 q1087 q1153 q1155 q1156 q1157 q1453 | MATCH |
 | `Kusto.Contents` | Y |  | missing |  |  |
 | `Kusto.Databases` | Y |  | missing |  |  |
 | `Lakehouse.Contents` | Y |  | missing |  |  |
-| `LimitClauseKind.AnsiSql2008` | Y | Y | constant | q1402 | MATCH |
+| `LimitClauseKind.AnsiSql2008` | Y | Y | constant | q1402 q1439 | MATCH |
 | `LimitClauseKind.Limit` | Y | Y | constant | q1402 q1439 | MATCH |
 | `LimitClauseKind.LimitOffset` | Y | Y | constant | q1402 q1439 | MATCH |
 | `LimitClauseKind.None` | Y | Y | constant | q1402 q1439 | MATCH |
-| `LimitClauseKind.Top` | Y | Y | constant | q1439 | MATCH |
+| `LimitClauseKind.Top` | Y | Y | constant | q1402 q1439 | MATCH |
 | `LimitClauseKind.Type` | Y | Y | constant |  |  |
 | `Lines.FromBinary` | Y | Y | function | q1386 | MATCH |
 | `Lines.FromText` | Y | Y | function | q296 q297 q298 q299 q300 q1093 | MATCH |
@@ -530,12 +530,12 @@ Source: q1167.mrsflow.out.
 | `List.DateTimes` | Y | Y | function | q908 | MATCH |
 | `List.DateTimeZones` | Y | Y | function | q1464 | MATCH |
 | `List.Difference` | Y | Y | function | q88 q134 q135 q136 q524 | MATCH |
-| `List.Distinct` | Y | Y | function | q62 q81 q121 q127 q128 q129 q130 q480 q498 q521 q817 q856 q857 q858 q859 q860 q861 q862 q923 q1146 | MATCH |
+| `List.Distinct` | Y | Y | function | q62 q81 q121 q127 q128 q129 q130 q480 q498 q521 q767 q817 q856 q857 q858 q859 q860 q861 q862 q923 q1146 | MATCH |
 | `List.Durations` | Y | Y | function | q909 | MATCH |
 | `List.FindText` | Y | Y | function | q1194 | MATCH |
 | `List.First` | Y | Y | function | q58 | MATCH |
 | `List.FirstN` | Y | Y | function | q90 q506 q509 q510 q882 q883 q884 q917 | MATCH |
-| `List.Generate` | Y | Y | function | q281 q282 q283 q284 q285 q326 q327 q328 q329 q330 q513 q817 q870 q871 q872 q873 q874 q875 q876 q915 | MATCH |
+| `List.Generate` | Y | Y | function | q281 q282 q283 q284 q285 q326 q327 q328 q329 q330 q513 q817 q870 q871 q872 q873 q874 q875 q876 q915 q929 | MATCH |
 | `List.InsertRange` | Y | Y | function | q1195 | MATCH |
 | `List.Intersect` | Y | Y | function | q83 q131 q132 q133 q523 | MATCH |
 | `List.IsDistinct` | Y | Y | function | q1196 | MATCH |
@@ -575,29 +575,29 @@ Source: q1167.mrsflow.out.
 | `List.Single` | Y | Y | function | q1205 | MATCH |
 | `List.SingleOrDefault` | Y | Y | function | q1206 | MATCH |
 | `List.Skip` | Y | Y | function | q63 q92 q526 q527 q880 q881 | MATCH |
-| `List.Sort` | Y | Y | function | q61 q82 q149 q256 q257 q259 q260 q383 q650 q849 q850 q851 q852 q853 q854 q855 q917 q1165 | MIXED |
+| `List.Sort` | Y | Y | function | q61 q82 q149 q256 q257 q259 q260 q383 q650 q767 q849 q850 q851 q852 q853 q854 q855 q917 q1165 | MIXED |
 | `List.Split` | Y | Y | function | q1204 | MATCH |
 | `List.StandardDeviation` | Y | Y | function | q645 q895 q898 | MATCH |
-| `List.Sum` | Y | Y | function | q54 q89 q115 q120 q330 q341 q393 q416 q420 q641 q875 q892 q896 q897 q898 q905 q914 q915 q934 q935 q936 q937 q939 q940 q1127 q1138 q1324 | MATCH |
+| `List.Sum` | Y | Y | function | q54 q89 q115 q120 q264 q330 q341 q393 q416 q420 q641 q875 q892 q896 q897 q898 q905 q914 q915 q934 q935 q936 q937 q939 q940 q977 q1127 q1138 q1324 | MATCH |
 | `List.Times` | Y | Y | function | q1465 | MATCH |
 | `List.Transform` | Y | Y | function | q21 q478 q480 q497 q498 q499 q519 q571 q572 q573 q574 q575 q816 q914 q923 q927 q928 q929 q930 q931 q1188 | MATCH |
 | `List.TransformMany` | Y | Y | function | q1207 | MATCH |
-| `List.Type` | Y | Y | constant |  |  |
+| `List.Type` | Y | Y | constant | q1448 | MATCH |
 | `List.Union` | Y | Y | function | q522 q525 | MATCH |
 | `List.Zip` | Y | Y | function | q307 q308 q885 q886 q887 q888 q889 | MATCH |
 | `Logical.From` | Y | Y | function | q456 q460 q1451 | MATCH |
 | `Logical.FromText` | Y | Y | function | q457 q458 q1451 | MATCH |
 | `Logical.ToText` | Y | Y | function | q459 q1451 | MATCH |
-| `Logical.Type` | Y | Y | constant | q1278 | MATCH |
-| `MissingField.Error` | Y | Y | constant | q1230 q1429 | MATCH |
-| `MissingField.Ignore` | Y | Y | constant | q1055 q1429 | MATCH |
+| `Logical.Type` | Y | Y | constant | q1278 q1447 | MATCH |
+| `MissingField.Error` | Y | Y | constant | q1051 q1230 q1429 | MATCH |
+| `MissingField.Ignore` | Y | Y | constant | q103 q105 q106 q1051 q1055 q1429 | MATCH |
 | `MissingField.Type` | Y |  | missing |  |  |
-| `MissingField.UseNull` | Y | Y | constant |  |  |
+| `MissingField.UseNull` | Y | Y | constant | q104 q107 q1051 q1230 q1429 | MATCH |
 | `Module.Versions` | Y |  | missing |  |  |
 | `MySQL.Database` | Y | Y | function |  |  |
 | `MySQL.Query` |  | Y | function |  |  |
 | `None.Type` | Y | Y | constant |  |  |
-| `Null.Type` | Y | Y | constant |  |  |
+| `Null.Type` | Y | Y | constant | q1278 | MATCH |
 | `Number.Abs` | Y | Y | function | q45 q541 q550 q749 q750 q751 q752 q753 q852 | MATCH |
 | `Number.Acos` | Y | Y | function | q547 q549 | MATCH |
 | `Number.Asin` | Y | Y | function | q547 q549 | MATCH |
@@ -612,7 +612,7 @@ Source: q1167.mrsflow.out.
 | `Number.Combinations` | Y | Y | function | q1208 | MATCH |
 | `Number.Cos` | Y | Y | function | q546 q550 | MATCH |
 | `Number.Cosh` | Y | Y | function | q1209 | MATCH |
-| `Number.E` | Y | Y | constant |  |  |
+| `Number.E` | Y | Y | constant | q544 | MATCH |
 | `Number.Epsilon` | Y | Y | constant |  |  |
 | `Number.Exp` | Y | Y | function | q544 q689 q690 | MATCH |
 | `Number.Factorial` | Y | Y | function | q1211 | MATCH |
@@ -626,11 +626,11 @@ Source: q1167.mrsflow.out.
 | `Number.Log` | Y | Y | function | q688 | MATCH |
 | `Number.Log10` | Y | Y | function | q544 q545 q687 | MATCH |
 | `Number.Mod` | Y | Y | function | q50 q318 q320 q481 q482 q484 q485 q504 q595 q663 q664 q665 q666 q667 q668 q669 q676 q753 q874 q956 q1141 q1295 | MATCH |
-| `Number.NaN` | Y | Y | constant | q485 q661 q667 q673 q680 q696 q703 q710 q716 q723 q730 q739 q759 | MATCH |
-| `Number.NegativeInfinity` | Y | Y | constant | q661 q667 q673 q680 q696 q703 q710 q716 q723 q730 | MATCH |
+| `Number.NaN` | Y | Y | constant | q278 q485 q661 q667 q673 q680 q685 q687 q690 q696 q703 q710 q716 q723 q730 q739 q748 q750 q759 | MATCH |
+| `Number.NegativeInfinity` | Y | Y | constant | q661 q667 q673 q680 q685 q687 q690 q696 q703 q710 q716 q723 q730 q748 q750 | MATCH |
 | `Number.Permutations` | Y | Y | function | q1212 | MATCH |
-| `Number.PI` | Y | Y | constant | q551 q552 | MATCH |
-| `Number.PositiveInfinity` | Y | Y | constant | q661 q667 q673 q680 q696 q703 q710 q716 q723 q730 q739 q759 | MATCH |
+| `Number.PI` | Y | Y | constant | q551 q552 q553 q554 q555 | MATCH |
+| `Number.PositiveInfinity` | Y | Y | constant | q661 q667 q673 q680 q685 q687 q690 q696 q703 q710 q716 q723 q730 q739 q748 q750 q759 | MATCH |
 | `Number.Power` | Y | Y | function | q51 q543 q550 q677 q678 q679 q680 q681 q682 q683 q690 q753 | MATCH |
 | `Number.Random` | Y | Y | function | q476 q478 q920 q926 | MATCH |
 | `Number.RandomBetween` | Y | Y | function | q477 q479 q480 q921 q923 q924 q925 q926 | MATCH |
@@ -642,20 +642,20 @@ Source: q1167.mrsflow.out.
 | `Number.Sign` | Y | Y | function | q52 q541 q747 q748 q751 q752 q753 | MATCH |
 | `Number.Sin` | Y | Y | function | q546 q550 q555 | MATCH |
 | `Number.Sinh` | Y | Y | function | q1215 | MATCH |
-| `Number.Sqrt` | Y | Y | function | q542 q684 q685 q690 q753 | MATCH |
+| `Number.Sqrt` | Y | Y | function | q542 q571 q684 q685 q690 q753 | MATCH |
 | `Number.Tan` | Y | Y | function | q546 q549 | MATCH |
 | `Number.Tanh` | Y | Y | function | q1216 | MATCH |
-| `Number.ToText` | Y | Y | function | q44 q154 q155 q156 q157 q158 q159 q176 q177 q178 q179 q180 q691 q692 q693 q694 q695 q696 q697 q698 q699 q700 q701 q702 q703 q704 q705 q706 q707 q708 q709 q710 q711 q712 q713 q714 q715 q716 q717 q718 q719 q720 q721 q722 q723 q724 q725 q726 q727 q728 q729 q730 q731 q732 q733 q734 q735 q736 q737 q738 q739 q1152 q1341 q1342 q1343 | MATCH |
-| `Number.Type` | Y | Y | constant |  |  |
-| `Occurrence.All` | Y | Y | constant | q823 q1423 | MATCH |
+| `Number.ToText` | Y | Y | function | q44 q154 q155 q156 q157 q158 q159 q176 q177 q178 q179 q180 q691 q692 q693 q694 q695 q696 q697 q698 q699 q700 q701 q702 q703 q704 q705 q706 q707 q708 q709 q710 q711 q712 q713 q714 q715 q716 q717 q718 q719 q720 q721 q722 q723 q724 q725 q726 q727 q728 q729 q730 q731 q732 q733 q734 q735 q736 q737 q738 q739 q1152 q1157 q1341 q1342 q1343 | MATCH |
+| `Number.Type` | Y | Y | constant | q1217 q1272 q1447 | MATCH |
+| `Occurrence.All` | Y | Y | constant | q109 q110 q111 q112 q367 q492 q493 q813 q820 q821 q822 q823 q824 q827 q1423 | MATCH |
 | `Occurrence.First` | Y | Y | constant | q84 q123 q370 q494 q823 q1423 | MATCH |
-| `Occurrence.Last` | Y | Y | constant | q1423 | MATCH |
-| `Occurrence.Optional` | Y | Y | constant |  |  |
+| `Occurrence.Last` | Y | Y | constant | q108 q820 q824 q827 q1231 q1423 | MATCH |
+| `Occurrence.Optional` | Y | Y | constant | q1423 | MATCH |
 | `Occurrence.Repeating` | Y |  | missing |  |  |
 | `Occurrence.Required` | Y |  | missing |  |  |
 | `Occurrence.Type` | Y |  | missing |  |  |
 | `OData.Feed` | Y |  | missing |  |  |
-| `ODataOmitValues.Nulls` | Y | Y | constant |  |  |
+| `ODataOmitValues.Nulls` | Y | Y | constant | q1442 | MATCH |
 | `ODataOmitValues.Type` | Y |  | missing |  |  |
 | `Odbc.DataSource` | Y | Y | function | q13 q14 q15 | MATCH |
 | `Odbc.InferOptions` | Y | Y | function |  |  |
@@ -664,32 +664,32 @@ Source: q1167.mrsflow.out.
 | `OleDb.DataSource` | Y |  | missing |  |  |
 | `OleDb.Query` | Y |  | missing |  |  |
 | `Oracle.Database` | Y |  | missing |  |  |
-| `Order.Ascending` | Y | Y | constant | q148 q1424 | MATCH |
-| `Order.Descending` | Y | Y | constant | q851 q942 | MATCH |
+| `Order.Ascending` | Y | Y | constant | q148 q588 q589 q851 q942 q943 q1424 | MATCH |
+| `Order.Descending` | Y | Y | constant | q147 q587 q589 q650 q851 q942 q943 q945 q1424 | MATCH |
 | `Order.Type` | Y |  | missing |  |  |
 | `Parquet.Document` |  | Y | function |  |  |
 | `Password.Type` | Y | Y | constant |  |  |
 | `Pdf.Tables` | Y |  | missing |  |  |
 | `Percentage.From` | Y | Y | function | q461 q462 q464 q465 | MATCH |
-| `Percentage.Type` | Y | Y | constant | q1283 | MATCH |
+| `Percentage.Type` | Y | Y | constant | q463 q1283 | MATCH |
 | `PercentileMode.ExcelExc` | Y | Y | constant | q1401 q1425 | MATCH |
 | `PercentileMode.ExcelInc` | Y | Y | constant | q1401 q1425 | MATCH |
 | `PercentileMode.SqlCont` | Y | Y | constant | q1401 q1425 | MATCH |
-| `PercentileMode.SqlDisc` | Y | Y | constant |  |  |
+| `PercentileMode.SqlDisc` | Y | Y | constant | q1401 q1425 | MATCH |
 | `PercentileMode.Type` | Y |  | missing |  |  |
 | `PostgreSQL.Database` | Y | Y | function |  |  |
 | `PostgreSQL.Query` |  | Y | function |  |  |
 | `PowerPlatform.Dataflows` | Y |  | missing |  |  |
 | `Precision.Decimal` | Y | Y | constant | q1437 | MATCH |
-| `Precision.Double` | Y | Y | constant |  |  |
+| `Precision.Double` | Y | Y | constant | q1437 | MATCH |
 | `Precision.Type` | Y | Y | constant |  |  |
 | `Progress.DataSourceProgress` | Y |  | missing |  |  |
-| `QuoteStyle.Csv` | Y | Y | constant |  |  |
-| `QuoteStyle.None` | Y | Y | constant | q98 q1432 | MATCH |
+| `QuoteStyle.Csv` | Y | Y | constant | q95 q96 q100 q101 q102 q373 q377 q439 q1432 | MATCH |
+| `QuoteStyle.None` | Y | Y | constant | q98 q1090 q1432 | MATCH |
 | `QuoteStyle.Type` | Y | Y | constant |  |  |
 | `RankKind.Competition` | Y | Y | constant | q1433 | MATCH |
 | `RankKind.Dense` | Y | Y | constant | q1433 | MATCH |
-| `RankKind.Ordinal` | Y | Y | constant |  |  |
+| `RankKind.Ordinal` | Y | Y | constant | q1433 | MATCH |
 | `RankKind.Type` | Y |  | missing |  |  |
 | `RData.FromBinary` | Y |  | missing |  |  |
 | `Record.AddField` | Y | Y | function | q231 q232 q233 q234 q235 q406 q407 q408 q409 q410 q864 q1046 q1047 q1048 | MATCH |
@@ -709,19 +709,19 @@ Source: q1167.mrsflow.out.
 | `Record.ToList` | Y | Y | function | q412 q415 q1454 | MATCH |
 | `Record.ToTable` | Y | Y | function | q414 q1149 | MATCH |
 | `Record.TransformFields` | Y | Y | function | q107 q578 q579 q580 q1053 q1054 q1055 | MATCH |
-| `Record.Type` | Y | Y | constant |  |  |
-| `RelativePosition.FromEnd` | Y | Y | constant |  |  |
+| `Record.Type` | Y | Y | constant | q1448 | MATCH |
+| `RelativePosition.FromEnd` | Y | Y | constant | q1441 | MATCH |
 | `RelativePosition.FromStart` | Y | Y | constant | q1441 | MATCH |
 | `RelativePosition.Type` | Y |  | missing |  |  |
 | `Replacer.ReplaceText` | Y | Y | function | q167 q187 q602 q1006 q1131 q1133 q1135 | MATCH |
-| `Replacer.ReplaceValue` | Y | Y | function | q166 q168 q186 q190 q601 q603 q604 q1004 q1005 q1007 q1010 q1130 q1132 q1134 q1142 | MATCH |
+| `Replacer.ReplaceValue` | Y | Y | function | q166 q168 q186 q190 q601 q603 q604 q1004 q1005 q1007 q1010 q1130 q1132 q1134 q1136 q1142 q1203 | MATCH |
 | `Resource.Access` | Y |  | missing |  |  |
-| `RoundingMode.AwayFromZero` | Y | Y | constant | q1395 q1422 | MATCH |
-| `RoundingMode.Down` | Y | Y | constant | q1395 q1422 | MATCH |
-| `RoundingMode.ToEven` | Y | Y | constant | q1395 | MATCH |
-| `RoundingMode.TowardZero` | Y | Y | constant | q1395 q1422 | MATCH |
+| `RoundingMode.AwayFromZero` | Y | Y | constant | q360 q656 q658 q659 q660 q661 q662 q1395 q1422 | MATCH |
+| `RoundingMode.Down` | Y | Y | constant | q658 q660 q662 q1395 q1422 | MATCH |
+| `RoundingMode.ToEven` | Y | Y | constant | q360 q657 q658 q660 q661 q662 q1395 q1422 | MATCH |
+| `RoundingMode.TowardZero` | Y | Y | constant | q658 q662 q1395 q1422 | MATCH |
 | `RoundingMode.Type` | Y | Y | constant |  |  |
-| `RoundingMode.Up` | Y | Y | constant | q1422 | MATCH |
+| `RoundingMode.Up` | Y | Y | constant | q658 q662 q1395 q1422 | MATCH |
 | `RowExpression.Column` | Y |  | missing |  |  |
 | `RowExpression.From` | Y |  | missing |  |  |
 | `RowExpression.Row` | Y |  | missing |  |  |
@@ -730,17 +730,17 @@ Source: q1167.mrsflow.out.
 | `SapBusinessWarehouse.Cubes` | Y |  | missing |  |  |
 | `SapBusinessWarehouseExecutionMode.BasXml` | Y | Y | constant | q1445 | MATCH |
 | `SapBusinessWarehouseExecutionMode.BasXmlGzip` | Y | Y | constant | q1445 | MATCH |
-| `SapBusinessWarehouseExecutionMode.DataStream` | Y | Y | constant |  |  |
+| `SapBusinessWarehouseExecutionMode.DataStream` | Y | Y | constant | q1445 | MATCH |
 | `SapBusinessWarehouseExecutionMode.Type` | Y |  | missing |  |  |
 | `SapHana.Database` | Y |  | missing |  |  |
 | `SapHanaDistribution.All` | Y | Y | constant | q1443 | MATCH |
 | `SapHanaDistribution.Connection` | Y | Y | constant | q1443 | MATCH |
 | `SapHanaDistribution.Off` | Y | Y | constant | q1443 | MATCH |
-| `SapHanaDistribution.Statement` | Y | Y | constant |  |  |
+| `SapHanaDistribution.Statement` | Y | Y | constant | q1443 | MATCH |
 | `SapHanaDistribution.Type` | Y |  | missing |  |  |
 | `SapHanaRangeOperator.Equals` | Y | Y | constant | q1444 | MATCH |
 | `SapHanaRangeOperator.GreaterThan` | Y | Y | constant | q1444 | MATCH |
-| `SapHanaRangeOperator.GreaterThanOrEquals` | Y | Y | constant |  |  |
+| `SapHanaRangeOperator.GreaterThanOrEquals` | Y | Y | constant | q1444 | MATCH |
 | `SapHanaRangeOperator.LessThan` | Y | Y | constant | q1444 | MATCH |
 | `SapHanaRangeOperator.LessThanOrEquals` | Y | Y | constant | q1444 | MATCH |
 | `SapHanaRangeOperator.NotEquals` | Y | Y | constant | q1444 | MATCH |
@@ -749,7 +749,7 @@ Source: q1167.mrsflow.out.
 | `SharePoint.Files` | Y |  | missing |  |  |
 | `SharePoint.Tables` | Y |  | missing |  |  |
 | `Single.From` | Y | Y | function | q1408 | MATCH |
-| `Single.Type` | Y | Y | constant |  |  |
+| `Single.Type` | Y | Y | constant | q1282 | MATCH |
 | `Soda.Feed` | Y |  | missing |  |  |
 | `Splitter.SplitByNothing` | Y | Y | function | q371 | MATCH |
 | `Splitter.SplitTextByAnyDelimiter` | Y | Y | function | q96 | MATCH |
@@ -814,7 +814,7 @@ Source: q1167.mrsflow.out.
 | `Table.InsertRows` | Y | Y | function | q1300 | MATCH |
 | `Table.IsDistinct` | Y | Y | function | q1293 | MATCH |
 | `Table.IsEmpty` | Y | Y | function | q640 | MATCH |
-| `Table.Join` | Y | Y | function | q116 q421 q422 q423 q425 q426 q427 q428 q983 q984 q985 q986 q987 q988 q989 q1168 | MATCH |
+| `Table.Join` | Y | Y | function | q116 q421 q422 q423 q425 q426 q427 q428 q983 q984 q985 q986 q987 q988 q989 q992 q1168 | MATCH |
 | `Table.Keys` | Y | Y | function | q1311 | MATCH |
 | `Table.Last` | Y | Y | function | q637 | MATCH |
 | `Table.LastN` | Y | Y | function | q1294 | MATCH |
@@ -873,7 +873,7 @@ Source: q1167.mrsflow.out.
 | `Table.TransformColumnTypes` | Y | Y | function | q18 q291 q292 q293 q294 q431 q432 q433 q434 q435 q1011 q1012 q1013 q1014 q1015 q1016 q1017 | MATCH |
 | `Table.TransformRows` | Y | Y | function | q1318 | MATCH |
 | `Table.Transpose` | Y | Y | function | q1310 | MATCH |
-| `Table.Type` | Y | Y | constant |  |  |
+| `Table.Type` | Y | Y | constant | q1448 | MATCH |
 | `Table.Unpivot` | Y | Y | function | q261 q979 q980 q982 | MATCH |
 | `Table.UnpivotOtherColumns` | Y | Y | function | q262 q265 q981 | MATCH |
 | `Table.View` | Y | Y | function |  |  |
@@ -892,7 +892,7 @@ Source: q1167.mrsflow.out.
 | `Text.End` | Y | Y | function | q34 q653 | MATCH |
 | `Text.EndsWith` | Y | Y | function | q495 q1118 | MATCH |
 | `Text.Format` | Y | Y | function | q191 q192 q193 q194 q195 q828 q829 q830 q831 q832 q833 q834 q1455 | MATCH |
-| `Text.From` | Y | Y | function | q27 q228 q271 q272 q273 q274 q275 q868 q871 q928 q955 q956 q1053 q1151 q1154 q1156 q1157 | MATCH |
+| `Text.From` | Y | Y | function | q27 q228 q271 q272 q273 q274 q275 q578 q868 q871 q928 q955 q956 q1053 q1151 q1154 q1156 q1157 | MATCH |
 | `Text.FromBinary` | Y | Y | function | q8 q266 q267 q268 q269 q270 q536 q537 q538 q539 q540 q1155 q1167 q1184 | MIXED |
 | `Text.InferNumberType` | Y | Y | function | q1222 | MATCH |
 | `Text.Insert` | Y | Y | function | q486 q490 q791 q792 q793 q794 q795 q796 q797 | MATCH |
@@ -922,15 +922,15 @@ Source: q1167.mrsflow.out.
 | `Text.Trim` | Y | Y | function | q38 q562 q564 q565 q798 q799 q800 q801 q802 q803 q804 | MATCH |
 | `Text.TrimEnd` | Y | Y | function | q563 q564 q801 q804 | MATCH |
 | `Text.TrimStart` | Y | Y | function | q563 q564 q801 q804 | MATCH |
-| `Text.Type` | Y | Y | constant |  |  |
-| `Text.Upper` | Y | Y | function | q31 q392 q402 q566 q567 q568 q569 q805 q806 q807 q808 q809 q810 q811 q815 q864 q927 q1054 q1317 q1491 | MATCH |
+| `Text.Type` | Y | Y | constant | q1225 q1447 | MATCH |
+| `Text.Upper` | Y | Y | function | q31 q392 q402 q566 q567 q568 q569 q805 q806 q807 q808 q809 q810 q811 q815 q864 q927 q1054 q1317 q1450 q1489 q1491 | MATCH |
 | `TextEncoding.Ascii` | Y | Y | constant | q1325 | MATCH |
 | `TextEncoding.BigEndianUnicode` | Y | Y | constant | q1325 | MATCH |
 | `TextEncoding.Type` | Y |  | missing |  |  |
 | `TextEncoding.Unicode` | Y | Y | constant | q1325 | MATCH |
 | `TextEncoding.Utf16` | Y | Y | constant | q1325 | MATCH |
-| `TextEncoding.Utf8` | Y | Y | constant | q1325 | MATCH |
-| `TextEncoding.Windows` | Y | Y | constant |  |  |
+| `TextEncoding.Utf8` | Y | Y | constant | q266 q267 q268 q269 q270 q350 q536 q537 q538 q539 q540 q1088 q1089 q1090 q1091 q1092 q1155 q1167 q1184 q1325 q1386 | MIXED |
+| `TextEncoding.Windows` | Y | Y | constant | q1325 | MATCH |
 | `Time.EndOfHour` | Y | Y | function | q1410 | MATCH |
 | `Time.From` | Y | Y | function | q452 q1077 | MATCH |
 | `Time.FromText` | Y | Y | function | q1235 | MATCH |
@@ -940,14 +940,14 @@ Source: q1167.mrsflow.out.
 | `Time.StartOfHour` | Y | Y | function | q1234 | MATCH |
 | `Time.ToRecord` | Y | Y | function | q1236 | MATCH |
 | `Time.ToText` | Y | Y | function | q162 q453 | MATCH |
-| `Time.Type` | Y | Y | constant |  |  |
+| `Time.Type` | Y | Y | constant | q1447 | MATCH |
 | `TimeZone.Current` | Y | Y | function |  |  |
 | `TraceLevel.Critical` | Y | Y | constant | q1396 q1421 | MATCH |
 | `TraceLevel.Error` | Y | Y | constant | q1396 q1421 | MATCH |
 | `TraceLevel.Information` | Y | Y | constant | q1396 q1421 q1470 | MATCH |
 | `TraceLevel.Type` | Y |  | missing |  |  |
-| `TraceLevel.Verbose` | Y | Y | constant | q1396 | MATCH |
-| `TraceLevel.Warning` | Y | Y | constant | q1421 | MATCH |
+| `TraceLevel.Verbose` | Y | Y | constant | q1396 q1421 | MATCH |
+| `TraceLevel.Warning` | Y | Y | constant | q1396 q1421 | MATCH |
 | `Type.AddTableKey` | Y | Y | function | q1493 | MATCH |
 | `Type.ClosedRecord` | Y | Y | function | q1242 | MATCH |
 | `Type.Facets` | Y | Y | function | q1415 | MATCH |
@@ -956,7 +956,7 @@ Source: q1167.mrsflow.out.
 | `Type.FunctionParameters` | Y | Y | function | q398 | MATCH |
 | `Type.FunctionRequiredParameters` | Y | Y | function | q1328 | MATCH |
 | `Type.FunctionReturn` | Y | Y | function | q1477 | MATCH |
-| `Type.Is` | Y | Y | function | q119 q120 q396 q1190 q1217 q1222 q1225 q1233 q1238 q1239 q1254 q1257 q1272 q1277 q1278 q1279 q1280 q1281 q1282 q1283 q1284 q1285 q1376 q1447 q1448 | MATCH |
+| `Type.Is` | Y | Y | function | q119 q120 q396 q1095 q1096 q1097 q1101 q1190 q1217 q1222 q1225 q1233 q1238 q1239 q1254 q1257 q1272 q1277 q1278 q1279 q1280 q1281 q1282 q1283 q1284 q1285 q1376 q1447 q1448 | MATCH |
 | `Type.IsNullable` | Y | Y | function | q1237 q1477 q1486 q1492 q1493 q1494 q1498 q1499 | MATCH |
 | `Type.IsOpenRecord` | Y | Y | function | q1240 q1241 q1242 q1329 q1331 q1332 q1476 q1487 | MATCH |
 | `Type.ListItem` | Y | Y | function | q1239 | MATCH |
@@ -1015,7 +1015,7 @@ Source: q1167.mrsflow.out.
 | `WebMethod.Delete` | Y | Y | constant | q1440 | MATCH |
 | `WebMethod.Get` | Y | Y | constant | q1440 | MATCH |
 | `WebMethod.Head` | Y | Y | constant | q1440 | MATCH |
-| `WebMethod.Patch` | Y | Y | constant |  |  |
+| `WebMethod.Patch` | Y | Y | constant | q1440 | MATCH |
 | `WebMethod.Post` | Y | Y | constant | q1440 | MATCH |
 | `WebMethod.Put` | Y | Y | constant | q1440 | MATCH |
 | `WebMethod.Type` | Y | Y | constant |  |  |

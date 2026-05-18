@@ -20,7 +20,7 @@ Counts come from `COVERAGE.md`; refresh both via `render.ps1`.
 | AdobeAnalytics | Untouched | 0 / 1 | Adobe Analytics OLAP cubes connector. |
 | AdoDotNet | Untouched | 0 / 2 | ADO.NET generic database connector. |
 | AnalysisServices | Untouched | 0 / 2 | SQL Server Analysis Services / Tabular OLAP connector. |
-| Any | Implemented | 1 / 1 | Type-record companion for the `any` type. |
+| Any | Tested | 1 / 1 | Type-record companion for the `any` type. |
 | AzureDataExplorer | Untouched | 0 / 3 | Azure Data Explorer / Kusto connector entry. |
 | AzureStorage | Untouched | 0 / 5 | Azure Blob / Table / Data Lake storage connector. |
 | Binary | Tested | 18 / 18 | Binary value operations (length, slice, encode, base64, compression). |
@@ -94,7 +94,7 @@ Counts come from `COVERAGE.md`; refresh both via `render.ps1`.
 | Module | Untouched | 0 / 1 | Module-versions introspection. |
 | MySQL | Implemented | 2 / 1 | MySQL database connector. mrsflow exposes both `MySQL.Database` and an extension `MySQL.Query` for raw SQL. |
 | None | Implemented | 1 / 1 | None type companion (uninhabited). |
-| Null | Implemented | 1 / 1 | Null type companion. |
+| Null | Tested | 1 / 1 | Null type companion. |
 | Number | Tested | 49 / 49 | Number value operations: arithmetic, rounding, formatting, parsing, bitwise. |
 | Occurrence | Partial | 4 / 7 | Text/List PositionOf occurrence enum (First / Last / All) + BinaryFormat reuse. |
 | OData | Untouched | 0 / 1 | OData v3/v4 feed connector. |
