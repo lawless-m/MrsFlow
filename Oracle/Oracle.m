@@ -12076,6 +12076,25 @@ let
             { RelativePosition.FromStart, RelativePosition.FromEnd }),
         SafeSerialize("q1442", () =>
             { ODataOmitValues.Nulls }),
+        // q1443-q1445: SAP-family enum lists. Excel ordinals are quirky
+        // (SapHanaDistribution: All=3 Connection=1 Off=0 Statement=2;
+        // SapHanaRangeOperator: Equals=4 NotEquals=5 LessThan=1 GreaterThan=0
+        // LessThanOrEquals=3 GreaterThanOrEquals=2;
+        // SapBusinessWarehouseExecutionMode: BasXml=64 BasXmlGzip=65
+        // DataStream=66). IdentityProvider.Default skipped — Excel
+        // didn't emit a serialisable result.
+        SafeSerialize("q1443", () =>
+            { SapHanaDistribution.All, SapHanaDistribution.Connection,
+              SapHanaDistribution.Off, SapHanaDistribution.Statement }),
+        SafeSerialize("q1444", () =>
+            { SapHanaRangeOperator.Equals, SapHanaRangeOperator.NotEquals,
+              SapHanaRangeOperator.LessThan, SapHanaRangeOperator.GreaterThan,
+              SapHanaRangeOperator.LessThanOrEquals,
+              SapHanaRangeOperator.GreaterThanOrEquals }),
+        SafeSerialize("q1445", () =>
+            { SapBusinessWarehouseExecutionMode.BasXml,
+              SapBusinessWarehouseExecutionMode.BasXmlGzip,
+              SapBusinessWarehouseExecutionMode.DataStream }),
         SafeSerialize("q1437", () =>
             { Precision.Decimal, Precision.Double }),
         SafeSerialize("q1438", () =>

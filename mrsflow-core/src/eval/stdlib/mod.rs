@@ -422,6 +422,42 @@ pub fn root_env() -> Env {
     // WebAction.Request — single-value sentinel for Web action requests.
     env = env.extend("WebAction.Request".into(), Value::Number(0.0));
 
+    // SapHanaDistribution.* — SAP HANA query-folding distribution hint.
+    // Ordinals from Excel observation (not contiguous: Off=0, Connection=1,
+    // Statement=2, All=3).
+    for (name, n) in [
+        ("SapHanaDistribution.Off",        0.0),
+        ("SapHanaDistribution.Connection", 1.0),
+        ("SapHanaDistribution.Statement",  2.0),
+        ("SapHanaDistribution.All",        3.0),
+    ] {
+        env = env.extend(name.to_string(), Value::Number(n));
+    }
+
+    // SapHanaRangeOperator.* — input-parameter range operator.
+    // Excel ordinals: GreaterThan=0, LessThan=1, GreaterThanOrEquals=2,
+    // LessThanOrEquals=3, Equals=4, NotEquals=5.
+    for (name, n) in [
+        ("SapHanaRangeOperator.GreaterThan",         0.0),
+        ("SapHanaRangeOperator.LessThan",            1.0),
+        ("SapHanaRangeOperator.GreaterThanOrEquals", 2.0),
+        ("SapHanaRangeOperator.LessThanOrEquals",    3.0),
+        ("SapHanaRangeOperator.Equals",              4.0),
+        ("SapHanaRangeOperator.NotEquals",           5.0),
+    ] {
+        env = env.extend(name.to_string(), Value::Number(n));
+    }
+
+    // SapBusinessWarehouseExecutionMode.* — BW query-engine execution mode.
+    // Excel ordinals start at 64 (BasXml=64, BasXmlGzip=65, DataStream=66).
+    for (name, n) in [
+        ("SapBusinessWarehouseExecutionMode.BasXml",     64.0),
+        ("SapBusinessWarehouseExecutionMode.BasXmlGzip", 65.0),
+        ("SapBusinessWarehouseExecutionMode.DataStream", 66.0),
+    ] {
+        env = env.extend(name.to_string(), Value::Number(n));
+    }
+
     // Math constants.
     for (name, n) in [
         ("Number.PI",       std::f64::consts::PI),
