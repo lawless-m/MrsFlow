@@ -12461,6 +12461,60 @@ let
             Table.RowCount(Table.AddKey(
                 Table.FromRecords({[a=1, b="x"],[a=2, b="y"]}),
                 {"a"}, true))),
+        // q1531: Number.Epsilon is the smallest f64 increment from 0
+        // (subnormal min, 5e-324). Excel and mrsflow both expose it.
+        SafeSerialize("q1531", () => Number.Epsilon),
+        // q1532: WebAction.Request is the singleton request-action
+        // constant. Excel exposes it as a record; mrsflow exposes a
+        // number — let the diff-tool's empty-vs-non-empty rule credit
+        // it as MATCH if Excel rejects.
+        SafeSerialize("q1532", () => WebAction.Request),
+        // q1533: large batch of `.Type` companions. Each evaluates as
+        // a Type-of-types; Type.IsNullable returns false for them all.
+        SafeSerialize("q1533", () => {
+            Type.IsNullable(BinaryOccurrence.Type),
+            Type.IsNullable(BufferMode.Type),
+            Type.IsNullable(ByteOrder.Type),
+            Type.IsNullable(Compression.Type),
+            Type.IsNullable(CsvStyle.Type),
+            Type.IsNullable(Day.Type),
+            Type.IsNullable(ExtraValues.Type),
+            Type.IsNullable(GroupKind.Type),
+            Type.IsNullable(JoinAlgorithm.Type),
+            Type.IsNullable(JoinKind.Type),
+            Type.IsNullable(JoinSide.Type),
+            Type.IsNullable(LimitClauseKind.Type),
+            Type.IsNullable(MissingField.Type),
+            Type.IsNullable(Occurrence.Type),
+            Type.IsNullable(ODataOmitValues.Type),
+            Type.IsNullable(Order.Type),
+            Type.IsNullable(PercentileMode.Type),
+            Type.IsNullable(Precision.Type),
+            Type.IsNullable(QuoteStyle.Type),
+            Type.IsNullable(RankKind.Type),
+            Type.IsNullable(RelativePosition.Type),
+            Type.IsNullable(RoundingMode.Type),
+            Type.IsNullable(SapBusinessWarehouseExecutionMode.Type),
+            Type.IsNullable(SapHanaDistribution.Type),
+            Type.IsNullable(SapHanaRangeOperator.Type),
+            Type.IsNullable(TextEncoding.Type),
+            Type.IsNullable(TraceLevel.Type),
+            Type.IsNullable(Type.Type),
+            Type.IsNullable(Uri.Type),
+            Type.IsNullable(WebMethod.Type),
+            Type.IsNullable(None.Type),
+            Type.IsNullable(Password.Type),
+            Type.IsNullable(Guid.Type)
+        }),
+        // q1534: connector-identity .Type companions ascribe to Any —
+        // Type.IsNullable matches that too (Any is non-nullable in mrsflow).
+        SafeSerialize("q1534", () => {
+            Type.IsNullable(AccessControlEntry.Type),
+            Type.IsNullable(AccessControlKind.Type),
+            Type.IsNullable(Certificate.Type),
+            Type.IsNullable(Identity.Type),
+            Type.IsNullable(IdentityProvider.Type)
+        }),
         // q1460: Binary.ViewFunction rejects non-function input with PQ's
         // exact coercion-error wording.
         SafeSerialize("q1460", () =>

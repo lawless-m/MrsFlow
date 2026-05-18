@@ -29,7 +29,7 @@ Counts come from `COVERAGE.md`; refresh both via `render.ps1`.
 | BufferMode | Tested | 3 / 3 | Buffer eagerness mode (Eager / Delayed) for *.Buffer. |
 | Byte | Tested | 2 / 2 | Byte-typed numeric (0–255) conversion + type companion. |
 | ByteOrder | Tested | 3 / 3 | Big / little endian constants used by BinaryFormat. |
-| Certificate | Implemented | 1 / 1 | Certificate type-record companion. |
+| Certificate | Tested | 1 / 1 | Certificate type-record companion. |
 | Character | Tested | 3 / 3 | Character-codepoint conversion (FromNumber / ToNumber). |
 | Combiner | Tested | 5 / 5 | Text-combine combinators (delimiter, lengths, positions). Symmetric with Splitter. |
 | CommonDataService | Untouched | 0 / 1 | Microsoft Dataverse / Common Data Service connector. |
@@ -92,7 +92,7 @@ Counts come from `COVERAGE.md`; refresh both via `render.ps1`.
 | MissingField | Tested | 4 / 4 | Record.SelectFields missingField option (Error / Ignore / UseNull). |
 | Module | Untouched | 0 / 1 | Module-versions introspection. |
 | MySQL | Implemented | 2 / 1 | MySQL database connector. mrsflow exposes both `MySQL.Database` and an extension `MySQL.Query` for raw SQL. |
-| None | Implemented | 1 / 1 | None type companion (uninhabited). |
+| None | Tested | 1 / 1 | None type companion (uninhabited). |
 | Null | Tested | 1 / 1 | Null type companion. |
 | Number | Tested | 49 / 49 | Number value operations: arithmetic, rounding, formatting, parsing, bitwise. |
 | Occurrence | Tested | 7 / 7 | Text/List PositionOf occurrence enum (First / Last / All) + BinaryFormat reuse. |
@@ -104,7 +104,7 @@ Counts come from `COVERAGE.md`; refresh both via `render.ps1`.
 | Oracle | Untouched | 0 / 1 | Oracle Database connector. |
 | Order | Tested | 3 / 3 | Sort order enum (Ascending / Descending). |
 | Parquet | Implemented | 1 / 0 | Parquet file reader. mrsflow extension; PQ exposes `Parquet.Document` natively. |
-| Password | Implemented | 1 / 1 | Password-credential type companion. |
+| Password | Tested | 1 / 1 | Password-credential type companion. |
 | Pdf | Untouched | 0 / 1 | PDF table extractor. |
 | Percentage | Tested | 2 / 2 | Percentage-typed decimal. |
 | PercentileMode | Tested | 5 / 5 | List.Percentile mode (ExcelInc / ExcelExc / SqlCont / SqlDisc). |
