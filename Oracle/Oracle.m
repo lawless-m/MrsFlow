@@ -12132,6 +12132,14 @@ let
               Character.ToNumber("€") }),
         SafeSerialize("q1450", () =>
             Function.IsDataSource(Text.Upper)),
+        // q1451: Logical round-trips. Logical.FromText accepts both
+        // "true"/"false" and "True"/"FALSE" (case-insensitive);
+        // Logical.ToText emits the lowercase form. Logical.From handles
+        // numeric and text coercion.
+        SafeSerialize("q1451", () =>
+            { Logical.FromText("true"), Logical.FromText("FALSE"),
+              Logical.ToText(true), Logical.ToText(false),
+              Logical.From(1), Logical.From(0), Logical.From("True") }),
         SafeSerialize("q1437", () =>
             { Precision.Decimal, Precision.Double }),
         SafeSerialize("q1438", () =>
