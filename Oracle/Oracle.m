@@ -12002,7 +12002,14 @@ let
         SafeSerialize("q1413", () =>
             Table.PartitionValues(Table.FromRecords({[a=1]}))),
         SafeSerialize("q1414", () =>
-            Type.TablePartitionKey(type table [a = number]))
+            Type.TablePartitionKey(type table [a = number])),
+        // q1415: Type.Facets — Excel returns the 10-slot facet record-of-
+        // nulls (NumericPrecisionBase, NumericPrecision, NumericScale,
+        // IsSigned, DateTimePrecision, MaxLength, IsVariableLength,
+        // NativeTypeName, NativeDefaultExpression, NativeExpression).
+        // Previously parked: mrsflow returned an empty record.
+        SafeSerialize("q1415", () =>
+            Type.Facets(type number))
     },
 
     Catalog = Table.FromRecords(cases)

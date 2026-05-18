@@ -347,9 +347,23 @@ fn for_record(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 fn facets(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    // PQ returns a record with the standard 10 facet slots, all null when
+    // no facets are set on the type. Field order matches the engine output.
     let _ = expect_type(&args[0])?;
+    let names = [
+        "NumericPrecisionBase",
+        "NumericPrecision",
+        "NumericScale",
+        "IsSigned",
+        "DateTimePrecision",
+        "MaxLength",
+        "IsVariableLength",
+        "NativeTypeName",
+        "NativeDefaultExpression",
+        "NativeExpression",
+    ];
     Ok(Value::Record(Record {
-        fields: Vec::new(),
+        fields: names.iter().map(|n| ((*n).to_string(), Value::Null)).collect(),
         env: EnvNode::empty(),
     }))
 }
