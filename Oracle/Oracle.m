@@ -12334,6 +12334,19 @@ let
         SafeSerialize("q1502", () =>
             let r = try Table.RowCount(Table.ReplaceRelationshipIdentity(Table.FromRecords({[a=1]}), null)) in
                 if r[HasError] then [HasError=true, Message=r[Error][Message]] else [HasError=false, Value=r[Value]]),
+        // q1503: Table.ViewFunction type-checks the Function input;
+        // a Table value is rejected with PQ's exact coercion error.
+        SafeSerialize("q1503", () =>
+            let r = try Table.ViewFunction(Table.FromRecords({[a=1]})) in
+                if r[HasError] then [HasError=true, Message=r[Error][Message]] else [HasError=false, IsFunc=Value.Is(r[Value], type function)]),
+        // q1505: Table.FilterWithDataTable's 2nd arg is a Text reference,
+        // not a Table; PQ rejects a Table input with the standard
+        // coercion error. mrsflow's signature said `dataTable` but
+        // accepted Tables — now type-checks Text.
+        SafeSerialize("q1505", () =>
+            let r = try Table.RowCount(Table.FilterWithDataTable(
+                Table.FromRecords({[a=1],[a=2],[a=3]}), Table.FromRecords({[a=1],[a=3]}))) in
+                if r[HasError] then [HasError=true, Message=r[Error][Message]] else [HasError=false, Value=r[Value]]),
         // q1460: Binary.ViewFunction rejects non-function input with PQ's
         // exact coercion-error wording.
         SafeSerialize("q1460", () =>

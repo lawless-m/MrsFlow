@@ -1490,3 +1490,5 @@ q1499	Type.IsNullable Type.ReplaceTablePartitionKey
 q1500	Table.FromRecords Table.ReplaceKeys Table.RowCount
 q1501	Table.FromRecords Table.ReplacePartitionKey Table.RowCount
 q1502	Table.FromRecords Table.ReplaceRelationshipIdentity Table.RowCount
+q1503	Table.FromRecords Table.ViewFunction Value.Is
+q1505	Table.FilterWithDataTable Table.FromRecords Table.RowCount

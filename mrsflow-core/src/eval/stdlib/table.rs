@@ -6085,9 +6085,32 @@ fn replace_relationship_identity(args: &[Value], _host: &dyn IoHost) -> Result<V
 
 fn filter_with_data_table(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     // v1: this is a query-folding hint with no semantic effect off-cloud.
+    // PQ's second arg is a Text reference to a data-table identifier, not
+    // an actual Table value — type-checking matches PQ.
     let _ = expect_table(&args[0])?;
-    let _ = expect_table(&args[1])?;
-    Ok(args[0].clone())
+    match &args[1] {
+        Value::Text(_) => Ok(args[0].clone()),
+        other => Err(MError::Other(format!(
+            "We cannot convert a value of type {} to type Text.",
+            match other {
+                Value::Null => "Null",
+                Value::Logical(_) => "Logical",
+                Value::Number(_) => "Number",
+                Value::Binary(_) => "Binary",
+                Value::List(_) => "List",
+                Value::Record(_) => "Record",
+                Value::Table(_) => "Table",
+                Value::Date(_) => "Date",
+                Value::Time(_) => "Time",
+                Value::Datetime(_) => "DateTime",
+                Value::Datetimezone(_) => "DateTimeZone",
+                Value::Duration(_) => "Duration",
+                Value::Type(_) => "Type",
+                Value::Function(_) => "Function",
+                _ => "Any",
+            }
+        ))),
+    }
 }
 
 fn from_partitions(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
@@ -6226,8 +6249,32 @@ fn view_error_identity(args: &[Value], _host: &dyn IoHost) -> Result<Value, MErr
     Ok(args[0].clone())
 }
 
+/// `Table.ViewFunction(function)` — type-check Function input, matching
+/// PQ's pre-call coercion error.
 fn view_function_identity(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    Ok(args[0].clone())
+    match &args[0] {
+        Value::Function(_) => Ok(args[0].clone()),
+        other => Err(MError::Other(format!(
+            "We cannot convert a value of type {} to type Function.",
+            match other {
+                Value::Null => "Null",
+                Value::Logical(_) => "Logical",
+                Value::Number(_) => "Number",
+                Value::Text(_) => "Text",
+                Value::Binary(_) => "Binary",
+                Value::List(_) => "List",
+                Value::Record(_) => "Record",
+                Value::Table(_) => "Table",
+                Value::Date(_) => "Date",
+                Value::Time(_) => "Time",
+                Value::Datetime(_) => "DateTime",
+                Value::Datetimezone(_) => "DateTimeZone",
+                Value::Duration(_) => "Duration",
+                Value::Type(_) => "Type",
+                _ => "Any",
+            }
+        ))),
+    }
 }
 
 fn type_matches(t: &super::super::value::TypeRep, v: &Value) -> bool {
