@@ -172,6 +172,20 @@ fn unwrap_raw_num_markers(s: &str) -> String {
 }
 
 /// PQ ISO-8601 form: "P[<days>D][T[<h>H][<m>M][<s>S]]". Zero is "PT0S".
+/// Append a fractional-second tail (up to 7 digits, PQ's .NET tick precision)
+/// to a "HH:MM:SS"-style prefix. Trailing zeros trimmed; omitted entirely when
+/// the rounded value is zero.
+fn format_fractional(prefix: String, nanos: u32) -> String {
+    // 100ns ticks (.NET DateTime granularity).
+    let ticks = nanos / 100;
+    if ticks == 0 {
+        return prefix;
+    }
+    let mut frac = format!("{ticks:07}");
+    while frac.ends_with('0') { frac.pop(); }
+    format!("{prefix}.{frac}")
+}
+
 fn duration_to_iso(d: chrono::Duration) -> String {
     let total = d.num_seconds();
     if total == 0 { return "PT0S".to_string(); }
@@ -235,16 +249,12 @@ fn value_to_json(v: &Value) -> Result<serde_json::Value, MError> {
         Value::Text(s) => Ok(serde_json::Value::String(s.clone())),
         Value::Date(d) => Ok(serde_json::Value::String(d.to_string())),
         Value::Datetime(dt) => {
-            // PQ emits fractional seconds only when non-zero, trailing zeros
-            // trimmed (e.g. "10:30:00.5", not "10:30:00.500000").
-            let s = if dt.nanosecond() == 0 {
-                dt.format("%Y-%m-%dT%H:%M:%S").to_string()
-            } else {
-                let mut s = dt.format("%Y-%m-%dT%H:%M:%S%.f").to_string();
-                while s.ends_with('0') { s.pop(); }
-                if s.ends_with('.') { s.pop(); }
-                s
-            };
+            // PQ values use .NET DateTime ticks (100ns resolution), so emit at
+            // most 7 fractional digits, trailing zeros trimmed.
+            let s = format_fractional(
+                dt.format("%Y-%m-%dT%H:%M:%S").to_string(),
+                dt.nanosecond(),
+            );
             Ok(serde_json::Value::String(s))
         }
         Value::Datetimezone(dt) => {
@@ -258,7 +268,15 @@ fn value_to_json(v: &Value) -> Result<serde_json::Value, MError> {
             };
             Ok(serde_json::Value::String(s))
         }
-        Value::Time(t) => Ok(serde_json::Value::String(t.to_string())),
+        Value::Time(t) => {
+            // Same 100ns tick precision as Datetime; chrono's Display uses
+            // full nanos which doesn't match PQ.
+            let s = format_fractional(
+                t.format("%H:%M:%S").to_string(),
+                t.nanosecond(),
+            );
+            Ok(serde_json::Value::String(s))
+        }
         Value::Duration(d) => {
             // ISO-8601 form. PQ emits "P[nD][T[nH][nM][nS]]". Negative durations
             // are prefixed with '-'.

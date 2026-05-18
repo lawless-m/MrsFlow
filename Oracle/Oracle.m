@@ -11980,7 +11980,12 @@ let
         // q1409: Binary.From("...") — base64-decodes the text input.
         // Previously parked (mrsflow returned raw UTF-8 bytes).
         SafeSerialize("q1409", () =>
-            Binary.ToList(Binary.From("SGVsbG8=")))
+            Binary.ToList(Binary.From("SGVsbG8="))),
+        // q1410: Time.EndOfHour — Excel emits 14:59:59.9999999 (7-digit
+        // .NET-tick precision). Previously parked: mrsflow's json
+        // serialiser emitted 9 digits, now trimmed to 7.
+        SafeSerialize("q1410", () =>
+            Time.EndOfHour(#time(14, 35, 42)))
     },
 
     Catalog = Table.FromRecords(cases)
