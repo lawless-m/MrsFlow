@@ -11915,7 +11915,36 @@ let
         // q1393: Number.Epsilon — was parked (mrsflow returned f64::EPSILON);
         // fixed in mrsflow to f64::from_bits(1) = smallest positive denormal.
         SafeSerialize("q1393", () =>
-            Number.Epsilon)
+            Number.Epsilon),
+        // q1394-q1402: enum ordinal fixes. mrsflow's per-family
+        // numbers now match PQ/Excel.
+        SafeSerialize("q1394", () =>
+            { Compression.Brotli, Compression.Deflate, Compression.GZip,
+              Compression.LZ4, Compression.None, Compression.Snappy,
+              Compression.Zstandard }),
+        SafeSerialize("q1395", () =>
+            { RoundingMode.AwayFromZero, RoundingMode.Down,
+              RoundingMode.ToEven, RoundingMode.TowardZero,
+              RoundingMode.Up }),
+        SafeSerialize("q1396", () =>
+            { TraceLevel.Critical, TraceLevel.Error, TraceLevel.Information,
+              TraceLevel.Verbose, TraceLevel.Warning }),
+        SafeSerialize("q1397", () =>
+            { BinaryOccurrence.Optional, BinaryOccurrence.Repeating,
+              BinaryOccurrence.Required }),
+        SafeSerialize("q1398", () =>
+            { BufferMode.Delayed, BufferMode.Eager }),
+        SafeSerialize("q1399", () =>
+            { ByteOrder.BigEndian, ByteOrder.LittleEndian }),
+        SafeSerialize("q1400", () =>
+            { ExtraValues.Error, ExtraValues.Ignore, ExtraValues.List }),
+        SafeSerialize("q1401", () =>
+            { PercentileMode.ExcelExc, PercentileMode.ExcelInc,
+              PercentileMode.SqlCont, PercentileMode.SqlDisc }),
+        SafeSerialize("q1402", () =>
+            { LimitClauseKind.AnsiSql2008, LimitClauseKind.Limit,
+              LimitClauseKind.LimitOffset, LimitClauseKind.None,
+              LimitClauseKind.Top })
     },
 
     Catalog = Table.FromRecords(cases)

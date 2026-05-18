@@ -5120,14 +5120,14 @@ fn split_column(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
         None | Some(Value::Null) => Value::Null,
         Some(v) => v.clone(),
     };
-    // ExtraValues: List = 0 (default), Ignore = 1, Error = 2 (same enum
-    // as Table.FromList). Only consulted when a split overflows `width`.
+    // ExtraValues (PQ ordinals): List = 0 (default), Error = 1, Ignore = 2.
+    // Only consulted when a split overflows `width`.
     let extra_values: u8 = match args.get(5) {
         None | Some(Value::Null) => 0,
         Some(Value::Number(n)) if *n == 0.0 || *n == 1.0 || *n == 2.0 => *n as u8,
         Some(other) => {
             return Err(MError::Other(format!(
-                "Table.SplitColumn: extraValues must be ExtraValues.List/Ignore/Error, got {}",
+                "Table.SplitColumn: extraValues must be ExtraValues.List/Error/Ignore, got {}",
                 super::super::type_name(other),
             )));
         }
@@ -5192,7 +5192,7 @@ fn split_column(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
                 }
                 if split_row.len() > width {
                     match extra_values {
-                        2 => {
+                        1 => {
                             return Err(MError::Other(format!(
                                 "Table.SplitColumn: split produced {} values but {} columns \
                                  (ExtraValues.Error)",
@@ -5200,7 +5200,7 @@ fn split_column(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
                                 width,
                             )));
                         }
-                        1 => {
+                        2 => {
                             split_row.truncate(width);
                         }
                         _ => {
@@ -5347,14 +5347,13 @@ fn from_list(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
         Some(v) => v.clone(),
     };
     // ExtraValues controls what to do when a row has more cells than `names`.
-    // List = 0, Ignore = 1, Error = 2 (per `ExtraValues.*` in the root env).
-    // Default per M spec is List; missing/null also maps to List for now.
+    // (PQ ordinals) List = 0, Error = 1, Ignore = 2. Default per spec is List.
     let extra_values: u8 = match args.get(4) {
         Some(Value::Null) | None => 0,
         Some(Value::Number(n)) if *n == 0.0 || *n == 1.0 || *n == 2.0 => *n as u8,
         Some(other) => {
             return Err(MError::Other(format!(
-                "Table.FromList: extraValues must be ExtraValues.List/Ignore/Error, got {}",
+                "Table.FromList: extraValues must be ExtraValues.List/Error/Ignore, got {}",
                 super::super::type_name(other),
             )));
         }
@@ -5379,14 +5378,14 @@ fn from_list(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
         }
         if row.len() > names.len() {
             match extra_values {
-                2 => {
+                1 => {
                     return Err(MError::Other(format!(
                         "Table.FromList: row has {} values but {} columns (ExtraValues.Error)",
                         row.len(),
                         names.len(),
                     )));
                 }
-                1 => {
+                2 => {
                     row.truncate(names.len());
                 }
                 _ => {

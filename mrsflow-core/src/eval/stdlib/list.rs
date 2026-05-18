@@ -1809,9 +1809,9 @@ fn percentile(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             "List.Percentile: percentile must be in [0,1] (got {other:?})"
         ))),
     };
-    // Options: only PercentileMode.ExcelInc (0, the default) is supported;
-    // other modes are rejected. Unknown fields are silently ignored so
-    // forward-compatibility doesn't break existing call sites.
+    // Options: only PercentileMode.ExcelInc (PQ ordinal 1, the default)
+    // is supported; other modes are rejected. Unknown fields are silently
+    // ignored so forward-compatibility doesn't break existing call sites.
     match args.get(2) {
         None | Some(Value::Null) => {}
         Some(Value::Record(r)) => {
@@ -1823,10 +1823,10 @@ fn percentile(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
                     Value::Null => {}
                     Value::Number(n) => {
                         let k = n as i64;
-                        if k != 0 {
+                        if k != 1 {
                             return Err(MError::Other(format!(
                                 "List.Percentile: PercentileMode {k} not yet supported \
-                                 (only ExcelInc=0 is implemented)"
+                                 (only ExcelInc=1 is implemented)"
                             )));
                         }
                     }

@@ -655,9 +655,10 @@ fn impl_factory_byte_order(args: &[Value], host: &dyn IoHost) -> Result<Value, M
     // the whole buffer would change which bytes the inner reads when the
     // caller passes a slice larger than the combinator needs (which is
     // typical when chunking a wire format).
+    // PQ ordinals: LittleEndian=0 (atom's default), BigEndian=1.
     let inner_v = Value::Function(inner.clone());
     let (_, consumed) = parse_with_size(&inner_v, b, host)?;
-    let prefix: Vec<u8> = if order == 0 {
+    let prefix: Vec<u8> = if order == 1 {
         b[..consumed].iter().rev().cloned().collect()
     } else {
         b[..consumed].to_vec()
@@ -674,8 +675,9 @@ fn parse_byte_order_sz(
     let order_v = capture_required(closure, "byte_order", "BinaryFormat.ByteOrder")?;
     let order = as_i32(&order_v, "BinaryFormat.ByteOrder")?;
     // Discover inner's byte size by parsing forward first.
+    // PQ ordinals: LittleEndian=0 (atom default), BigEndian=1.
     let (_, consumed) = parse_with_size(&inner_v, b, host)?;
-    let prefix: Vec<u8> = if order == 0 {
+    let prefix: Vec<u8> = if order == 1 {
         b[..consumed].iter().rev().cloned().collect()
     } else {
         b[..consumed].to_vec()

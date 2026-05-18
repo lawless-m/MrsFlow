@@ -1392,3 +1392,12 @@ q1390	List.Percentile
 q1391	DateTimeZone.UtcNow DateTimeZone.ZoneHours
 q1392	DateTimeZone.FixedUtcNow DateTimeZone.ZoneHours
 q1393	
+q1394	Compression.Brotli Compression.Deflate Compression.GZip Compression.LZ4 Compression.None Compression.Snappy
+q1395	RoundingMode.AwayFromZero RoundingMode.Down RoundingMode.ToEven RoundingMode.TowardZero
+q1396	TraceLevel.Critical TraceLevel.Error TraceLevel.Information TraceLevel.Verbose
+q1397	BinaryOccurrence.Optional BinaryOccurrence.Repeating
+q1398	BufferMode.Delayed
+q1399	ByteOrder.BigEndian
+q1400	ExtraValues.Error ExtraValues.Ignore
+q1401	PercentileMode.ExcelExc PercentileMode.ExcelInc PercentileMode.SqlCont
+q1402	LimitClauseKind.AnsiSql2008 LimitClauseKind.Limit LimitClauseKind.LimitOffset LimitClauseKind.None

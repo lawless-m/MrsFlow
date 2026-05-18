@@ -177,13 +177,13 @@ pub fn root_env() -> Env {
         env = env.extend(name.to_string(), Value::Number(n));
     }
 
-    // ExtraValues.* constants — Table.FromList extraValues arg. Per M spec:
-    // List = 0 (excess goes into the last column as a list), Ignore = 1
-    // (excess is dropped), Error = 2 (excess raises an error).
+    // ExtraValues.* constants — Table.FromList extraValues arg.
+    // Per PQ/Excel ordinals: List = 0 (excess goes into the last column
+    // as a list), Error = 1 (excess raises), Ignore = 2 (excess dropped).
     for (name, n) in [
         ("ExtraValues.List",   0.0),
-        ("ExtraValues.Ignore", 1.0),
-        ("ExtraValues.Error",  2.0),
+        ("ExtraValues.Error",  1.0),
+        ("ExtraValues.Ignore", 2.0),
     ] {
         env = env.extend(name.to_string(), Value::Number(n));
     }
@@ -221,14 +221,15 @@ pub fn root_env() -> Env {
     }
 
     // PercentileMode.* constants — List.Percentile options.PercentileMode.
-    // ExcelInc (default): linear interpolation, rank = p*(n-1) — matches
-    // Excel PERCENTILE.INC. Other modes are documented in M but not
-    // implemented here (rejected at runtime with a clear message).
+    // ExcelInc (default, ordinal 1): linear interpolation, rank = p*(n-1)
+    // — matches Excel PERCENTILE.INC. Other modes are documented in M
+    // but not implemented here (rejected at runtime with a clear message).
+    // PQ ordinals.
     for (name, n) in [
-        ("PercentileMode.ExcelInc", 0.0),
-        ("PercentileMode.ExcelExc", 1.0),
-        ("PercentileMode.SqlCont",  2.0),
+        ("PercentileMode.ExcelInc", 1.0),
+        ("PercentileMode.ExcelExc", 2.0),
         ("PercentileMode.SqlDisc",  3.0),
+        ("PercentileMode.SqlCont",  4.0),
     ] {
         env = env.extend(name.to_string(), Value::Number(n));
     }
@@ -271,17 +272,18 @@ pub fn root_env() -> Env {
     }
 
     // Compression.* constants — Binary.Compress/Decompress compressionType arg.
-    // The first four are real (Binary.Compress dispatches on these); LZ4 /
-    // Snappy / Zstandard are registered for PQ-parity, with Binary.Compress
-    // erroring out clearly if asked to actually use one.
+    // Ordinals match Excel/PQ. The first four are really implemented (Binary.
+    // Compress dispatches on these); LZ4 / Snappy / Zstandard are registered
+    // for PQ-parity, with Binary.Compress erroring out clearly if asked to
+    // actually use one.
     for (name, n) in [
-        ("Compression.None",       0.0),
-        ("Compression.GZip",       1.0),
-        ("Compression.Deflate",    2.0),
-        ("Compression.Brotli",     3.0),
-        ("Compression.LZ4",        4.0),
-        ("Compression.Snappy",     5.0),
-        ("Compression.Zstandard",  6.0),
+        ("Compression.None",       -1.0),
+        ("Compression.GZip",        0.0),
+        ("Compression.Deflate",     1.0),
+        ("Compression.Snappy",      2.0),
+        ("Compression.Brotli",      3.0),
+        ("Compression.LZ4",         4.0),
+        ("Compression.Zstandard",   5.0),
     ] {
         env = env.extend(name.to_string(), Value::Number(n));
     }
@@ -295,27 +297,30 @@ pub fn root_env() -> Env {
     }
 
     // RoundingMode.* constants — Number.Round's 3rd argument.
+    // Ordinals match Excel/PQ.
     for (name, n) in [
-        ("RoundingMode.AwayFromZero", 0.0),
+        ("RoundingMode.Up",           0.0),
         ("RoundingMode.Down",         1.0),
-        ("RoundingMode.ToEven",       2.0),
+        ("RoundingMode.AwayFromZero", 2.0),
         ("RoundingMode.TowardZero",   3.0),
-        ("RoundingMode.Up",           4.0),
+        ("RoundingMode.ToEven",       4.0),
     ] {
         env = env.extend(name.to_string(), Value::Number(n));
     }
 
     // JoinAlgorithm.* — Table.Join / Table.NestedJoin algorithm hint.
-    // mrsflow has a single working join algorithm and ignores the hint;
-    // the constants are registered for PQ parity so source compiles.
+    // PQ ordinals (Dynamic, PairwiseHash, SortMerge values are
+    // MS-doc-default — Oracle confirmed LeftHash=3, LeftIndex=5,
+    // RightHash=4, RightIndex=6). mrsflow has a single working join
+    // algorithm and ignores the hint.
     for (name, n) in [
         ("JoinAlgorithm.Dynamic",       0.0),
-        ("JoinAlgorithm.LeftHash",      1.0),
-        ("JoinAlgorithm.LeftIndex",     2.0),
-        ("JoinAlgorithm.PairwiseHash",  3.0),
+        ("JoinAlgorithm.PairwiseHash",  1.0),
+        ("JoinAlgorithm.SortMerge",     2.0),
+        ("JoinAlgorithm.LeftHash",      3.0),
         ("JoinAlgorithm.RightHash",     4.0),
-        ("JoinAlgorithm.RightIndex",    5.0),
-        ("JoinAlgorithm.SortMerge",     6.0),
+        ("JoinAlgorithm.LeftIndex",     5.0),
+        ("JoinAlgorithm.RightIndex",    6.0),
     ] {
         env = env.extend(name.to_string(), Value::Number(n));
     }
@@ -330,30 +335,28 @@ pub fn root_env() -> Env {
     }
 
     // BinaryOccurrence.* — BinaryFormat.Choice / BinaryFormat.List
-    // occurrence enum (no real implementation yet — BinaryFormat itself
-    // is a future slice — but the constants are exposed for PQ parity).
+    // occurrence enum. PQ/Excel ordinals.
     for (name, n) in [
         ("BinaryOccurrence.Optional",  0.0),
-        ("BinaryOccurrence.Repeating", 1.0),
-        ("BinaryOccurrence.Required",  2.0),
+        ("BinaryOccurrence.Required",  1.0),
+        ("BinaryOccurrence.Repeating", 2.0),
     ] {
         env = env.extend(name.to_string(), Value::Number(n));
     }
 
-    // BufferMode.* — *.Buffer mode (Eager / Delayed). mrsflow doesn't
-    // change buffering behaviour based on this hint; the constants exist
-    // so source compiles.
+    // BufferMode.* — *.Buffer mode. PQ ordinals.
+    // mrsflow doesn't change buffering behaviour based on this hint.
     for (name, n) in [
-        ("BufferMode.Delayed", 0.0),
         ("BufferMode.Eager",   1.0),
+        ("BufferMode.Delayed", 2.0),
     ] {
         env = env.extend(name.to_string(), Value::Number(n));
     }
 
-    // ByteOrder.* — BinaryFormat byte-order enum.
+    // ByteOrder.* — BinaryFormat byte-order enum. PQ ordinals.
     for (name, n) in [
-        ("ByteOrder.BigEndian",    0.0),
-        ("ByteOrder.LittleEndian", 1.0),
+        ("ByteOrder.LittleEndian", 0.0),
+        ("ByteOrder.BigEndian",    1.0),
     ] {
         env = env.extend(name.to_string(), Value::Number(n));
     }
@@ -368,15 +371,15 @@ pub fn root_env() -> Env {
         env = env.extend(name.to_string(), Value::Number(n));
     }
 
-    // LimitClauseKind.* — SQL-folding LIMIT/TOP dialect enum. Only
-    // meaningful inside connector folding code; registered as constants
-    // for PQ parity.
+    // LimitClauseKind.* — SQL-folding LIMIT/TOP dialect enum. PQ ordinals.
+    // Only meaningful inside connector folding code; registered as
+    // constants for PQ parity.
     for (name, n) in [
-        ("LimitClauseKind.AnsiSql2008", 0.0),
-        ("LimitClauseKind.Limit",       1.0),
+        ("LimitClauseKind.None",        0.0),
+        ("LimitClauseKind.Top",         1.0),
         ("LimitClauseKind.LimitOffset", 2.0),
-        ("LimitClauseKind.None",        3.0),
-        ("LimitClauseKind.Top",         4.0),
+        ("LimitClauseKind.Limit",       3.0),
+        ("LimitClauseKind.AnsiSql2008", 4.0),
     ] {
         env = env.extend(name.to_string(), Value::Number(n));
     }
@@ -442,12 +445,14 @@ pub fn root_env() -> Env {
     }
 
     // TraceLevel.* constants — Diagnostics.Trace traceLevel argument.
+    // PQ/Excel ordinals are powers-of-two-like (Warning=4, Information=8,
+    // Verbose=16) so they can be OR'd together for filtering.
     for (name, n) in [
-        ("TraceLevel.Critical",    1.0),
-        ("TraceLevel.Error",       2.0),
-        ("TraceLevel.Warning",     3.0),
-        ("TraceLevel.Information", 4.0),
-        ("TraceLevel.Verbose",     5.0),
+        ("TraceLevel.Critical",     1.0),
+        ("TraceLevel.Error",        2.0),
+        ("TraceLevel.Warning",      4.0),
+        ("TraceLevel.Information",  8.0),
+        ("TraceLevel.Verbose",     16.0),
     ] {
         env = env.extend(name.to_string(), Value::Number(n));
     }

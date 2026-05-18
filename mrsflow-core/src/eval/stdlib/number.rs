@@ -1288,20 +1288,21 @@ fn round(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         Some(Value::Null) | None => 0,
         Some(other) => return Err(type_mismatch("number or null", other)),
     };
-    // RoundingMode: 0 AwayFromZero, 1 Down, 2 ToEven (default), 3 TowardZero, 4 Up.
+    // RoundingMode (PQ/Excel ordinals): 0 Up, 1 Down, 2 AwayFromZero,
+    // 3 TowardZero, 4 ToEven (default).
     let mode = match args.get(2) {
         Some(Value::Number(m)) => *m as i32,
-        Some(Value::Null) | None => 2,
+        Some(Value::Null) | None => 4,
         Some(other) => return Err(type_mismatch("number or null", other)),
     };
     let factor = 10f64.powi(digits);
     let scaled = n * factor;
     let rounded = match mode {
-        0 => scaled.round(),                    // AwayFromZero (Rust's f64::round)
+        0 => scaled.ceil(),                     // Up
         1 => scaled.floor(),                    // Down
-        2 => round_half_to_even(scaled),        // ToEven (banker's)
+        2 => scaled.round(),                    // AwayFromZero (Rust's f64::round)
         3 => scaled.trunc(),                    // TowardZero
-        4 => scaled.ceil(),                     // Up
+        4 => round_half_to_even(scaled),        // ToEven (banker's)
         _ => return Err(MError::Other(format!("Number.Round: unknown rounding mode {mode}"))),
     };
     Ok(Value::Number(rounded / factor))

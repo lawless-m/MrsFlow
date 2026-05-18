@@ -322,10 +322,12 @@ enum Compression {
 }
 
 fn parse_compression(v: &Value, ctx: &str) -> Result<Compression, MError> {
+    // PQ Compression.* ordinals: None=-1, GZip=0, Deflate=1, Snappy=2,
+    // Brotli=3, LZ4=4, Zstandard=5. The first four are real here.
     match v {
-        Value::Number(n) if *n == 0.0 => Ok(Compression::None),
-        Value::Number(n) if *n == 1.0 => Ok(Compression::GZip),
-        Value::Number(n) if *n == 2.0 => Ok(Compression::Deflate),
+        Value::Number(n) if *n == -1.0 => Ok(Compression::None),
+        Value::Number(n) if *n == 0.0 => Ok(Compression::GZip),
+        Value::Number(n) if *n == 1.0 => Ok(Compression::Deflate),
         Value::Number(n) if *n == 3.0 => Ok(Compression::Brotli),
         other => Err(MError::Other(format!(
             "{ctx}: expected Compression.* constant, got {other:?}"

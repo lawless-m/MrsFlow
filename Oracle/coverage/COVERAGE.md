@@ -30,16 +30,16 @@ Source: q1167.mrsflow.out.
 | Binary | 18 | 18 | 18 | 18 | 0 | 0 | 12 | 0 |
 | BinaryEncoding | 3 | 3 | 3 | 3 | 0 | 0 | 1 | 0 |
 | BinaryFormat | 22 | 22 | 22 | 22 | 0 | 0 | 22 | 13 |
-| BinaryOccurrence | 4 | 4 | 4 | 4 | 0 | 0 | 0 | 0 |
-| BufferMode | 3 | 3 | 3 | 3 | 0 | 0 | 0 | 0 |
+| BinaryOccurrence | 4 | 4 | 4 | 4 | 0 | 0 | 2 | 0 |
+| BufferMode | 3 | 3 | 3 | 3 | 0 | 0 | 1 | 0 |
 | Byte | 2 | 2 | 2 | 2 | 0 | 0 | 2 | 0 |
-| ByteOrder | 3 | 3 | 3 | 3 | 0 | 0 | 0 | 0 |
+| ByteOrder | 3 | 3 | 3 | 3 | 0 | 0 | 1 | 0 |
 | Certificate | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Character | 3 | 3 | 3 | 3 | 0 | 0 | 2 | 0 |
 | Combiner | 5 | 5 | 5 | 5 | 0 | 0 | 5 | 0 |
 | CommonDataService | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Comparer | 4 | 4 | 4 | 4 | 0 | 0 | 4 | 0 |
-| Compression | 8 | 8 | 8 | 8 | 0 | 0 | 0 | 0 |
+| Compression | 8 | 8 | 8 | 8 | 0 | 0 | 6 | 0 |
 | Csv | 1 | 1 | 1 | 1 | 0 | 0 | 1 | 0 |
 | CsvStyle | 3 | 3 | 3 | 3 | 0 | 0 | 0 | 0 |
 | Cube | 16 | 16 | 0 | 0 | 16 | 0 | 0 | 0 |
@@ -61,7 +61,7 @@ Source: q1167.mrsflow.out.
 | Excel | 4 | 4 | 3 | 3 | 1 | 0 | 1 | 0 |
 | Exchange | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Expression | 3 | 3 | 3 | 3 | 0 | 0 | 3 | 1 |
-| ExtraValues | 4 | 4 | 4 | 4 | 0 | 0 | 0 | 0 |
+| ExtraValues | 4 | 4 | 4 | 4 | 0 | 0 | 2 | 0 |
 | Fabric | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | File | 2 | 1 | 2 | 1 | 0 | 1 | 1 | 1 |
 | Folder | 2 | 2 | 2 | 2 | 0 | 0 | 1 | 0 |
@@ -90,7 +90,7 @@ Source: q1167.mrsflow.out.
 | Json | 2 | 2 | 2 | 2 | 0 | 0 | 2 | 0 |
 | Kusto | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
 | Lakehouse | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
-| LimitClauseKind | 6 | 6 | 6 | 6 | 0 | 0 | 0 | 0 |
+| LimitClauseKind | 6 | 6 | 6 | 6 | 0 | 0 | 4 | 0 |
 | Lines | 4 | 4 | 4 | 4 | 0 | 0 | 3 | 0 |
 | List | 72 | 72 | 71 | 71 | 1 | 0 | 66 | 1 |
 | Logical | 4 | 4 | 4 | 4 | 0 | 0 | 4 | 0 |
@@ -112,7 +112,7 @@ Source: q1167.mrsflow.out.
 | Password | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Pdf | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Percentage | 2 | 2 | 2 | 2 | 0 | 0 | 2 | 0 |
-| PercentileMode | 5 | 5 | 4 | 4 | 1 | 0 | 0 | 0 |
+| PercentileMode | 5 | 5 | 4 | 4 | 1 | 0 | 3 | 0 |
 | PostgreSQL | 2 | 1 | 2 | 1 | 0 | 1 | 0 | 0 |
 | PowerPlatform | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Precision | 3 | 3 | 3 | 3 | 0 | 0 | 0 | 0 |
@@ -124,7 +124,7 @@ Source: q1167.mrsflow.out.
 | RelativePosition | 3 | 3 | 0 | 0 | 3 | 0 | 0 | 0 |
 | Replacer | 2 | 2 | 2 | 2 | 0 | 0 | 2 | 0 |
 | Resource | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
-| RoundingMode | 6 | 6 | 6 | 6 | 0 | 0 | 0 | 0 |
+| RoundingMode | 6 | 6 | 6 | 6 | 0 | 0 | 4 | 0 |
 | RowExpression | 3 | 3 | 0 | 0 | 3 | 0 | 0 | 0 |
 | Salesforce | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
 | SapBusinessWarehouse | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
@@ -146,7 +146,7 @@ Source: q1167.mrsflow.out.
 | TextEncoding | 7 | 7 | 6 | 6 | 1 | 0 | 5 | 0 |
 | Time | 10 | 10 | 10 | 10 | 0 | 0 | 8 | 0 |
 | TimeZone | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
-| TraceLevel | 6 | 6 | 5 | 5 | 1 | 0 | 0 | 0 |
+| TraceLevel | 6 | 6 | 5 | 5 | 1 | 0 | 4 | 0 |
 | Type | 25 | 25 | 24 | 24 | 1 | 0 | 12 | 0 |
 | Uri | 5 | 5 | 5 | 5 | 0 | 0 | 3 | 0 |
 | Value | 27 | 27 | 26 | 26 | 1 | 0 | 14 | 0 |
@@ -155,7 +155,7 @@ Source: q1167.mrsflow.out.
 | WebAction | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | WebMethod | 7 | 7 | 7 | 7 | 0 | 0 | 0 | 0 |
 | Xml | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| **TOTAL** | 860 | 856 | 720 | 716 | 140 | 4 | 523 | 19 |
+| **TOTAL** | 860 | 856 | 720 | 716 | 140 | 4 | 550 | 19 |
 
 ## Per-name detail
 
@@ -227,16 +227,16 @@ Source: q1167.mrsflow.out.
 | `BinaryFormat.UnsignedInteger16` | Y | Y | function | q1170 q1178 | DIFF |
 | `BinaryFormat.UnsignedInteger32` | Y | Y | function | q1170 q1176 | DIFF |
 | `BinaryFormat.UnsignedInteger64` | Y | Y | function | q1343 | MATCH |
-| `BinaryOccurrence.Optional` | Y | Y | constant |  |  |
-| `BinaryOccurrence.Repeating` | Y | Y | constant |  |  |
+| `BinaryOccurrence.Optional` | Y | Y | constant | q1397 | MATCH |
+| `BinaryOccurrence.Repeating` | Y | Y | constant | q1397 | MATCH |
 | `BinaryOccurrence.Required` | Y | Y | constant |  |  |
 | `BinaryOccurrence.Type` | Y | Y | constant |  |  |
-| `BufferMode.Delayed` | Y | Y | constant |  |  |
+| `BufferMode.Delayed` | Y | Y | constant | q1398 | MATCH |
 | `BufferMode.Eager` | Y | Y | constant |  |  |
 | `BufferMode.Type` | Y | Y | constant |  |  |
 | `Byte.From` | Y | Y | function | q1286 | MATCH |
 | `Byte.Type` | Y | Y | constant | q1284 | MATCH |
-| `ByteOrder.BigEndian` | Y | Y | constant |  |  |
+| `ByteOrder.BigEndian` | Y | Y | constant | q1399 | MATCH |
 | `ByteOrder.LittleEndian` | Y | Y | constant |  |  |
 | `ByteOrder.Type` | Y | Y | constant |  |  |
 | `Certificate.Type` | Y |  | missing |  |  |
@@ -253,12 +253,12 @@ Source: q1167.mrsflow.out.
 | `Comparer.FromCulture` | Y | Y | function | q127 q384 q1120 | MATCH |
 | `Comparer.Ordinal` | Y | Y | function | q124 q381 q385 q1119 | MATCH |
 | `Comparer.OrdinalIgnoreCase` | Y | Y | function | q125 q126 q382 q857 q1119 | MATCH |
-| `Compression.Brotli` | Y | Y | constant |  |  |
-| `Compression.Deflate` | Y | Y | constant |  |  |
-| `Compression.GZip` | Y | Y | constant |  |  |
-| `Compression.LZ4` | Y | Y | constant |  |  |
-| `Compression.None` | Y | Y | constant |  |  |
-| `Compression.Snappy` | Y | Y | constant |  |  |
+| `Compression.Brotli` | Y | Y | constant | q1394 | MATCH |
+| `Compression.Deflate` | Y | Y | constant | q1394 | MATCH |
+| `Compression.GZip` | Y | Y | constant | q1394 | MATCH |
+| `Compression.LZ4` | Y | Y | constant | q1394 | MATCH |
+| `Compression.None` | Y | Y | constant | q1394 | MATCH |
+| `Compression.Snappy` | Y | Y | constant | q1394 | MATCH |
 | `Compression.Type` | Y | Y | constant |  |  |
 | `Compression.Zstandard` | Y | Y | constant |  |  |
 | `Csv.Document` | Y | Y | function | q10 q236 q237 q238 q239 q240 q1088 q1089 q1090 q1091 q1092 | MATCH |
@@ -427,8 +427,8 @@ Source: q1167.mrsflow.out.
 | `Expression.Constant` | Y | Y | function | q1378 | MATCH |
 | `Expression.Evaluate` | Y | Y | function | q401 q402 q403 q404 q405 q1167 q1184 | MIXED |
 | `Expression.Identifier` | Y | Y | function | q1379 | MATCH |
-| `ExtraValues.Error` | Y | Y | constant |  |  |
-| `ExtraValues.Ignore` | Y | Y | constant |  |  |
+| `ExtraValues.Error` | Y | Y | constant | q1400 | MATCH |
+| `ExtraValues.Ignore` | Y | Y | constant | q1400 | MATCH |
 | `ExtraValues.List` | Y | Y | constant |  |  |
 | `ExtraValues.Type` | Y | Y | constant |  |  |
 | `Fabric.Warehouse` | Y |  | missing |  |  |
@@ -503,10 +503,10 @@ Source: q1167.mrsflow.out.
 | `Kusto.Contents` | Y |  | missing |  |  |
 | `Kusto.Databases` | Y |  | missing |  |  |
 | `Lakehouse.Contents` | Y |  | missing |  |  |
-| `LimitClauseKind.AnsiSql2008` | Y | Y | constant |  |  |
-| `LimitClauseKind.Limit` | Y | Y | constant |  |  |
-| `LimitClauseKind.LimitOffset` | Y | Y | constant |  |  |
-| `LimitClauseKind.None` | Y | Y | constant |  |  |
+| `LimitClauseKind.AnsiSql2008` | Y | Y | constant | q1402 | MATCH |
+| `LimitClauseKind.Limit` | Y | Y | constant | q1402 | MATCH |
+| `LimitClauseKind.LimitOffset` | Y | Y | constant | q1402 | MATCH |
+| `LimitClauseKind.None` | Y | Y | constant | q1402 | MATCH |
 | `LimitClauseKind.Top` | Y | Y | constant |  |  |
 | `LimitClauseKind.Type` | Y | Y | constant |  |  |
 | `Lines.FromBinary` | Y | Y | function | q1386 | MATCH |
@@ -672,9 +672,9 @@ Source: q1167.mrsflow.out.
 | `Pdf.Tables` | Y |  | missing |  |  |
 | `Percentage.From` | Y | Y | function | q461 q462 q464 q465 | MATCH |
 | `Percentage.Type` | Y | Y | constant | q1283 | MATCH |
-| `PercentileMode.ExcelExc` | Y | Y | constant |  |  |
-| `PercentileMode.ExcelInc` | Y | Y | constant |  |  |
-| `PercentileMode.SqlCont` | Y | Y | constant |  |  |
+| `PercentileMode.ExcelExc` | Y | Y | constant | q1401 | MATCH |
+| `PercentileMode.ExcelInc` | Y | Y | constant | q1401 | MATCH |
+| `PercentileMode.SqlCont` | Y | Y | constant | q1401 | MATCH |
 | `PercentileMode.SqlDisc` | Y | Y | constant |  |  |
 | `PercentileMode.Type` | Y |  | missing |  |  |
 | `PostgreSQL.Database` | Y | Y | function |  |  |
@@ -716,10 +716,10 @@ Source: q1167.mrsflow.out.
 | `Replacer.ReplaceText` | Y | Y | function | q167 q187 q602 q1006 q1131 q1133 q1135 | MATCH |
 | `Replacer.ReplaceValue` | Y | Y | function | q166 q168 q186 q190 q601 q603 q604 q1004 q1005 q1007 q1010 q1130 q1132 q1134 q1142 | MATCH |
 | `Resource.Access` | Y |  | missing |  |  |
-| `RoundingMode.AwayFromZero` | Y | Y | constant |  |  |
-| `RoundingMode.Down` | Y | Y | constant |  |  |
-| `RoundingMode.ToEven` | Y | Y | constant |  |  |
-| `RoundingMode.TowardZero` | Y | Y | constant |  |  |
+| `RoundingMode.AwayFromZero` | Y | Y | constant | q1395 | MATCH |
+| `RoundingMode.Down` | Y | Y | constant | q1395 | MATCH |
+| `RoundingMode.ToEven` | Y | Y | constant | q1395 | MATCH |
+| `RoundingMode.TowardZero` | Y | Y | constant | q1395 | MATCH |
 | `RoundingMode.Type` | Y | Y | constant |  |  |
 | `RoundingMode.Up` | Y | Y | constant |  |  |
 | `RowExpression.Column` | Y |  | missing |  |  |
@@ -942,11 +942,11 @@ Source: q1167.mrsflow.out.
 | `Time.ToText` | Y | Y | function | q162 q453 | MATCH |
 | `Time.Type` | Y | Y | constant |  |  |
 | `TimeZone.Current` | Y | Y | function |  |  |
-| `TraceLevel.Critical` | Y | Y | constant |  |  |
-| `TraceLevel.Error` | Y | Y | constant |  |  |
-| `TraceLevel.Information` | Y | Y | constant |  |  |
+| `TraceLevel.Critical` | Y | Y | constant | q1396 | MATCH |
+| `TraceLevel.Error` | Y | Y | constant | q1396 | MATCH |
+| `TraceLevel.Information` | Y | Y | constant | q1396 | MATCH |
 | `TraceLevel.Type` | Y |  | missing |  |  |
-| `TraceLevel.Verbose` | Y | Y | constant |  |  |
+| `TraceLevel.Verbose` | Y | Y | constant | q1396 | MATCH |
 | `TraceLevel.Warning` | Y | Y | constant |  |  |
 | `Type.AddTableKey` | Y | Y | function |  |  |
 | `Type.ClosedRecord` | Y | Y | function | q1242 | MATCH |
