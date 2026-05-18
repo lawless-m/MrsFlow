@@ -211,11 +211,13 @@ pub fn root_env() -> Env {
 
     // Occurrence.* constants — *.PositionOf / *.PositionOfAny occurrence arg.
     // First (default) returns the first match index (or -1); Last returns
-    // the last; All returns a list of every match index.
+    // the last; All returns a list of every match index. Optional is an
+    // alias for First (Excel exposes both names with ordinal 0).
     for (name, n) in [
-        ("Occurrence.First", 0.0),
-        ("Occurrence.Last",  1.0),
-        ("Occurrence.All",   2.0),
+        ("Occurrence.First",    0.0),
+        ("Occurrence.Last",     1.0),
+        ("Occurrence.All",      2.0),
+        ("Occurrence.Optional", 0.0),
     ] {
         env = env.extend(name.to_string(), Value::Number(n));
     }

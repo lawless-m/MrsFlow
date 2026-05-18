@@ -12009,7 +12009,33 @@ let
         // NativeTypeName, NativeDefaultExpression, NativeExpression).
         // Previously parked: mrsflow returned an empty record.
         SafeSerialize("q1415", () =>
-            Type.Facets(type number))
+            Type.Facets(type number)),
+        // q1416-q1425: enum-constant list round-trips. Previously parked
+        // (ordinals diverged); after the fix-2 batch and this loop's
+        // Occurrence.Optional alias, all 10 byte-match Excel.
+        SafeSerialize("q1416", () =>
+            { Compression.None, Compression.GZip, Compression.Deflate, Compression.Brotli }),
+        SafeSerialize("q1417", () =>
+            { BinaryOccurrence.Required, BinaryOccurrence.Optional, BinaryOccurrence.Repeating }),
+        SafeSerialize("q1418", () =>
+            { BufferMode.Eager, BufferMode.Delayed }),
+        SafeSerialize("q1419", () =>
+            { ByteOrder.LittleEndian, ByteOrder.BigEndian }),
+        SafeSerialize("q1420", () =>
+            { ExtraValues.List, ExtraValues.Error, ExtraValues.Ignore }),
+        SafeSerialize("q1421", () =>
+            { TraceLevel.Critical, TraceLevel.Error, TraceLevel.Warning,
+              TraceLevel.Information, TraceLevel.Verbose }),
+        SafeSerialize("q1422", () =>
+            { RoundingMode.Up, RoundingMode.Down, RoundingMode.AwayFromZero,
+              RoundingMode.TowardZero, RoundingMode.ToEven }),
+        SafeSerialize("q1423", () =>
+            { Occurrence.First, Occurrence.Last, Occurrence.All, Occurrence.Optional }),
+        SafeSerialize("q1424", () =>
+            { Order.Ascending, Order.Descending }),
+        SafeSerialize("q1425", () =>
+            { PercentileMode.ExcelInc, PercentileMode.ExcelExc,
+              PercentileMode.SqlCont, PercentileMode.SqlDisc })
     },
 
     Catalog = Table.FromRecords(cases)
