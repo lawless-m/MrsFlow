@@ -1401,3 +1401,4 @@ q1399	ByteOrder.BigEndian
 q1400	ExtraValues.Error ExtraValues.Ignore
 q1401	PercentileMode.ExcelExc PercentileMode.ExcelInc PercentileMode.SqlCont
 q1402	LimitClauseKind.AnsiSql2008 LimitClauseKind.Limit LimitClauseKind.LimitOffset LimitClauseKind.None
+q1403	Value.NullableEquals

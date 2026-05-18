@@ -149,13 +149,13 @@ Source: q1167.mrsflow.out.
 | TraceLevel | 6 | 6 | 5 | 5 | 1 | 0 | 4 | 0 |
 | Type | 25 | 25 | 24 | 24 | 1 | 0 | 12 | 0 |
 | Uri | 5 | 5 | 5 | 5 | 0 | 0 | 3 | 0 |
-| Value | 27 | 27 | 26 | 26 | 1 | 0 | 14 | 0 |
+| Value | 27 | 27 | 26 | 26 | 1 | 0 | 15 | 0 |
 | Variable | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
 | Web | 4 | 4 | 4 | 4 | 0 | 0 | 0 | 0 |
 | WebAction | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | WebMethod | 7 | 7 | 7 | 7 | 0 | 0 | 0 | 0 |
 | Xml | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| **TOTAL** | 860 | 856 | 720 | 716 | 140 | 4 | 550 | 19 |
+| **TOTAL** | 860 | 856 | 720 | 716 | 140 | 4 | 551 | 19 |
 
 ## Per-name detail
 
@@ -992,7 +992,7 @@ Source: q1167.mrsflow.out.
 | `Value.Metadata` | Y | Y | function | q1268 q1270 | MATCH |
 | `Value.Multiply` | Y | Y | function | q1265 | MATCH |
 | `Value.NativeQuery` | Y | Y | function |  |  |
-| `Value.NullableEquals` | Y | Y | function |  |  |
+| `Value.NullableEquals` | Y | Y | function | q1403 | MATCH |
 | `Value.Optimize` | Y | Y | function |  |  |
 | `Value.RemoveMetadata` | Y | Y | function | q1269 | MATCH |
 | `Value.ReplaceMetadata` | Y | Y | function | q1270 | MATCH |

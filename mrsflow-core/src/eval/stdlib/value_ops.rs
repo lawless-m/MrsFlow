@@ -762,6 +762,10 @@ fn nullable_equals(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     if !matches!(args.get(2), Some(Value::Null) | None) {
         return Err(type_mismatch("function or null (comparer)", &args[2]));
     }
-    // null only equals null.
+    // Three-valued logic per PQ: if either operand is null, the result
+    // is null. Otherwise normal deep equality returns a bool.
+    if matches!(args[0], Value::Null) || matches!(args[1], Value::Null) {
+        return Ok(Value::Null);
+    }
     Ok(Value::Logical(values_equal_deep(&args[0], &args[1])?))
 }

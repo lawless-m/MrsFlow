@@ -11944,7 +11944,16 @@ let
         SafeSerialize("q1402", () =>
             { LimitClauseKind.AnsiSql2008, LimitClauseKind.Limit,
               LimitClauseKind.LimitOffset, LimitClauseKind.None,
-              LimitClauseKind.Top })
+              LimitClauseKind.Top }),
+        // q1403: Value.NullableEquals — three-valued logic.
+        // Previously parked; mrsflow now returns null when either
+        // operand is null (matching PQ).
+        SafeSerialize("q1403", () =>
+            { Value.NullableEquals(null, null),
+              Value.NullableEquals(null, 1),
+              Value.NullableEquals(1, null),
+              Value.NullableEquals(1, 1),
+              Value.NullableEquals(1, 2) })
     },
 
     Catalog = Table.FromRecords(cases)
