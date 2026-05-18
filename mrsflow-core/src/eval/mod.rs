@@ -758,6 +758,8 @@ fn evaluate_as_type(expr: &Expr, env: &Env, host: &dyn IoHost) -> Result<TypeRep
             "text" => Ok(TypeRep::Text),
             "date" => Ok(TypeRep::Date),
             "datetime" => Ok(TypeRep::Datetime),
+            "datetimezone" => Ok(TypeRep::Datetimezone),
+            "time" => Ok(TypeRep::Time),
             "duration" => Ok(TypeRep::Duration),
             "binary" => Ok(TypeRep::Binary),
             "list" => Ok(TypeRep::List),

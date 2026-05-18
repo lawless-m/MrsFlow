@@ -12100,6 +12100,17 @@ let
         // not serialisable on either engine.
         SafeSerialize("q1446", () =>
             { Compression.LZ4, Compression.Snappy, Compression.Zstandard }),
+        // q1447: Type.Is round-trips using *.Type constants. Previously
+        // would have failed because mrsflow's primitive-type parser
+        // didn't recognise `time` (and `datetimezone`). Now fixed; Excel
+        // and mrsflow agree on the six checks.
+        SafeSerialize("q1447", () =>
+            { Type.Is(type number, Number.Type),
+              Type.Is(type text,   Text.Type),
+              Type.Is(type binary, Binary.Type),
+              Type.Is(type date,   Date.Type),
+              Type.Is(type time,   Time.Type),
+              Type.Is(type logical, Logical.Type) }),
         SafeSerialize("q1437", () =>
             { Precision.Decimal, Precision.Double }),
         SafeSerialize("q1438", () =>
