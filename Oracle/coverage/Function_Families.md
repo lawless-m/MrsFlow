@@ -146,7 +146,7 @@ Counts come from `COVERAGE.md`; refresh both via `render.ps1`.
 | Type | Tested | 25 / 25 | Type-value construction and introspection (Type.Is, RecordFields, TableSchema, etc.). |
 | Uri | Tested | 5 / 5 | URI parsing / building. |
 | Value | Partial | 26 / 27 | Generic value introspection (Compare, Equals, Is, NativeQuery, Metadata). |
-| Variable | Implemented | 2 / 2 | Variable.Value / .ValueOrDefault — env probe. |
+| Variable | Tested | 2 / 2 | Variable.Value / .ValueOrDefault — env probe. |
 | Web | Implemented | 4 / 4 | HTTP-fetching connector (Web.Contents, Web.Headers, Web.Page). |
 | WebAction | Implemented | 1 / 1 | Web.Contents action-request constants. |
 | WebMethod | Tested | 7 / 7 | HTTP verb constants (Get / Post / Put / Delete / Patch / Head). |

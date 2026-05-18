@@ -218,10 +218,25 @@ fn to_record(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
-fn add_zone(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    Err(MError::NotImplemented(
-        "DateTime.AddZone: produces a Datetimezone; pending Datetimezone Value variant",
-    ))
+fn add_zone(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let naive = match &args[0] {
+        Value::Datetime(dt) => *dt,
+        Value::Null => return Ok(Value::Null),
+        other => return Err(type_mismatch("datetime", other)),
+    };
+    let hours = expect_int(&args[1], "DateTime.AddZone: hours")?;
+    let minutes = match args.get(2) {
+        None | Some(Value::Null) => 0,
+        Some(v) => expect_int(v, "DateTime.AddZone: minutes")?,
+    };
+    // Match #datetimezone's sign convention: minutes inherit the sign
+    // of hours when hours is signed, otherwise they're independent.
+    let total_secs = (hours * 3600 + minutes.signum() * (minutes.abs() * 60)) as i32;
+    let offset = chrono::FixedOffset::east_opt(total_secs)
+        .ok_or_else(|| MError::Other(format!(
+            "DateTime.AddZone: offset {hours}h{minutes}m out of range"
+        )))?;
+    Ok(Value::Datetimezone(naive.and_local_timezone(offset).unwrap()))
 }
 
 

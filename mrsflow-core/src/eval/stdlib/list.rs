@@ -230,7 +230,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
             replace_value,
         ),
         ("List.Repeat", two("list", "count"), repeat),
-        ("List.Times", two("value", "count"), times),
+        ("List.Times", three("start", "count", "step"), times),
         (
             "List.ConformToPageReader",
             vec![
@@ -1301,12 +1301,39 @@ fn repeat(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 fn times(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    let value = &args[0];
+    // PQ: List.Times(start as time, count as number, step as duration).
+    // Mirrors the (start, count, step) shape of List.Dates / DateTimes /
+    // DateTimeZones / Durations. Steps that overflow time-of-day wrap
+    // around past midnight, matching PQ.
+    use chrono::Timelike;
+    let start = match &args[0] {
+        Value::Time(t) => *t,
+        other => return Err(type_mismatch("time (start)", other)),
+    };
     let count = match &args[1] {
         Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
         other => return Err(type_mismatch("non-negative integer (count)", other)),
     };
-    Ok(Value::list_of(vec![value.clone(); count]))
+    let step = match &args[2] {
+        Value::Duration(d) => *d,
+        other => return Err(type_mismatch("duration (step)", other)),
+    };
+    let mut out = Vec::with_capacity(count);
+    let step_nanos = step.num_nanoseconds()
+        .ok_or_else(|| MError::Other("List.Times: step too large".into()))?;
+    let start_nanos = (start.num_seconds_from_midnight() as i64) * 1_000_000_000
+        + start.nanosecond() as i64;
+    let day_nanos: i64 = 86_400 * 1_000_000_000;
+    for i in 0..count {
+        let total = start_nanos + step_nanos * (i as i64);
+        let modn = total.rem_euclid(day_nanos);
+        let secs = (modn / 1_000_000_000) as u32;
+        let nano = (modn % 1_000_000_000) as u32;
+        let t = chrono::NaiveTime::from_num_seconds_from_midnight_opt(secs, nano)
+            .ok_or_else(|| MError::Other("List.Times: result out of range".into()))?;
+        out.push(Value::Time(t));
+    }
+    Ok(Value::list_of(out))
 }
 
 /// Power BI engine hook for paged data sources — "intended for internal

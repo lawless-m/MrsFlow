@@ -12173,6 +12173,30 @@ let
                 r = try Binary.ViewError([Reason="x", Message="m", Detail=null]) in
                     if r[HasError] then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
                     else [HasError=false, Value=Value.Is(r[Value], type binary)]),
+        // q1461: DateTime.AddZone — attaches a (hours, minutes) tz
+        // offset to a naive datetime; result is a Datetimezone. Was a
+        // stale stub claiming Datetimezone variant didn't exist.
+        SafeSerialize("q1461", () =>
+            DateTime.AddZone(#datetime(2024,6,15,10,30,0), 1, 30)),
+        // q1462: DateTimeZone.ToLocal converts to the host's local tz.
+        // Both engines run on the same host so the conversion lines up.
+        SafeSerialize("q1462", () =>
+            DateTimeZone.ToLocal(#datetimezone(2024,6,15,10,30,0,5,0))),
+        // q1464: List.DateTimeZones generates a stride of N tz-aware
+        // datetimes from a start + step duration.
+        SafeSerialize("q1464", () =>
+            List.DateTimeZones(#datetimezone(2024,1,1,0,0,0,0,0),
+                               3, #duration(0,12,0,0))),
+        // q1465: List.Times — same (start, count, step) shape as the
+        // other List.* date/time generators. mrsflow previously had a
+        // 2-arg (value, count) "repeat" signature; replaced with PQ's
+        // 3-arg form.
+        SafeSerialize("q1465", () =>
+            List.Times(#time(9,0,0), 4, #duration(0,1,0,0))),
+        // q1466: Variable.ValueOrDefault returns the default when the
+        // identifier doesn't exist in the workbook's parameter table.
+        SafeSerialize("q1466", () =>
+            Variable.ValueOrDefault("NOPE", "fallback")),
         // q1460: Binary.ViewFunction rejects non-function input with PQ's
         // exact coercion-error wording.
         SafeSerialize("q1460", () =>

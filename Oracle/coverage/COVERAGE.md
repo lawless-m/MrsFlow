@@ -47,8 +47,8 @@ Source: q1167.mrsflow.out.
 | Currency | 2 | 2 | 2 | 2 | 0 | 0 | 1 | 0 |
 | DataLake | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
 | Date | 58 | 58 | 58 | 58 | 0 | 0 | 58 | 0 |
-| DateTime | 26 | 26 | 26 | 26 | 0 | 0 | 16 | 0 |
-| DateTimeZone | 16 | 16 | 16 | 16 | 0 | 0 | 12 | 0 |
+| DateTime | 26 | 26 | 26 | 26 | 0 | 0 | 17 | 0 |
+| DateTimeZone | 16 | 16 | 16 | 16 | 0 | 0 | 13 | 0 |
 | Day | 8 | 8 | 8 | 8 | 0 | 0 | 7 | 0 |
 | DB2 | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Decimal | 2 | 2 | 2 | 2 | 0 | 0 | 1 | 0 |
@@ -92,7 +92,7 @@ Source: q1167.mrsflow.out.
 | Lakehouse | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | LimitClauseKind | 6 | 6 | 6 | 6 | 0 | 0 | 5 | 0 |
 | Lines | 4 | 4 | 4 | 4 | 0 | 0 | 4 | 0 |
-| List | 72 | 72 | 72 | 72 | 0 | 0 | 68 | 1 |
+| List | 72 | 72 | 72 | 72 | 0 | 0 | 70 | 1 |
 | Logical | 4 | 4 | 4 | 4 | 0 | 0 | 4 | 0 |
 | MissingField | 4 | 4 | 3 | 3 | 1 | 0 | 2 | 0 |
 | Module | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
@@ -150,12 +150,12 @@ Source: q1167.mrsflow.out.
 | Type | 25 | 25 | 25 | 25 | 0 | 0 | 14 | 0 |
 | Uri | 5 | 5 | 5 | 5 | 0 | 0 | 4 | 0 |
 | Value | 27 | 27 | 26 | 26 | 1 | 0 | 15 | 0 |
-| Variable | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
+| Variable | 2 | 2 | 2 | 2 | 0 | 0 | 1 | 0 |
 | Web | 4 | 4 | 4 | 4 | 0 | 0 | 0 | 0 |
 | WebAction | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | WebMethod | 7 | 7 | 7 | 7 | 0 | 0 | 5 | 0 |
 | Xml | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| **TOTAL** | 860 | 856 | 744 | 740 | 116 | 4 | 600 | 8 |
+| **TOTAL** | 860 | 856 | 744 | 740 | 116 | 4 | 605 | 8 |
 
 ## Per-name detail
 
@@ -344,7 +344,7 @@ Source: q1167.mrsflow.out.
 | `Date.WeekOfMonth` | Y | Y | function | q441 | MATCH |
 | `Date.WeekOfYear` | Y | Y | function | q442 q1064 | MATCH |
 | `Date.Year` | Y | Y | function | q75 q1073 | MATCH |
-| `DateTime.AddZone` | Y | Y | function |  |  |
+| `DateTime.AddZone` | Y | Y | function | q1461 | MATCH |
 | `DateTime.Date` | Y | Y | function | q1073 q1333 q1334 q1335 q1336 q1337 q1338 q1339 q1340 q1344 q1345 q1346 q1347 q1348 q1349 q1350 q1351 q1352 q1353 q1354 q1355 q1356 q1357 q1358 q1359 q1360 q1361 q1362 q1363 q1364 q1365 q1366 q1367 | MATCH |
 | `DateTime.FixedLocalNow` | Y | Y | function |  |  |
 | `DateTime.From` | Y | Y | function | q1067 q1068 | MATCH |
@@ -378,7 +378,7 @@ Source: q1167.mrsflow.out.
 | `DateTimeZone.LocalNow` | Y | Y | function |  |  |
 | `DateTimeZone.RemoveZone` | Y | Y | function | q1069 | MATCH |
 | `DateTimeZone.SwitchZone` | Y | Y | function | q1069 | MATCH |
-| `DateTimeZone.ToLocal` | Y | Y | function |  |  |
+| `DateTimeZone.ToLocal` | Y | Y | function | q1462 | MATCH |
 | `DateTimeZone.ToRecord` | Y | Y | function | q1260 | MATCH |
 | `DateTimeZone.ToText` | Y | Y | function | q185 q1158 q1159 q1160 q1161 q1162 q1163 q1164 | MATCH |
 | `DateTimeZone.ToUtc` | Y | Y | function | q1069 | MATCH |
@@ -528,7 +528,7 @@ Source: q1167.mrsflow.out.
 | `List.Covariance` | Y | Y | function | q1406 | MATCH |
 | `List.Dates` | Y | Y | function | q515 q906 q907 q910 q911 q912 | MATCH |
 | `List.DateTimes` | Y | Y | function | q908 | MATCH |
-| `List.DateTimeZones` | Y | Y | function |  |  |
+| `List.DateTimeZones` | Y | Y | function | q1464 | MATCH |
 | `List.Difference` | Y | Y | function | q88 q134 q135 q136 q524 | MATCH |
 | `List.Distinct` | Y | Y | function | q62 q81 q121 q127 q128 q129 q130 q480 q498 q521 q817 q856 q857 q858 q859 q860 q861 q862 q923 q1146 | MATCH |
 | `List.Durations` | Y | Y | function | q909 | MATCH |
@@ -579,7 +579,7 @@ Source: q1167.mrsflow.out.
 | `List.Split` | Y | Y | function | q1204 | MATCH |
 | `List.StandardDeviation` | Y | Y | function | q645 q895 q898 | MATCH |
 | `List.Sum` | Y | Y | function | q54 q89 q115 q120 q330 q341 q393 q416 q420 q641 q875 q892 q896 q897 q898 q905 q914 q915 q934 q935 q936 q937 q939 q940 q1127 q1138 q1324 | MATCH |
-| `List.Times` | Y | Y | function |  |  |
+| `List.Times` | Y | Y | function | q1465 | MATCH |
 | `List.Transform` | Y | Y | function | q21 q478 q480 q497 q498 q499 q519 q571 q572 q573 q574 q575 q816 q914 q923 q927 q928 q929 q930 q931 q1188 | MATCH |
 | `List.TransformMany` | Y | Y | function | q1207 | MATCH |
 | `List.Type` | Y | Y | constant |  |  |
@@ -1006,7 +1006,7 @@ Source: q1167.mrsflow.out.
 | `Value.ViewError` | Y | Y | function |  |  |
 | `Value.ViewFunction` | Y | Y | function |  |  |
 | `Variable.Value` | Y | Y | function |  |  |
-| `Variable.ValueOrDefault` | Y | Y | function |  |  |
+| `Variable.ValueOrDefault` | Y | Y | function | q1466 | MATCH |
 | `Web.BrowserContents` | Y | Y | function |  |  |
 | `Web.Contents` | Y | Y | function |  |  |
 | `Web.Headers` | Y | Y | function |  |  |
