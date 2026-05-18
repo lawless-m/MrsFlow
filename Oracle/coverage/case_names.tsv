@@ -1478,3 +1478,10 @@ q1486	Type.IsNullable Type.TableColumn
 q1487	Type.IsOpenRecord Type.TableRow
 q1488	Value.Optimize
 q1489	Value.Is Value.ViewFunction
+q1491	Function.From Text.Upper Value.Is
+q1492	Type.ForFunction Type.IsNullable
+q1493	Type.AddTableKey Type.IsNullable
+q1494	Type.IsNullable Type.ReplaceFacets
+q1495	Table.FromRecords Table.RowCount Table.WithErrorContext
+q1496	Value.Alternates
+q1497	Value.Expression Value.Is

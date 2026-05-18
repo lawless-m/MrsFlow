@@ -217,8 +217,12 @@ fn from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 fn expression(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    Err(MError::NotImplemented(
-        "Value.Expression: source expression introspection requires cloud-PQ infra",
+    // PQ raises this exact wording when called on a raw value (i.e.,
+    // anything not run through Value.Optimize). Since mrsflow has no
+    // Value.Optimize that produces optimized-expression handles, the
+    // raw-value path is the only one we ever take.
+    Err(MError::Other(
+        "Value.Expression can only resolve optimized expressions, use: Value.Expression(Value.Optimize(...))".into(),
     ))
 }
 
@@ -270,7 +274,23 @@ fn firewall(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 fn alternates(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    Ok(Value::list_of(vec![args[0].clone()]))
+    // PQ Value.Alternates expects a list; non-list inputs raise a PQ-shaped
+    // "We cannot convert the value <x> to type List." error.
+    match &args[0] {
+        Value::List(_) => Ok(args[0].clone()),
+        Value::Null => Ok(Value::Null),
+        other => {
+            let rendered = match other {
+                Value::Number(n) => format!("{n}"),
+                Value::Text(s) => format!("\"{s}\""),
+                Value::Logical(b) => if *b { "true".into() } else { "false".into() },
+                _ => "(value)".into(),
+            };
+            Err(MError::Other(format!(
+                "We cannot convert the value {rendered} to type List."
+            )))
+        }
+    }
 }
 
 // --- Slice #171: metadata ---

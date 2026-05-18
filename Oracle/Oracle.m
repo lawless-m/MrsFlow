@@ -12279,6 +12279,38 @@ let
         // (return is the same function value).
         SafeSerialize("q1489", () =>
             Value.Is(Value.ViewFunction(Text.Upper), type function)),
+        // q1491: Function.From wraps a List-arg lambda as a positional
+        // function value.
+        SafeSerialize("q1491", () =>
+            let r = try Function.From(type function (s as text) as text, each Text.Upper(_{0})) in
+                if r[HasError] then [HasError=true, Message=r[Error][Message]] else [HasError=false, IsFunc=Value.Is(r[Value], type function)]),
+        // q1492-q1494: Type.ForFunction / Type.AddTableKey / Type.ReplaceFacets
+        // all produce non-nullable Type values; Type.IsNullable is false.
+        SafeSerialize("q1492", () =>
+            let r = try Type.IsNullable(Type.ForFunction([ReturnType=type number, Parameters=[a=type number]], 1)) in
+                if r[HasError] then [HasError=true, Message=r[Error][Message]] else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1493", () =>
+            let r = try Type.IsNullable(Type.AddTableKey(type table [a=number], {"a"}, true)) in
+                if r[HasError] then [HasError=true, Message=r[Error][Message]] else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1494", () =>
+            let r = try Type.IsNullable(Type.ReplaceFacets(type number, [])) in
+                if r[HasError] then [HasError=true, Message=r[Error][Message]] else [HasError=false, Value=r[Value]]),
+        // q1495: Table.WithErrorContext is a passthrough; row count of
+        // a single-row table is 1.
+        SafeSerialize("q1495", () =>
+            let r = try Table.WithErrorContext(Table.FromRecords({[a=1]}), "ctx") in
+                if r[HasError] then [HasError=true, Message=r[Error][Message]] else [HasError=false, RowCount=Table.RowCount(r[Value])]),
+        // q1496: Value.Alternates rejects non-list input with PQ's
+        // exact "We cannot convert the value 42 to type List." wording.
+        SafeSerialize("q1496", () =>
+            let r = try Value.Alternates(42) in
+                if r[HasError] then [HasError=true, Message=r[Error][Message]] else [HasError=false, Value=r[Value]]),
+        // q1497: Value.Expression on a non-optimized value raises PQ's
+        // "Value.Expression can only resolve optimized expressions, use:
+        // Value.Expression(Value.Optimize(...))." wording.
+        SafeSerialize("q1497", () =>
+            let r = try Value.Expression(42) in
+                if r[HasError] then [HasError=true, Message=r[Error][Message]] else [HasError=false, IsRecord=Value.Is(r[Value], type record)]),
         // q1460: Binary.ViewFunction rejects non-function input with PQ's
         // exact coercion-error wording.
         SafeSerialize("q1460", () =>
