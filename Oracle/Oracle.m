@@ -11911,7 +11911,11 @@ let
             DateTimeZone.ZoneHours(DateTimeZone.UtcNow())),
         SafeSerialize("q1392", () =>
             // DateTimeZone.FixedUtcNow's offset is also 0.
-            DateTimeZone.ZoneHours(DateTimeZone.FixedUtcNow()))
+            DateTimeZone.ZoneHours(DateTimeZone.FixedUtcNow())),
+        // q1393: Number.Epsilon — was parked (mrsflow returned f64::EPSILON);
+        // fixed in mrsflow to f64::from_bits(1) = smallest positive denormal.
+        SafeSerialize("q1393", () =>
+            Number.Epsilon)
     },
 
     Catalog = Table.FromRecords(cases)

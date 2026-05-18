@@ -409,7 +409,10 @@ pub fn root_env() -> Env {
     for (name, n) in [
         ("Number.PI",       std::f64::consts::PI),
         ("Number.E",        std::f64::consts::E),
-        ("Number.Epsilon",  f64::EPSILON),
+        // PQ defines Number.Epsilon as the smallest positive denormal
+        // (f64::from_bits(1) ≈ 4.94e-324), NOT machine epsilon
+        // (~2.22e-16). f64::EPSILON is the wrong choice.
+        ("Number.Epsilon",  f64::from_bits(1)),
         ("Number.PositiveInfinity", f64::INFINITY),
         ("Number.NegativeInfinity", f64::NEG_INFINITY),
         ("Number.NaN",      f64::NAN),
