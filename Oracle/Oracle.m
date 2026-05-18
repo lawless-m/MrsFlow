@@ -11965,7 +11965,13 @@ let
         // q1406: List.Covariance — population (n divisor), matches
         // Excel COVAR. mrsflow was using sample (n-1).
         SafeSerialize("q1406", () =>
-            List.Covariance({1.0, 2.0, 3.0, 4.0}, {2.0, 4.0, 5.0, 8.0}))
+            List.Covariance({1.0, 2.0, 3.0, 4.0}, {2.0, 4.0, 5.0, 8.0})),
+        // q1407: List.Alternate — drop count items, keep repeatInterval
+        // items, repeat. Previously parked (mrsflow had repeatInterval
+        // alone as the cycle length; correct cycle is count+repeatInterval).
+        SafeSerialize("q1407", () =>
+            { List.Alternate({1,2,3,4,5,6,7}, 1),
+              List.Alternate({1,2,3,4,5,6}, 1, 1, 1) })
     },
 
     Catalog = Table.FromRecords(cases)

@@ -92,7 +92,7 @@ Source: q1167.mrsflow.out.
 | Lakehouse | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | LimitClauseKind | 6 | 6 | 6 | 6 | 0 | 0 | 4 | 0 |
 | Lines | 4 | 4 | 4 | 4 | 0 | 0 | 4 | 0 |
-| List | 72 | 72 | 71 | 71 | 1 | 0 | 67 | 1 |
+| List | 72 | 72 | 71 | 71 | 1 | 0 | 68 | 1 |
 | Logical | 4 | 4 | 4 | 4 | 0 | 0 | 4 | 0 |
 | MissingField | 4 | 4 | 3 | 3 | 1 | 0 | 2 | 0 |
 | Module | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
@@ -155,7 +155,7 @@ Source: q1167.mrsflow.out.
 | WebAction | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | WebMethod | 7 | 7 | 7 | 7 | 0 | 0 | 0 | 0 |
 | Xml | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| **TOTAL** | 860 | 856 | 720 | 716 | 140 | 4 | 554 | 19 |
+| **TOTAL** | 860 | 856 | 720 | 716 | 140 | 4 | 555 | 19 |
 
 ## Per-name detail
 
@@ -515,7 +515,7 @@ Source: q1167.mrsflow.out.
 | `Lines.ToText` | Y | Y | function | q300 q1094 | MATCH |
 | `List.Accumulate` | Y | Y | function | q163 q164 q165 q196 q197 q198 q199 q200 q863 q864 q865 q866 q867 q868 q869 | MATCH |
 | `List.AllTrue` | Y | Y | function | q478 q499 q516 q518 q519 q520 q816 | MATCH |
-| `List.Alternate` | Y | Y | function |  |  |
+| `List.Alternate` | Y | Y | function | q1407 | MATCH |
 | `List.AnyTrue` | Y | Y | function | q517 q518 q520 | MATCH |
 | `List.Average` | Y | Y | function | q55 q642 q892 q896 q898 q923 q937 | MATCH |
 | `List.Buffer` | Y | Y | function | q341 q342 q344 q913 q914 q915 q916 q917 q918 q919 | MATCH |

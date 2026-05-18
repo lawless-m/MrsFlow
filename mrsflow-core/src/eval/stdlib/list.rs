@@ -1320,33 +1320,40 @@ fn conform_to_page_reader(args: &[Value], _host: &dyn IoHost) -> Result<Value, M
 }
 
 fn alternate(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    // PQ semantics: from `offset`, drop `count` items, then keep
+    // `repeatInterval` items, then repeat the (drop count, keep
+    // repeatInterval) cycle. Excel's behaviour for List.Alternate
+    // with no repeatInterval is "drop once and stop" — i.e., default
+    // repeatInterval is unbounded, not count. Items before `offset`
+    // are kept untouched.
     let list = expect_list(&args[0])?;
     let count = match &args[1] {
         Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
         other => return Err(type_mismatch("non-negative integer (count)", other)),
-    };
-    let repeat_interval = match args.get(2) {
-        Some(Value::Number(n)) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
-        Some(Value::Null) | None => count + 1,
-        Some(other) => return Err(type_mismatch("non-negative integer (repeatInterval)", other)),
     };
     let offset = match args.get(3) {
         Some(Value::Number(n)) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
         Some(Value::Null) | None => 0,
         Some(other) => return Err(type_mismatch("non-negative integer (offset)", other)),
     };
-    if repeat_interval == 0 {
-        return Err(MError::Other("List.Alternate: repeatInterval must be > 0".into()));
+    // Default repeatInterval = list length (effectively unbounded after the
+    // first drop window). User-supplied value triggers the cyclic mode.
+    let repeat_interval = match args.get(2) {
+        Some(Value::Number(n)) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
+        Some(Value::Null) | None => list.len().saturating_sub(offset).saturating_sub(count).max(1),
+        Some(other) => return Err(type_mismatch("non-negative integer (repeatInterval)", other)),
+    };
+    let stride = count + repeat_interval;
+    if stride == 0 {
+        return Err(MError::Other("List.Alternate: count + repeatInterval must be > 0".into()));
     }
     let mut out: Vec<Value> = Vec::with_capacity(list.len());
     for (i, v) in list.iter().enumerate() {
-        // Position within the cycle starting at offset; values within `count`
-        // window are dropped, rest kept.
         if i < offset {
             out.push(v.clone());
             continue;
         }
-        let cycle_pos = (i - offset) % repeat_interval;
+        let cycle_pos = (i - offset) % stride;
         if cycle_pos >= count {
             out.push(v.clone());
         }
