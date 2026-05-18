@@ -1784,19 +1784,21 @@ fn standard_deviation(args: &[Value], _host: &dyn IoHost) -> Result<Value, MErro
 }
 
 fn covariance(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    // PQ matches Excel's COVAR (population covariance, n divisor), not
+    // COVAR.S / COVARIANCE.S (sample, n-1).
     let xs = numbers_only(expect_list(&args[0])?, "List.Covariance: list1")?;
     let ys = numbers_only(expect_list(&args[1])?, "List.Covariance: list2")?;
     if xs.len() != ys.len() {
         return Err(MError::Other("List.Covariance: lists must have equal length".into()));
     }
-    if xs.len() < 2 {
+    if xs.is_empty() {
         return Ok(Value::Null);
     }
     let mx: f64 = xs.iter().sum::<f64>() / xs.len() as f64;
     let my: f64 = ys.iter().sum::<f64>() / ys.len() as f64;
     let cov: f64 = xs.iter().zip(ys.iter())
         .map(|(x, y)| (x - mx) * (y - my))
-        .sum::<f64>() / (xs.len() - 1) as f64;
+        .sum::<f64>() / xs.len() as f64;
     Ok(Value::Number(cov))
 }
 

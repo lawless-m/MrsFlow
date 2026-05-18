@@ -92,7 +92,7 @@ Source: q1167.mrsflow.out.
 | Lakehouse | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | LimitClauseKind | 6 | 6 | 6 | 6 | 0 | 0 | 4 | 0 |
 | Lines | 4 | 4 | 4 | 4 | 0 | 0 | 4 | 0 |
-| List | 72 | 72 | 71 | 71 | 1 | 0 | 66 | 1 |
+| List | 72 | 72 | 71 | 71 | 1 | 0 | 67 | 1 |
 | Logical | 4 | 4 | 4 | 4 | 0 | 0 | 4 | 0 |
 | MissingField | 4 | 4 | 3 | 3 | 1 | 0 | 2 | 0 |
 | Module | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
@@ -155,7 +155,7 @@ Source: q1167.mrsflow.out.
 | WebAction | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | WebMethod | 7 | 7 | 7 | 7 | 0 | 0 | 0 | 0 |
 | Xml | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| **TOTAL** | 860 | 856 | 720 | 716 | 140 | 4 | 553 | 19 |
+| **TOTAL** | 860 | 856 | 720 | 716 | 140 | 4 | 554 | 19 |
 
 ## Per-name detail
 
@@ -525,7 +525,7 @@ Source: q1167.mrsflow.out.
 | `List.ContainsAll` | Y | Y | function | q1192 | MATCH |
 | `List.ContainsAny` | Y | Y | function | q1193 | MATCH |
 | `List.Count` | Y | Y | function | q53 q118 q480 q498 q645 q817 q819 q875 q889 q914 q922 q923 q1127 q1128 q1146 q1147 | MATCH |
-| `List.Covariance` | Y | Y | function |  |  |
+| `List.Covariance` | Y | Y | function | q1406 | MATCH |
 | `List.Dates` | Y | Y | function | q515 q906 q907 q910 q911 q912 | MATCH |
 | `List.DateTimes` | Y | Y | function | q908 | MATCH |
 | `List.DateTimeZones` | Y | Y | function |  |  |

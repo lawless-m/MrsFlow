@@ -11961,7 +11961,11 @@ let
         // included. Previously parked (mrsflow was using join-style
         // sep-between-only).
         SafeSerialize("q1405", () =>
-            Binary.ToList(Lines.ToBinary({"a","b","c"})))
+            Binary.ToList(Lines.ToBinary({"a","b","c"}))),
+        // q1406: List.Covariance — population (n divisor), matches
+        // Excel COVAR. mrsflow was using sample (n-1).
+        SafeSerialize("q1406", () =>
+            List.Covariance({1.0, 2.0, 3.0, 4.0}, {2.0, 4.0, 5.0, 8.0}))
     },
 
     Catalog = Table.FromRecords(cases)
