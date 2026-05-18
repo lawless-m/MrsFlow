@@ -34,11 +34,11 @@
 //!
 //! ## Endianness
 //!
-//! Atoms default to little-endian (PQ's default). `BinaryFormat.ByteOrder
-//! (format, byteOrder)` wraps a fixed-width primitive and reverses the
-//! input prefix before delegating. Variable-length combinators (varints,
-//! Binary(n), Text(n)) ignore byte-order — there's no well-defined
-//! reverse for them.
+//! Atoms default to big-endian (PQ's default, matches network byte order).
+//! `BinaryFormat.ByteOrder(format, byteOrder)` wraps a fixed-width
+//! primitive and reverses the input prefix when ByteOrder.LittleEndian is
+//! supplied. Variable-length combinators (varints, Binary(n), Text(n))
+//! ignore byte-order — there's no well-defined reverse for them.
 //!
 //! ## Decimal precision
 //!
@@ -426,50 +426,53 @@ fn parse_byte_sz(b: &[u8]) -> Result<(Value, usize), MError> {
     Ok((Value::Number(b[0] as f64), 1))
 }
 
+// PQ BinaryFormat numeric readers default to big-endian (network byte
+// order). BinaryFormat.ByteOrder + ByteOrder.LittleEndian swaps it.
+
 fn parse_u16_sz(b: &[u8]) -> Result<(Value, usize), MError> {
     need(b, 2, "BinaryFormat.UnsignedInteger16")?;
-    Ok((Value::Number(u16::from_le_bytes([b[0], b[1]]) as f64), 2))
+    Ok((Value::Number(u16::from_be_bytes([b[0], b[1]]) as f64), 2))
 }
 
 fn parse_i16_sz(b: &[u8]) -> Result<(Value, usize), MError> {
     need(b, 2, "BinaryFormat.SignedInteger16")?;
-    Ok((Value::Number(i16::from_le_bytes([b[0], b[1]]) as f64), 2))
+    Ok((Value::Number(i16::from_be_bytes([b[0], b[1]]) as f64), 2))
 }
 
 fn parse_u32_sz(b: &[u8]) -> Result<(Value, usize), MError> {
     need(b, 4, "BinaryFormat.UnsignedInteger32")?;
-    Ok((Value::Number(u32::from_le_bytes([b[0], b[1], b[2], b[3]]) as f64), 4))
+    Ok((Value::Number(u32::from_be_bytes([b[0], b[1], b[2], b[3]]) as f64), 4))
 }
 
 fn parse_i32_sz(b: &[u8]) -> Result<(Value, usize), MError> {
     need(b, 4, "BinaryFormat.SignedInteger32")?;
-    Ok((Value::Number(i32::from_le_bytes([b[0], b[1], b[2], b[3]]) as f64), 4))
+    Ok((Value::Number(i32::from_be_bytes([b[0], b[1], b[2], b[3]]) as f64), 4))
 }
 
 fn parse_u64_sz(b: &[u8]) -> Result<(Value, usize), MError> {
     need(b, 8, "BinaryFormat.UnsignedInteger64")?;
     let mut buf = [0u8; 8];
     buf.copy_from_slice(&b[..8]);
-    Ok((Value::Number(u64::from_le_bytes(buf) as f64), 8))
+    Ok((Value::Number(u64::from_be_bytes(buf) as f64), 8))
 }
 
 fn parse_i64_sz(b: &[u8]) -> Result<(Value, usize), MError> {
     need(b, 8, "BinaryFormat.SignedInteger64")?;
     let mut buf = [0u8; 8];
     buf.copy_from_slice(&b[..8]);
-    Ok((Value::Number(i64::from_le_bytes(buf) as f64), 8))
+    Ok((Value::Number(i64::from_be_bytes(buf) as f64), 8))
 }
 
 fn parse_f32_sz(b: &[u8]) -> Result<(Value, usize), MError> {
     need(b, 4, "BinaryFormat.Single")?;
-    Ok((Value::Number(f32::from_le_bytes([b[0], b[1], b[2], b[3]]) as f64), 4))
+    Ok((Value::Number(f32::from_be_bytes([b[0], b[1], b[2], b[3]]) as f64), 4))
 }
 
 fn parse_f64_sz(b: &[u8]) -> Result<(Value, usize), MError> {
     need(b, 8, "BinaryFormat.Double")?;
     let mut buf = [0u8; 8];
     buf.copy_from_slice(&b[..8]);
-    Ok((Value::Number(f64::from_le_bytes(buf)), 8))
+    Ok((Value::Number(f64::from_be_bytes(buf)), 8))
 }
 
 fn parse_decimal_sz(b: &[u8]) -> Result<(Value, usize), MError> {
@@ -508,9 +511,16 @@ fn parse_varint_u_sz(b: &[u8]) -> Result<(Value, usize), MError> {
 }
 
 fn parse_varint_s_sz(b: &[u8]) -> Result<(Value, usize), MError> {
+    // PQ uses zigzag encoding for the signed varint: even-encoded values
+    // map to non-negatives, odd-encoded values to negatives. Decoding is
+    // (n >> 1) ^ -(n & 1).
     let (val, consumed) = parse_varint_u_sz(b)?;
     match val {
-        Value::Number(n) => Ok((Value::Number(n as u64 as i64 as f64), consumed)),
+        Value::Number(n) => {
+            let u = n as u64;
+            let s = ((u >> 1) as i64) ^ -((u & 1) as i64);
+            Ok((Value::Number(s as f64), consumed))
+        }
         other => Ok((other, consumed)),
     }
 }
@@ -655,10 +665,11 @@ fn impl_factory_byte_order(args: &[Value], host: &dyn IoHost) -> Result<Value, M
     // the whole buffer would change which bytes the inner reads when the
     // caller passes a slice larger than the combinator needs (which is
     // typical when chunking a wire format).
-    // PQ ordinals: LittleEndian=0 (atom's default), BigEndian=1.
+    // PQ ordinals: LittleEndian=0 (reverses our big-endian default),
+    // BigEndian=1 (no-op).
     let inner_v = Value::Function(inner.clone());
     let (_, consumed) = parse_with_size(&inner_v, b, host)?;
-    let prefix: Vec<u8> = if order == 1 {
+    let prefix: Vec<u8> = if order == 0 {
         b[..consumed].iter().rev().cloned().collect()
     } else {
         b[..consumed].to_vec()
@@ -675,9 +686,10 @@ fn parse_byte_order_sz(
     let order_v = capture_required(closure, "byte_order", "BinaryFormat.ByteOrder")?;
     let order = as_i32(&order_v, "BinaryFormat.ByteOrder")?;
     // Discover inner's byte size by parsing forward first.
-    // PQ ordinals: LittleEndian=0 (atom default), BigEndian=1.
+    // PQ ordinals: LittleEndian=0 (reverses our big-endian default),
+    // BigEndian=1 (no-op).
     let (_, consumed) = parse_with_size(&inner_v, b, host)?;
-    let prefix: Vec<u8> = if order == 1 {
+    let prefix: Vec<u8> = if order == 0 {
         b[..consumed].iter().rev().cloned().collect()
     } else {
         b[..consumed].to_vec()
