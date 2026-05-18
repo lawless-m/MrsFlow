@@ -12062,8 +12062,20 @@ let
             { QuoteStyle.None, QuoteStyle.Csv }),
         SafeSerialize("q1433", () =>
             { RankKind.Competition, RankKind.Dense, RankKind.Ordinal }),
-        // LimitClauseKind / ODataOmitValues / RelativePosition skipped:
-        // mrsflow doesn't know some of those constant names yet.
+        // q1439-q1442: more enum-constant lists. WebMethod's parked note
+        // was correct (PQ uses uppercase HTTP verb text, not ordinals) —
+        // changed mrsflow's WebMethod.* to Text. RelativePosition and
+        // ODataOmitValues.Nulls were missing constants; registered.
+        SafeSerialize("q1439", () =>
+            { LimitClauseKind.None, LimitClauseKind.Top, LimitClauseKind.Limit,
+              LimitClauseKind.LimitOffset, LimitClauseKind.AnsiSql2008 }),
+        SafeSerialize("q1440", () =>
+            { WebMethod.Get, WebMethod.Post, WebMethod.Put, WebMethod.Delete,
+              WebMethod.Head, WebMethod.Patch }),
+        SafeSerialize("q1441", () =>
+            { RelativePosition.FromStart, RelativePosition.FromEnd }),
+        SafeSerialize("q1442", () =>
+            { ODataOmitValues.Nulls }),
         SafeSerialize("q1437", () =>
             { Precision.Decimal, Precision.Double }),
         SafeSerialize("q1438", () =>

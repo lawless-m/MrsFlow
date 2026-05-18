@@ -394,17 +394,29 @@ pub fn root_env() -> Env {
         env = env.extend(name.to_string(), Value::Number(n));
     }
 
-    // WebMethod.* — HTTP verb constants. Web.Contents itself is out of
-    // scope for mrsflow, but the verb constants are pure values.
+    // RelativePosition.* — Text.At positioning offset enum.
     for (name, n) in [
-        ("WebMethod.Delete", 0.0),
-        ("WebMethod.Get",    1.0),
-        ("WebMethod.Head",   2.0),
-        ("WebMethod.Patch",  3.0),
-        ("WebMethod.Post",   4.0),
-        ("WebMethod.Put",    5.0),
+        ("RelativePosition.FromStart", 0.0),
+        ("RelativePosition.FromEnd",   1.0),
     ] {
         env = env.extend(name.to_string(), Value::Number(n));
+    }
+
+    // ODataOmitValues.* — OData.Feed null-handling enum. PQ uses the
+    // lowercase text "nulls" rather than an ordinal.
+    env = env.extend("ODataOmitValues.Nulls".to_string(), Value::Text("nulls".to_string()));
+
+    // WebMethod.* — HTTP verb constants. PQ uses the uppercase verb text
+    // ("GET", "POST", ...) rather than ordinals.
+    for (name, verb) in [
+        ("WebMethod.Delete", "DELETE"),
+        ("WebMethod.Get",    "GET"),
+        ("WebMethod.Head",   "HEAD"),
+        ("WebMethod.Patch",  "PATCH"),
+        ("WebMethod.Post",   "POST"),
+        ("WebMethod.Put",    "PUT"),
+    ] {
+        env = env.extend(name.to_string(), Value::Text(verb.to_string()));
     }
 
     // WebAction.Request — single-value sentinel for Web action requests.
