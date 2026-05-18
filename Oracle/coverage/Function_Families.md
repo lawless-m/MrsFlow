@@ -38,7 +38,7 @@ Counts come from `COVERAGE.md`; refresh both via `render.ps1`.
 | Csv | Tested | 1 / 1 | CSV document parser (Csv.Document). |
 | CsvStyle | Tested | 3 / 3 | Csv.Document quote-style options. |
 | Cube | Untouched | 0 / 16 | OLAP cube operations (Analysis Services / SAP BW / Essbase). Niche enterprise OLAP. |
-| Culture | Untouched | 0 / 1 | Current-thread culture probe. |
+| Culture | Tested | 1 / 1 | Current-thread culture probe. |
 | Currency | Tested | 2 / 2 | Currency-typed decimal value support. |
 | DataLake | Untouched | 0 / 2 | Azure Data Lake file enumeration. |
 | Date | Tested | 58 / 58 | Date value operations: arithmetic, parts, IsIn*, FromText, formatting. |

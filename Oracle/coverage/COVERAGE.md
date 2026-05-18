@@ -42,11 +42,11 @@ Source: q1167.mrsflow.out.
 | Csv | 1 | 1 | 1 | 1 | 0 | 0 | 1 | 0 |
 | CsvStyle | 3 | 3 | 3 | 3 | 0 | 0 | 2 | 0 |
 | Cube | 16 | 16 | 0 | 0 | 16 | 0 | 0 | 0 |
-| Culture | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
+| Culture | 1 | 1 | 1 | 1 | 0 | 0 | 1 | 0 |
 | Currency | 2 | 2 | 2 | 2 | 0 | 0 | 2 | 0 |
 | DataLake | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
 | Date | 58 | 58 | 58 | 58 | 0 | 0 | 58 | 0 |
-| DateTime | 26 | 26 | 26 | 26 | 0 | 0 | 21 | 3 |
+| DateTime | 26 | 26 | 26 | 26 | 0 | 0 | 21 | 0 |
 | DateTimeZone | 16 | 16 | 16 | 16 | 0 | 0 | 16 | 0 |
 | Day | 8 | 8 | 8 | 8 | 0 | 0 | 7 | 0 |
 | DB2 | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
@@ -154,7 +154,7 @@ Source: q1167.mrsflow.out.
 | WebAction | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | WebMethod | 7 | 7 | 7 | 7 | 0 | 0 | 6 | 0 |
 | Xml | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| **TOTAL** | 858 | 854 | 762 | 758 | 96 | 4 | 683 | 12 |
+| **TOTAL** | 858 | 854 | 763 | 759 | 95 | 4 | 684 | 9 |
 
 ## Per-name detail
 
@@ -280,7 +280,7 @@ Source: q1167.mrsflow.out.
 | `Cube.PropertyKey` | Y |  | missing |  |  |
 | `Cube.ReplaceDimensions` | Y |  | missing |  |  |
 | `Cube.Transform` | Y |  | missing |  |  |
-| `Culture.Current` | Y |  | missing |  |  |
+| `Culture.Current` | Y | Y | constant | q1508 | MATCH |
 | `Currency.From` | Y | Y | function | q466 q467 q469 q470 | MATCH |
 | `Currency.Type` | Y | Y | constant | q468 q1284 | MATCH |
 | `DataLake.Contents` | Y |  | missing |  |  |
@@ -349,8 +349,8 @@ Source: q1167.mrsflow.out.
 | `DateTime.From` | Y | Y | function | q1067 q1068 q1072 | MATCH |
 | `DateTime.FromFileTime` | Y | Y | function | q1255 | MATCH |
 | `DateTime.FromText` | Y | Y | function | q1072 q1452 | MATCH |
-| `DateTime.IsInCurrentHour` | Y | Y | function | q1469 | DIFF |
-| `DateTime.IsInCurrentMinute` | Y | Y | function | q1469 | DIFF |
+| `DateTime.IsInCurrentHour` | Y | Y | function | q1469 | MATCH |
+| `DateTime.IsInCurrentMinute` | Y | Y | function | q1469 | MATCH |
 | `DateTime.IsInCurrentSecond` | Y | Y | function |  |  |
 | `DateTime.IsInNextHour` | Y | Y | function | q1374 | MATCH |
 | `DateTime.IsInNextMinute` | Y | Y | function |  |  |
@@ -364,7 +364,7 @@ Source: q1167.mrsflow.out.
 | `DateTime.IsInPreviousNMinutes` | Y | Y | function | q1372 | MATCH |
 | `DateTime.IsInPreviousNSeconds` | Y | Y | function | q1373 | MATCH |
 | `DateTime.IsInPreviousSecond` | Y | Y | function |  |  |
-| `DateTime.LocalNow` | Y | Y | function | q1333 q1334 q1335 q1336 q1337 q1338 q1339 q1340 q1344 q1345 q1346 q1347 q1348 q1349 q1350 q1351 q1352 q1353 q1354 q1355 q1356 q1357 q1358 q1359 q1360 q1361 q1362 q1363 q1364 q1365 q1366 q1367 q1368 q1369 q1370 q1371 q1372 q1373 q1374 q1375 q1469 | MIXED |
+| `DateTime.LocalNow` | Y | Y | function | q1333 q1334 q1335 q1336 q1337 q1338 q1339 q1340 q1344 q1345 q1346 q1347 q1348 q1349 q1350 q1351 q1352 q1353 q1354 q1355 q1356 q1357 q1358 q1359 q1360 q1361 q1362 q1363 q1364 q1365 q1366 q1367 q1368 q1369 q1370 q1371 q1372 q1373 q1374 q1375 q1469 | MATCH |
 | `DateTime.Time` | Y | Y | function | q1073 | MATCH |
 | `DateTime.ToRecord` | Y | Y | function | q1256 | MATCH |
 | `DateTime.ToText` | Y | Y | function | q160 q161 q183 q184 q611 q612 q613 q614 q615 q1070 | MATCH |
@@ -893,7 +893,7 @@ Source: q1167.mrsflow.out.
 | `Text.FromBinary` | Y | Y | function | q8 q266 q267 q268 q269 q270 q536 q537 q538 q539 q540 q1155 q1167 q1184 | MIXED |
 | `Text.InferNumberType` | Y | Y | function | q1222 | MATCH |
 | `Text.Insert` | Y | Y | function | q486 q490 q791 q792 q793 q794 q795 q796 q797 | MATCH |
-| `Text.Length` | Y | Y | function | q30 q496 q497 q500 q569 q570 q651 q813 q814 q819 q844 q845 q846 q848 q852 q870 | MATCH |
+| `Text.Length` | Y | Y | function | q30 q496 q497 q500 q569 q570 q651 q813 q814 q819 q844 q845 q846 q848 q852 q870 q1508 | MATCH |
 | `Text.Lower` | Y | Y | function | q32 q80 q81 q83 q84 q85 q86 q87 q88 q89 q128 q129 q131 q132 q134 q135 q137 q138 q141 q142 q145 q499 q566 q567 q568 q569 q767 q805 q806 q807 q808 q809 q810 q811 q812 q815 q854 q858 q946 q1037 | MATCH |
 | `Text.Middle` | Y | Y | function | q654 | MATCH |
 | `Text.NewGuid` | Y | Y | function | q496 q497 q498 q499 q500 q813 q814 q815 q816 q817 q818 q819 | MATCH |

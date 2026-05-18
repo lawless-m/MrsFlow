@@ -12367,6 +12367,14 @@ let
                     [RowSelector="tr"])
             in
                 Table.RowCount(t)),
+        // q1508: Culture.Current returns the host's BCP-47 locale
+        // string (e.g. "en-GB"). Excel auto-invokes parameter-less
+        // function values when used as expressions, so `Culture.Current`
+        // (bare, no parens) reaches its inner Text. Probe via
+        // Text.Length to keep the case host-portable. Note: mrsflow
+        // doesn't auto-invoke — instead Culture.Current is exposed as
+        // a constant Text in the env, matching the value Excel resolves.
+        SafeSerialize("q1508", () => Text.Length(Culture.Current) > 0),
         // q1460: Binary.ViewFunction rejects non-function input with PQ's
         // exact coercion-error wording.
         SafeSerialize("q1460", () =>

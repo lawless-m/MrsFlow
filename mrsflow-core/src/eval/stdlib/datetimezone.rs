@@ -120,6 +120,35 @@ fn utc_now(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     ))
 }
 
+/// Compute the host CLR's current-thread culture as a BCP-47 locale
+/// string (e.g. "en-GB"). On Windows we shell out to PowerShell for
+/// the .NET-flavoured name; elsewhere we fall back to $LANG / "en-US".
+///
+/// Returned as a plain `String` so the env-extension in stdlib::mod can
+/// bind `Culture.Current` to a constant `Value::Text`, matching how PQ
+/// surfaces it (auto-invoked parameter-less function whose return is
+/// indistinguishable from a constant once resolved).
+pub(super) fn detect_culture() -> String {
+    #[cfg(target_os = "windows")]
+    {
+        if let Ok(out) = std::process::Command::new("powershell")
+            .args(["-NoProfile", "-NonInteractive", "-Command",
+                "[System.Globalization.CultureInfo]::CurrentCulture.Name"])
+            .output()
+            && out.status.success()
+        {
+            let name = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            if !name.is_empty() {
+                return name;
+            }
+        }
+    }
+    std::env::var("LANG")
+        .ok()
+        .and_then(|s| s.split('.').next().map(|s| s.replace('_', "-")))
+        .unwrap_or_else(|| "en-US".to_string())
+}
+
 /// PQ's `TimeZone.Current` returns the host's current Windows
 /// timezone display name (e.g. "GMT Standard Time") as text — NOT a
 /// duration. On Windows we shell out to `tzutil /g`; elsewhere we

@@ -454,6 +454,12 @@ pub fn root_env() -> Env {
     // WebAction.Request — single-value sentinel for Web action requests.
     env = env.extend("WebAction.Request".into(), Value::Number(0.0));
 
+    // Culture.Current — host CLR culture name. PQ exposes it as a
+    // zero-arg function that auto-invokes when referenced as a value;
+    // mrsflow binds the resolved string directly so `Culture.Current`
+    // and `Culture.Current()` produce the same result.
+    env = env.extend("Culture.Current".into(), Value::Text(datetimezone::detect_culture()));
+
     // SapHanaDistribution.* — SAP HANA query-folding distribution hint.
     // Ordinals from Excel observation (not contiguous: Off=0, Connection=1,
     // Statement=2, All=3).
