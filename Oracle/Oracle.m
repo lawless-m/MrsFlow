@@ -12095,6 +12095,11 @@ let
             { SapBusinessWarehouseExecutionMode.BasXml,
               SapBusinessWarehouseExecutionMode.BasXmlGzip,
               SapBusinessWarehouseExecutionMode.DataStream }),
+        // q1446: extended Compression family (LZ4=4, Snappy=2, Zstandard=5).
+        // SqlExpression.SchemaFrom/ToExpression skipped — function values,
+        // not serialisable on either engine.
+        SafeSerialize("q1446", () =>
+            { Compression.LZ4, Compression.Snappy, Compression.Zstandard }),
         SafeSerialize("q1437", () =>
             { Precision.Decimal, Precision.Double }),
         SafeSerialize("q1438", () =>
