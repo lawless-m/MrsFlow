@@ -15,7 +15,6 @@ Source: q1167.mrsflow.out.
 
 | Family | Total | In PQ | In mrsflow | Both | PQ only | Ours only | Tested | DIFF/MIXED |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| (top-level) | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
 | Access | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | AccessControlEntry | 3 | 3 | 0 | 0 | 3 | 0 | 0 | 0 |
 | AccessControlKind | 3 | 3 | 0 | 0 | 3 | 0 | 0 | 0 |
@@ -155,7 +154,7 @@ Source: q1167.mrsflow.out.
 | WebAction | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | WebMethod | 7 | 7 | 7 | 7 | 0 | 0 | 6 | 0 |
 | Xml | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| **TOTAL** | 860 | 856 | 744 | 740 | 116 | 4 | 682 | 9 |
+| **TOTAL** | 858 | 854 | 744 | 740 | 114 | 4 | 682 | 9 |
 
 ## Per-name detail
 
@@ -418,7 +417,6 @@ Source: q1167.mrsflow.out.
 | `Duration.Type` | Y | Y | constant | q1233 q1279 q1448 | MATCH |
 | `Embedded.Value` | Y |  | missing |  |  |
 | `Error.Record` | Y | Y | function | q209 | MATCH |
-| `EvalFile` | Y |  | missing |  |  |
 | `Excel.CurrentWorkbook` | Y | Y | function | q12 | MATCH |
 | `Excel.RichDocument` | Y |  | missing |  |  |
 | `Excel.ShapeTable` | Y | Y | function |  |  |
@@ -475,7 +473,6 @@ Source: q1167.mrsflow.out.
 | `Int64.Type` | Y | Y | constant | q18 q26 q226 q291 q292 q293 q294 q416 q417 q419 q420 q431 q434 q1138 q1281 | MATCH |
 | `Int8.From` | Y | Y | function | q1382 | MATCH |
 | `Int8.Type` | Y | Y | constant | q1281 | MATCH |
-| `Invoked FunctionEvalFile` | Y |  | missing |  |  |
 | `ItemExpression.From` | Y |  | missing |  |  |
 | `ItemExpression.Item` | Y |  | missing |  |  |
 | `JoinAlgorithm.Dynamic` | Y | Y | constant | q1169 q1428 | MATCH |

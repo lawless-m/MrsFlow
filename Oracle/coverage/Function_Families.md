@@ -11,7 +11,6 @@ Counts come from `COVERAGE.md`; refresh both via `render.ps1`.
 
 | Family | Status | mrsflow / PQ | Description |
 |---|---|---:|---|
-| (top-level) | Untouched | 0 / 2 | Bare names without a `.Family` prefix (e.g. EvalFile, Beehiveid). Mostly engine internals. |
 | Access | Untouched | 0 / 1 | Microsoft Access database connector. |
 | AccessControlEntry | Untouched | 0 / 3 | ACL types used by the firewall / trust model. |
 | AccessControlKind | Untouched | 0 / 3 | ACL allow / deny / type constants. |

@@ -18,12 +18,22 @@ let
     casesDir = "cases",
 
     // --- Read both engines' #shared dumps ---
+    // `excludeNames` strips harness leakage: `EvalFile` is the workbook
+    // wrapper-query name that Excel injects into `#shared` for the
+    // catalog itself; mrsflow doesn't surface it (mrsflow runs the .m
+    // file directly). The space-filter further drops a junk row
+    // "Invoked FunctionEvalFile" that the workbook export concatenates
+    // from the "Invoked Function" header and the EvalFile name.
+    excludeNames = {"EvalFile"},
     readNameList = (relPath) =>
         let
             raw   = try Text.FromBinary(File.Contents(relPath), TextEncoding.Utf8)
                       otherwise "",
             lines = Lines.FromText(raw),
-            kept  = List.Select(lines, each Text.Length(Text.Trim(_)) > 0)
+            kept  = List.Select(lines, each
+                Text.Length(Text.Trim(_)) > 0
+                and not Text.Contains(_, " ")
+                and not List.Contains(excludeNames, _))
         in
             List.Distinct(kept),
 
