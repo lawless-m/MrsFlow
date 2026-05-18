@@ -12124,6 +12124,14 @@ let
               Type.Is(type any, Any.Type),
               Type.Is(type duration, Duration.Type),
               Type.Is(type datetimezone, DateTimeZone.Type) }),
+        // PROBES:
+        SafeSerialize("q1449", () =>
+            { Character.FromNumber(65),
+              Character.FromNumber(8364),
+              Character.ToNumber("A"),
+              Character.ToNumber("€") }),
+        SafeSerialize("q1450", () =>
+            Function.IsDataSource(Text.Upper)),
         SafeSerialize("q1437", () =>
             { Precision.Decimal, Precision.Double }),
         SafeSerialize("q1438", () =>
