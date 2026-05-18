@@ -12140,6 +12140,24 @@ let
             { Logical.FromText("true"), Logical.FromText("FALSE"),
               Logical.ToText(true), Logical.ToText(false),
               Logical.From(1), Logical.From(0), Logical.From("True") }),
+        // q1452: DateTime.FromText / Duration.FromText accept ISO-8601 and
+        // the colon-separated d.HH:MM:SS form for durations.
+        SafeSerialize("q1452", () =>
+            { DateTime.FromText("2024-06-15T10:30:00"),
+              DateTime.FromText("2024-06-15"),
+              Duration.FromText("1.02:03:04"),
+              Duration.FromText("PT5H30M") }),
+        // q1453: Json.FromValue then Json.Document round-trip drops back
+        // to the record shape.
+        SafeSerialize("q1453", () =>
+            Json.Document(Json.FromValue([a=1, b="hello", c={1,2,3}]))),
+        // q1454: Record.ToList / Record.FromList symmetry.
+        SafeSerialize("q1454", () =>
+            { Record.ToList([a=1, b=2, c=3]),
+              Record.FromList({10, 20, 30}, {"x", "y", "z"}) }),
+        // q1455: Text.Format with #{N} placeholder syntax.
+        SafeSerialize("q1455", () =>
+            Text.Format("#{0} and #{1}", {"first", "second"})),
         SafeSerialize("q1437", () =>
             { Precision.Decimal, Precision.Double }),
         SafeSerialize("q1438", () =>
