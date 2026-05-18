@@ -47,12 +47,12 @@ Source: q1167.mrsflow.out.
 | Currency | 2 | 2 | 2 | 2 | 0 | 0 | 1 | 0 |
 | DataLake | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
 | Date | 58 | 58 | 58 | 58 | 0 | 0 | 58 | 0 |
-| DateTime | 26 | 26 | 26 | 26 | 0 | 0 | 17 | 0 |
-| DateTimeZone | 16 | 16 | 16 | 16 | 0 | 0 | 13 | 0 |
+| DateTime | 26 | 26 | 26 | 26 | 0 | 0 | 18 | 0 |
+| DateTimeZone | 16 | 16 | 16 | 16 | 0 | 0 | 15 | 0 |
 | Day | 8 | 8 | 8 | 8 | 0 | 0 | 7 | 0 |
 | DB2 | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Decimal | 2 | 2 | 2 | 2 | 0 | 0 | 1 | 0 |
-| Diagnostics | 3 | 3 | 3 | 3 | 0 | 0 | 0 | 0 |
+| Diagnostics | 3 | 3 | 3 | 3 | 0 | 0 | 2 | 0 |
 | DirectQueryCapabilities | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Double | 2 | 2 | 2 | 2 | 0 | 0 | 2 | 0 |
 | Duration | 13 | 13 | 13 | 13 | 0 | 0 | 12 | 0 |
@@ -155,7 +155,7 @@ Source: q1167.mrsflow.out.
 | WebAction | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | WebMethod | 7 | 7 | 7 | 7 | 0 | 0 | 5 | 0 |
 | Xml | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| **TOTAL** | 860 | 856 | 744 | 740 | 116 | 4 | 605 | 8 |
+| **TOTAL** | 860 | 856 | 744 | 740 | 116 | 4 | 610 | 8 |
 
 ## Per-name detail
 
@@ -346,7 +346,7 @@ Source: q1167.mrsflow.out.
 | `Date.Year` | Y | Y | function | q75 q1073 | MATCH |
 | `DateTime.AddZone` | Y | Y | function | q1461 | MATCH |
 | `DateTime.Date` | Y | Y | function | q1073 q1333 q1334 q1335 q1336 q1337 q1338 q1339 q1340 q1344 q1345 q1346 q1347 q1348 q1349 q1350 q1351 q1352 q1353 q1354 q1355 q1356 q1357 q1358 q1359 q1360 q1361 q1362 q1363 q1364 q1365 q1366 q1367 | MATCH |
-| `DateTime.FixedLocalNow` | Y | Y | function |  |  |
+| `DateTime.FixedLocalNow` | Y | Y | function | q1467 | MATCH |
 | `DateTime.From` | Y | Y | function | q1067 q1068 | MATCH |
 | `DateTime.FromFileTime` | Y | Y | function | q1255 | MATCH |
 | `DateTime.FromText` | Y | Y | function | q1072 q1452 | MATCH |
@@ -370,12 +370,12 @@ Source: q1167.mrsflow.out.
 | `DateTime.ToRecord` | Y | Y | function | q1256 | MATCH |
 | `DateTime.ToText` | Y | Y | function | q160 q161 q183 q184 q611 q612 q613 q614 q615 q1070 | MATCH |
 | `DateTime.Type` | Y | Y | constant |  |  |
-| `DateTimeZone.FixedLocalNow` | Y | Y | function |  |  |
+| `DateTimeZone.FixedLocalNow` | Y | Y | function | q1467 | MATCH |
 | `DateTimeZone.FixedUtcNow` | Y | Y | function | q1392 | MATCH |
 | `DateTimeZone.From` | Y | Y | function | q1258 | MATCH |
 | `DateTimeZone.FromFileTime` | Y | Y | function | q1259 | MATCH |
 | `DateTimeZone.FromText` | Y | Y | function | q1163 | MATCH |
-| `DateTimeZone.LocalNow` | Y | Y | function |  |  |
+| `DateTimeZone.LocalNow` | Y | Y | function | q1467 | MATCH |
 | `DateTimeZone.RemoveZone` | Y | Y | function | q1069 | MATCH |
 | `DateTimeZone.SwitchZone` | Y | Y | function | q1069 | MATCH |
 | `DateTimeZone.ToLocal` | Y | Y | function | q1462 | MATCH |
@@ -397,8 +397,8 @@ Source: q1167.mrsflow.out.
 | `DB2.Database` | Y |  | missing |  |  |
 | `Decimal.From` | Y | Y | function | q277 q280 q471 q472 q473 q474 | MATCH |
 | `Decimal.Type` | Y | Y | constant |  |  |
-| `Diagnostics.ActivityId` | Y | Y | function |  |  |
-| `Diagnostics.CorrelationId` | Y | Y | function |  |  |
+| `Diagnostics.ActivityId` | Y | Y | function | q1468 | MATCH |
+| `Diagnostics.CorrelationId` | Y | Y | function | q1468 | MATCH |
 | `Diagnostics.Trace` | Y | Y | function |  |  |
 | `DirectQueryCapabilities.From` | Y |  | missing |  |  |
 | `Double.From` | Y | Y | function | q1377 | MATCH |
@@ -987,7 +987,7 @@ Source: q1167.mrsflow.out.
 | `Value.Expression` | Y | Y | function |  |  |
 | `Value.Firewall` | Y | Y | function |  |  |
 | `Value.FromText` | Y | Y | function | q1267 | MATCH |
-| `Value.Is` | Y | Y | function | q233 q235 q244 q399 q400 q408 q409 q410 q463 q468 q472 q473 q1095 q1096 q1097 q1100 q1148 q1169 q1459 q1460 | MATCH |
+| `Value.Is` | Y | Y | function | q233 q235 q244 q399 q400 q408 q409 q410 q463 q468 q472 q473 q1095 q1096 q1097 q1100 q1148 q1169 q1459 q1460 q1467 q1468 | MATCH |
 | `Value.Lineage` | Y | Y | function |  |  |
 | `Value.Metadata` | Y | Y | function | q1268 q1270 | MATCH |
 | `Value.Multiply` | Y | Y | function | q1265 | MATCH |

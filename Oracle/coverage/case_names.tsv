@@ -1461,3 +1461,5 @@ q1462	DateTimeZone.ToLocal
 q1464	List.DateTimeZones
 q1465	List.Times
 q1466	Variable.ValueOrDefault
+q1467	DateTime.FixedLocalNow DateTimeZone.FixedLocalNow DateTimeZone.LocalNow Value.Is
+q1468	Diagnostics.ActivityId Diagnostics.CorrelationId Value.Is

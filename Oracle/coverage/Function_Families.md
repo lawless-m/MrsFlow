@@ -48,7 +48,7 @@ Counts come from `COVERAGE.md`; refresh both via `render.ps1`.
 | Day | Tested | 8 / 8 | Day-of-week enum constants (Monday=0 .. Sunday=6). |
 | DB2 | Untouched | 0 / 1 | IBM DB2 connector. |
 | Decimal | Tested | 2 / 2 | Decimal-typed numeric (high-precision) operations. |
-| Diagnostics | Implemented | 3 / 3 | Tracing primitives (Diagnostics.Trace, ActivityId). |
+| Diagnostics | Tested | 3 / 3 | Tracing primitives (Diagnostics.Trace, ActivityId). |
 | DirectQueryCapabilities | Untouched | 0 / 1 | Connector folding-capability advertisement. |
 | Double | Tested | 2 / 2 | Double-precision float type companion. |
 | Duration | Tested | 13 / 13 | Duration (timespan) operations and arithmetic. |

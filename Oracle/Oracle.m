@@ -12197,6 +12197,18 @@ let
         // identifier doesn't exist in the workbook's parameter table.
         SafeSerialize("q1466", () =>
             Variable.ValueOrDefault("NOPE", "fallback")),
+        // q1467: clock-snapshot functions return values of the expected
+        // type. Probing the type rather than the moment keeps the test
+        // free of clock-flake.
+        SafeSerialize("q1467", () =>
+            { Value.Is(DateTime.FixedLocalNow(), type datetime),
+              Value.Is(DateTimeZone.FixedLocalNow(), type datetimezone),
+              Value.Is(DateTimeZone.LocalNow(), type datetimezone) }),
+        // q1468: Diagnostics.ActivityId/CorrelationId return correlation
+        // identifiers as text.
+        SafeSerialize("q1468", () =>
+            { Value.Is(Diagnostics.ActivityId(), type text),
+              Value.Is(Diagnostics.CorrelationId(), type text) }),
         // q1460: Binary.ViewFunction rejects non-function input with PQ's
         // exact coercion-error wording.
         SafeSerialize("q1460", () =>
