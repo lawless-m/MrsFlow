@@ -12311,6 +12311,29 @@ let
         SafeSerialize("q1497", () =>
             let r = try Value.Expression(42) in
                 if r[HasError] then [HasError=true, Message=r[Error][Message]] else [HasError=false, IsRecord=Value.Is(r[Value], type record)]),
+        // q1498-q1499: Type.ReplaceTableKeys / Type.ReplaceTablePartitionKey
+        // pass through their input type-value; Type.IsNullable on a
+        // non-nullable table-type is false.
+        SafeSerialize("q1498", () =>
+            let r = try Type.IsNullable(Type.ReplaceTableKeys(type table [a=number], {})) in
+                if r[HasError] then [HasError=true, Message=r[Error][Message]] else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1499", () =>
+            let r = try Type.IsNullable(Type.ReplaceTablePartitionKey(type table [a=number], null)) in
+                if r[HasError] then [HasError=true, Message=r[Error][Message]] else [HasError=false, Value=r[Value]]),
+        // q1500-q1501: Table.ReplaceKeys / Table.ReplacePartitionKey are
+        // metadata passthroughs; row count is unchanged.
+        SafeSerialize("q1500", () =>
+            let r = try Table.RowCount(Table.ReplaceKeys(Table.FromRecords({[a=1]}), {})) in
+                if r[HasError] then [HasError=true, Message=r[Error][Message]] else [HasError=false, Value=r[Value]]),
+        SafeSerialize("q1501", () =>
+            let r = try Table.RowCount(Table.ReplacePartitionKey(Table.FromRecords({[a=1]}), null)) in
+                if r[HasError] then [HasError=true, Message=r[Error][Message]] else [HasError=false, Value=r[Value]]),
+        // q1502: Table.ReplaceRelationshipIdentity type-checks the
+        // identity arg (Text); null fails with PQ's exact coercion error
+        // wording. mrsflow previously accepted any value.
+        SafeSerialize("q1502", () =>
+            let r = try Table.RowCount(Table.ReplaceRelationshipIdentity(Table.FromRecords({[a=1]}), null)) in
+                if r[HasError] then [HasError=true, Message=r[Error][Message]] else [HasError=false, Value=r[Value]]),
         // q1460: Binary.ViewFunction rejects non-function input with PQ's
         // exact coercion-error wording.
         SafeSerialize("q1460", () =>

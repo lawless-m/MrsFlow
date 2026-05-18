@@ -569,7 +569,7 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ("Table.ReplaceKeys", two("table", "keys"), identity_passthrough),
         ("Table.ConformToPageReader", one("table"), identity_passthrough_one),
         ("Table.StopFolding", one("table"), identity_passthrough_one),
-        ("Table.ReplaceRelationshipIdentity", two("table", "identity"), identity_passthrough),
+        ("Table.ReplaceRelationshipIdentity", two("table", "identity"), replace_relationship_identity),
         (
             "Table.SelectRowsWithErrors",
             vec![
@@ -6060,6 +6060,27 @@ fn identity_passthrough(args: &[Value], _host: &dyn IoHost) -> Result<Value, MEr
 fn identity_passthrough_one(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let _ = expect_table(&args[0])?;
     Ok(args[0].clone())
+}
+
+/// PQ's `Table.ReplaceRelationshipIdentity` type-checks the identity arg
+/// (Text) before doing the relationship swap; null fails with a fixed
+/// coercion error.
+fn replace_relationship_identity(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    let _ = expect_table(&args[0])?;
+    match &args[1] {
+        Value::Text(_) => Ok(args[0].clone()),
+        Value::Null => Err(MError::Other(
+            "We cannot convert the value null to type Text.".into(),
+        )),
+        other => Err(MError::Other(format!(
+            "We cannot convert the value {} to type Text.",
+            match other {
+                Value::Number(n) => format!("{n}"),
+                Value::Logical(b) => if *b { "true".into() } else { "false".into() },
+                _ => "(value)".into(),
+            }
+        ))),
+    }
 }
 
 fn filter_with_data_table(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {

@@ -1485,3 +1485,8 @@ q1494	Type.IsNullable Type.ReplaceFacets
 q1495	Table.FromRecords Table.RowCount Table.WithErrorContext
 q1496	Value.Alternates
 q1497	Value.Expression Value.Is
+q1498	Type.IsNullable Type.ReplaceTableKeys
+q1499	Type.IsNullable Type.ReplaceTablePartitionKey
+q1500	Table.FromRecords Table.ReplaceKeys Table.RowCount
+q1501	Table.FromRecords Table.ReplacePartitionKey Table.RowCount
+q1502	Table.FromRecords Table.ReplaceRelationshipIdentity Table.RowCount
