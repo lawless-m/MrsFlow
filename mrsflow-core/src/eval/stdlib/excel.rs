@@ -72,5 +72,7 @@ fn workbook(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     };
 
     host.excel_workbook(bytes, use_headers, delay_types)
-        .map_err(|e| MError::Other(format!("Excel.Workbook: {e:?}")))
+        .map_err(|e| MError::Raised(super::super::build_data_format_error(
+            format!("Excel.Workbook: {e:?}")
+        )))
 }

@@ -12392,6 +12392,18 @@ let
             Geography.ToWellKnownText(GeographyPoint.From(47.651, -122.349))),
         SafeSerialize("q1514", () =>
             Geometry.ToWellKnownText(GeometryPoint.From(10, 20))),
+        // q1515: Excel.ShapeTable single-arg passthrough — when no
+        // options record is supplied, returns the table unchanged.
+        SafeSerialize("q1515", () =>
+            let r = try Table.RowCount(Excel.ShapeTable(Table.FromRecords({[a=1],[a=2]}))) in
+                if r[HasError] then [HasError=true, Message=r[Error][Message]] else [HasError=false, Value=r[Value]]),
+        // q1516: Excel.Workbook on non-XLSX bytes raises a
+        // DataFormat.Error (not Expression.Error). mrsflow had been
+        // routing the parse failure through generic MError::Other,
+        // surfacing Reason="Expression.Error".
+        SafeSerialize("q1516", () =>
+            let r = try Excel.Workbook(#binary({1,2,3,4})) in
+                if r[HasError] then [HasError=true, Reason=r[Error][Reason]] else [HasError=false, IsTable=Value.Is(r[Value], type table)]),
         // q1460: Binary.ViewFunction rejects non-function input with PQ's
         // exact coercion-error wording.
         SafeSerialize("q1460", () =>

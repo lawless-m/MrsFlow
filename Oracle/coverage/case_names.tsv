@@ -1501,3 +1501,5 @@ q1511	Geometry.FromWellKnownText
 q1512	GeometryPoint.From
 q1513	Geography.ToWellKnownText GeographyPoint.From
 q1514	Geometry.ToWellKnownText GeometryPoint.From
+q1515	Excel.ShapeTable Table.FromRecords Table.RowCount
+q1516	Excel.Workbook Value.Is
