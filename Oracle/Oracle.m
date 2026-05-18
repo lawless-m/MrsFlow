@@ -11985,7 +11985,15 @@ let
         // .NET-tick precision). Previously parked: mrsflow's json
         // serialiser emitted 9 digits, now trimmed to 7.
         SafeSerialize("q1410", () =>
-            Time.EndOfHour(#time(14, 35, 42)))
+            Time.EndOfHour(#time(14, 35, 42))),
+        // q1411: Table.CombineColumnsToRecord — new record column lands
+        // at the position of the first source column, not at the end.
+        // Previously parked (mrsflow appended).
+        SafeSerialize("q1411", () =>
+            Table.CombineColumnsToRecord(
+                Table.FromRecords({[a=1,b=2,c=3,d=4]}),
+                "BC",
+                {"b","c"}))
     },
 
     Catalog = Table.FromRecords(cases)

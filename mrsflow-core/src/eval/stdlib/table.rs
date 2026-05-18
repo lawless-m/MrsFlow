@@ -4986,20 +4986,37 @@ fn combine_columns_to_record(args: &[Value], _host: &dyn IoHost) -> Result<Value
             })
         })
         .collect::<Result<_, _>>()?;
-    let keep: Vec<usize> = (0..names.len()).filter(|i| !src_indices.contains(i)).collect();
-    let mut out_names: Vec<String> = keep.iter().map(|&i| names[i].clone()).collect();
-    out_names.push(new_name);
+    // PQ places the new record column at the original position of the
+    // first source column, not at the end.
+    let insert_pos = *src_indices.iter().min().expect("non-empty sources");
+    let src_set: std::collections::HashSet<usize> = src_indices.iter().copied().collect();
+    let mut out_names: Vec<String> = Vec::with_capacity(names.len() - src_indices.len() + 1);
+    for (i, n) in names.iter().enumerate() {
+        if i == insert_pos {
+            out_names.push(new_name.clone());
+        }
+        if !src_set.contains(&i) {
+            out_names.push(n.clone());
+        }
+    }
     let mut out_rows: Vec<Vec<Value>> = Vec::with_capacity(rows.len());
     for row in rows {
-        let mut new_row: Vec<Value> = keep.iter().map(|&i| row[i].clone()).collect();
-        let fields: Vec<(String, Value)> = src_indices
-            .iter()
-            .map(|&i| (names[i].clone(), row[i].clone()))
-            .collect();
-        new_row.push(Value::Record(Record {
-            fields,
+        let record = Value::Record(Record {
+            fields: src_indices
+                .iter()
+                .map(|&i| (names[i].clone(), row[i].clone()))
+                .collect(),
             env: EnvNode::empty(),
-        }));
+        });
+        let mut new_row: Vec<Value> = Vec::with_capacity(out_names.len());
+        for (i, v) in row.iter().enumerate() {
+            if i == insert_pos {
+                new_row.push(record.clone());
+            }
+            if !src_set.contains(&i) {
+                new_row.push(v.clone());
+            }
+        }
         out_rows.push(new_row);
     }
     Ok(Value::Table(values_to_table(&out_names, &out_rows)?))
