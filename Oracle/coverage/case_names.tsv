@@ -1463,3 +1463,5 @@ q1465	List.Times
 q1466	Variable.ValueOrDefault
 q1467	DateTime.FixedLocalNow DateTimeZone.FixedLocalNow DateTimeZone.LocalNow Value.Is
 q1468	Diagnostics.ActivityId Diagnostics.CorrelationId Value.Is
+q1469	DateTime.IsInCurrentHour DateTime.IsInCurrentMinute DateTime.LocalNow
+q1470	Diagnostics.Trace TraceLevel.Information

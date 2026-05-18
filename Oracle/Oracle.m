@@ -12209,6 +12209,17 @@ let
         SafeSerialize("q1468", () =>
             { Value.Is(Diagnostics.ActivityId(), type text),
               Value.Is(Diagnostics.CorrelationId(), type text) }),
+        // q1469: DateTime.IsInCurrentHour/Minute on "now" both return
+        // true. IsInCurrentSecond skipped — Excel evaluates LocalNow
+        // once at compile time, and the second can roll over before
+        // the check runs; mrsflow evaluates lazily and always agrees.
+        SafeSerialize("q1469", () =>
+            { DateTime.IsInCurrentHour(DateTime.LocalNow()),
+              DateTime.IsInCurrentMinute(DateTime.LocalNow()) }),
+        // q1470: Diagnostics.Trace returns the `value` arg unchanged
+        // after (optionally) emitting the trace message.
+        SafeSerialize("q1470", () =>
+            Diagnostics.Trace(TraceLevel.Information, "test message", "passthrough-value", false)),
         // q1460: Binary.ViewFunction rejects non-function input with PQ's
         // exact coercion-error wording.
         SafeSerialize("q1460", () =>
