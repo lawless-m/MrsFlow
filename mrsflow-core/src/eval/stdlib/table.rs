@@ -6036,15 +6036,20 @@ fn partition(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 fn partition_key(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    // v1: no partition key tracking.
+    // v1: no partition key tracking. PQ returns null (not []) for an
+    // unpartitioned table.
     let _ = expect_table(&args[0])?;
-    Ok(Value::list_of(Vec::new()))
+    Ok(Value::Null)
 }
 
 fn partition_values(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    // v1: no partition key tracking.
+    // v1: no partition key tracking. PQ returns [{}] (a single empty
+    // record) for an unpartitioned table, not [].
     let _ = expect_table(&args[0])?;
-    Ok(Value::list_of(Vec::new()))
+    Ok(Value::list_of(vec![Value::Record(Record {
+        fields: Vec::new(),
+        env: EnvNode::empty(),
+    })]))
 }
 
 fn identity_passthrough(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {

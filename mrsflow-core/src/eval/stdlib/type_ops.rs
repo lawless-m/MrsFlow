@@ -355,8 +355,9 @@ fn facets(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 fn table_partition_key(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    // PQ returns null for an unpartitioned table-type, not an empty list.
     let _ = expect_type(&args[0])?;
-    Ok(Value::list_of(Vec::new()))
+    Ok(Value::Null)
 }
 
 fn identity_passthrough(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {

@@ -11993,7 +11993,16 @@ let
             Table.CombineColumnsToRecord(
                 Table.FromRecords({[a=1,b=2,c=3,d=4]}),
                 "BC",
-                {"b","c"}))
+                {"b","c"})),
+        // q1412-q1414: partition sentinels for unpartitioned tables.
+        // Previously parked: mrsflow returned [] / [] / [] where Excel
+        // returns null / [{}] / null.
+        SafeSerialize("q1412", () =>
+            Table.PartitionKey(Table.FromRecords({[a=1]}))),
+        SafeSerialize("q1413", () =>
+            Table.PartitionValues(Table.FromRecords({[a=1]}))),
+        SafeSerialize("q1414", () =>
+            Type.TablePartitionKey(type table [a = number]))
     },
 
     Catalog = Table.FromRecords(cases)
