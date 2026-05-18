@@ -11956,7 +11956,12 @@ let
               Value.NullableEquals(1, 2) }),
         // q1404: Uri.BuildQueryString — no leading "?".
         SafeSerialize("q1404", () =>
-            Uri.BuildQueryString([key1 = "v1", key2 = "v 2"]))
+            Uri.BuildQueryString([key1 = "v1", key2 = "v 2"])),
+        // q1405: Lines.ToBinary — line ending after every line, last
+        // included. Previously parked (mrsflow was using join-style
+        // sep-between-only).
+        SafeSerialize("q1405", () =>
+            Binary.ToList(Lines.ToBinary({"a","b","c"})))
     },
 
     Catalog = Table.FromRecords(cases)

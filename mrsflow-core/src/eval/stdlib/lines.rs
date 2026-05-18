@@ -88,18 +88,25 @@ fn from_binary(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 
 fn to_binary(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let lines = expect_text_list(&args[0], "Lines.ToBinary")?;
+    // PQ writes the line-ending after EVERY line, including the last.
+    // arg 1 is the lineSeparator (\r\n default); arg 2 is documented as
+    // an additional terminator after the final line — Excel evidence
+    // suggests it's appended as well, so both apply if both supplied.
     let sep = match args.get(1) {
         Some(Value::Text(s)) => s.clone(),
         Some(Value::Null) | None => "\r\n".to_string(),
         Some(other) => return Err(type_mismatch("text", other)),
     };
-    // lineTerminator (arg 2) appends after the final line; default empty.
     let term = match args.get(2) {
         Some(Value::Text(s)) => s.clone(),
         Some(Value::Null) | None => String::new(),
         Some(other) => return Err(type_mismatch("text", other)),
     };
-    let mut joined = lines.join(&sep);
+    let mut joined = String::new();
+    for line in &lines {
+        joined.push_str(line);
+        joined.push_str(&sep);
+    }
     joined.push_str(&term);
     Ok(Value::Binary(joined.into_bytes()))
 }

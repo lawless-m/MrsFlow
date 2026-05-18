@@ -91,7 +91,7 @@ Source: q1167.mrsflow.out.
 | Kusto | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
 | Lakehouse | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | LimitClauseKind | 6 | 6 | 6 | 6 | 0 | 0 | 4 | 0 |
-| Lines | 4 | 4 | 4 | 4 | 0 | 0 | 3 | 0 |
+| Lines | 4 | 4 | 4 | 4 | 0 | 0 | 4 | 0 |
 | List | 72 | 72 | 71 | 71 | 1 | 0 | 66 | 1 |
 | Logical | 4 | 4 | 4 | 4 | 0 | 0 | 4 | 0 |
 | MissingField | 4 | 4 | 3 | 3 | 1 | 0 | 2 | 0 |
@@ -155,7 +155,7 @@ Source: q1167.mrsflow.out.
 | WebAction | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | WebMethod | 7 | 7 | 7 | 7 | 0 | 0 | 0 | 0 |
 | Xml | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| **TOTAL** | 860 | 856 | 720 | 716 | 140 | 4 | 552 | 19 |
+| **TOTAL** | 860 | 856 | 720 | 716 | 140 | 4 | 553 | 19 |
 
 ## Per-name detail
 
@@ -196,7 +196,7 @@ Source: q1167.mrsflow.out.
 | `Binary.Length` | Y | Y | function | q346 q349 | MATCH |
 | `Binary.Range` | Y | Y | function | q348 | MATCH |
 | `Binary.Split` | Y | Y | function | q1188 | MATCH |
-| `Binary.ToList` | Y | Y | function | q1186 q1187 q1188 q1189 q1191 | MATCH |
+| `Binary.ToList` | Y | Y | function | q1186 q1187 q1188 q1189 q1191 q1405 | MATCH |
 | `Binary.ToText` | Y | Y | function | q9 q347 q348 q350 q351 q352 q353 q354 q355 q1174 | MATCH |
 | `Binary.Type` | Y | Y | constant |  |  |
 | `Binary.View` | Y | Y | function |  |  |
@@ -511,7 +511,7 @@ Source: q1167.mrsflow.out.
 | `LimitClauseKind.Type` | Y | Y | constant |  |  |
 | `Lines.FromBinary` | Y | Y | function | q1386 | MATCH |
 | `Lines.FromText` | Y | Y | function | q296 q297 q298 q299 q300 q1093 | MATCH |
-| `Lines.ToBinary` | Y | Y | function |  |  |
+| `Lines.ToBinary` | Y | Y | function | q1405 | MATCH |
 | `Lines.ToText` | Y | Y | function | q300 q1094 | MATCH |
 | `List.Accumulate` | Y | Y | function | q163 q164 q165 q196 q197 q198 q199 q200 q863 q864 q865 q866 q867 q868 q869 | MATCH |
 | `List.AllTrue` | Y | Y | function | q478 q499 q516 q518 q519 q520 q816 | MATCH |
