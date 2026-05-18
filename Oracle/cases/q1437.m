@@ -1,0 +1,1 @@
+{ Precision.Decimal, Precision.Double }

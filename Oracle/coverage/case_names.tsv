@@ -1406,3 +1406,49 @@ q1404	Uri.BuildQueryString
 q1405	Binary.ToList Lines.ToBinary
 q1406	List.Covariance
 q1407	List.Alternate
+q1408	Single.From
+q1409	Binary.From Binary.ToList
+q1410	Time.EndOfHour
+q1411	Table.CombineColumnsToRecord Table.FromRecords
+q1412	Table.FromRecords Table.PartitionKey
+q1413	Table.FromRecords Table.PartitionValues
+q1414	Type.TablePartitionKey
+q1415	Type.Facets
+q1416	Compression.Deflate Compression.GZip Compression.None
+q1417	BinaryOccurrence.Optional BinaryOccurrence.Required
+q1418	BufferMode.Eager
+q1419	ByteOrder.LittleEndian
+q1420	ExtraValues.Error ExtraValues.List
+q1421	TraceLevel.Critical TraceLevel.Error TraceLevel.Information TraceLevel.Warning
+q1422	RoundingMode.AwayFromZero RoundingMode.Down RoundingMode.TowardZero RoundingMode.Up
+q1423	Occurrence.All Occurrence.First Occurrence.Last
+q1424	Order.Ascending
+q1425	PercentileMode.ExcelExc PercentileMode.ExcelInc PercentileMode.SqlCont
+q1426	JoinKind.FullOuter JoinKind.Inner JoinKind.LeftAnti JoinKind.LeftOuter JoinKind.LeftSemi JoinKind.RightAnti JoinKind.RightOuter
+q1427	JoinSide.Left
+q1428	JoinAlgorithm.Dynamic JoinAlgorithm.LeftHash JoinAlgorithm.LeftIndex JoinAlgorithm.PairwiseHash JoinAlgorithm.RightHash JoinAlgorithm.SortMerge
+q1429	MissingField.Error MissingField.Ignore
+q1430	GroupKind.Global
+q1431	CsvStyle.QuoteAfterDelimiter
+q1432	QuoteStyle.None
+q1433	RankKind.Competition RankKind.Dense
+q1437	Precision.Decimal
+q1438	Day.Friday Day.Monday Day.Sunday Day.Thursday Day.Tuesday Day.Wednesday
+q1439	LimitClauseKind.Limit LimitClauseKind.LimitOffset LimitClauseKind.None LimitClauseKind.Top
+q1440	WebMethod.Delete WebMethod.Get WebMethod.Head WebMethod.Post WebMethod.Put
+q1441	RelativePosition.FromStart
+q1442	
+q1443	SapHanaDistribution.All SapHanaDistribution.Connection SapHanaDistribution.Off
+q1444	SapHanaRangeOperator.Equals SapHanaRangeOperator.GreaterThan SapHanaRangeOperator.LessThan SapHanaRangeOperator.LessThanOrEquals SapHanaRangeOperator.NotEquals
+q1445	SapBusinessWarehouseExecutionMode.BasXml SapBusinessWarehouseExecutionMode.BasXmlGzip
+q1446	Compression.LZ4 Compression.Snappy
+q1447	Type.Is
+q1448	Type.Is
+q1449	Character.FromNumber Character.ToNumber
+q1450	Function.IsDataSource
+q1451	Logical.From Logical.FromText Logical.ToText
+q1452	DateTime.FromText Duration.FromText
+q1453	Json.Document Json.FromValue
+q1454	Record.FromList Record.ToList
+q1455	Text.Format
+q1456	Action.WithErrorContext

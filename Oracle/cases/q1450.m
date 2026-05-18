@@ -1,0 +1,1 @@
+Function.IsDataSource(Text.Upper)

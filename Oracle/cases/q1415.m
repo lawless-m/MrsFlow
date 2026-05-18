@@ -1,0 +1,1 @@
+Type.Facets(type number)

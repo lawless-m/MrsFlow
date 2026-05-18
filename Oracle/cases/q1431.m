@@ -1,0 +1,1 @@
+{ CsvStyle.QuoteAfterDelimiter, CsvStyle.QuoteAlways }

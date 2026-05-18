@@ -1,0 +1,1 @@
+{ ByteOrder.LittleEndian, ByteOrder.BigEndian }

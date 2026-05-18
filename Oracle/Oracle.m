@@ -12158,6 +12158,16 @@ let
         // q1455: Text.Format with #{N} placeholder syntax.
         SafeSerialize("q1455", () =>
             Text.Format("#{0} and #{1}", {"first", "second"})),
+        // q1456: Action.WithErrorContext. mrsflow has no Action type so
+        // every call raises the same null→Action coercion error PQ
+        // raises. Excel returns "We cannot convert the value null to
+        // type Action."; mrsflow now mirrors that wording.
+        SafeSerialize("q1456", () =>
+            let
+                r = try Action.WithErrorContext(null, "ctx") in
+                    if r[HasError]
+                        then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                        else [HasError=false, Value=r[Value]]),
         SafeSerialize("q1437", () =>
             { Precision.Decimal, Precision.Double }),
         SafeSerialize("q1438", () =>

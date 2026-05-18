@@ -1,0 +1,1 @@
+{ QuoteStyle.None, QuoteStyle.Csv }

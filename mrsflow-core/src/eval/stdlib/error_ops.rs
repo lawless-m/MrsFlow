@@ -32,13 +32,21 @@ fn record(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     }))
 }
 
-fn action_with_error_context(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn action_with_error_context(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     // MS docs: "intended for internal use only". mrsflow has no `action`
-    // type yet (the Action.* family is empty); when one lands, this
-    // should wrap the inner action so its raised errors carry the
-    // context string. Until then, error rather than silently returning
-    // the input unchanged.
-    Err(MError::NotImplemented(
-        "Action.WithErrorContext: no Action type in mrsflow — Power BI engine internal",
-    ))
+    // type yet (the Action.* family is empty); raise the same coercion
+    // error PQ raises when the inner `action` arg isn't an Action value.
+    // Since no value can ever satisfy that in mrsflow, every call lands
+    // here. The rendered value matches PQ's wording: `null`, `"text"`,
+    // `42`, `true`, etc.
+    let rendered = match &args[0] {
+        Value::Null => "null".to_string(),
+        Value::Text(s) => format!("\"{s}\""),
+        Value::Number(n) => format!("{n}"),
+        Value::Logical(b) => if *b { "true".into() } else { "false".into() },
+        _ => "(value)".into(),
+    };
+    Err(MError::Other(format!(
+        "We cannot convert the value {rendered} to type Action."
+    )))
 }
