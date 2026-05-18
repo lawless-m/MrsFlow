@@ -12158,6 +12158,29 @@ let
         // q1455: Text.Format with #{N} placeholder syntax.
         SafeSerialize("q1455", () =>
             Text.Format("#{0} and #{1}", {"first", "second"})),
+        // q1458: Binary.View wraps a binary with custom GetLength/etc.
+        // handlers; downstream Binary.* funcs call through the view's
+        // handler instead of inspecting the raw bytes.
+        SafeSerialize("q1458", () =>
+            let
+                v = Binary.View(#binary({1,2,3}), [GetLength = () => 3])
+            in
+                Binary.Length(v)),
+        // q1459: Binary.ViewError wraps an error record; the value
+        // returned isn't a Binary, so Value.Is(_, type binary) is false.
+        SafeSerialize("q1459", () =>
+            let
+                r = try Binary.ViewError([Reason="x", Message="m", Detail=null]) in
+                    if r[HasError] then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, Value=Value.Is(r[Value], type binary)]),
+        // q1460: Binary.ViewFunction rejects non-function input with PQ's
+        // exact coercion-error wording.
+        SafeSerialize("q1460", () =>
+            let
+                v = Binary.View(#binary({1,2,3}), [GetLength = () => 3]),
+                r = try Binary.ViewFunction(v) in
+                    if r[HasError] then [HasError=true, Reason=r[Error][Reason], Message=r[Error][Message]]
+                    else [HasError=false, IsFunc=Value.Is(r[Value], type function)]),
         // q1457: Binary.InferContentType on opaque bytes. PQ always
         // returns a record with at least Content.Type=null; mrsflow now
         // matches that for bytes it doesn't recognise. The full CSV

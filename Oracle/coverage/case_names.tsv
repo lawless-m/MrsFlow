@@ -1453,3 +1453,6 @@ q1454	Record.FromList Record.ToList
 q1455	Text.Format
 q1456	Action.WithErrorContext
 q1457	Binary.InferContentType
+q1458	Binary.Length Binary.View
+q1459	Binary.ViewError Value.Is
+q1460	Binary.View Binary.ViewFunction Value.Is

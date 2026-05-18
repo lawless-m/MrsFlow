@@ -27,7 +27,7 @@ Source: q1167.mrsflow.out.
 | Any | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | AzureDataExplorer | 3 | 3 | 0 | 0 | 3 | 0 | 0 | 0 |
 | AzureStorage | 5 | 5 | 0 | 0 | 5 | 0 | 0 | 0 |
-| Binary | 18 | 18 | 18 | 18 | 0 | 0 | 14 | 0 |
+| Binary | 18 | 18 | 18 | 18 | 0 | 0 | 17 | 0 |
 | BinaryEncoding | 3 | 3 | 3 | 3 | 0 | 0 | 1 | 0 |
 | BinaryFormat | 22 | 22 | 22 | 22 | 0 | 0 | 22 | 2 |
 | BinaryOccurrence | 4 | 4 | 4 | 4 | 0 | 0 | 3 | 0 |
@@ -155,7 +155,7 @@ Source: q1167.mrsflow.out.
 | WebAction | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | WebMethod | 7 | 7 | 7 | 7 | 0 | 0 | 5 | 0 |
 | Xml | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| **TOTAL** | 860 | 856 | 744 | 740 | 116 | 4 | 597 | 8 |
+| **TOTAL** | 860 | 856 | 744 | 740 | 116 | 4 | 600 | 8 |
 
 ## Per-name detail
 
@@ -193,15 +193,15 @@ Source: q1167.mrsflow.out.
 | `Binary.FromList` | Y | Y | function | q351 q352 q353 q354 q355 | MATCH |
 | `Binary.FromText` | Y | Y | function | q346 q347 q348 q349 q354 | MATCH |
 | `Binary.InferContentType` | Y | Y | function | q1457 | MATCH |
-| `Binary.Length` | Y | Y | function | q346 q349 | MATCH |
+| `Binary.Length` | Y | Y | function | q346 q349 q1458 | MATCH |
 | `Binary.Range` | Y | Y | function | q348 | MATCH |
 | `Binary.Split` | Y | Y | function | q1188 | MATCH |
 | `Binary.ToList` | Y | Y | function | q1186 q1187 q1188 q1189 q1191 q1405 q1409 | MATCH |
 | `Binary.ToText` | Y | Y | function | q9 q347 q348 q350 q351 q352 q353 q354 q355 q1174 | MATCH |
 | `Binary.Type` | Y | Y | constant |  |  |
-| `Binary.View` | Y | Y | function |  |  |
-| `Binary.ViewError` | Y | Y | function |  |  |
-| `Binary.ViewFunction` | Y | Y | function |  |  |
+| `Binary.View` | Y | Y | function | q1458 q1460 | MATCH |
+| `Binary.ViewError` | Y | Y | function | q1459 | MATCH |
+| `Binary.ViewFunction` | Y | Y | function | q1460 | MATCH |
 | `BinaryEncoding.Base64` | Y | Y | constant | q1226 q1380 | MATCH |
 | `BinaryEncoding.Hex` | Y | Y | constant |  |  |
 | `BinaryEncoding.Type` | Y | Y | constant |  |  |
@@ -987,7 +987,7 @@ Source: q1167.mrsflow.out.
 | `Value.Expression` | Y | Y | function |  |  |
 | `Value.Firewall` | Y | Y | function |  |  |
 | `Value.FromText` | Y | Y | function | q1267 | MATCH |
-| `Value.Is` | Y | Y | function | q233 q235 q244 q399 q400 q408 q409 q410 q463 q468 q472 q473 q1095 q1096 q1097 q1100 q1148 q1169 | MATCH |
+| `Value.Is` | Y | Y | function | q233 q235 q244 q399 q400 q408 q409 q410 q463 q468 q472 q473 q1095 q1096 q1097 q1100 q1148 q1169 q1459 q1460 | MATCH |
 | `Value.Lineage` | Y | Y | function |  |  |
 | `Value.Metadata` | Y | Y | function | q1268 q1270 | MATCH |
 | `Value.Multiply` | Y | Y | function | q1265 | MATCH |

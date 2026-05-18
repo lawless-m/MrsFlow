@@ -54,8 +54,37 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         ("Binary.Decompress", two("binary", "compressionType"), decompress),
         ("Binary.View", two("binary", "handlers"), view),
         ("Binary.ViewError", one("record"), view_passthrough),
-        ("Binary.ViewFunction", one("function"), view_passthrough),
+        ("Binary.ViewFunction", one("function"), view_function),
     ]
+}
+
+/// PQ's `Binary.ViewFunction` requires a function input; any other type
+/// is rejected with a fixed coercion error before mrsflow gets a chance
+/// to do anything useful with it.
+fn view_function(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    match &args[0] {
+        Value::Function(_) => Ok(args[0].clone()),
+        other => Err(MError::Other(format!(
+            "We cannot convert a value of type {} to type Function.",
+            match other {
+                Value::Null => "Null",
+                Value::Logical(_) => "Logical",
+                Value::Number(_) => "Number",
+                Value::Text(_) => "Text",
+                Value::Binary(_) => "Binary",
+                Value::List(_) => "List",
+                Value::Record(_) => "Record",
+                Value::Table(_) => "Table",
+                Value::Date(_) => "Date",
+                Value::Time(_) => "Time",
+                Value::Datetime(_) => "DateTime",
+                Value::Datetimezone(_) => "DateTimeZone",
+                Value::Duration(_) => "Duration",
+                Value::Type(_) => "Type",
+                _ => "Any",
+            }
+        ))),
+    }
 }
 
 fn expect_binary(v: &Value) -> Result<&[u8], MError> {
