@@ -17,7 +17,7 @@ Source: q1167.mrsflow.out.
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
 | Access | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | AccessControlEntry | 3 | 3 | 1 | 1 | 2 | 0 | 1 | 0 |
-| AccessControlKind | 3 | 3 | 1 | 1 | 2 | 0 | 1 | 0 |
+| AccessControlKind | 3 | 3 | 1 | 1 | 2 | 0 | 3 | 0 |
 | Action | 1 | 1 | 1 | 1 | 0 | 0 | 1 | 0 |
 | ActiveDirectory | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | AdobeAnalytics | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
@@ -154,7 +154,7 @@ Source: q1167.mrsflow.out.
 | WebAction | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | WebMethod | 7 | 7 | 7 | 7 | 0 | 0 | 7 | 0 |
 | Xml | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| **TOTAL** | 858 | 854 | 776 | 772 | 82 | 4 | 739 | 9 |
+| **TOTAL** | 858 | 854 | 776 | 772 | 82 | 4 | 741 | 9 |
 
 ## Per-name detail
 
@@ -164,8 +164,8 @@ Source: q1167.mrsflow.out.
 | `AccessControlEntry.ConditionContextType` | Y |  | missing |  |  |
 | `AccessControlEntry.ConditionToIdentities` | Y |  | missing |  |  |
 | `AccessControlEntry.Type` | Y | Y | constant | q1534 | MATCH |
-| `AccessControlKind.Allow` | Y |  | missing |  |  |
-| `AccessControlKind.Deny` | Y |  | missing |  |  |
+| `AccessControlKind.Allow` | Y |  | constant | q1535 | MATCH |
+| `AccessControlKind.Deny` | Y |  | constant | q1535 | MATCH |
 | `AccessControlKind.Type` | Y | Y | constant | q1534 | MATCH |
 | `Action.WithErrorContext` | Y | Y | function | q1456 | MATCH |
 | `ActiveDirectory.Domains` | Y |  | missing |  |  |

@@ -1,4 +1,6 @@
 AccessControlEntry.Type
+AccessControlKind.Allow
+AccessControlKind.Deny
 AccessControlKind.Type
 Action.WithErrorContext
 Any.Type

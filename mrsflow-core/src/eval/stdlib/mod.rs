@@ -469,6 +469,17 @@ pub fn root_env() -> Env {
     // WebAction.Request — single-value sentinel for Web action requests.
     env = env.extend("WebAction.Request".into(), Value::Number(0.0));
 
+    // AccessControlKind constants — connector access-control list (ACL)
+    // entries: Allow=1 grants, Deny=0 denies. Surfaced through #shared
+    // for completeness; mrsflow has no connector firewall machinery, so
+    // the values are inert sentinels.
+    for (name, n) in [
+        ("AccessControlKind.Deny",  0.0),
+        ("AccessControlKind.Allow", 1.0),
+    ] {
+        env = env.extend(name.to_string(), Value::Number(n));
+    }
+
     // Culture.Current — host CLR culture name. PQ exposes it as a
     // zero-arg function that auto-invokes when referenced as a value;
     // mrsflow binds the resolved string directly so `Culture.Current`

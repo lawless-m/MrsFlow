@@ -12515,6 +12515,11 @@ let
             Type.IsNullable(Identity.Type),
             Type.IsNullable(IdentityProvider.Type)
         }),
+        // q1535: AccessControlKind.Allow=1 / Deny=0 — connector ACL
+        // entries. Surface mrsflow's #shared so user code doesn't see
+        // a name-not-in-scope error on a copy-pasted Power BI snippet.
+        SafeSerialize("q1535", () =>
+            { AccessControlKind.Allow, AccessControlKind.Deny }),
         // q1460: Binary.ViewFunction rejects non-function input with PQ's
         // exact coercion-error wording.
         SafeSerialize("q1460", () =>
