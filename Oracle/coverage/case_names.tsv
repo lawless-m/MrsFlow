@@ -1474,3 +1474,7 @@ q1482	Value.Is Value.ViewError
 q1483	Variable.Value
 q1484	Value.Versions
 q1485	Type.TableSchema Value.Is
+q1486	Type.IsNullable Type.TableColumn
+q1487	Type.IsOpenRecord Type.TableRow
+q1488	Value.Optimize
+q1489	Value.Is Value.ViewFunction

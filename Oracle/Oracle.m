@@ -12261,6 +12261,24 @@ let
         SafeSerialize("q1485", () =>
             let r = try Type.TableSchema(type table [a=number, b=text]) in
                 if r[HasError] then [HasError=true, Message=r[Error][Message]] else [HasError=false, IsTable=Value.Is(r[Value], type table)]),
+        // q1486: Type.IsNullable on a returned column-type from
+        // Type.TableColumn. Both engines compute Type.TableColumn but the
+        // raw Type value doesn't round-trip through Json.FromValue, so
+        // funnel through a non-Type assertion (Type.IsNullable returns
+        // a boolean) before reaching SafeSerialize.
+        SafeSerialize("q1486", () =>
+            Type.IsNullable(Type.TableColumn(type table [a=number, b=text], "a"))),
+        // q1487: Type.IsOpenRecord on Type.TableRow output — same
+        // wrap-the-Type-value-in-a-bool pattern.
+        SafeSerialize("q1487", () =>
+            Type.IsOpenRecord(Type.TableRow(type table [a=number, b=text]))),
+        // q1488: Value.Optimize is a passthrough; the input value comes
+        // back unchanged.
+        SafeSerialize("q1488", () => Value.Optimize(42)),
+        // q1489: Value.ViewFunction is a passthrough for functions
+        // (return is the same function value).
+        SafeSerialize("q1489", () =>
+            Value.Is(Value.ViewFunction(Text.Upper), type function)),
         // q1460: Binary.ViewFunction rejects non-function input with PQ's
         // exact coercion-error wording.
         SafeSerialize("q1460", () =>

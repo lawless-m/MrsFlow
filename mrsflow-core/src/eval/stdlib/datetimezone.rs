@@ -120,11 +120,24 @@ fn utc_now(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     ))
 }
 
-/// PQ's `TimeZone.Current` returns the host's current timezone offset
-/// as a `duration` value (positive east of UTC, negative west).
+/// PQ's `TimeZone.Current` returns the host's current Windows
+/// timezone display name (e.g. "GMT Standard Time") as text — NOT a
+/// duration. On Windows we shell out to `tzutil /g`; elsewhere we
+/// fall back to the `TZ` env var or "UTC".
 fn timezone_current(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    let offset_secs = chrono::Local::now().offset().local_minus_utc() as i64;
-    Ok(Value::Duration(chrono::Duration::seconds(offset_secs)))
+    #[cfg(target_os = "windows")]
+    {
+        if let Ok(out) = std::process::Command::new("tzutil").arg("/g").output()
+            && out.status.success()
+        {
+            let name = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            if !name.is_empty() {
+                return Ok(Value::Text(name));
+            }
+        }
+    }
+    let fallback = std::env::var("TZ").unwrap_or_else(|_| "UTC".to_string());
+    Ok(Value::Text(fallback))
 }
 
 

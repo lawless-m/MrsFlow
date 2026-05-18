@@ -47,7 +47,7 @@ Source: q1167.mrsflow.out.
 | Currency | 2 | 2 | 2 | 2 | 0 | 0 | 1 | 0 |
 | DataLake | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
 | Date | 58 | 58 | 58 | 58 | 0 | 0 | 58 | 0 |
-| DateTime | 26 | 26 | 26 | 26 | 0 | 0 | 20 | 0 |
+| DateTime | 26 | 26 | 26 | 26 | 0 | 0 | 20 | 2 |
 | DateTimeZone | 16 | 16 | 16 | 16 | 0 | 0 | 15 | 0 |
 | Day | 8 | 8 | 8 | 8 | 0 | 0 | 7 | 0 |
 | DB2 | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
@@ -147,15 +147,15 @@ Source: q1167.mrsflow.out.
 | Time | 10 | 10 | 10 | 10 | 0 | 0 | 9 | 0 |
 | TimeZone | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | TraceLevel | 6 | 6 | 5 | 5 | 1 | 0 | 5 | 0 |
-| Type | 25 | 25 | 25 | 25 | 0 | 0 | 17 | 0 |
+| Type | 25 | 25 | 25 | 25 | 0 | 0 | 19 | 0 |
 | Uri | 5 | 5 | 5 | 5 | 0 | 0 | 4 | 0 |
-| Value | 27 | 27 | 26 | 26 | 1 | 0 | 19 | 0 |
+| Value | 27 | 27 | 26 | 26 | 1 | 0 | 21 | 0 |
 | Variable | 2 | 2 | 2 | 2 | 0 | 0 | 2 | 0 |
 | Web | 4 | 4 | 4 | 4 | 0 | 0 | 0 | 0 |
 | WebAction | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | WebMethod | 7 | 7 | 7 | 7 | 0 | 0 | 5 | 0 |
 | Xml | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| **TOTAL** | 860 | 856 | 744 | 740 | 116 | 4 | 622 | 8 |
+| **TOTAL** | 860 | 856 | 744 | 740 | 116 | 4 | 626 | 10 |
 
 ## Per-name detail
 
@@ -353,7 +353,7 @@ Source: q1167.mrsflow.out.
 | `DateTime.IsInCurrentHour` | Y | Y | function | q1469 | MATCH |
 | `DateTime.IsInCurrentMinute` | Y | Y | function | q1469 | MATCH |
 | `DateTime.IsInCurrentSecond` | Y | Y | function |  |  |
-| `DateTime.IsInNextHour` | Y | Y | function | q1374 | MATCH |
+| `DateTime.IsInNextHour` | Y | Y | function | q1374 | DIFF |
 | `DateTime.IsInNextMinute` | Y | Y | function |  |  |
 | `DateTime.IsInNextNHours` | Y | Y | function | q1368 | MATCH |
 | `DateTime.IsInNextNMinutes` | Y | Y | function | q1369 | MATCH |
@@ -365,7 +365,7 @@ Source: q1167.mrsflow.out.
 | `DateTime.IsInPreviousNMinutes` | Y | Y | function | q1372 | MATCH |
 | `DateTime.IsInPreviousNSeconds` | Y | Y | function | q1373 | MATCH |
 | `DateTime.IsInPreviousSecond` | Y | Y | function |  |  |
-| `DateTime.LocalNow` | Y | Y | function | q1333 q1334 q1335 q1336 q1337 q1338 q1339 q1340 q1344 q1345 q1346 q1347 q1348 q1349 q1350 q1351 q1352 q1353 q1354 q1355 q1356 q1357 q1358 q1359 q1360 q1361 q1362 q1363 q1364 q1365 q1366 q1367 q1368 q1369 q1370 q1371 q1372 q1373 q1374 q1375 q1469 | MATCH |
+| `DateTime.LocalNow` | Y | Y | function | q1333 q1334 q1335 q1336 q1337 q1338 q1339 q1340 q1344 q1345 q1346 q1347 q1348 q1349 q1350 q1351 q1352 q1353 q1354 q1355 q1356 q1357 q1358 q1359 q1360 q1361 q1362 q1363 q1364 q1365 q1366 q1367 q1368 q1369 q1370 q1371 q1372 q1373 q1374 q1375 q1469 | MIXED |
 | `DateTime.Time` | Y | Y | function | q1073 | MATCH |
 | `DateTime.ToRecord` | Y | Y | function | q1256 | MATCH |
 | `DateTime.ToText` | Y | Y | function | q160 q161 q183 q184 q611 q612 q613 q614 q615 q1070 | MATCH |
@@ -957,8 +957,8 @@ Source: q1167.mrsflow.out.
 | `Type.FunctionRequiredParameters` | Y | Y | function | q1328 | MATCH |
 | `Type.FunctionReturn` | Y | Y | function | q1477 | MATCH |
 | `Type.Is` | Y | Y | function | q119 q120 q396 q1190 q1217 q1222 q1225 q1233 q1238 q1239 q1254 q1257 q1272 q1277 q1278 q1279 q1280 q1281 q1282 q1283 q1284 q1285 q1376 q1447 q1448 | MATCH |
-| `Type.IsNullable` | Y | Y | function | q1237 q1477 | MATCH |
-| `Type.IsOpenRecord` | Y | Y | function | q1240 q1241 q1242 q1329 q1331 q1332 q1476 | MATCH |
+| `Type.IsNullable` | Y | Y | function | q1237 q1477 q1486 | MATCH |
+| `Type.IsOpenRecord` | Y | Y | function | q1240 q1241 q1242 q1329 q1331 q1332 q1476 q1487 | MATCH |
 | `Type.ListItem` | Y | Y | function | q1239 | MATCH |
 | `Type.NonNullable` | Y | Y | function | q1238 | MATCH |
 | `Type.OpenRecord` | Y | Y | function | q1241 | MATCH |
@@ -966,10 +966,10 @@ Source: q1167.mrsflow.out.
 | `Type.ReplaceFacets` | Y | Y | function |  |  |
 | `Type.ReplaceTableKeys` | Y | Y | function |  |  |
 | `Type.ReplaceTablePartitionKey` | Y | Y | function |  |  |
-| `Type.TableColumn` | Y | Y | function |  |  |
+| `Type.TableColumn` | Y | Y | function | q1486 | MATCH |
 | `Type.TableKeys` | Y | Y | function | q1330 | MATCH |
 | `Type.TablePartitionKey` | Y | Y | function | q1414 | MATCH |
-| `Type.TableRow` | Y | Y | function |  |  |
+| `Type.TableRow` | Y | Y | function | q1487 | MATCH |
 | `Type.TableSchema` | Y | Y | function | q1485 | MATCH |
 | `Type.Type` | Y | Y | constant |  |  |
 | `Type.Union` | Y | Y | function | q1476 | MATCH |
@@ -987,13 +987,13 @@ Source: q1167.mrsflow.out.
 | `Value.Expression` | Y | Y | function |  |  |
 | `Value.Firewall` | Y | Y | function |  |  |
 | `Value.FromText` | Y | Y | function | q1267 | MATCH |
-| `Value.Is` | Y | Y | function | q233 q235 q244 q399 q400 q408 q409 q410 q463 q468 q472 q473 q1095 q1096 q1097 q1100 q1148 q1169 q1459 q1460 q1467 q1468 q1481 q1482 q1485 | MATCH |
+| `Value.Is` | Y | Y | function | q233 q235 q244 q399 q400 q408 q409 q410 q463 q468 q472 q473 q1095 q1096 q1097 q1100 q1148 q1169 q1459 q1460 q1467 q1468 q1481 q1482 q1485 q1489 | MATCH |
 | `Value.Lineage` | Y | Y | function | q1479 | MATCH |
 | `Value.Metadata` | Y | Y | function | q1268 q1270 | MATCH |
 | `Value.Multiply` | Y | Y | function | q1265 | MATCH |
 | `Value.NativeQuery` | Y | Y | function |  |  |
 | `Value.NullableEquals` | Y | Y | function | q1403 | MATCH |
-| `Value.Optimize` | Y | Y | function |  |  |
+| `Value.Optimize` | Y | Y | function | q1488 | MATCH |
 | `Value.RemoveMetadata` | Y | Y | function | q1269 | MATCH |
 | `Value.ReplaceMetadata` | Y | Y | function | q1270 | MATCH |
 | `Value.ReplaceType` | Y | Y | function | q1272 | MATCH |
@@ -1004,7 +1004,7 @@ Source: q1167.mrsflow.out.
 | `Value.VersionIdentity` | Y | Y | function |  |  |
 | `Value.Versions` | Y | Y | function | q1484 | MATCH |
 | `Value.ViewError` | Y | Y | function | q1482 | MATCH |
-| `Value.ViewFunction` | Y | Y | function |  |  |
+| `Value.ViewFunction` | Y | Y | function | q1489 | MATCH |
 | `Variable.Value` | Y | Y | function | q1483 | MATCH |
 | `Variable.ValueOrDefault` | Y | Y | function | q1466 | MATCH |
 | `Web.BrowserContents` | Y | Y | function |  |  |
