@@ -1452,3 +1452,4 @@ q1453	Json.Document Json.FromValue
 q1454	Record.FromList Record.ToList
 q1455	Text.Format
 q1456	Action.WithErrorContext
+q1457	Binary.InferContentType

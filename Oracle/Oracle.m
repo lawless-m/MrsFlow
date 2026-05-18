@@ -12158,6 +12158,14 @@ let
         // q1455: Text.Format with #{N} placeholder syntax.
         SafeSerialize("q1455", () =>
             Text.Format("#{0} and #{1}", {"first", "second"})),
+        // q1457: Binary.InferContentType on opaque bytes. PQ always
+        // returns a record with at least Content.Type=null; mrsflow now
+        // matches that for bytes it doesn't recognise. The full CSV
+        // detector (Csv.PotentialDelimiters probe table) isn't emulated,
+        // so this case sticks to non-CSV inputs.
+        SafeSerialize("q1457", () =>
+            { Binary.InferContentType(#binary({})),
+              Binary.InferContentType(#binary({1,2,3,4})) }),
         // q1456: Action.WithErrorContext. mrsflow has no Action type so
         // every call raises the same null→Action coercion error PQ
         // raises. Excel returns "We cannot convert the value null to

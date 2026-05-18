@@ -27,7 +27,7 @@ Source: q1167.mrsflow.out.
 | Any | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | AzureDataExplorer | 3 | 3 | 0 | 0 | 3 | 0 | 0 | 0 |
 | AzureStorage | 5 | 5 | 0 | 0 | 5 | 0 | 0 | 0 |
-| Binary | 18 | 18 | 18 | 18 | 0 | 0 | 13 | 0 |
+| Binary | 18 | 18 | 18 | 18 | 0 | 0 | 14 | 0 |
 | BinaryEncoding | 3 | 3 | 3 | 3 | 0 | 0 | 1 | 0 |
 | BinaryFormat | 22 | 22 | 22 | 22 | 0 | 0 | 22 | 2 |
 | BinaryOccurrence | 4 | 4 | 4 | 4 | 0 | 0 | 3 | 0 |
@@ -155,7 +155,7 @@ Source: q1167.mrsflow.out.
 | WebAction | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | WebMethod | 7 | 7 | 7 | 7 | 0 | 0 | 5 | 0 |
 | Xml | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| **TOTAL** | 860 | 856 | 744 | 740 | 116 | 4 | 596 | 8 |
+| **TOTAL** | 860 | 856 | 744 | 740 | 116 | 4 | 597 | 8 |
 
 ## Per-name detail
 
@@ -192,7 +192,7 @@ Source: q1167.mrsflow.out.
 | `Binary.From` | Y | Y | function | q1409 | MATCH |
 | `Binary.FromList` | Y | Y | function | q351 q352 q353 q354 q355 | MATCH |
 | `Binary.FromText` | Y | Y | function | q346 q347 q348 q349 q354 | MATCH |
-| `Binary.InferContentType` | Y | Y | function |  |  |
+| `Binary.InferContentType` | Y | Y | function | q1457 | MATCH |
 | `Binary.Length` | Y | Y | function | q346 q349 | MATCH |
 | `Binary.Range` | Y | Y | function | q348 | MATCH |
 | `Binary.Split` | Y | Y | function | q1188 | MATCH |

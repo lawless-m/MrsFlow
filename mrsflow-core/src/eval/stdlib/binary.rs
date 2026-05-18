@@ -220,9 +220,15 @@ fn split(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 fn infer_content_type(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    // v1: no sniffing — return null. (PQ uses this for HTTP content-types.)
+    // PQ always returns a record. For unidentified bytes the record has a
+    // single null `Content.Type` field. CSV-shaped text adds
+    // Csv.PotentialDelimiters with a delimiter-probe table — not yet
+    // emulated; we fall through to the null case for those too.
     let _ = expect_binary(&args[0])?;
-    Ok(Value::Null)
+    Ok(Value::Record(super::super::value::Record {
+        fields: vec![("Content.Type".into(), Value::Null)],
+        env: super::super::env::EnvNode::empty(),
+    }))
 }
 
 // --- Base64 / hex codecs (no external crate dependency) ---
