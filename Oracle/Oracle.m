@@ -12220,6 +12220,21 @@ let
         // after (optionally) emitting the trace message.
         SafeSerialize("q1470", () =>
             Diagnostics.Trace(TraceLevel.Information, "test message", "passthrough-value", false)),
+        // q1476: Type.Union merges two record-types; the merged type
+        // is closed (Type.IsOpenRecord returns false).
+        SafeSerialize("q1476", () =>
+            Type.IsOpenRecord(Type.Union({ type [a=number], type [b=text] }))),
+        // q1477: Type.FunctionReturn returns a type-value (the function's
+        // return type), and Type.IsNullable on `text` is false.
+        SafeSerialize("q1477", () =>
+            Type.IsNullable(Type.FunctionReturn(type function (a as number) as text))),
+        // q1479: Value.Lineage on an untracked value returns the default
+        // lineage record (Name="", Value=null, To=[]).
+        SafeSerialize("q1479", () =>
+            Value.Lineage(42)),
+        // q1480: Value.Traits on an untracked value returns [].
+        SafeSerialize("q1480", () =>
+            Value.Traits(42)),
         // q1460: Binary.ViewFunction rejects non-function input with PQ's
         // exact coercion-error wording.
         SafeSerialize("q1460", () =>

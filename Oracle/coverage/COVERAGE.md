@@ -147,15 +147,15 @@ Source: q1167.mrsflow.out.
 | Time | 10 | 10 | 10 | 10 | 0 | 0 | 9 | 0 |
 | TimeZone | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | TraceLevel | 6 | 6 | 5 | 5 | 1 | 0 | 5 | 0 |
-| Type | 25 | 25 | 25 | 25 | 0 | 0 | 14 | 0 |
+| Type | 25 | 25 | 25 | 25 | 0 | 0 | 16 | 0 |
 | Uri | 5 | 5 | 5 | 5 | 0 | 0 | 4 | 0 |
-| Value | 27 | 27 | 26 | 26 | 1 | 0 | 15 | 0 |
+| Value | 27 | 27 | 26 | 26 | 1 | 0 | 17 | 0 |
 | Variable | 2 | 2 | 2 | 2 | 0 | 0 | 1 | 0 |
 | Web | 4 | 4 | 4 | 4 | 0 | 0 | 0 | 0 |
 | WebAction | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | WebMethod | 7 | 7 | 7 | 7 | 0 | 0 | 5 | 0 |
 | Xml | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| **TOTAL** | 860 | 856 | 744 | 740 | 116 | 4 | 613 | 8 |
+| **TOTAL** | 860 | 856 | 744 | 740 | 116 | 4 | 617 | 8 |
 
 ## Per-name detail
 
@@ -955,10 +955,10 @@ Source: q1167.mrsflow.out.
 | `Type.ForRecord` | Y | Y | function | q1329 q1331 q1332 | MATCH |
 | `Type.FunctionParameters` | Y | Y | function | q398 | MATCH |
 | `Type.FunctionRequiredParameters` | Y | Y | function | q1328 | MATCH |
-| `Type.FunctionReturn` | Y | Y | function |  |  |
+| `Type.FunctionReturn` | Y | Y | function | q1477 | MATCH |
 | `Type.Is` | Y | Y | function | q119 q120 q396 q1190 q1217 q1222 q1225 q1233 q1238 q1239 q1254 q1257 q1272 q1277 q1278 q1279 q1280 q1281 q1282 q1283 q1284 q1285 q1376 q1447 q1448 | MATCH |
-| `Type.IsNullable` | Y | Y | function | q1237 | MATCH |
-| `Type.IsOpenRecord` | Y | Y | function | q1240 q1241 q1242 q1329 q1331 q1332 | MATCH |
+| `Type.IsNullable` | Y | Y | function | q1237 q1477 | MATCH |
+| `Type.IsOpenRecord` | Y | Y | function | q1240 q1241 q1242 q1329 q1331 q1332 q1476 | MATCH |
 | `Type.ListItem` | Y | Y | function | q1239 | MATCH |
 | `Type.NonNullable` | Y | Y | function | q1238 | MATCH |
 | `Type.OpenRecord` | Y | Y | function | q1241 | MATCH |
@@ -972,7 +972,7 @@ Source: q1167.mrsflow.out.
 | `Type.TableRow` | Y | Y | function |  |  |
 | `Type.TableSchema` | Y | Y | function |  |  |
 | `Type.Type` | Y | Y | constant |  |  |
-| `Type.Union` | Y | Y | function |  |  |
+| `Type.Union` | Y | Y | function | q1476 | MATCH |
 | `Uri.BuildQueryString` | Y | Y | function | q1404 | MATCH |
 | `Uri.Combine` | Y | Y | function | q1326 | MATCH |
 | `Uri.EscapeDataString` | Y | Y | function | q1327 | MATCH |
@@ -988,7 +988,7 @@ Source: q1167.mrsflow.out.
 | `Value.Firewall` | Y | Y | function |  |  |
 | `Value.FromText` | Y | Y | function | q1267 | MATCH |
 | `Value.Is` | Y | Y | function | q233 q235 q244 q399 q400 q408 q409 q410 q463 q468 q472 q473 q1095 q1096 q1097 q1100 q1148 q1169 q1459 q1460 q1467 q1468 | MATCH |
-| `Value.Lineage` | Y | Y | function |  |  |
+| `Value.Lineage` | Y | Y | function | q1479 | MATCH |
 | `Value.Metadata` | Y | Y | function | q1268 q1270 | MATCH |
 | `Value.Multiply` | Y | Y | function | q1265 | MATCH |
 | `Value.NativeQuery` | Y | Y | function |  |  |
@@ -999,7 +999,7 @@ Source: q1167.mrsflow.out.
 | `Value.ReplaceType` | Y | Y | function | q1272 | MATCH |
 | `Value.ResourceExpression` | Y |  | missing |  |  |
 | `Value.Subtract` | Y | Y | function | q1264 | MATCH |
-| `Value.Traits` | Y | Y | function |  |  |
+| `Value.Traits` | Y | Y | function | q1480 | MATCH |
 | `Value.Type` | Y | Y | function | q1100 q1272 | MATCH |
 | `Value.VersionIdentity` | Y | Y | function |  |  |
 | `Value.Versions` | Y | Y | function |  |  |

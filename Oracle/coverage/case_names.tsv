@@ -1465,3 +1465,7 @@ q1467	DateTime.FixedLocalNow DateTimeZone.FixedLocalNow DateTimeZone.LocalNow Va
 q1468	Diagnostics.ActivityId Diagnostics.CorrelationId Value.Is
 q1469	DateTime.IsInCurrentHour DateTime.IsInCurrentMinute DateTime.LocalNow
 q1470	Diagnostics.Trace TraceLevel.Information
+q1476	Type.IsOpenRecord Type.Union
+q1477	Type.FunctionReturn Type.IsNullable
+q1479	Value.Lineage
+q1480	Value.Traits

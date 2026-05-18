@@ -223,15 +223,21 @@ fn expression(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 fn lineage(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    // v1: no fold lineage tracking.
-    Ok(Value::list_of(Vec::new()))
+    // v1: no fold lineage tracking. PQ returns a default lineage record
+    // with Name="" / Value=null / To=[] for untracked values.
+    Ok(Value::Record(Record {
+        fields: vec![
+            ("Name".into(), Value::Text(String::new())),
+            ("Value".into(), Value::Null),
+            ("To".into(), Value::list_of(Vec::new())),
+        ],
+        env: EnvNode::empty(),
+    }))
 }
 
 fn traits(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    Ok(Value::Record(Record {
-        fields: Vec::new(),
-        env: EnvNode::empty(),
-    }))
+    // PQ returns an empty list, not an empty record, for untracked traits.
+    Ok(Value::list_of(Vec::new()))
 }
 
 fn version_identity(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
