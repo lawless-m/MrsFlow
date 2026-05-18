@@ -64,14 +64,24 @@ fn table(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let specs = parse_column_specs(&specs_forced)?;
     let row_selector = parse_row_selector(opts_forced.as_ref())?;
 
+    // PQ requires an explicit RowSelector option whenever more than one
+    // column is specified — otherwise it can't disambiguate which
+    // column-selector matches define rows. mrsflow had been defaulting
+    // to row_count = 1 in that case; PQ rejects with this exact wording.
+    if specs.len() > 1 && row_selector.is_none() {
+        return Err(MError::Other(
+            "The RowSelector option is required when more than one column is specified.".into(),
+        ));
+    }
+
     let doc = Html::parse_document(&html_src);
     let root_ref = doc.root_element();
 
     // PQ's algorithm: each column selector is applied to the whole
     // document; row N's cell is the Nth document-order match. The
     // RowSelector controls the row count (= number of matches it
-    // produces). Without RowSelector, the table has one row (each
-    // column's first match). This matches both MS doc examples.
+    // produces). For single-column tables (RowSelector optional), default
+    // to one row (the first match), matching both MS doc examples.
     let row_count = match &row_selector {
         Some(sel) => root_ref.select(sel).count(),
         None => 1,

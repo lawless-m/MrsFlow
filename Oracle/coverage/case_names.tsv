@@ -1492,3 +1492,5 @@ q1501	Table.FromRecords Table.ReplacePartitionKey Table.RowCount
 q1502	Table.FromRecords Table.ReplaceRelationshipIdentity Table.RowCount
 q1503	Table.FromRecords Table.ViewFunction Value.Is
 q1505	Table.FilterWithDataTable Table.FromRecords Table.RowCount
+q1506	Html.Table Table.RowCount Text.ToBinary TextEncoding.Utf8
+q1507	Html.Table Table.RowCount Text.ToBinary TextEncoding.Utf8

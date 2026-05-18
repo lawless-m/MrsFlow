@@ -12347,6 +12347,26 @@ let
             let r = try Table.RowCount(Table.FilterWithDataTable(
                 Table.FromRecords({[a=1],[a=2],[a=3]}), Table.FromRecords({[a=1],[a=3]}))) in
                 if r[HasError] then [HasError=true, Message=r[Error][Message]] else [HasError=false, Value=r[Value]]),
+        // q1506: Html.Table with >=2 column selectors requires an
+        // explicit RowSelector — mrsflow had been defaulting to 1 row.
+        SafeSerialize("q1506", () =>
+            let
+                html = "<table><tr><td>a</td><td>1</td></tr><tr><td>b</td><td>2</td></tr></table>",
+                bin = Text.ToBinary(html, TextEncoding.Utf8),
+                r = try Html.Table(bin, {{"k", "td:nth-child(1)"}, {"v", "td:nth-child(2)"}}) in
+                    if r[HasError] then [HasError=true, Message=r[Error][Message]]
+                    else [HasError=false, RowCount=Table.RowCount(r[Value])]),
+        // q1507: Html.Table happy path — with RowSelector, both rows
+        // extract.
+        SafeSerialize("q1507", () =>
+            let
+                html = "<table><tr><td>a</td><td>1</td></tr><tr><td>b</td><td>2</td></tr></table>",
+                bin = Text.ToBinary(html, TextEncoding.Utf8),
+                t = Html.Table(bin,
+                    {{"k", "td:nth-child(1)"}, {"v", "td:nth-child(2)"}},
+                    [RowSelector="tr"])
+            in
+                Table.RowCount(t)),
         // q1460: Binary.ViewFunction rejects non-function input with PQ's
         // exact coercion-error wording.
         SafeSerialize("q1460", () =>

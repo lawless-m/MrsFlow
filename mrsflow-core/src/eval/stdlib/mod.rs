@@ -161,7 +161,32 @@ pub fn root_env() -> Env {
         ("QuoteStyle.Type",         TypeRep::Number),
         ("RoundingMode.Type",       TypeRep::Number),
         ("Uri.Type",                TypeRep::Text),
-        ("WebMethod.Type",          TypeRep::Number),
+        ("WebMethod.Type",          TypeRep::Text),
+        // Enum families that Excel exposes a `.Type` companion for, but
+        // mrsflow had been omitting. All numeric (the family's constants
+        // are number ordinals) except ODataOmitValues, which PQ keys by
+        // lowercase text.
+        ("MissingField.Type",       TypeRep::Number),
+        ("Occurrence.Type",         TypeRep::Number),
+        ("ODataOmitValues.Type",    TypeRep::Text),
+        ("Order.Type",              TypeRep::Number),
+        ("PercentileMode.Type",     TypeRep::Number),
+        ("RankKind.Type",           TypeRep::Number),
+        ("RelativePosition.Type",   TypeRep::Number),
+        ("SapBusinessWarehouseExecutionMode.Type", TypeRep::Number),
+        ("SapHanaDistribution.Type", TypeRep::Number),
+        ("SapHanaRangeOperator.Type", TypeRep::Number),
+        ("TextEncoding.Type",       TypeRep::Number),
+        ("TraceLevel.Type",         TypeRep::Number),
+        // Connector-side identity types. mrsflow doesn't implement the
+        // underlying connectors, so the `.Type` exists only so name
+        // lookup and Type.Is probes don't fail.
+        ("AccessControlEntry.Type", TypeRep::Any),
+        ("AccessControlKind.Type",  TypeRep::Any),
+        ("Certificate.Type",        TypeRep::Any),
+        ("Guid.Type",               TypeRep::Text),
+        ("Identity.Type",           TypeRep::Any),
+        ("IdentityProvider.Type",   TypeRep::Any),
     ] {
         env = env.extend(name.to_string(), Value::Type(tr));
     }

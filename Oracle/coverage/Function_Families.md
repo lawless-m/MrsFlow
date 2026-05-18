@@ -12,8 +12,8 @@ Counts come from `COVERAGE.md`; refresh both via `render.ps1`.
 | Family | Status | mrsflow / PQ | Description |
 |---|---|---:|---|
 | Access | Untouched | 0 / 1 | Microsoft Access database connector. |
-| AccessControlEntry | Untouched | 0 / 3 | ACL types used by the firewall / trust model. |
-| AccessControlKind | Untouched | 0 / 3 | ACL allow / deny / type constants. |
+| AccessControlEntry | Partial | 1 / 3 | ACL types used by the firewall / trust model. |
+| AccessControlKind | Partial | 1 / 3 | ACL allow / deny / type constants. |
 | Action | Tested | 1 / 1 | Side-effectful action runner (Action.Try / WithErrorContext). Niche. |
 | ActiveDirectory | Untouched | 0 / 1 | Active Directory domain enumeration. |
 | AdobeAnalytics | Untouched | 0 / 1 | Adobe Analytics OLAP cubes connector. |
@@ -29,7 +29,7 @@ Counts come from `COVERAGE.md`; refresh both via `render.ps1`.
 | BufferMode | Tested | 3 / 3 | Buffer eagerness mode (Eager / Delayed) for *.Buffer. |
 | Byte | Tested | 2 / 2 | Byte-typed numeric (0–255) conversion + type companion. |
 | ByteOrder | Tested | 3 / 3 | Big / little endian constants used by BinaryFormat. |
-| Certificate | Untouched | 0 / 1 | Certificate type-record companion. |
+| Certificate | Implemented | 1 / 1 | Certificate type-record companion. |
 | Character | Tested | 3 / 3 | Character-codepoint conversion (FromNumber / ToNumber). |
 | Combiner | Tested | 5 / 5 | Text-combine combinators (delimiter, lengths, positions). Symmetric with Splitter. |
 | CommonDataService | Untouched | 0 / 1 | Microsoft Dataverse / Common Data Service connector. |
@@ -67,12 +67,12 @@ Counts come from `COVERAGE.md`; refresh both via `render.ps1`.
 | GeometryPoint | Untouched | 0 / 1 | Geometry point constructor. |
 | Graph | Untouched | 0 / 1 | Microsoft Graph entity-graph navigation. |
 | GroupKind | Tested | 3 / 3 | Table.Group kind (Global / Local). |
-| Guid | Partial | 1 / 2 | GUID type companion. |
+| Guid | Tested | 2 / 2 | GUID type companion. |
 | Hdfs | Untouched | 0 / 2 | HDFS file system connector. |
 | HdInsight | Untouched | 0 / 3 | Azure HDInsight Hadoop connector. |
-| Html | Implemented | 1 / 1 | HTML table scraper. |
-| Identity | Untouched | 0 / 3 | User-identity record. |
-| IdentityProvider | Untouched | 0 / 2 | Identity-provider constants for auth flows. |
+| Html | Tested | 1 / 1 | HTML table scraper. |
+| Identity | Partial | 1 / 3 | User-identity record. |
+| IdentityProvider | Partial | 1 / 2 | Identity-provider constants for auth flows. |
 | Informix | Untouched | 0 / 1 | IBM Informix connector. |
 | Int16 | Tested | 2 / 2 | 16-bit signed integer numeric type. |
 | Int32 | Tested | 2 / 2 | 32-bit signed integer numeric type. |
@@ -89,44 +89,44 @@ Counts come from `COVERAGE.md`; refresh both via `render.ps1`.
 | Lines | Tested | 4 / 4 | Line-oriented text helpers (FromText / ToText / FromBinary / ToBinary). |
 | List | Tested | 72 / 72 | List operations — the broadest family. Filter, map, reduce, sort, generate, statistical. |
 | Logical | Tested | 4 / 4 | Boolean conversion + type companion. |
-| MissingField | Partial | 3 / 4 | Record.SelectFields missingField option (Error / Ignore / UseNull). |
+| MissingField | Tested | 4 / 4 | Record.SelectFields missingField option (Error / Ignore / UseNull). |
 | Module | Untouched | 0 / 1 | Module-versions introspection. |
 | MySQL | Implemented | 2 / 1 | MySQL database connector. mrsflow exposes both `MySQL.Database` and an extension `MySQL.Query` for raw SQL. |
 | None | Implemented | 1 / 1 | None type companion (uninhabited). |
 | Null | Tested | 1 / 1 | Null type companion. |
 | Number | Tested | 49 / 49 | Number value operations: arithmetic, rounding, formatting, parsing, bitwise. |
-| Occurrence | Partial | 4 / 7 | Text/List PositionOf occurrence enum (First / Last / All) + BinaryFormat reuse. |
+| Occurrence | Partial | 5 / 7 | Text/List PositionOf occurrence enum (First / Last / All) + BinaryFormat reuse. |
 | OData | Untouched | 0 / 1 | OData v3/v4 feed connector. |
-| ODataOmitValues | Partial | 1 / 2 | OData null-handling enum. |
+| ODataOmitValues | Tested | 2 / 2 | OData null-handling enum. |
 | Odbc | Tested | 3 / 3 | Generic ODBC connector. mrsflow has a real implementation with lazy/folded queries. |
 | Office | Untouched | 0 / 1 | Office shape inference (Excel chart properties). |
 | OleDb | Untouched | 0 / 2 | OLE DB connector (legacy Windows DB connectivity). |
 | Oracle | Untouched | 0 / 1 | Oracle Database connector. |
-| Order | Partial | 2 / 3 | Sort order enum (Ascending / Descending). |
+| Order | Tested | 3 / 3 | Sort order enum (Ascending / Descending). |
 | Parquet | Implemented | 1 / 0 | Parquet file reader. mrsflow extension; PQ exposes `Parquet.Document` natively. |
 | Password | Implemented | 1 / 1 | Password-credential type companion. |
 | Pdf | Untouched | 0 / 1 | PDF table extractor. |
 | Percentage | Tested | 2 / 2 | Percentage-typed decimal. |
-| PercentileMode | Partial | 4 / 5 | List.Percentile mode (ExcelInc / ExcelExc / SqlCont / SqlDisc). |
+| PercentileMode | Tested | 5 / 5 | List.Percentile mode (ExcelInc / ExcelExc / SqlCont / SqlDisc). |
 | PostgreSQL | Implemented | 2 / 1 | PostgreSQL database connector. mrsflow extension `PostgreSQL.Query` for raw SQL. |
 | PowerPlatform | Untouched | 0 / 1 | Power Platform dataflows connector. |
 | Precision | Tested | 3 / 3 | Decimal / Double precision enum for numeric typing. |
 | Progress | Untouched | 0 / 1 | Progress / DataDirect connector. |
 | QuoteStyle | Tested | 3 / 3 | Csv.Document quote-style enum (Csv / None). |
-| RankKind | Partial | 3 / 4 | Table.AddRankColumn tie-handling (Competition / Ordinal / Dense). |
+| RankKind | Tested | 4 / 4 | Table.AddRankColumn tie-handling (Competition / Ordinal / Dense). |
 | RData | Untouched | 0 / 1 | R serialisation format reader. |
 | Record | Tested | 18 / 18 | Record operations: field access, transform, combine, FromList / FromTable round-trips. |
-| RelativePosition | Partial | 2 / 3 | Text.Range / .Middle relative-position enum (FromStart / FromEnd). |
+| RelativePosition | Tested | 3 / 3 | Text.Range / .Middle relative-position enum (FromStart / FromEnd). |
 | Replacer | Tested | 2 / 2 | Replacer.ReplaceValue / .ReplaceText — passed as the replacer arg to Table.ReplaceValue. |
 | Resource | Untouched | 0 / 1 | Connector resource-access plumbing. |
 | RoundingMode | Tested | 6 / 6 | Number.Round mode (ToEven / Up / Down / AwayFromZero / TowardZero). |
 | RowExpression | Untouched | 0 / 3 | Query-folding helper for per-row expressions. |
 | Salesforce | Untouched | 0 / 2 | Salesforce Data / Reports connector. |
 | SapBusinessWarehouse | Untouched | 0 / 1 | SAP BW cube connector. |
-| SapBusinessWarehouseExecutionMode | Partial | 3 / 4 | SAP BW execution-mode enum. |
+| SapBusinessWarehouseExecutionMode | Tested | 4 / 4 | SAP BW execution-mode enum. |
 | SapHana | Untouched | 0 / 1 | SAP HANA database connector. |
-| SapHanaDistribution | Partial | 4 / 5 | SAP HANA query-distribution enum. |
-| SapHanaRangeOperator | Partial | 6 / 7 | SAP HANA range-filter operator enum. |
+| SapHanaDistribution | Tested | 5 / 5 | SAP HANA query-distribution enum. |
+| SapHanaRangeOperator | Tested | 7 / 7 | SAP HANA range-filter operator enum. |
 | SharePoint | Untouched | 0 / 3 | SharePoint Online connector. |
 | Single | Tested | 2 / 2 | Single-precision float type companion. |
 | Soda | Untouched | 0 / 1 | Socrata Open Data API connector. |
@@ -138,10 +138,10 @@ Counts come from `COVERAGE.md`; refresh both via `render.ps1`.
 | Tables | Untouched | 0 / 1 | Cross-connector "list tables" facade. |
 | Teradata | Untouched | 0 / 1 | Teradata database connector. |
 | Text | Tested | 42 / 42 | Text (string) operations: split, replace, format, length, encoding-conversion. UTF-16 code-unit semantics matching .NET. |
-| TextEncoding | Partial | 6 / 7 | Encoding constants for Text.FromBinary / ToBinary (UTF-8 the only one decoded). |
+| TextEncoding | Tested | 7 / 7 | Encoding constants for Text.FromBinary / ToBinary (UTF-8 the only one decoded). |
 | Time | Tested | 10 / 10 | Time-of-day operations. |
 | TimeZone | Implemented | 1 / 1 | TimeZone.Current — host timezone probe. |
-| TraceLevel | Partial | 5 / 6 | Diagnostics.Trace level enum. |
+| TraceLevel | Tested | 6 / 6 | Diagnostics.Trace level enum. |
 | Type | Tested | 25 / 25 | Type-value construction and introspection (Type.Is, RecordFields, TableSchema, etc.). |
 | Uri | Tested | 5 / 5 | URI parsing / building. |
 | Value | Partial | 26 / 27 | Generic value introspection (Compare, Equals, Is, NativeQuery, Metadata). |
