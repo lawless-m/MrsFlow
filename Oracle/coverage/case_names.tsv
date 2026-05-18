@@ -1469,3 +1469,8 @@ q1476	Type.IsOpenRecord Type.Union
 q1477	Type.FunctionReturn Type.IsNullable
 q1479	Value.Lineage
 q1480	Value.Traits
+q1481	Table.ViewError Value.Is
+q1482	Value.Is Value.ViewError
+q1483	Variable.Value
+q1484	Value.Versions
+q1485	Type.TableSchema Value.Is

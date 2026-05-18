@@ -31,7 +31,7 @@ fn value(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     match lookup(&name, host)? {
         Some(v) => Ok(v),
         None => Err(MError::Other(format!(
-            "Variable.Value: variable '{name}' is not defined"
+            "The variable '{name}' could not be found."
         ))),
     }
 }

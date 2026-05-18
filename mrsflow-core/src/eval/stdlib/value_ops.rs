@@ -247,8 +247,10 @@ fn version_identity(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError
 }
 
 fn versions(_args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    Err(MError::NotImplemented(
-        "Value.Versions: requires versioning machinery not built in v1",
+    // PQ raises this exact message when asked for versions on a value
+    // without versioning metadata (i.e., everything mrsflow produces).
+    Err(MError::Other(
+        "The value does not support versioning.".into(),
     ))
 }
 

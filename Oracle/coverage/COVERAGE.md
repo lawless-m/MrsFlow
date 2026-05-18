@@ -139,7 +139,7 @@ Source: q1167.mrsflow.out.
 | Sql | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
 | SqlExpression | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
 | Sybase | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
-| Table | 114 | 114 | 114 | 114 | 0 | 0 | 99 | 0 |
+| Table | 114 | 114 | 114 | 114 | 0 | 0 | 100 | 0 |
 | Tables | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Teradata | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | Text | 42 | 42 | 42 | 42 | 0 | 0 | 41 | 2 |
@@ -147,15 +147,15 @@ Source: q1167.mrsflow.out.
 | Time | 10 | 10 | 10 | 10 | 0 | 0 | 9 | 0 |
 | TimeZone | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | TraceLevel | 6 | 6 | 5 | 5 | 1 | 0 | 5 | 0 |
-| Type | 25 | 25 | 25 | 25 | 0 | 0 | 16 | 0 |
+| Type | 25 | 25 | 25 | 25 | 0 | 0 | 17 | 0 |
 | Uri | 5 | 5 | 5 | 5 | 0 | 0 | 4 | 0 |
-| Value | 27 | 27 | 26 | 26 | 1 | 0 | 17 | 0 |
-| Variable | 2 | 2 | 2 | 2 | 0 | 0 | 1 | 0 |
+| Value | 27 | 27 | 26 | 26 | 1 | 0 | 19 | 0 |
+| Variable | 2 | 2 | 2 | 2 | 0 | 0 | 2 | 0 |
 | Web | 4 | 4 | 4 | 4 | 0 | 0 | 0 | 0 |
 | WebAction | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | WebMethod | 7 | 7 | 7 | 7 | 0 | 0 | 5 | 0 |
 | Xml | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| **TOTAL** | 860 | 856 | 744 | 740 | 116 | 4 | 617 | 8 |
+| **TOTAL** | 860 | 856 | 744 | 740 | 116 | 4 | 622 | 8 |
 
 ## Per-name detail
 
@@ -877,7 +877,7 @@ Source: q1167.mrsflow.out.
 | `Table.Unpivot` | Y | Y | function | q261 q979 q980 q982 | MATCH |
 | `Table.UnpivotOtherColumns` | Y | Y | function | q262 q265 q981 | MATCH |
 | `Table.View` | Y | Y | function |  |  |
-| `Table.ViewError` | Y | Y | function |  |  |
+| `Table.ViewError` | Y | Y | function | q1481 | MATCH |
 | `Table.ViewFunction` | Y | Y | function |  |  |
 | `Table.WithErrorContext` | Y | Y | function |  |  |
 | `Tables.GetRelationships` | Y |  | missing |  |  |
@@ -970,7 +970,7 @@ Source: q1167.mrsflow.out.
 | `Type.TableKeys` | Y | Y | function | q1330 | MATCH |
 | `Type.TablePartitionKey` | Y | Y | function | q1414 | MATCH |
 | `Type.TableRow` | Y | Y | function |  |  |
-| `Type.TableSchema` | Y | Y | function |  |  |
+| `Type.TableSchema` | Y | Y | function | q1485 | MATCH |
 | `Type.Type` | Y | Y | constant |  |  |
 | `Type.Union` | Y | Y | function | q1476 | MATCH |
 | `Uri.BuildQueryString` | Y | Y | function | q1404 | MATCH |
@@ -987,7 +987,7 @@ Source: q1167.mrsflow.out.
 | `Value.Expression` | Y | Y | function |  |  |
 | `Value.Firewall` | Y | Y | function |  |  |
 | `Value.FromText` | Y | Y | function | q1267 | MATCH |
-| `Value.Is` | Y | Y | function | q233 q235 q244 q399 q400 q408 q409 q410 q463 q468 q472 q473 q1095 q1096 q1097 q1100 q1148 q1169 q1459 q1460 q1467 q1468 | MATCH |
+| `Value.Is` | Y | Y | function | q233 q235 q244 q399 q400 q408 q409 q410 q463 q468 q472 q473 q1095 q1096 q1097 q1100 q1148 q1169 q1459 q1460 q1467 q1468 q1481 q1482 q1485 | MATCH |
 | `Value.Lineage` | Y | Y | function | q1479 | MATCH |
 | `Value.Metadata` | Y | Y | function | q1268 q1270 | MATCH |
 | `Value.Multiply` | Y | Y | function | q1265 | MATCH |
@@ -1002,10 +1002,10 @@ Source: q1167.mrsflow.out.
 | `Value.Traits` | Y | Y | function | q1480 | MATCH |
 | `Value.Type` | Y | Y | function | q1100 q1272 | MATCH |
 | `Value.VersionIdentity` | Y | Y | function |  |  |
-| `Value.Versions` | Y | Y | function |  |  |
-| `Value.ViewError` | Y | Y | function |  |  |
+| `Value.Versions` | Y | Y | function | q1484 | MATCH |
+| `Value.ViewError` | Y | Y | function | q1482 | MATCH |
 | `Value.ViewFunction` | Y | Y | function |  |  |
-| `Variable.Value` | Y | Y | function |  |  |
+| `Variable.Value` | Y | Y | function | q1483 | MATCH |
 | `Variable.ValueOrDefault` | Y | Y | function | q1466 | MATCH |
 | `Web.BrowserContents` | Y | Y | function |  |  |
 | `Web.Contents` | Y | Y | function |  |  |

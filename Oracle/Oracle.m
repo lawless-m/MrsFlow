@@ -12235,6 +12235,32 @@ let
         // q1480: Value.Traits on an untracked value returns [].
         SafeSerialize("q1480", () =>
             Value.Traits(42)),
+        // q1481: Table.ViewError wraps an error-record for deferred raise;
+        // the wrapper isn't a Table.
+        SafeSerialize("q1481", () =>
+            let r = try Table.ViewError([Reason="x",Message="m",Detail=null]) in
+                if r[HasError] then [HasError=true, Message=r[Error][Message]] else [HasError=false, IsTable=Value.Is(r[Value], type table)]),
+        // q1482: Value.ViewError wraps an error-record; the wrapper IS a
+        // Record (the input record itself, passed through).
+        SafeSerialize("q1482", () =>
+            let r = try Value.ViewError([Reason="x",Message="m",Detail=null]) in
+                if r[HasError] then [HasError=true, Message=r[Error][Message]] else [HasError=false, IsRecord=Value.Is(r[Value], type record)]),
+        // q1483: Variable.Value on an unknown identifier — PQ message
+        // wording exactly matched ("The variable '...' could not be
+        // found.").
+        SafeSerialize("q1483", () =>
+            let r = try Variable.Value("NOPE") in
+                if r[HasError] then [HasError=true, Message=r[Error][Message]] else [HasError=false, Value=r[Value]]),
+        // q1484: Value.Versions on an unversioned value — PQ raises
+        // "The value does not support versioning."
+        SafeSerialize("q1484", () =>
+            let r = try Value.Versions(42) in
+                if r[HasError] then [HasError=true, Message=r[Error][Message]] else [HasError=false, Value=r[Value]]),
+        // q1485: Type.TableSchema produces a table value describing the
+        // input table-type's columns.
+        SafeSerialize("q1485", () =>
+            let r = try Type.TableSchema(type table [a=number, b=text]) in
+                if r[HasError] then [HasError=true, Message=r[Error][Message]] else [HasError=false, IsTable=Value.Is(r[Value], type table)]),
         // q1460: Binary.ViewFunction rejects non-function input with PQ's
         // exact coercion-error wording.
         SafeSerialize("q1460", () =>
