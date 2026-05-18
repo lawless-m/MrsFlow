@@ -162,16 +162,16 @@ fn constant(v: Value) -> Value {
     ])
 }
 
+/// `RowExpression.Column(name)` returns a FieldAccess AST record whose
+/// target is the row-sentinel — identical to what `RowExpression.From`
+/// emits for `each [name]` (which desugars to `each _[name]`).
 fn column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let name = expect_text(&args[0])?;
-    Ok(column_record(name))
-}
-
-fn column_record(name: &str) -> Value {
-    record(vec![
-        ("Kind", Value::Text("Column".into())),
-        ("Name", Value::Text(name.into())),
-    ])
+    Ok(record(vec![
+        ("Kind", Value::Text("FieldAccess".into())),
+        ("Expression", sentinel_invocation()),
+        ("MemberName", Value::Text(name.into())),
+    ]))
 }
 
 fn record(fields: Vec<(&'static str, Value)>) -> Value {

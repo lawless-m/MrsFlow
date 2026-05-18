@@ -80,6 +80,7 @@ foreach ($q in $allCases) {
                  $src.Contains($n + ',') -or
                  $src.Contains($n + ')') -or
                  $src.Contains($n + '}') -or
+                 $src.Contains($n + '[') -or
                  $src.Contains($n + ' ') -or
                  $src.EndsWith($n)
         if ($found) {

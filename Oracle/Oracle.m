@@ -12441,6 +12441,18 @@ let
             ItemExpression.From(each [a] + 1)[Kind]),
         SafeSerialize("q1526", () =>
             ItemExpression.Item[Kind]),
+        // q1527: RowExpression.Row sentinel (Kind=Invocation).
+        SafeSerialize("q1527", () =>
+            RowExpression.Row[Kind]),
+        // q1528: RowExpression.Column constructor — returns a
+        // FieldAccess AST record (Kind=FieldAccess, Expression={row
+        // sentinel}, MemberName=name). Same shape RowExpression.From
+        // emits for `each [name]`.
+        SafeSerialize("q1528", () =>
+            RowExpression.Column("CustomerName")[Kind]),
+        // q1529: nested check — RowExpression.Column's MemberName.
+        SafeSerialize("q1529", () =>
+            RowExpression.Column("CustomerName")[MemberName]),
         // q1460: Binary.ViewFunction rejects non-function input with PQ's
         // exact coercion-error wording.
         SafeSerialize("q1460", () =>

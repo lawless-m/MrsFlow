@@ -46,7 +46,7 @@ Source: q1167.mrsflow.out.
 | Currency | 2 | 2 | 2 | 2 | 0 | 0 | 2 | 0 |
 | DataLake | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
 | Date | 58 | 58 | 58 | 58 | 0 | 0 | 58 | 0 |
-| DateTime | 26 | 26 | 26 | 26 | 0 | 0 | 21 | 0 |
+| DateTime | 26 | 26 | 26 | 26 | 0 | 0 | 21 | 3 |
 | DateTimeZone | 16 | 16 | 16 | 16 | 0 | 0 | 16 | 0 |
 | Day | 8 | 8 | 8 | 8 | 0 | 0 | 7 | 0 |
 | DB2 | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
@@ -82,7 +82,7 @@ Source: q1167.mrsflow.out.
 | Int32 | 2 | 2 | 2 | 2 | 0 | 0 | 2 | 0 |
 | Int64 | 2 | 2 | 2 | 2 | 0 | 0 | 2 | 0 |
 | Int8 | 2 | 2 | 2 | 2 | 0 | 0 | 2 | 0 |
-| ItemExpression | 2 | 2 | 2 | 2 | 0 | 0 | 1 | 0 |
+| ItemExpression | 2 | 2 | 2 | 2 | 0 | 0 | 2 | 0 |
 | JoinAlgorithm | 8 | 8 | 8 | 8 | 0 | 0 | 7 | 0 |
 | JoinKind | 9 | 9 | 9 | 9 | 0 | 0 | 8 | 0 |
 | JoinSide | 3 | 3 | 3 | 3 | 0 | 0 | 2 | 0 |
@@ -124,7 +124,7 @@ Source: q1167.mrsflow.out.
 | Replacer | 2 | 2 | 2 | 2 | 0 | 0 | 2 | 0 |
 | Resource | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | RoundingMode | 6 | 6 | 6 | 6 | 0 | 0 | 5 | 0 |
-| RowExpression | 3 | 3 | 3 | 3 | 0 | 0 | 1 | 0 |
+| RowExpression | 3 | 3 | 3 | 3 | 0 | 0 | 3 | 0 |
 | Salesforce | 2 | 2 | 0 | 0 | 2 | 0 | 0 | 0 |
 | SapBusinessWarehouse | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | SapBusinessWarehouseExecutionMode | 4 | 4 | 4 | 4 | 0 | 0 | 3 | 0 |
@@ -154,7 +154,7 @@ Source: q1167.mrsflow.out.
 | WebAction | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | WebMethod | 7 | 7 | 7 | 7 | 0 | 0 | 6 | 0 |
 | Xml | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| **TOTAL** | 858 | 854 | 776 | 772 | 82 | 4 | 697 | 9 |
+| **TOTAL** | 858 | 854 | 776 | 772 | 82 | 4 | 700 | 12 |
 
 ## Per-name detail
 
@@ -349,8 +349,8 @@ Source: q1167.mrsflow.out.
 | `DateTime.From` | Y | Y | function | q1067 q1068 q1072 | MATCH |
 | `DateTime.FromFileTime` | Y | Y | function | q1255 | MATCH |
 | `DateTime.FromText` | Y | Y | function | q1072 q1452 | MATCH |
-| `DateTime.IsInCurrentHour` | Y | Y | function | q1469 | MATCH |
-| `DateTime.IsInCurrentMinute` | Y | Y | function | q1469 | MATCH |
+| `DateTime.IsInCurrentHour` | Y | Y | function | q1469 | DIFF |
+| `DateTime.IsInCurrentMinute` | Y | Y | function | q1469 | DIFF |
 | `DateTime.IsInCurrentSecond` | Y | Y | function |  |  |
 | `DateTime.IsInNextHour` | Y | Y | function | q1374 | MATCH |
 | `DateTime.IsInNextMinute` | Y | Y | function |  |  |
@@ -364,7 +364,7 @@ Source: q1167.mrsflow.out.
 | `DateTime.IsInPreviousNMinutes` | Y | Y | function | q1372 | MATCH |
 | `DateTime.IsInPreviousNSeconds` | Y | Y | function | q1373 | MATCH |
 | `DateTime.IsInPreviousSecond` | Y | Y | function |  |  |
-| `DateTime.LocalNow` | Y | Y | function | q1333 q1334 q1335 q1336 q1337 q1338 q1339 q1340 q1344 q1345 q1346 q1347 q1348 q1349 q1350 q1351 q1352 q1353 q1354 q1355 q1356 q1357 q1358 q1359 q1360 q1361 q1362 q1363 q1364 q1365 q1366 q1367 q1368 q1369 q1370 q1371 q1372 q1373 q1374 q1375 q1469 | MATCH |
+| `DateTime.LocalNow` | Y | Y | function | q1333 q1334 q1335 q1336 q1337 q1338 q1339 q1340 q1344 q1345 q1346 q1347 q1348 q1349 q1350 q1351 q1352 q1353 q1354 q1355 q1356 q1357 q1358 q1359 q1360 q1361 q1362 q1363 q1364 q1365 q1366 q1367 q1368 q1369 q1370 q1371 q1372 q1373 q1374 q1375 q1469 | MIXED |
 | `DateTime.Time` | Y | Y | function | q1073 | MATCH |
 | `DateTime.ToRecord` | Y | Y | function | q1256 | MATCH |
 | `DateTime.ToText` | Y | Y | function | q160 q161 q183 q184 q611 q612 q613 q614 q615 q1070 | MATCH |
@@ -474,7 +474,7 @@ Source: q1167.mrsflow.out.
 | `Int8.From` | Y | Y | function | q1382 | MATCH |
 | `Int8.Type` | Y | Y | constant | q1281 | MATCH |
 | `ItemExpression.From` | Y | Y | function | q1525 | MATCH |
-| `ItemExpression.Item` | Y | Y | constant |  |  |
+| `ItemExpression.Item` | Y | Y | constant | q1526 | MATCH |
 | `JoinAlgorithm.Dynamic` | Y | Y | constant | q1169 q1428 | MATCH |
 | `JoinAlgorithm.LeftHash` | Y | Y | constant | q1428 | MATCH |
 | `JoinAlgorithm.LeftIndex` | Y | Y | constant | q1428 | MATCH |
@@ -719,9 +719,9 @@ Source: q1167.mrsflow.out.
 | `RoundingMode.TowardZero` | Y | Y | constant | q658 q662 q1395 q1422 | MATCH |
 | `RoundingMode.Type` | Y | Y | constant |  |  |
 | `RoundingMode.Up` | Y | Y | constant | q658 q662 q1395 q1422 | MATCH |
-| `RowExpression.Column` | Y | Y | function |  |  |
+| `RowExpression.Column` | Y | Y | function | q1528 q1529 | MATCH |
 | `RowExpression.From` | Y | Y | function | q1519 q1520 q1521 q1522 q1523 q1524 | MATCH |
-| `RowExpression.Row` | Y | Y | constant |  |  |
+| `RowExpression.Row` | Y | Y | constant | q1527 | MATCH |
 | `Salesforce.Data` | Y |  | missing |  |  |
 | `Salesforce.Reports` | Y |  | missing |  |  |
 | `SapBusinessWarehouse.Cubes` | Y |  | missing |  |  |

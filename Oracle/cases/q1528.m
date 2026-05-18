@@ -1,0 +1,1 @@
+RowExpression.Column("CustomerName")[Kind]
