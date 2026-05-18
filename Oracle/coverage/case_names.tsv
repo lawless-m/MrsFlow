@@ -1505,3 +1505,11 @@ q1515	Excel.ShapeTable Table.FromRecords Table.RowCount
 q1516	Excel.Workbook Value.Is
 q1517	Occurrence.Repeating Occurrence.Required
 q1518	BinaryEncoding.Type Type.Is
+q1519	RowExpression.From
+q1520	RowExpression.From
+q1521	RowExpression.From
+q1522	RowExpression.From
+q1523	RowExpression.From
+q1524	RowExpression.From
+q1525	ItemExpression.From
+q1526	

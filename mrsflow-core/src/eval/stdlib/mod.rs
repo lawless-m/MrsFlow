@@ -45,6 +45,7 @@ mod json;
 mod file;
 mod excel;
 mod geo;
+mod row_expression;
 mod web;
 mod csv;
 mod folder;
@@ -474,6 +475,11 @@ pub fn root_env() -> Env {
     // and `Culture.Current()` produce the same result.
     env = env.extend("Culture.Current".into(), Value::Text(datetimezone::detect_culture()));
 
+    // RowExpression.Row / ItemExpression.Item — sentinel records that
+    // RowExpression.From substitutes for parameter references when
+    // lifting a lambda body into its AST form.
+    env = row_expression::extend_env(env);
+
     // SapHanaDistribution.* — SAP HANA query-folding distribution hint.
     // Ordinals from Excel observation (not contiguous: Off=0, Connection=1,
     // Statement=2, All=3).
@@ -635,6 +641,7 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         file::bindings(),
         excel::bindings(),
         geo::bindings(),
+        row_expression::bindings(),
         web::bindings(),
         csv::bindings(),
         folder::bindings(),

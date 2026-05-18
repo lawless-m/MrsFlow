@@ -12417,6 +12417,30 @@ let
         // outer try-wrapper formats both engines' ERROR text uniformly.
         SafeSerialize("q1518", () =>
             Type.Is(0, BinaryEncoding.Type)),
+        // q1519-q1523: RowExpression.From lifts a 1-arg lambda body
+        // into an AST record. PQ docs example projected piecewise to
+        // dodge function-value subrecords that Json.FromValue chokes on.
+        SafeSerialize("q1519", () =>
+            RowExpression.From(each [CustomerName] = "ALFKI")[Kind]),
+        SafeSerialize("q1520", () =>
+            RowExpression.From(each [CustomerName] = "ALFKI")[Operator]),
+        SafeSerialize("q1521", () =>
+            RowExpression.From(each [Price] + 10)[Kind]),
+        SafeSerialize("q1522", () =>
+            RowExpression.From(each [Price] + 10)[Operator]),
+        SafeSerialize("q1523", () =>
+            RowExpression.From(each [a])[Kind]),
+        // q1524: probe the nested Left record — Kind=FieldAccess
+        // (Excel docs misleadingly imply RowExpression.Column
+        // substitution; in practice both engines emit FieldAccess).
+        SafeSerialize("q1524", () =>
+            RowExpression.From(each [CustomerName] = "ALFKI")[Left][Kind]),
+        // q1525-q1526: ItemExpression.From is identical to
+        // RowExpression.From; ItemExpression.Item is the row sentinel.
+        SafeSerialize("q1525", () =>
+            ItemExpression.From(each [a] + 1)[Kind]),
+        SafeSerialize("q1526", () =>
+            ItemExpression.Item[Kind]),
         // q1460: Binary.ViewFunction rejects non-function input with PQ's
         // exact coercion-error wording.
         SafeSerialize("q1460", () =>

@@ -78,7 +78,7 @@ Counts come from `COVERAGE.md`; refresh both via `render.ps1`.
 | Int32 | Tested | 2 / 2 | 32-bit signed integer numeric type. |
 | Int64 | Tested | 2 / 2 | 64-bit signed integer numeric type. |
 | Int8 | Tested | 2 / 2 | 8-bit signed integer numeric type. |
-| ItemExpression | Untouched | 0 / 2 | Query-folding helper for per-item expressions inside List.* projections. |
+| ItemExpression | Tested | 2 / 2 | Query-folding helper for per-item expressions inside List.* projections. |
 | JoinAlgorithm | Tested | 8 / 8 | Table.NestedJoin algorithm hint (Hash / SortMerge / etc.). |
 | JoinKind | Tested | 9 / 9 | Table.Join / NestedJoin kind (Inner / LeftOuter / FullOuter / etc.). |
 | JoinSide | Tested | 3 / 3 | Join-side enum for asymmetric joins. |
@@ -120,7 +120,7 @@ Counts come from `COVERAGE.md`; refresh both via `render.ps1`.
 | Replacer | Tested | 2 / 2 | Replacer.ReplaceValue / .ReplaceText — passed as the replacer arg to Table.ReplaceValue. |
 | Resource | Untouched | 0 / 1 | Connector resource-access plumbing. |
 | RoundingMode | Tested | 6 / 6 | Number.Round mode (ToEven / Up / Down / AwayFromZero / TowardZero). |
-| RowExpression | Untouched | 0 / 3 | Query-folding helper for per-row expressions. |
+| RowExpression | Tested | 3 / 3 | Query-folding helper for per-row expressions. |
 | Salesforce | Untouched | 0 / 2 | Salesforce Data / Reports connector. |
 | SapBusinessWarehouse | Untouched | 0 / 1 | SAP BW cube connector. |
 | SapBusinessWarehouseExecutionMode | Tested | 4 / 4 | SAP BW execution-mode enum. |

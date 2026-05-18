@@ -257,6 +257,8 @@ Int64.From
 Int64.Type
 Int8.From
 Int8.Type
+ItemExpression.From
+ItemExpression.Item
 JoinAlgorithm.Dynamic
 JoinAlgorithm.LeftHash
 JoinAlgorithm.LeftIndex
@@ -487,6 +489,9 @@ RoundingMode.ToEven
 RoundingMode.TowardZero
 RoundingMode.Type
 RoundingMode.Up
+RowExpression.Column
+RowExpression.From
+RowExpression.Row
 SapBusinessWarehouseExecutionMode.BasXml
 SapBusinessWarehouseExecutionMode.BasXmlGzip
 SapBusinessWarehouseExecutionMode.DataStream
