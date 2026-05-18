@@ -767,6 +767,8 @@ fn evaluate_as_type(expr: &Expr, env: &Env, host: &dyn IoHost) -> Result<TypeRep
             "table" => Ok(TypeRep::Table),
             "function" => Ok(TypeRep::Function),
             "type" => Ok(TypeRep::Type),
+            "none" => Ok(TypeRep::Null),
+            "password" => Ok(TypeRep::Text),
             other => match env.lookup(other) {
                 Some(v) => {
                     let forced = force(v, &mut |e, env| evaluate(e, env, host))?;

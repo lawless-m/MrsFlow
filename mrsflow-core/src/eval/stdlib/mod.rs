@@ -131,6 +131,13 @@ pub fn root_env() -> Env {
         ("Binary.Type",   TypeRep::Binary),
         ("Null.Type",     TypeRep::Null),
         ("Any.Type",      TypeRep::Any),
+        ("List.Type",     TypeRep::List),
+        ("Record.Type",   TypeRep::Record),
+        ("Table.Type",    TypeRep::Table),
+        ("Function.Type", TypeRep::Function),
+        ("Type.Type",     TypeRep::Type),
+        ("None.Type",     TypeRep::Null),
+        ("Password.Type", TypeRep::Text),
         // Enum-family `.Type` companions. PQ exposes each enum's `.Type`
         // as the type-value for its underlying representation (most are
         // numeric; Character.Type is text, Uri.Type is text). They appear

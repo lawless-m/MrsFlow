@@ -12111,6 +12111,19 @@ let
               Type.Is(type date,   Date.Type),
               Type.Is(type time,   Time.Type),
               Type.Is(type logical, Logical.Type) }),
+        // q1448: Type.Is round-trips for the remaining primitive type
+        // families. Registered List/Record/Table/Function/Type/None/
+        // Password .Type constants that mrsflow was missing. (`type type`
+        // skipped — mrsflow's tokeniser treats `type` as a reserved
+        // keyword, so two-in-a-row doesn't parse.)
+        SafeSerialize("q1448", () =>
+            { Type.Is(type list, List.Type),
+              Type.Is(type record, Record.Type),
+              Type.Is(type table, Table.Type),
+              Type.Is(type function, Function.Type),
+              Type.Is(type any, Any.Type),
+              Type.Is(type duration, Duration.Type),
+              Type.Is(type datetimezone, DateTimeZone.Type) }),
         SafeSerialize("q1437", () =>
             { Precision.Decimal, Precision.Double }),
         SafeSerialize("q1438", () =>
