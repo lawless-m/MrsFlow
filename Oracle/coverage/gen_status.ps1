@@ -82,7 +82,9 @@ foreach ($q in $allCases) {
                  $src.Contains($n + '}') -or
                  $src.Contains($n + '[') -or
                  $src.Contains($n + ' ') -or
-                 $src.EndsWith($n)
+                 $src.Contains($n + "`n") -or
+                 $src.Contains($n + "`r") -or
+                 $src.TrimEnd().EndsWith($n)
         if ($found) {
             [void]$hit.Add($n)
             $src = $src.Replace($n, '')   # strip so shorter prefixes don't double-count

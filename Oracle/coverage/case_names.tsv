@@ -419,16 +419,16 @@ q417	Int64.Type Table.Group Table.RowCount
 q418	Table.Group
 q419	Int64.Type Table.Group Table.RowCount
 q420	Int64.Type List.Sum Table.Group
-q421	Table.Join
-q422	Table.Join
-q423	Table.Join
-q424	Table.ColumnNames Table.NestedJoin
-q425	Table.Join
-q426	Table.Join
-q427	Table.Join
-q428	Table.Join
-q429	Table.ColumnNames Table.NestedJoin
-q430	Table.AddColumn Table.NestedJoin Table.RowCount Table.SelectColumns
+q421	JoinKind.Inner Table.Join
+q422	JoinKind.LeftOuter Table.Join
+q423	JoinKind.FullOuter Table.Join
+q424	JoinKind.LeftOuter Table.ColumnNames Table.NestedJoin
+q425	JoinKind.Inner Table.Join
+q426	JoinKind.RightOuter Table.Join
+q427	JoinKind.LeftAnti Table.Join
+q428	JoinKind.RightAnti Table.Join
+q429	JoinKind.Inner Table.ColumnNames Table.NestedJoin
+q430	JoinKind.LeftOuter Table.AddColumn Table.NestedJoin Table.RowCount Table.SelectColumns
 q431	Int64.Type Table.TransformColumnTypes
 q432	Table.TransformColumnTypes
 q433	Table.TransformColumnTypes
@@ -483,7 +483,7 @@ q481	Number.IntegerDivide Number.Mod
 q482	Number.Mod
 q483	Number.IntegerDivide
 q484	Number.IntegerDivide Number.Mod
-q485	Number.IntegerDivide Number.Mod Number.NaN
+q485	Number.IntegerDivide Number.Mod Number.NaN Number.PositiveInfinity
 q486	Text.Insert
 q487	Text.Remove
 q488	Text.RemoveRange
@@ -1177,9 +1177,9 @@ q1175	BinaryFormat.Text
 q1176	BinaryFormat.ByteOrder BinaryFormat.UnsignedInteger32 ByteOrder.BigEndian
 q1177	BinaryFormat.7BitEncodedSignedInteger BinaryFormat.7BitEncodedUnsignedInteger
 q1178	BinaryFormat.Byte BinaryFormat.Record BinaryFormat.UnsignedInteger16
-q1179	BinaryFormat.Byte BinaryFormat.Group
+q1179	BinaryFormat.Byte BinaryFormat.Group BinaryFormat.UnsignedInteger16
 q1180	BinaryFormat.Byte BinaryFormat.List
-q1181	BinaryFormat.Byte BinaryFormat.Choice BinaryFormat.Null
+q1181	BinaryFormat.Byte BinaryFormat.Choice BinaryFormat.Null BinaryFormat.UnsignedInteger16 BinaryFormat.UnsignedInteger32
 q1182	BinaryFormat.Byte BinaryFormat.Length BinaryFormat.Text
 q1183	BinaryFormat.Byte BinaryFormat.Transform
 q1184	Expression.Evaluate File.Contents Text.FromBinary TextEncoding.Utf8
@@ -1208,7 +1208,7 @@ q1206	List.SingleOrDefault
 q1207	List.TransformMany
 q1208	Number.Combinations
 q1209	Number.Cosh
-q1210	
+q1210	Number.E
 q1211	Number.Factorial
 q1212	Number.Permutations
 q1213	Number.RoundAwayFromZero
@@ -1391,7 +1391,7 @@ q1389	List.Percentile
 q1390	List.Percentile
 q1391	DateTimeZone.UtcNow DateTimeZone.ZoneHours
 q1392	DateTimeZone.FixedUtcNow DateTimeZone.ZoneHours
-q1393	
+q1393	Number.Epsilon
 q1394	Compression.Brotli Compression.Deflate Compression.GZip Compression.LZ4 Compression.None Compression.Snappy Compression.Zstandard
 q1395	RoundingMode.AwayFromZero RoundingMode.Down RoundingMode.ToEven RoundingMode.TowardZero RoundingMode.Up
 q1396	TraceLevel.Critical TraceLevel.Error TraceLevel.Information TraceLevel.Verbose TraceLevel.Warning
@@ -1517,8 +1517,8 @@ q1527	RowExpression.Row
 q1528	RowExpression.Column
 q1529	RowExpression.Column
 q1530	Table.AddKey Table.FromRecords Table.RowCount
-q1531	
-q1532	
+q1531	Number.Epsilon
+q1532	WebAction.Request
 q1533	BinaryOccurrence.Type BufferMode.Type ByteOrder.Type Compression.Type CsvStyle.Type Day.Type ExtraValues.Type GroupKind.Type Guid.Type JoinAlgorithm.Type JoinKind.Type JoinSide.Type LimitClauseKind.Type MissingField.Type None.Type Occurrence.Type ODataOmitValues.Type Order.Type Password.Type PercentileMode.Type Precision.Type QuoteStyle.Type RankKind.Type RelativePosition.Type RoundingMode.Type SapBusinessWarehouseExecutionMode.Type SapHanaDistribution.Type SapHanaRangeOperator.Type TextEncoding.Type TraceLevel.Type Type.IsNullable Type.Type Uri.Type WebMethod.Type
 q1534	AccessControlEntry.Type AccessControlKind.Type Certificate.Type Identity.Type IdentityProvider.Type Type.IsNullable
 q1535	AccessControlKind.Allow AccessControlKind.Deny

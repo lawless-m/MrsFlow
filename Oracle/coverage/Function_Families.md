@@ -147,6 +147,6 @@ Counts come from `COVERAGE.md`; refresh both via `render.ps1`.
 | Value | Partial | 26 / 27 | Generic value introspection (Compare, Equals, Is, NativeQuery, Metadata). |
 | Variable | Tested | 2 / 2 | Variable.Value / .ValueOrDefault — env probe. |
 | Web | Implemented | 4 / 4 | HTTP-fetching connector (Web.Contents, Web.Headers, Web.Page). |
-| WebAction | Implemented | 1 / 1 | Web.Contents action-request constants. |
+| WebAction | Tested | 1 / 1 | Web.Contents action-request constants. |
 | WebMethod | Tested | 7 / 7 | HTTP verb constants (Get / Post / Put / Delete / Patch / Head). |
 | Xml | Tested | 2 / 2 | XML document / table parser. |
