@@ -466,8 +466,8 @@ pub fn root_env() -> Env {
         env = env.extend(name.to_string(), Value::Text(verb.to_string()));
     }
 
-    // WebAction.Request — single-value sentinel for Web action requests.
-    env = env.extend("WebAction.Request".into(), Value::Number(0.0));
+    // WebAction.Request is bound as a function in web.rs (matches PQ's
+    // shape; `Value.Is(WebAction.Request, type function)` is true).
 
     // AccessControlKind constants — connector access-control list (ACL)
     // entries: Allow=1 grants, Deny=0 denies. Surfaced through #shared

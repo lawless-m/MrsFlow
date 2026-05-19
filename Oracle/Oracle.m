@@ -12468,7 +12468,10 @@ let
         // constant. Excel exposes it as a record; mrsflow exposes a
         // number — let the diff-tool's empty-vs-non-empty rule credit
         // it as MATCH if Excel rejects.
-        SafeSerialize("q1532", () => WebAction.Request),
+        // q1532: WebAction.Request is a function in Excel and (now) in
+        // mrsflow. Probe via Value.Is so the result is a serialisable
+        // boolean rather than the unserialisable function value.
+        SafeSerialize("q1532", () => Value.Is(WebAction.Request, type function)),
         // q1533: large batch of `.Type` companions. Each evaluates as
         // a Type-of-types; Type.IsNullable returns false for them all.
         SafeSerialize("q1533", () => {
@@ -12520,6 +12523,19 @@ let
         // a name-not-in-scope error on a copy-pasted Power BI snippet.
         SafeSerialize("q1535", () =>
             { AccessControlKind.Allow, AccessControlKind.Deny }),
+        // PROBES: Xml.Document / Xml.Tables / WebAction.Request.
+        SafeSerialize("q1536", () =>
+            let
+                src = Text.ToBinary("<r><a>1</a><b>2</b></r>", TextEncoding.Utf8),
+                t = Xml.Document(src)
+            in
+                Table.RowCount(t)),
+        SafeSerialize("q1537", () =>
+            let
+                src = Text.ToBinary("<r><a>1</a><b>2</b></r>", TextEncoding.Utf8),
+                t = Xml.Tables(src)
+            in
+                Table.RowCount(t)),
         // q1460: Binary.ViewFunction rejects non-function input with PQ's
         // exact coercion-error wording.
         SafeSerialize("q1460", () =>

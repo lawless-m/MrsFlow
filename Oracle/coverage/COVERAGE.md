@@ -17,7 +17,7 @@ Source: q1167.mrsflow.out.
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
 | Access | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | AccessControlEntry | 3 | 3 | 1 | 1 | 2 | 0 | 1 | 0 |
-| AccessControlKind | 3 | 3 | 1 | 1 | 2 | 0 | 3 | 0 |
+| AccessControlKind | 3 | 3 | 3 | 3 | 0 | 0 | 3 | 0 |
 | Action | 1 | 1 | 1 | 1 | 0 | 0 | 1 | 0 |
 | ActiveDirectory | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
 | AdobeAnalytics | 1 | 1 | 0 | 0 | 1 | 0 | 0 | 0 |
@@ -153,8 +153,8 @@ Source: q1167.mrsflow.out.
 | Web | 4 | 4 | 4 | 4 | 0 | 0 | 0 | 0 |
 | WebAction | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | WebMethod | 7 | 7 | 7 | 7 | 0 | 0 | 7 | 0 |
-| Xml | 2 | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| **TOTAL** | 858 | 854 | 776 | 772 | 82 | 4 | 741 | 9 |
+| Xml | 2 | 2 | 2 | 2 | 0 | 0 | 2 | 0 |
+| **TOTAL** | 858 | 854 | 778 | 774 | 80 | 4 | 743 | 9 |
 
 ## Per-name detail
 
@@ -164,8 +164,8 @@ Source: q1167.mrsflow.out.
 | `AccessControlEntry.ConditionContextType` | Y |  | missing |  |  |
 | `AccessControlEntry.ConditionToIdentities` | Y |  | missing |  |  |
 | `AccessControlEntry.Type` | Y | Y | constant | q1534 | MATCH |
-| `AccessControlKind.Allow` | Y |  | constant | q1535 | MATCH |
-| `AccessControlKind.Deny` | Y |  | constant | q1535 | MATCH |
+| `AccessControlKind.Allow` | Y | Y | constant | q1535 | MATCH |
+| `AccessControlKind.Deny` | Y | Y | constant | q1535 | MATCH |
 | `AccessControlKind.Type` | Y | Y | constant | q1534 | MATCH |
 | `Action.WithErrorContext` | Y | Y | function | q1456 | MATCH |
 | `ActiveDirectory.Domains` | Y |  | missing |  |  |
@@ -849,7 +849,7 @@ Source: q1167.mrsflow.out.
 | `Table.ReplaceRows` | Y | Y | function | q1316 | MATCH |
 | `Table.ReplaceValue` | Y | Y | function | q166 q167 q168 q190 q601 q602 q603 q604 q1004 q1005 q1006 q1007 q1010 q1132 q1133 q1134 q1142 | MATCH |
 | `Table.ReverseRows` | Y | Y | function | q74 | MATCH |
-| `Table.RowCount` | Y | Y | function | q70 q292 q343 q417 q419 q430 q585 q636 q639 q934 q937 q1031 q1141 q1143 q1149 q1166 q1495 q1500 q1501 q1502 q1505 q1506 q1507 q1515 q1530 | MATCH |
+| `Table.RowCount` | Y | Y | function | q70 q292 q343 q417 q419 q430 q585 q636 q639 q934 q937 q1031 q1141 q1143 q1149 q1166 q1495 q1500 q1501 q1502 q1505 q1506 q1507 q1515 q1530 q1536 q1537 | MATCH |
 | `Table.Schema` | Y | Y | function | q291 q292 q295 | MATCH |
 | `Table.SelectColumns` | Y | Y | function | q13 q15 q430 q634 q635 | MATCH |
 | `Table.SelectRows` | Y | Y | function | q14 q15 q591 q592 q593 q594 q595 q948 q949 q950 q951 q952 q953 q954 q1141 q1166 | MATCH |
@@ -914,7 +914,7 @@ Source: q1167.mrsflow.out.
 | `Text.SplitAny` | Y | Y | function | q304 q771 q773 | MATCH |
 | `Text.Start` | Y | Y | function | q33 q652 | MATCH |
 | `Text.StartsWith` | Y | Y | function | q495 q593 q1118 q1147 | MATCH |
-| `Text.ToBinary` | Y | Y | function | q8 q9 q10 q236 q237 q238 q239 q240 q350 q1088 q1089 q1090 q1091 q1092 q1386 q1506 q1507 | MATCH |
+| `Text.ToBinary` | Y | Y | function | q8 q9 q10 q236 q237 q238 q239 q240 q350 q1088 q1089 q1090 q1091 q1092 q1386 q1506 q1507 q1536 q1537 | MATCH |
 | `Text.ToList` | Y | Y | function | q499 q816 | MATCH |
 | `Text.Trim` | Y | Y | function | q38 q562 q564 q565 q798 q799 q800 q801 q802 q803 q804 | MATCH |
 | `Text.TrimEnd` | Y | Y | function | q563 q564 q801 q804 | MATCH |
@@ -926,7 +926,7 @@ Source: q1167.mrsflow.out.
 | `TextEncoding.Type` | Y | Y | constant | q1533 | MATCH |
 | `TextEncoding.Unicode` | Y | Y | constant | q1325 | MATCH |
 | `TextEncoding.Utf16` | Y | Y | constant | q1325 | MATCH |
-| `TextEncoding.Utf8` | Y | Y | constant | q266 q267 q268 q269 q270 q350 q536 q537 q538 q539 q540 q1088 q1089 q1090 q1091 q1092 q1155 q1167 q1184 q1325 q1386 q1506 q1507 | MIXED |
+| `TextEncoding.Utf8` | Y | Y | constant | q266 q267 q268 q269 q270 q350 q536 q537 q538 q539 q540 q1088 q1089 q1090 q1091 q1092 q1155 q1167 q1184 q1325 q1386 q1506 q1507 q1536 q1537 | MIXED |
 | `TextEncoding.Windows` | Y | Y | constant | q1325 | MATCH |
 | `Time.EndOfHour` | Y | Y | function | q1410 | MATCH |
 | `Time.From` | Y | Y | function | q452 q1077 | MATCH |
@@ -1008,7 +1008,7 @@ Source: q1167.mrsflow.out.
 | `Web.Contents` | Y | Y | function |  |  |
 | `Web.Headers` | Y | Y | function |  |  |
 | `Web.Page` | Y | Y | function |  |  |
-| `WebAction.Request` | Y | Y | constant |  |  |
+| `WebAction.Request` | Y | Y | function |  |  |
 | `WebMethod.Delete` | Y | Y | constant | q1440 | MATCH |
 | `WebMethod.Get` | Y | Y | constant | q1440 | MATCH |
 | `WebMethod.Head` | Y | Y | constant | q1440 | MATCH |
@@ -1016,5 +1016,5 @@ Source: q1167.mrsflow.out.
 | `WebMethod.Post` | Y | Y | constant | q1440 | MATCH |
 | `WebMethod.Put` | Y | Y | constant | q1440 | MATCH |
 | `WebMethod.Type` | Y | Y | constant | q1533 | MATCH |
-| `Xml.Document` | Y | Y | function |  |  |
-| `Xml.Tables` | Y | Y | function |  |  |
+| `Xml.Document` | Y | Y | function | q1536 | MATCH |
+| `Xml.Tables` | Y | Y | function | q1537 | MATCH |

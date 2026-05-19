@@ -1522,3 +1522,5 @@ q1532
 q1533	BinaryOccurrence.Type BufferMode.Type ByteOrder.Type Compression.Type CsvStyle.Type Day.Type ExtraValues.Type GroupKind.Type Guid.Type JoinAlgorithm.Type JoinKind.Type JoinSide.Type LimitClauseKind.Type MissingField.Type None.Type Occurrence.Type ODataOmitValues.Type Order.Type Password.Type PercentileMode.Type Precision.Type QuoteStyle.Type RankKind.Type RelativePosition.Type RoundingMode.Type SapBusinessWarehouseExecutionMode.Type SapHanaDistribution.Type SapHanaRangeOperator.Type TextEncoding.Type TraceLevel.Type Type.IsNullable Type.Type Uri.Type WebMethod.Type
 q1534	AccessControlEntry.Type AccessControlKind.Type Certificate.Type Identity.Type IdentityProvider.Type Type.IsNullable
 q1535	AccessControlKind.Allow AccessControlKind.Deny
+q1536	Table.RowCount Text.ToBinary TextEncoding.Utf8 Xml.Document
+q1537	Table.RowCount Text.ToBinary TextEncoding.Utf8 Xml.Tables

@@ -13,7 +13,7 @@ Counts come from `COVERAGE.md`; refresh both via `render.ps1`.
 |---|---|---:|---|
 | Access | Untouched | 0 / 1 | Microsoft Access database connector. |
 | AccessControlEntry | Partial | 1 / 3 | ACL types used by the firewall / trust model. |
-| AccessControlKind | Partial | 1 / 3 | ACL allow / deny / type constants. |
+| AccessControlKind | Tested | 3 / 3 | ACL allow / deny / type constants. |
 | Action | Tested | 1 / 1 | Side-effectful action runner (Action.Try / WithErrorContext). Niche. |
 | ActiveDirectory | Untouched | 0 / 1 | Active Directory domain enumeration. |
 | AdobeAnalytics | Untouched | 0 / 1 | Adobe Analytics OLAP cubes connector. |
@@ -149,4 +149,4 @@ Counts come from `COVERAGE.md`; refresh both via `render.ps1`.
 | Web | Implemented | 4 / 4 | HTTP-fetching connector (Web.Contents, Web.Headers, Web.Page). |
 | WebAction | Implemented | 1 / 1 | Web.Contents action-request constants. |
 | WebMethod | Tested | 7 / 7 | HTTP verb constants (Get / Post / Put / Delete / Patch / Head). |
-| Xml | Implemented | 2 / 2 | XML document / table parser. |
+| Xml | Tested | 2 / 2 | XML document / table parser. |

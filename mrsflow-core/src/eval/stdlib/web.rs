@@ -49,7 +49,21 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
             ],
             browser_contents,
         ),
+        (
+            "WebAction.Request",
+            vec![Param { name: "request".into(), optional: false, type_annotation: None }],
+            web_action_request,
+        ),
     ]
+}
+
+/// PQ exposes WebAction.Request as a function value — it constructs a
+/// Power BI dataflow "action" record from a request descriptor. mrsflow
+/// has no action machinery; the binding exists so name lookup yields a
+/// function value (so `Value.Is(WebAction.Request, type function)` is
+/// true) and so calling it returns the input record unchanged.
+fn web_action_request(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    Ok(args[0].clone())
 }
 
 /// Web.Page(html) parses an HTML document into a navigation table of
