@@ -1901,7 +1901,7 @@ dependencies = [
 
 [[package]]
 name = "mrsflow-cli"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "arrow",
  "bytes",
@@ -1928,7 +1928,7 @@ dependencies = [
 
 [[package]]
 name = "mrsflow-core"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "arrow",
  "bytes",
@@ -1947,7 +1947,7 @@ dependencies = [
 
 [[package]]
 name = "mrsflow-wasm"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "arrow",
  "bytes",

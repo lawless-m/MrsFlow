@@ -1,9 +1,18 @@
 # Changelog
 
-Pre-v1, no released versions. This is a narrative of notable work rather
-than a SemVer log — renames and removals are free until v1.
+A narrative of notable work rather than a strict SemVer log. The API
+isn't frozen yet, so this reads as a story of capability rather than a
+list of breaking changes.
 
-## The oracle-coverage grind (q1393–q1537)
+## v1
+
+The data-shaping core is complete and proven: the v1 scope from
+[`../mrsflow/03-scope-v1.md`](../mrsflow/03-scope-v1.md) (Parquet → M →
+Parquet via the CLI, ODBC for live reads) is met, and 745 of 774
+implemented `#shared` functions are verified byte-for-byte against real
+Power Query. What got it there was the oracle-coverage grind below.
+
+### The oracle-coverage grind (q1393–q1537)
 
 A sustained push to close the gap between "mrsflow has a binding for
 this" and "mrsflow matches Excel for this," driven entirely by the

@@ -1,6 +1,6 @@
 # Contributing to MrsFlow
 
-This is a single-author pre-v1 tool, but the workflow is written down so
+This is a single-author tool at v1, but the workflow is written down so
 that (a) future-me can pick it back up and (b) anyone reading the repo
 can see how the pieces fit. The house rules are in
 [`../CODE_OF_CONDUCT.md`](../CODE_OF_CONDUCT.md): work is judged on

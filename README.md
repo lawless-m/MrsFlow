@@ -60,10 +60,13 @@ You only find these by asking Excel. See
 
 ## Status
 
-Pre-v1. Single-author tool — no API stability, no release cadence. The
-shape of v1 is in [`mrsflow/03-scope-v1.md`](mrsflow/03-scope-v1.md):
-Parquet → M → Parquet via the CLI, with ODBC for live database reads.
-Everything beyond that is opportunistic.
+**v1.** The goal set out in
+[`mrsflow/03-scope-v1.md`](mrsflow/03-scope-v1.md) — Parquet → M →
+Parquet via the CLI, with ODBC for live database reads — is met, and the
+745-of-774 oracle-verified function surface backs it up. Single-author
+tool: still no formal release cadence, and the API may shift between
+versions, but the data-shaping core is done and proven against real
+Power Query.
 
 ## What works today
 
@@ -218,8 +221,9 @@ Three tiers:
   almost entirely cloud connectors (Salesforce, SharePoint, Azure, SAP,
   …) that need a backend mrsflow doesn't have. See
   [`docs/COVERAGE.md`](docs/COVERAGE.md).
-- **No backwards-compatibility shims.** Pre-v1; renames and removals are
-  free.
+- **No backwards-compatibility promises yet.** v1 is functional, not
+  frozen — internal APIs may still be renamed between versions. Don't
+  pin to them.
 
 ## Contributing & conduct
 
