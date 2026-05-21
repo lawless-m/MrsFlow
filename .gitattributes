@@ -13,9 +13,9 @@ Oracle/coverage/*.tsv    linguist-generated
 Oracle/coverage/*.md     linguist-generated
 Oracle/coverage/*.m      linguist-generated
 
-# The hand-written Oracle catalog is test-fixture data, not library
-# source — vendor it so it doesn't dominate the bar.
-Oracle/Oracle.m          linguist-vendored
+# The hand-written Oracle catalog and helper queries are test-fixture
+# data, not library source — vendor them so they don't dominate the bar.
+Oracle/*.m               linguist-vendored
 
 # Example M queries and tool fixtures are documentation/data, not the
 # implementation. Mark as data so they don't count as code.
