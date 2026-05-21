@@ -1,0 +1,34 @@
+# --- GitHub Linguist language-detection overrides ---
+#
+# The repo is Rust. The mountain of *.m files are Power Query M test
+# fixtures, but Linguist has no "Power Query M" language and guesses
+# them as MATLAB / Wolfram / Objective-C by the shared .m extension.
+# That made the language bar read "35% Wolfram" — nonsense. Reclassify
+# the M files so the bar reflects what the project actually is.
+
+# The Oracle differential-test corpus: 1,500+ machine-extracted cases
+# plus the generated outputs. Not authored source — exclude from stats.
+Oracle/cases/**          linguist-generated
+Oracle/coverage/*.tsv    linguist-generated
+Oracle/coverage/*.md     linguist-generated
+Oracle/coverage/*.m      linguist-generated
+
+# The hand-written Oracle catalog is test-fixture data, not library
+# source — vendor it so it doesn't dominate the bar.
+Oracle/Oracle.m          linguist-vendored
+
+# Example M queries and tool fixtures are documentation/data, not the
+# implementation. Mark as data so they don't count as code.
+examples/**/*.m              linguist-vendored
+tools/explain/test_cases/**  linguist-vendored
+tools/png-decoder/m/**       linguist-vendored
+
+# Anything Linguist still detects as MATLAB/Wolfram/Objective-C from a
+# .m extension is Power Query M here. There's no Linguist alias for it,
+# so the classifications above (generated/vendored) are how we keep the
+# bar honest. Detect remaining *.m as plain text rather than a wrong
+# language.
+*.m text
+
+# The vendored odbc-api fork is third-party — exclude from stats.
+vendor/**                linguist-vendored
