@@ -948,11 +948,7 @@ impl Table {
     pub fn try_to_arrow(&self) -> Result<arrow::record_batch::RecordBatch, MError> {
         match &self.repr {
             TableRepr::Arrow(b) => Ok(b.clone()),
-            TableRepr::Rows { .. } => Err(MError::Other(
-                "table has heterogeneous cells; Arrow encoding requires uniform columns \
-                 (coerce mixed cells with Text.From or Table.TransformColumnTypes first)"
-                    .into(),
-            )),
+            TableRepr::Rows { columns, rows } => rows_to_arrow(columns, rows),
             TableRepr::LazyParquet(s) => decode_lazy_parquet(s),
             TableRepr::LazyOdbc(s) => materialise_lazy_odbc(s),
             TableRepr::JoinView(_) => Err(MError::Other(
@@ -988,6 +984,53 @@ impl Table {
             TableRepr::ExpandView(ev) => Ok(Cow::Owned(materialise_expand_view(ev)?)),
         }
     }
+}
+
+/// Encode a Rows-backed table into an Arrow `RecordBatch`. Runs the same
+/// per-column inference as `#table` construction (`infer_cells`): a column
+/// whose cells are uniform (after ignoring nulls) encodes to its Arrow
+/// type; only a genuinely mixed or compound column fails. This is the
+/// Rows→Arrow path the Parquet sink needs once data has passed through
+/// SelectRows/Group/join and landed in the Rows representation.
+fn rows_to_arrow(
+    columns: &[String],
+    rows: &[Vec<Value>],
+) -> Result<arrow::record_batch::RecordBatch, MError> {
+    use arrow::datatypes::{Field, Schema};
+
+    let n_cols = columns.len();
+    if n_cols == 0 {
+        let schema = Arc::new(Schema::empty());
+        let options =
+            arrow::record_batch::RecordBatchOptions::new().with_row_count(Some(rows.len()));
+        return arrow::record_batch::RecordBatch::try_new_with_options(schema, vec![], &options)
+            .map_err(|e| MError::Other(format!("Rows→Arrow: empty-cols build failed: {e}")));
+    }
+
+    let mut fields: Vec<Field> = Vec::with_capacity(n_cols);
+    let mut arrays: Vec<arrow::array::ArrayRef> = Vec::with_capacity(n_cols);
+    for col_idx in 0..n_cols {
+        let cells: Vec<&Value> = rows.iter().map(|r| &r[col_idx]).collect();
+        match super::stdlib::table::infer_cells(&cells)? {
+            Some((dtype, array)) => {
+                let is_nullable = matches!(dtype, arrow::datatypes::DataType::Null)
+                    || cells.iter().any(|v| matches!(v, Value::Null));
+                fields.push(Field::new(columns[col_idx].clone(), dtype, is_nullable));
+                arrays.push(array);
+            }
+            None => {
+                return Err(MError::Other(format!(
+                    "column {:?} has heterogeneous or compound cells; Arrow encoding requires \
+                     uniform columns (coerce mixed cells with Text.From or \
+                     Table.TransformColumnTypes first)",
+                    columns[col_idx]
+                )));
+            }
+        }
+    }
+    let schema = Arc::new(Schema::new(fields));
+    arrow::record_batch::RecordBatch::try_new(schema, arrays)
+        .map_err(|e| MError::Other(format!("Rows→Arrow: build failed: {e}")))
 }
 
 /// Run a `LazyOdbc`'s plan through its `force_fn` and apply per-column
@@ -2001,5 +2044,57 @@ mod odbc_sql_tests {
         state.projection = vec![1]; // just "name"
         let sql = state.render_sql();
         assert_eq!(sql, r#"SELECT "name" FROM "customers""#);
+    }
+
+    #[test]
+    fn rows_backed_uniform_table_encodes_to_arrow() {
+        // The original Parquet-sink bug: a Rows-backed table with uniform
+        // columns (text, number) must encode rather than fail.
+        let t = Table::from_rows(
+            vec!["sacust".into(), "saval".into()],
+            vec![
+                vec![Value::Text("ACME".into()), Value::Number(12.5)],
+                vec![Value::Text("BETA".into()), Value::Number(0.0)],
+            ],
+        );
+        let batch = t.try_to_arrow().expect("uniform Rows table should encode");
+        assert_eq!(batch.num_rows(), 2);
+        assert_eq!(batch.num_columns(), 2);
+        assert_eq!(batch.schema().field(0).name(), "sacust");
+        assert_eq!(
+            batch.schema().field(0).data_type(),
+            &arrow::datatypes::DataType::Utf8
+        );
+        assert_eq!(
+            batch.schema().field(1).data_type(),
+            &arrow::datatypes::DataType::Float64
+        );
+    }
+
+    #[test]
+    fn rows_backed_nulls_dont_block_inference() {
+        // A null among otherwise-numeric cells stays numeric (nullable).
+        let t = Table::from_rows(
+            vec!["n".into()],
+            vec![vec![Value::Number(1.0)], vec![Value::Null], vec![Value::Number(3.0)]],
+        );
+        let batch = t.try_to_arrow().expect("null-bearing numeric column should encode");
+        assert_eq!(
+            batch.schema().field(0).data_type(),
+            &arrow::datatypes::DataType::Float64
+        );
+        assert!(batch.schema().field(0).is_nullable());
+    }
+
+    #[test]
+    fn rows_backed_mixed_column_still_errors() {
+        // Genuinely heterogeneous column (text + number) must still fail.
+        let t = Table::from_rows(
+            vec!["mixed".into()],
+            vec![vec![Value::Text("a".into())], vec![Value::Number(1.0)]],
+        );
+        let err = t.try_to_arrow().expect_err("mixed column must not encode");
+        let msg = format!("{err:?}");
+        assert!(msg.contains("mixed"), "error should name the column: {msg}");
     }
 }
