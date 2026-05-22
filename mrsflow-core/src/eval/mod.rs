@@ -7276,6 +7276,72 @@ mod tests {
     }
 
     #[test]
+    fn table_group_preserves_first_seen_order() {
+        // Hash fast-path must keep groups in first-seen key order, not
+        // hash order. Keys first appear as c, a, b.
+        let src = r#"
+            let
+                t = #table({"k", "v"}, {{"c", 1}, {"a", 2}, {"b", 3}, {"a", 4}, {"c", 5}}),
+                g = Table.Group(t, "k", {{"sumV", each List.Sum(Table.Column(_, "v"))}})
+            in
+                Table.Column(g, "k")
+        "#;
+        match eval_str(src).unwrap() {
+            Value::List(xs) => {
+                let keys: Vec<String> = xs.iter().map(|v| match v {
+                    Value::Text(s) => s.clone(),
+                    _ => panic!(),
+                }).collect();
+                assert_eq!(keys, vec!["c", "a", "b"]);
+            }
+            other => panic!("expected list, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn table_group_numeric_key_merges_equal_values() {
+        // Numeric keys go through the hash path; 1.0 rows must merge.
+        let src = r#"
+            let
+                t = #table({"k", "v"}, {{1, 10}, {2, 20}, {1, 30}}),
+                g = Table.Group(t, "k", {{"sumV", each List.Sum(Table.Column(_, "v"))}})
+            in
+                {Table.Column(g, "k"), Table.Column(g, "sumV")}
+        "#;
+        match eval_str(src).unwrap() {
+            Value::List(xs) => {
+                let sums = match &xs[1] {
+                    Value::List(ns) => ns.iter().map(|v| match v {
+                        Value::Number(n) => *n,
+                        _ => panic!(),
+                    }).collect::<Vec<_>>(),
+                    _ => panic!(),
+                };
+                assert_eq!(sums, vec![40.0, 20.0]); // k=1 → 10+30, k=2 → 20
+            }
+            other => panic!("expected list, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn table_group_nan_keys_use_linear_fallback() {
+        // NaN is unequal to itself: each NaN row is its own group, matching
+        // the linear scan. The hash path must decline (group_hash_key→None).
+        let src = r#"
+            let
+                nan = Number.Sqrt(-1),
+                t = #table({"k", "v"}, {{nan, 1}, {nan, 2}}),
+                g = Table.Group(t, "k", {{"cnt", each Table.RowCount(_)}})
+            in
+                Table.RowCount(g)
+        "#;
+        match eval_str(src).unwrap() {
+            Value::Number(n) => assert_eq!(n, 2.0, "two NaN rows must stay in two groups"),
+            other => panic!("expected number, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn table_add_rank_column_basic() {
         // Rank by "n" ascending: 1→1, 2→2, 3→3.
         let src = r#"

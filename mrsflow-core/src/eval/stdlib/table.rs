@@ -5775,6 +5775,66 @@ fn profile(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
 
 // --- Slice #164: Group + AddRankColumn + Split + Buffer ---
 
+/// Canonical, hashable form of a primitive key cell, used by `Table.Group`'s
+/// fast path. Two cells produce equal `GroupHashKey`s **iff**
+/// `values_equal_primitive` would return `true` for them — so grouping by
+/// hash gives the same partition the linear scan would.
+///
+/// `Number` and `Decimal` collapse into one `Num(u64)` variant via
+/// `as_f64_lossy().to_bits()`, matching the existing cross-type equality
+/// (`Decimal.From(1.5) = 1.5`). Cells that can't satisfy this contract —
+/// `NaN` (which is unequal to itself), `Binary`, `Type`, and any compound
+/// value — return `None`, forcing the caller onto the linear path.
+#[derive(PartialEq, Eq, Hash)]
+enum GroupHashKey {
+    Null,
+    Logical(bool),
+    Num(u64),
+    Text(String),
+    Date(i32),
+    Datetime(i64),
+    Time(i64),
+    Duration(i64),
+    Datetimezone(i64),
+}
+
+fn group_hash_key(v: &Value) -> Option<GroupHashKey> {
+    match v {
+        Value::Null => Some(GroupHashKey::Null),
+        Value::Logical(b) => Some(GroupHashKey::Logical(*b)),
+        Value::Number(_) | Value::Decimal { .. } => {
+            let f = v.as_f64_lossy()?;
+            // NaN is never equal to itself; the linear scan keeps each NaN
+            // row in its own group, which a hash key can't replicate.
+            if f.is_nan() {
+                None
+            } else {
+                // Normalise -0.0 and 0.0 to the same bits (they compare equal).
+                let f = if f == 0.0 { 0.0 } else { f };
+                Some(GroupHashKey::Num(f.to_bits()))
+            }
+        }
+        Value::Text(s) => Some(GroupHashKey::Text(s.clone())),
+        Value::Date(d) => {
+            let epoch = chrono::NaiveDate::from_ymd_opt(1970, 1, 1)?;
+            Some(GroupHashKey::Date(d.signed_duration_since(epoch).num_days() as i32))
+        }
+        Value::Datetime(dt) => Some(GroupHashKey::Datetime(dt.and_utc().timestamp_micros())),
+        Value::Time(t) => {
+            use chrono::Timelike;
+            Some(GroupHashKey::Time(
+                t.num_seconds_from_midnight() as i64 * 1_000_000 + t.nanosecond() as i64 / 1_000,
+            ))
+        }
+        Value::Duration(d) => d.num_microseconds().map(GroupHashKey::Duration),
+        // `==` on DateTime<FixedOffset> compares the UTC instant, ignoring
+        // the offset — key on the same instant so equal datetimezones merge.
+        Value::Datetimezone(dtz) => Some(GroupHashKey::Datetimezone(dtz.timestamp_micros())),
+        // Binary, Type, and compound values fall back to the linear scan.
+        _ => None,
+    }
+}
+
 fn group(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let keys: Vec<String> = match &args[1] {
@@ -5833,30 +5893,65 @@ fn group(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
         .collect::<Result<_, _>>()?;
 
     // Group rows by key tuple, preserving first-seen order.
-    // GroupKind.Global: scan all existing groups; GroupKind.Local: only
-    // fold into the most recent group (consecutive-run grouping).
+    // GroupKind.Global: collapse all rows sharing a key; GroupKind.Local:
+    // only fold into the most recent group (consecutive-run grouping).
+    //
+    // Global grouping with no custom comparer is the hot path. A naive
+    // linear scan of existing groups for every row is O(rows × groups) —
+    // pathological when the key has many distinct values. Index the groups
+    // by a canonical hash key instead, giving O(rows). The fast path is
+    // only safe when every key cell hashes consistently with
+    // `values_equal_primitive` (see `group_hash_key`); if any cell can't
+    // (NaN, Binary, compound, …) we fall back to the linear scan, which
+    // also remains the path for `GroupKind.Local` and custom comparers.
     let mut groups: Vec<(Vec<Value>, Vec<Vec<Value>>)> = Vec::new();
-    for row in rows {
-        let key_tuple: Vec<Value> = key_indices.iter().map(|&i| row[i].clone()).collect();
-        let mut placed = false;
-        if group_local {
-            if let Some((existing_key, group_rows)) = groups.last_mut() {
-                if keys_equal_with_criteria(&keys, existing_key, &key_tuple, criteria)? {
-                    group_rows.push(row.clone());
-                    placed = true;
-                }
-            }
-        } else {
-            for (existing_key, group_rows) in groups.iter_mut() {
-                if keys_equal_with_criteria(&keys, existing_key, &key_tuple, criteria)? {
-                    group_rows.push(row.clone());
-                    placed = true;
-                    break;
+
+    let hashable = !group_local
+        && criteria.is_none()
+        && key_indices
+            .iter()
+            .all(|&i| rows.iter().all(|r| group_hash_key(&r[i]).is_some()));
+
+    if hashable {
+        let mut index: HashMap<Vec<GroupHashKey>, usize> = HashMap::new();
+        for row in rows {
+            let hkey: Vec<GroupHashKey> = key_indices
+                .iter()
+                .map(|&i| group_hash_key(&row[i]).expect("hashability pre-checked"))
+                .collect();
+            match index.get(&hkey) {
+                Some(&gi) => groups[gi].1.push(row),
+                None => {
+                    let key_tuple: Vec<Value> =
+                        key_indices.iter().map(|&i| row[i].clone()).collect();
+                    index.insert(hkey, groups.len());
+                    groups.push((key_tuple, vec![row]));
                 }
             }
         }
-        if !placed {
-            groups.push((key_tuple, vec![row]));
+    } else {
+        for row in rows {
+            let key_tuple: Vec<Value> = key_indices.iter().map(|&i| row[i].clone()).collect();
+            let mut placed = false;
+            if group_local {
+                if let Some((existing_key, group_rows)) = groups.last_mut() {
+                    if keys_equal_with_criteria(&keys, existing_key, &key_tuple, criteria)? {
+                        group_rows.push(row.clone());
+                        placed = true;
+                    }
+                }
+            } else {
+                for (existing_key, group_rows) in groups.iter_mut() {
+                    if keys_equal_with_criteria(&keys, existing_key, &key_tuple, criteria)? {
+                        group_rows.push(row.clone());
+                        placed = true;
+                        break;
+                    }
+                }
+            }
+            if !placed {
+                groups.push((key_tuple, vec![row]));
+            }
         }
     }
 
