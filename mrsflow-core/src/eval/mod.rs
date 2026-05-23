@@ -3344,6 +3344,55 @@ mod tests {
     }
 
     #[test]
+    fn transform_column_types_strips_currency_symbols() {
+        // PQ accepts "£0", "$1,234.56", "€10", "¥100" as numeric input when
+        // casting a text column to `type number` / `Currency.Type`. Surfaced
+        // by the xmas oracle case (YOY Previous Xmas Sales By Day → £0).
+        let src = r#"
+            let
+                t = #table({"v"}, {{"£0"}, {"$1,234.56"}, {"€10"}, {"¥100"}}),
+                cast = Table.TransformColumnTypes(t, {{"v", type number}})
+            in
+                Table.Column(cast, "v")
+        "#;
+        match eval_str(src).unwrap() {
+            Value::List(xs) => {
+                let nums: Vec<f64> = xs.iter().map(|v| match v {
+                    Value::Number(n) => *n,
+                    _ => panic!(),
+                }).collect();
+                assert_eq!(nums, vec![0.0, 1234.56, 10.0, 100.0]);
+            }
+            other => panic!("expected list, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn transform_column_types_empty_text_becomes_null_on_numeric_cast() {
+        // PQ treats empty/whitespace text as null when cast to number. The
+        // field is auto-relaxed to nullable even if the user-declared type
+        // was non-nullable — matching PQ's permissive runtime behaviour.
+        let src = r#"
+            let
+                t = #table({"v"}, {{"10"}, {""}, {"  "}, {"20"}}),
+                cast = Table.TransformColumnTypes(t, {{"v", type number}})
+            in
+                Table.Column(cast, "v")
+        "#;
+        match eval_str(src).unwrap() {
+            Value::List(xs) => {
+                let cells: Vec<Option<f64>> = xs.iter().map(|v| match v {
+                    Value::Number(n) => Some(*n),
+                    Value::Null => None,
+                    _ => panic!(),
+                }).collect();
+                assert_eq!(cells, vec![Some(10.0), None, None, Some(20.0)]);
+            }
+            other => panic!("expected list, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn transform_column_types_type_any_on_mixed_passes() {
         // `type any` is the escape hatch: leave the column untouched.
         let src = format!(
@@ -6139,6 +6188,28 @@ mod tests {
             Value::Table(t) => {
                 assert_eq!(t.num_rows(), 0);
                 assert_eq!(t.num_columns(), 0);
+            }
+            other => panic!("expected table, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn table_constructor_numeric_column_count() {
+        // #table(n, rows) overload: integer first arg means "n columns,
+        // auto-named Column1..Column<n>". The two failing xmas oracle cases
+        // (Last Refresh) use this shape.
+        match eval_str(r#"#table(2, {{"a", 1}, {"b", 2}})"#).unwrap() {
+            Value::Table(t) => {
+                assert_eq!(t.num_rows(), 2);
+                assert_eq!(t.column_names(), vec!["Column1", "Column2"]);
+            }
+            other => panic!("expected table, got {other:?}"),
+        }
+        // Zero columns is allowed and matches the existing #table({}, {}) shape.
+        match eval_str("#table(0, {})").unwrap() {
+            Value::Table(t) => {
+                assert_eq!(t.num_columns(), 0);
+                assert_eq!(t.num_rows(), 0);
             }
             other => panic!("expected table, got {other:?}"),
         }

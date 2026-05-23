@@ -632,7 +632,22 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
 }
 
 fn constructor(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    let names = expect_text_list(&args[0], "#table: columns")?;
+    // #table accepts the column spec as either a list of names ({"a","b"})
+    // or a column count (2) — the latter auto-names as Column1..ColumnN.
+    // PQ also accepts `type table [...]` here; that overload isn't wired
+    // up yet (lands when TypeRep carries field info reliably).
+    let names: Vec<String> = match &args[0] {
+        Value::Number(_) => {
+            let n = int_n_arg(&args[0], "#table: column count")?;
+            if n < 0 {
+                return Err(MError::Other(format!(
+                    "#table: column count must be non-negative, got {n}"
+                )));
+            }
+            (1..=n).map(|i| format!("Column{i}")).collect()
+        }
+        _ => expect_text_list(&args[0], "#table: columns")?,
+    };
     let rows = expect_list_of_lists(&args[1], "#table: rows")?;
     for (i, row) in rows.iter().enumerate() {
         if row.len() != names.len() {
@@ -2086,8 +2101,20 @@ fn transform_column_types(args: &[Value], _host: &dyn IoHost) -> Result<Value, M
                     name,
                     "Table.TransformColumnTypes",
                 )?;
+                // If the cast introduced nulls (e.g. empty text → null when
+                // casting to a numeric type), the field must be nullable
+                // regardless of what the user-declared type said. PQ is
+                // permissive about this — `Currency.Type` is nominally
+                // non-nullable but accepts nulls in practice. Matching that
+                // tolerance avoids a RecordBatch strict-validation failure
+                // on otherwise-correct data.
+                let needs_null = cast.null_count() > 0;
                 new_columns[idx] = cast;
-                new_fields[idx] = Field::new(name, target_dtype.clone(), *target_nullable);
+                new_fields[idx] = Field::new(
+                    name,
+                    target_dtype.clone(),
+                    *target_nullable || needs_null,
+                );
             }
             let new_schema = Arc::new(Schema::new(new_fields));
             let new_batch = RecordBatch::try_new(new_schema, new_columns).map_err(|e| {
@@ -6535,15 +6562,30 @@ fn parse_text_to_number(
             continue;
         }
         let raw = s.value(i);
+        // PQ treats an empty (or whitespace-only) text cell as null when
+        // cast to a numeric type. Match that — `""` and `"  "` both → null.
+        if raw.trim().is_empty() {
+            out.push(None);
+            continue;
+        }
+        // Strip currency symbols anywhere they appear ("£0", "$1,234.56",
+        // "€10", "¥100"). Power Query treats currency-tagged text columns
+        // as already-numeric for the purposes of `Currency.Type` / `type
+        // number` casts. The symbol carries no value, only presentation.
+        // Percent (`%`) is intentionally NOT stripped here — `Percentage.Type`
+        // means "divide by 100", and by the time we reach parse_text_to_number
+        // the target has already been collapsed to Float64, losing that
+        // distinction. Strip-only would silently inflate by 100×.
+        let is_currency = |c: char| matches!(c, '£' | '$' | '€' | '¥');
         let cleaned: String = if is_comma_decimal {
             // de-style: drop `.` (thousands), turn `,` into `.` (decimal).
             raw.chars()
-                .filter(|c| !c.is_whitespace() && *c != '.' && *c != '\u{00a0}')
+                .filter(|c| !c.is_whitespace() && *c != '.' && *c != '\u{00a0}' && !is_currency(*c))
                 .map(|c| if c == ',' { '.' } else { c })
                 .collect()
         } else {
             raw.chars()
-                .filter(|c| !c.is_whitespace() && *c != ',' && *c != '\u{00a0}')
+                .filter(|c| !c.is_whitespace() && *c != ',' && *c != '\u{00a0}' && !is_currency(*c))
                 .collect()
         };
         let n = cleaned.parse::<f64>().map_err(|e| {
