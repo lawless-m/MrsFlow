@@ -3327,6 +3327,55 @@ mod tests {
     }
 
     #[test]
+    fn transform_column_types_percentage_type_divides_by_100() {
+        // Percentage.Type cast: strip `%`, divide by 100. PQ behaviour;
+        // hit by JBP/Trigger Points (Growth Scale columns formatted as
+        // "3.10%") and cots/nisa Growth Rebates NISA ("0.30%" rebate).
+        let src = r#"
+            let
+                t = #table({"r"}, {{"3.10%"}, {"0.30%"}, {"15%"}, {""}, {null}}),
+                cast = Table.TransformColumnTypes(t, {{"r", Percentage.Type}})
+            in
+                Table.Column(cast, "r")
+        "#;
+        match eval_str(src).unwrap() {
+            Value::List(xs) => {
+                let cells: Vec<Option<f64>> = xs.iter().map(|v| match v {
+                    Value::Number(n) => Some(*n),
+                    Value::Null => None,
+                    other => panic!("unexpected: {other:?}"),
+                }).collect();
+                assert_eq!(
+                    cells,
+                    vec![Some(0.031), Some(0.003), Some(0.15), None, None]
+                );
+            }
+            other => panic!("expected list, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn transform_column_types_type_number_still_rejects_percent() {
+        // The `%` suffix is only stripped when the target type is
+        // Percentage.Type — a `type number` cast on "3.10%" should still
+        // error, matching PQ (no silent inflate-by-100).
+        let src = r#"
+            let
+                t = #table({"v"}, {{"3.10%"}}),
+                cast = Table.TransformColumnTypes(t, {{"v", type number}})
+            in
+                cast
+        "#;
+        match eval_str(src) {
+            Err(MError::Other(msg)) => assert!(
+                msg.contains("3.10%"),
+                "expected percent-parse error, got: {msg}"
+            ),
+            other => panic!("expected error, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn transform_column_types_excel_serial_to_date() {
         // Excel/PQ stores dates as serial days since 1899-12-30. The
         // cots/JBP/nisa GP PowerBI and Revenue PowerBI queries hit this

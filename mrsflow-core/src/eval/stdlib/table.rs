@@ -2101,12 +2101,13 @@ fn transform_column_types(args: &[Value], _host: &dyn IoHost) -> Result<Value, M
                         "Table.TransformColumnTypes: column not found: {name}"
                     ))
                 })?;
-                let Some((target_dtype, target_nullable)) = target else {
+                let Some((target_dtype, target_nullable, is_percentage)) = target else {
                     continue; // type any → no cast
                 };
                 let cast = cultural_cast(
                     &new_columns[idx],
                     target_dtype,
+                    *is_percentage,
                     name,
                     "Table.TransformColumnTypes",
                 )?;
@@ -2207,7 +2208,12 @@ fn find_typerep_for_name(
 }
 
 
-type ColTypePairs = Vec<(String, Option<(DataType, bool)>)>;
+/// Per-column cast spec: `(name, Option<(arrow_dtype, nullable, is_percentage)>)`.
+/// `None` means "type any" (no cast). `is_percentage` is true when the user
+/// declared `Percentage.Type`; `parse_text_to_number` strips `%` and divides
+/// by 100 in that case. The dtype collapses to Float64 either way, so the
+/// flag is the only signal that survives.
+type ColTypePairs = Vec<(String, Option<(DataType, bool, bool)>)>;
 
 fn parse_col_type_pairs(transforms: &[Value]) -> Result<ColTypePairs, MError> {
     let mut out = Vec::with_capacity(transforms.len());
@@ -2236,7 +2242,12 @@ fn parse_col_type_pairs(transforms: &[Value]) -> Result<ColTypePairs, MError> {
         let mapped = if matches!(type_value, super::super::value::TypeRep::Any) {
             None
         } else {
-            Some(type_rep_to_datatype(&type_value)?)
+            let (dt, nullable) = type_rep_to_datatype(&type_value)?;
+            let is_percentage = matches!(
+                &type_value,
+                super::super::value::TypeRep::NamedNumeric("Percentage.Type")
+            );
+            Some((dt, nullable, is_percentage))
         };
         out.push((name, mapped));
     }
@@ -2371,7 +2382,11 @@ fn cast_cells_to_type(
             "{ctx}: cast {col_name} to {target_dtype:?} failed: column has heterogeneous cells"
         ))
     })?;
-    let cast = cultural_cast(&inferred_array, &target_dtype, col_name, ctx)?;
+    let is_percentage = matches!(
+        t,
+        super::super::value::TypeRep::NamedNumeric("Percentage.Type")
+    );
+    let cast = cultural_cast(&inferred_array, &target_dtype, is_percentage, col_name, ctx)?;
     // Decode the cast result back to Values via a temporary single-column table.
     // Auto-relax the field to nullable when the cast introduced nulls (e.g.
     // empty text → null on a `type number` cast). PQ is permissive here even
@@ -6469,6 +6484,7 @@ fn type_matches(t: &super::super::value::TypeRep, v: &Value) -> bool {
 fn cultural_cast(
     source: &ArrayRef,
     target: &DataType,
+    is_percentage: bool,
     col_name: &str,
     ctx: &str,
 ) -> Result<ArrayRef, MError> {
@@ -6481,7 +6497,7 @@ fn cultural_cast(
             return parse_text_to_int(source, col_name, ctx);
         }
         if matches!(target, DataType::Float64) {
-            return parse_text_to_number(source, col_name, ctx);
+            return parse_text_to_number(source, is_percentage, col_name, ctx);
         }
     }
     // Float64 → Date32: Excel/PQ store dates as serial days since
@@ -6625,6 +6641,7 @@ fn parse_text_to_int(
 
 fn parse_text_to_number(
     source: &ArrayRef,
+    is_percentage: bool,
     col_name: &str,
     ctx: &str,
 ) -> Result<ArrayRef, MError> {
@@ -6657,20 +6674,26 @@ fn parse_text_to_number(
         // "€10", "¥100"). Power Query treats currency-tagged text columns
         // as already-numeric for the purposes of `Currency.Type` / `type
         // number` casts. The symbol carries no value, only presentation.
-        // Percent (`%`) is intentionally NOT stripped here — `Percentage.Type`
-        // means "divide by 100", and by the time we reach parse_text_to_number
-        // the target has already been collapsed to Float64, losing that
-        // distinction. Strip-only would silently inflate by 100×.
+        //
+        // Percent (`%`): only stripped when the user-declared type is
+        // `Percentage.Type` (is_percentage=true), and we divide the result
+        // by 100 — matches PQ's Percentage.Type cast semantics. Without
+        // the flag, a `%` would error (PQ rejects unmarked-text "3.10%"
+        // as `type number` too).
         let is_currency = |c: char| matches!(c, '£' | '$' | '€' | '¥');
+        let drop_char = |c: char| {
+            c.is_whitespace() || c == '\u{00a0}' || is_currency(c)
+                || (is_percentage && c == '%')
+        };
         let cleaned: String = if is_comma_decimal {
             // de-style: drop `.` (thousands), turn `,` into `.` (decimal).
             raw.chars()
-                .filter(|c| !c.is_whitespace() && *c != '.' && *c != '\u{00a0}' && !is_currency(*c))
+                .filter(|c| !drop_char(*c) && *c != '.')
                 .map(|c| if c == ',' { '.' } else { c })
                 .collect()
         } else {
             raw.chars()
-                .filter(|c| !c.is_whitespace() && *c != ',' && *c != '\u{00a0}' && !is_currency(*c))
+                .filter(|c| !drop_char(*c) && *c != ',')
                 .collect()
         };
         let n = cleaned.parse::<f64>().map_err(|e| {
@@ -6678,6 +6701,7 @@ fn parse_text_to_number(
                 "{ctx}: cast {col_name} to number failed on `{raw}`: {e}"
             ))
         })?;
+        let n = if is_percentage { n / 100.0 } else { n };
         out.push(Some(n));
     }
     Ok(Arc::new(Float64Array::from(out)))
