@@ -38,6 +38,7 @@ This file is the source of truth — if you fix one, delete the entry. If you fi
 
 - **`Analysis` timeouts (300s+)** — these are queries that load a 4.8M-row table then filter in M without folding. Excel also takes 3-7 minutes on these. Pattern is wrong, not engine.
 - **`IM002` "data source not found"** — DSN isn't installed on this machine (`OCS1`, possibly others). Environmental.
+- **Transitive failures from dependent queries** — e.g. `JBP/Analysis incl Rebate` joins `Analysis` (timeout), `Customer Rebate` (OK), and `PowerBI tab` (N1). It can only succeed when its upstream queries do; its FAIL row mirrors whichever upstream failed first (typically the `Analysis` timeout). The error message often shows incidental B1 driver panic chatter that resolved via row-at-a-time — the real cause is upstream, not this query.
 
 ## Recently fixed (left here briefly for reference; trim periodically)
 
