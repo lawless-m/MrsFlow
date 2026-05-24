@@ -37,11 +37,13 @@ This file is the source of truth — if you fix one, delete the entry. If you fi
 - **What we know:** the source column is numeric (Excel/PQ's serial date — days since 1899-12-30). Arrow's built-in cast doesn't know that convention.
 - **Next step:** add a Float64→Date32 path in `cultural_cast` interpreting the f64 as Excel serial days.
 
-### S3. Heterogeneous-cell text cast (nulls mixed with text)
-- **Symptom:** `Table.TransformColumnTypes: cast CODE to Utf8 failed: column has heterogeneous cells`.
-- **Hits:** `cots/Customer Rebate`, `JBP/Customer Rebate`, `nisa/Customer Rebate`, `cots/PowerBI tab`, `JBP/PowerBI tab`, `nisa/PowerBI tab`.
-- **What we know:** the column contains text + nulls (legitimate PQ shape — nullable text). `infer_cells` declines because it sees mixed types.
-- **Next step:** treat null cells as compatible with any inferred type in `infer_cells` (or equivalently in the Utf8 path here), matching what we already do for numeric.
+## Notes on what is intentionally NOT a bug
+
+### N1. `JBP/PowerBI tab` Int64 cast on a string column — won't fix
+- **Symptom:** `Table.TransformColumnTypes: cast SAPRODUCT to Int64 failed: column has heterogeneous cells`.
+- **Hits:** `JBP/PowerBI tab` (only).
+- **Diagnosis:** SAPRODUCT is an ASCII product-code string that happens to contain digits. PowerQuery's "Detect Data Type" feature auto-classified it as `Int64.Type` when the M was first generated — wrong call, but invisible because PQ silently parses text-that-looks-numeric back to int. The user-correct version of this query (in `cots/PowerBI tab` and `nisa/PowerBI tab`) casts SAPRODUCT to `type text`, matching the data.
+- **Why not fix:** MrsFlow correctly surfaces that the M is wrong. Making the Int64 cast silently coerce text would replicate PQ's misfeature and lose a useful signal. The fix belongs in the M (change `Int64.Type` → `type text`), not the engine.
 
 ## Notes on what is NOT a bug
 
@@ -56,3 +58,4 @@ This file is the source of truth — if you fix one, delete the entry. If you fi
 - ~~Currency symbols in text→number cast~~ — `£ $ € ¥` stripped.
 - ~~Empty text → null on numeric cast~~ — `""` and whitespace-only cells become null.
 - ~~`Text.Proper(null) = null`~~ — was rejecting nulls; now passes through.
+- ~~Heterogeneous-cell `type text` cast errors~~ — fixed in `b58382c`. `Table.TransformColumnTypes(_, {{"col", type text}})` now coerces per cell via `Text.From` rather than rejecting mixed columns. Also: the parquet writer (`rows_to_arrow`) coerces heterogeneous primitive columns to text on write instead of failing. Closed 5 of the 6 cluster cases; the remaining one (`JBP/PowerBI tab`) is filed under N1 — intentionally not fixed because the user's M is wrong.
