@@ -1215,94 +1215,79 @@ fn odbc_query_row_at_a_time(connection_string: &str, sql: &str) -> Result<Value,
     let mut acc_ts: Vec<Vec<Option<i64>>> = vec![Vec::new(); n_cols];
     let mut acc_bool: Vec<Vec<Option<bool>>> = vec![Vec::new(); n_cols];
 
+    // Per-cell typed scratch buffers — one allocation, reused across rows.
+    // Text stays on `get_text` (it has its own growable buffer); numeric/
+    // date/timestamp/bool use Nullable<T> typed-binding via get_data,
+    // which dispatches to SQLGetData with the appropriate C type and
+    // avoids the text→typed reparse a `get_text` + `parse` would do.
     let mut buf = Vec::<u8>::new();
+    let mut nf64 = odbc_api::Nullable::<f64>::null();
+    let mut ndate = odbc_api::Nullable::<odbc_api::sys::Date>::null();
+    let mut nts = odbc_api::Nullable::<odbc_api::sys::Timestamp>::null();
+    let mut nbit = odbc_api::Nullable::<odbc_api::Bit>::null();
+
     while let Some(mut row) = cursor
         .next_row()
         .map_err(|e| IoError::Other(format!("Odbc.Query fetch: {}", e)))?
     {
         for col_idx in 0..n_cols {
-            buf.clear();
-            let has_data = row
-                .get_text((col_idx + 1) as u16, &mut buf)
-                .map_err(|e| {
-                    IoError::Other(format!(
-                        "Odbc.Query read col {}: {}",
-                        col_idx + 1,
-                        e
-                    ))
-                })?;
+            let col_num = (col_idx + 1) as u16;
             match fields[col_idx].data_type() {
                 DataType::Float64 => {
-                    let cell = if !has_data {
-                        None
-                    } else {
-                        String::from_utf8_lossy(&buf).trim().parse::<f64>().ok()
-                    };
-                    acc_f64[col_idx].push(cell);
+                    row.get_data(col_num, &mut nf64).map_err(|e| {
+                        IoError::Other(format!("Odbc.Query read col {col_num}: {e}"))
+                    })?;
+                    acc_f64[col_idx].push(nf64.into_opt());
                 }
                 DataType::Boolean => {
-                    // Fallback path reads via SQLGetData(SQL_C_CHAR); a Bit
-                    // column comes back textually. Accept "0"/"1", "true"/
-                    // "false" (case-insensitive). Anything else → null.
-                    let cell = if !has_data {
-                        None
-                    } else {
-                        let t = String::from_utf8_lossy(&buf);
-                        let t = t.trim();
-                        match t {
-                            "1" => Some(true),
-                            "0" => Some(false),
-                            _ => match t.to_ascii_lowercase().as_str() {
-                                "true" => Some(true),
-                                "false" => Some(false),
-                                _ => None,
-                            },
-                        }
-                    };
-                    acc_bool[col_idx].push(cell);
+                    row.get_data(col_num, &mut nbit).map_err(|e| {
+                        IoError::Other(format!("Odbc.Query read col {col_num}: {e}"))
+                    })?;
+                    acc_bool[col_idx].push(nbit.into_opt().map(|b| b.as_bool()));
                 }
                 DataType::Utf8 => {
+                    buf.clear();
+                    let has_data = row.get_text(col_num, &mut buf).map_err(|e| {
+                        IoError::Other(format!("Odbc.Query read col {col_num}: {e}"))
+                    })?;
                     let cell = if !has_data {
                         None
                     } else {
                         // Trim trailing whitespace — DBISAM (and other
                         // fixed-width-CHAR drivers) pad to column width.
-                        // Excel/PQ trims the same way before exposing.
                         Some(String::from_utf8_lossy(&buf).trim_end().to_string())
                     };
                     acc_str[col_idx].push(cell);
                 }
                 DataType::Date32 => {
-                    let cell = if !has_data {
-                        None
-                    } else {
-                        let text = String::from_utf8_lossy(&buf);
-                        let t = text.trim();
-                        let d = NaiveDate::parse_from_str(t, "%Y-%m-%d")
-                            .or_else(|_| NaiveDate::parse_from_str(t, "%d/%m/%Y"))
-                            .or_else(|_| NaiveDate::parse_from_str(t, "%m/%d/%Y"))
-                            .ok();
-                        d.map(|d| (d - epoch).num_days() as i32)
-                    };
+                    row.get_data(col_num, &mut ndate).map_err(|e| {
+                        IoError::Other(format!("Odbc.Query read col {col_num}: {e}"))
+                    })?;
+                    let cell = ndate.into_opt().and_then(|d| {
+                        NaiveDate::from_ymd_opt(d.year as i32, d.month as u32, d.day as u32)
+                            .map(|nd| (nd - epoch).num_days() as i32)
+                    });
                     acc_date[col_idx].push(cell);
                 }
                 DataType::Timestamp(TimeUnit::Microsecond, _) => {
-                    let cell = if !has_data {
-                        None
-                    } else {
-                        let text = String::from_utf8_lossy(&buf);
-                        let t = text.trim();
-                        // Common ODBC timestamp shapes; prefer ISO.
-                        let dt = chrono::NaiveDateTime::parse_from_str(t, "%Y-%m-%d %H:%M:%S%.f")
-                            .or_else(|_| {
-                                chrono::NaiveDateTime::parse_from_str(t, "%Y-%m-%d %H:%M:%S")
-                            })
-                            .or_else(|_| {
-                                chrono::NaiveDateTime::parse_from_str(t, "%Y-%m-%dT%H:%M:%S%.f")
-                            })
-                            .ok();
-                        dt.map(|d| d.and_utc().timestamp_micros())
-                    };
+                    row.get_data(col_num, &mut nts).map_err(|e| {
+                        IoError::Other(format!("Odbc.Query read col {col_num}: {e}"))
+                    })?;
+                    let cell = nts.into_opt().and_then(|t| {
+                        let date = NaiveDate::from_ymd_opt(
+                            t.year as i32,
+                            t.month as u32,
+                            t.day as u32,
+                        )?;
+                        // fraction is in nanoseconds per ODBC spec.
+                        let dt = date.and_hms_nano_opt(
+                            t.hour as u32,
+                            t.minute as u32,
+                            t.second as u32,
+                            t.fraction,
+                        )?;
+                        Some(dt.and_utc().timestamp_micros())
+                    });
                     acc_ts[col_idx].push(cell);
                 }
                 _ => unreachable!(
