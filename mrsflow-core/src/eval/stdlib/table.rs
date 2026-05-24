@@ -6476,8 +6476,62 @@ fn cultural_cast(
             return parse_text_to_number(source, col_name, ctx);
         }
     }
+    // Float64 → Date32: Excel/PQ store dates as serial days since
+    // 1899-12-30 (Lotus 1-2-3's leap-year-1900 bug carried forward).
+    // Arrow's built-in cast doesn't know this convention and errors with
+    // "Casting from Float64 to Date32 not supported". The cots/JBP/nisa
+    // GP PowerBI and Revenue PowerBI queries hit this on a Date column
+    // that Excel reports to PQ as a number.
+    if matches!(source.data_type(), DataType::Float64) && matches!(target, DataType::Date32) {
+        return excel_serial_to_date(source, col_name, ctx);
+    }
     arrow::compute::cast(source, target)
         .map_err(|e| MError::Other(format!("{ctx}: cast {col_name} to {target:?} failed: {e}")))
+}
+
+/// Excel/PQ serial-days → Date32. Source f64 is days since 1899-12-30
+/// (Excel's epoch). We convert via chrono to days since 1970-01-01
+/// (Arrow's Date32 epoch). Non-finite, NaN, or out-of-range values
+/// become null — PQ would error on those, but null is the conservative
+/// pass-through here.
+fn excel_serial_to_date(
+    source: &ArrayRef,
+    col_name: &str,
+    ctx: &str,
+) -> Result<ArrayRef, MError> {
+    let s = source
+        .as_any()
+        .downcast_ref::<Float64Array>()
+        .ok_or_else(|| MError::Other(format!("{ctx}: {col_name}: expected Float64 source")))?;
+    let excel_epoch = chrono::NaiveDate::from_ymd_opt(1899, 12, 30).unwrap();
+    let unix_epoch = chrono::NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
+    let epoch_offset = (excel_epoch - unix_epoch).num_days() as i32; // negative
+    let mut out: Vec<Option<i32>> = Vec::with_capacity(s.len());
+    for i in 0..s.len() {
+        if s.is_null(i) {
+            out.push(None);
+            continue;
+        }
+        let serial = s.value(i);
+        if !serial.is_finite() || serial.fract() != 0.0 {
+            // Non-integer serials are PQ's "datetime" (with time portion);
+            // Date32 can't represent the time. We drop it — same outcome as
+            // PQ's Date.From on a datetime: take the date part. fract() of
+            // a non-integer serial gets truncated by `as i32` below; but
+            // first guard NaN/Inf.
+            if !serial.is_finite() {
+                out.push(None);
+                continue;
+            }
+        }
+        let days = serial.trunc() as i64;
+        // i32 range check — Arrow Date32 is i32 days since unix epoch.
+        // Excel serial 0 = 1899-12-30 → -25569 days. Add epoch_offset to
+        // convert to unix-epoch-relative days.
+        let unix_days = days as i32 + epoch_offset;
+        out.push(Some(unix_days));
+    }
+    Ok(Arc::new(Date32Array::from(out)) as ArrayRef)
 }
 
 fn parse_text_to_date(

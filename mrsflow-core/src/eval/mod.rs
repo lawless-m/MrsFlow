@@ -3327,6 +3327,36 @@ mod tests {
     }
 
     #[test]
+    fn transform_column_types_excel_serial_to_date() {
+        // Excel/PQ stores dates as serial days since 1899-12-30. The
+        // cots/JBP/nisa GP PowerBI and Revenue PowerBI queries hit this
+        // when an Excel "Date" column is delivered to PQ as a number.
+        // Arrow's built-in Float64→Date32 cast errors; cultural_cast now
+        // handles it. Serial 44562 = 2022-01-01.
+        let src = r#"
+            let
+                t = #table({"d"}, {{44562}, {44593}, {44621}}),
+                cast = Table.TransformColumnTypes(t, {{"d", type date}})
+            in
+                Table.Column(cast, "d")
+        "#;
+        match eval_str(src).unwrap() {
+            Value::List(xs) => {
+                let dates: Vec<chrono::NaiveDate> = xs.iter().map(|v| match v {
+                    Value::Date(d) => *d,
+                    other => panic!("expected date, got {other:?}"),
+                }).collect();
+                assert_eq!(dates, vec![
+                    chrono::NaiveDate::from_ymd_opt(2022, 1, 1).unwrap(),
+                    chrono::NaiveDate::from_ymd_opt(2022, 2, 1).unwrap(),
+                    chrono::NaiveDate::from_ymd_opt(2022, 3, 1).unwrap(),
+                ]);
+            }
+            other => panic!("expected list, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn transform_column_types_text_cast_on_mixed_column_succeeds() {
         // Heterogeneous (text + number) column cast to `type text` now
         // succeeds via per-cell Text.From coercion, matching PQ. Previously
