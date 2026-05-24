@@ -633,10 +633,15 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
 }
 
 fn constructor(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    // #table accepts the column spec as either a list of names ({"a","b"})
-    // or a column count (2) — the latter auto-names as Column1..ColumnN.
-    // PQ also accepts `type table [...]` here; that overload isn't wired
-    // up yet (lands when TypeRep carries field info reliably).
+    // #table accepts the column spec in three forms:
+    //   - list of names: `{"a", "b"}` — explicit names, no types.
+    //   - column count: `2` — auto-names as Column1..ColumnN, no types.
+    //   - type table: `type table [a = T, b = U]` — names + per-column types.
+    // For the type-table form we currently use only the names and leave cell
+    // types as-is; the declared types aren't enforced. A follow-up could
+    // chain Table.TransformColumnTypes equivalent if needed. The cots/JBP/
+    // nisa LastRefreshed corpus queries use this form for a single-row
+    // single-column datetime table; just-the-names is sufficient.
     let names: Vec<String> = match &args[0] {
         Value::Number(_) => {
             let n = int_n_arg(&args[0], "#table: column count")?;
@@ -646,6 +651,9 @@ fn constructor(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
                 )));
             }
             (1..=n).map(|i| format!("Column{i}")).collect()
+        }
+        Value::Type(super::super::value::TypeRep::TableOf { columns }) => {
+            columns.iter().map(|(name, _ty)| name.clone()).collect()
         }
         _ => expect_text_list(&args[0], "#table: columns")?,
     };

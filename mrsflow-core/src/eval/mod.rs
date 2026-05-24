@@ -6331,6 +6331,31 @@ mod tests {
     }
 
     #[test]
+    fn table_constructor_type_table_overload() {
+        // #table accepts `type table [...]` as the first arg: use its column
+        // names; declared types are not enforced at construction time
+        // (matches PQ leniency). The cots/JBP/nisa LastRefreshed corpus
+        // queries use this overload for a single-row datetime table.
+        let src = r#"
+            let
+                t = #table(type table [#"Date Last Refreshed" = datetime],
+                           {{#datetime(2026, 5, 24, 19, 17, 11)}})
+            in
+                Table.ColumnNames(t)
+        "#;
+        match eval_str(src).unwrap() {
+            Value::List(xs) => {
+                let names: Vec<String> = xs.iter().map(|v| match v {
+                    Value::Text(s) => s.clone(),
+                    other => panic!("expected text, got {other:?}"),
+                }).collect();
+                assert_eq!(names, vec!["Date Last Refreshed".to_string()]);
+            }
+            other => panic!("expected list, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn table_constructor_numeric_column_count() {
         // #table(n, rows) overload: integer first arg means "n columns,
         // auto-named Column1..Column<n>". The two failing xmas oracle cases
