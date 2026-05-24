@@ -1031,7 +1031,9 @@ fn odbc_query_impl(connection_string: &str, sql: &str) -> Result<Value, IoError>
 
 #[cfg(feature = "odbc")]
 fn odbc_query_columnar(connection_string: &str, sql: &str) -> Result<Value, IoError> {
-    use arrow::array::{Date32Array, Float64Array, StringArray, TimestampMicrosecondArray};
+    use arrow::array::{
+        BooleanArray, Date32Array, Float64Array, StringArray, TimestampMicrosecondArray,
+    };
     use arrow::datatypes::{DataType, Schema, TimeUnit};
     use chrono::NaiveDate;
     use odbc_api::{
@@ -1064,6 +1066,7 @@ fn odbc_query_columnar(connection_string: &str, sql: &str) -> Result<Value, IoEr
     let mut acc_str: Vec<Vec<Option<String>>> = vec![Vec::new(); n_cols];
     let mut acc_date: Vec<Vec<Option<i32>>> = vec![Vec::new(); n_cols];
     let mut acc_ts: Vec<Vec<Option<i64>>> = vec![Vec::new(); n_cols];
+    let mut acc_bool: Vec<Vec<Option<bool>>> = vec![Vec::new(); n_cols];
 
     while let Some(batch) = row_set_cursor
         .fetch()
@@ -1079,6 +1082,15 @@ fn odbc_query_columnar(connection_string: &str, sql: &str) -> Result<Value, IoEr
                         .expect("F64 buffer");
                     for opt in view {
                         acc_f64[col_idx].push(opt.copied());
+                    }
+                }
+                DataType::Boolean => {
+                    let view = batch
+                        .column(col_idx)
+                        .as_nullable_slice::<odbc_api::Bit>()
+                        .expect("Bit buffer");
+                    for opt in view {
+                        acc_bool[col_idx].push(opt.map(|b| b.as_bool()));
                     }
                 }
                 DataType::Utf8 => {
@@ -1135,7 +1147,9 @@ fn odbc_query_columnar(connection_string: &str, sql: &str) -> Result<Value, IoEr
                         acc_ts[col_idx].push(cell);
                     }
                 }
-                _ => unreachable!("describe_columns only emits Float64/Utf8/Date32/Timestamp(us)"),
+                _ => unreachable!(
+                    "describe_columns only emits Float64/Utf8/Date32/Timestamp(us)/Boolean"
+                ),
             }
         }
     }
@@ -1157,6 +1171,9 @@ fn odbc_query_columnar(connection_string: &str, sql: &str) -> Result<Value, IoEr
                 DataType::Timestamp(TimeUnit::Microsecond, _) => std::sync::Arc::new(
                     TimestampMicrosecondArray::from(std::mem::take(&mut acc_ts[i])),
                 ),
+                DataType::Boolean => std::sync::Arc::new(BooleanArray::from(std::mem::take(
+                    &mut acc_bool[i],
+                ))),
                 _ => unreachable!(),
             }
         })
@@ -1170,7 +1187,9 @@ fn odbc_query_columnar(connection_string: &str, sql: &str) -> Result<Value, IoEr
 
 #[cfg(feature = "odbc")]
 fn odbc_query_row_at_a_time(connection_string: &str, sql: &str) -> Result<Value, IoError> {
-    use arrow::array::{Date32Array, Float64Array, StringArray, TimestampMicrosecondArray};
+    use arrow::array::{
+        BooleanArray, Date32Array, Float64Array, StringArray, TimestampMicrosecondArray,
+    };
     use arrow::datatypes::{DataType, Schema, TimeUnit};
     use chrono::NaiveDate;
     use odbc_api::{ConnectionOptions, Cursor};
@@ -1194,6 +1213,7 @@ fn odbc_query_row_at_a_time(connection_string: &str, sql: &str) -> Result<Value,
     let mut acc_str: Vec<Vec<Option<String>>> = vec![Vec::new(); n_cols];
     let mut acc_date: Vec<Vec<Option<i32>>> = vec![Vec::new(); n_cols];
     let mut acc_ts: Vec<Vec<Option<i64>>> = vec![Vec::new(); n_cols];
+    let mut acc_bool: Vec<Vec<Option<bool>>> = vec![Vec::new(); n_cols];
 
     let mut buf = Vec::<u8>::new();
     while let Some(mut row) = cursor
@@ -1219,6 +1239,27 @@ fn odbc_query_row_at_a_time(connection_string: &str, sql: &str) -> Result<Value,
                         String::from_utf8_lossy(&buf).trim().parse::<f64>().ok()
                     };
                     acc_f64[col_idx].push(cell);
+                }
+                DataType::Boolean => {
+                    // Fallback path reads via SQLGetData(SQL_C_CHAR); a Bit
+                    // column comes back textually. Accept "0"/"1", "true"/
+                    // "false" (case-insensitive). Anything else → null.
+                    let cell = if !has_data {
+                        None
+                    } else {
+                        let t = String::from_utf8_lossy(&buf);
+                        let t = t.trim();
+                        match t {
+                            "1" => Some(true),
+                            "0" => Some(false),
+                            _ => match t.to_ascii_lowercase().as_str() {
+                                "true" => Some(true),
+                                "false" => Some(false),
+                                _ => None,
+                            },
+                        }
+                    };
+                    acc_bool[col_idx].push(cell);
                 }
                 DataType::Utf8 => {
                     let cell = if !has_data {
@@ -1264,7 +1305,9 @@ fn odbc_query_row_at_a_time(connection_string: &str, sql: &str) -> Result<Value,
                     };
                     acc_ts[col_idx].push(cell);
                 }
-                _ => unreachable!("describe_columns only emits Float64/Utf8/Date32/Timestamp(us)"),
+                _ => unreachable!(
+                    "describe_columns only emits Float64/Utf8/Date32/Timestamp(us)/Boolean"
+                ),
             }
         }
     }
@@ -1286,6 +1329,9 @@ fn odbc_query_row_at_a_time(connection_string: &str, sql: &str) -> Result<Value,
                 DataType::Timestamp(TimeUnit::Microsecond, _) => std::sync::Arc::new(
                     TimestampMicrosecondArray::from(std::mem::take(&mut acc_ts[i])),
                 ),
+                DataType::Boolean => std::sync::Arc::new(BooleanArray::from(std::mem::take(
+                    &mut acc_bool[i],
+                ))),
                 _ => unreachable!(),
             }
         })
@@ -1303,6 +1349,12 @@ fn describe_columns<C: odbc_api::Cursor + odbc_api::ResultSetMetadata>(
 ) -> Result<(Vec<arrow::datatypes::Field>, Vec<odbc_api::buffers::BufferDesc>), IoError> {
     use arrow::datatypes::{DataType, Field};
     use odbc_api::buffers::BufferDesc;
+
+    // Per-cell byte cap for text/memo columns. At BATCH_SIZE = 1024 this
+    // tops out the buffer at ~64 MiB per column. Cells exceeding the cap
+    // are truncated by the driver — fine for DBISAM memo columns where the
+    // declared length is i32::MAX but the actual content is short.
+    const CELL_CAP: usize = 65_536;
 
     let n_cols = cursor
         .num_result_cols()
@@ -1338,7 +1390,14 @@ fn describe_columns<C: odbc_api::Cursor + odbc_api::ResultSetMetadata>(
             | odbc_api::DataType::Varchar { length }
             | odbc_api::DataType::WVarchar { length }
             | odbc_api::DataType::LongVarchar { length } => {
-                let max = length.map(|n| n.get()).unwrap_or(255);
+                // Cap the bind buffer at CELL_CAP. Driver-reported lengths
+                // can be i32::MAX (DBISAM memo columns), which multiplied by
+                // BATCH_SIZE would ask the allocator for ~2 TiB and abort
+                // the process. SQLBindCol is free to bind at less than the
+                // declared length; cells longer than CELL_CAP get truncated
+                // — fine for memo columns where 99.9% of cells are short.
+                let declared = length.map(|n| n.get()).unwrap_or(255);
+                let max = declared.min(CELL_CAP);
                 (DataType::Utf8, BufferDesc::Text { max_str_len: max })
             }
             // Temporal types: bind natively (SQL_C_TYPE_DATE/TIMESTAMP).
@@ -1359,6 +1418,18 @@ fn describe_columns<C: odbc_api::Cursor + odbc_api::ResultSetMetadata>(
                     DataType::Timestamp(arrow::datatypes::TimeUnit::Microsecond, None),
                     BufferDesc::Timestamp { nullable: true },
                 )
+            }
+            // SQL BIT — DBISAM stores logical flags this way (e.g. ORDERH.CRNOTE,
+            // CUSTOMER.EVCUSTOMER, PRODUCT.PACKCONV). PQ maps these to logical.
+            odbc_api::DataType::Bit => {
+                (DataType::Boolean, BufferDesc::Bit { nullable: true })
+            }
+            // DBISAM memo columns come back as LongVarbinary with the i32::MAX
+            // sentinel length. Treat as text (CS-EM2Parquet does the same)
+            // and cap at CELL_CAP — see the LongVarchar branch above for the
+            // truncation rationale.
+            odbc_api::DataType::LongVarbinary { .. } => {
+                (DataType::Utf8, BufferDesc::Text { max_str_len: CELL_CAP })
             }
             other => {
                 return Err(IoError::Other(format!(

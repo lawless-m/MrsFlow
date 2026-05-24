@@ -1187,6 +1187,9 @@ fn reverse(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 
 
 fn proper(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    if matches!(&args[0], Value::Null) {
+        return Ok(Value::Null);
+    }
     let text = expect_text(&args[0])?;
     let mut out = String::with_capacity(text.len());
     let mut start_of_word = true;

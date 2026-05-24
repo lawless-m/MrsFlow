@@ -4304,6 +4304,17 @@ mod tests {
     }
 
     #[test]
+    fn text_proper_passes_null_through() {
+        // PQ text functions are null-aware: Text.Proper(null) = null.
+        // Surfaced by Main Product Category (Table.TransformColumns
+        // applying Text.Proper to a column containing nulls).
+        match eval_str("Text.Proper(null)").unwrap() {
+            Value::Null => {}
+            other => panic!("expected null, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn logical_to_text_basic() {
         assert!(matches!(eval_str("Logical.ToText(true)").unwrap(), Value::Text(s) if s == "true"));
         assert!(matches!(eval_str("Logical.ToText(false)").unwrap(), Value::Text(s) if s == "false"));
