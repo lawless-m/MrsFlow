@@ -16,7 +16,7 @@ use super::value::{BuiltinFn, Closure, FnBody, Value};
 
 mod common;
 mod number;
-mod text;
+pub(crate) mod text;
 mod logical;
 mod list;
 mod record;

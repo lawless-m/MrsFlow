@@ -1019,12 +1019,35 @@ fn rows_to_arrow(
                 arrays.push(array);
             }
             None => {
-                return Err(MError::Other(format!(
-                    "column {:?} has heterogeneous or compound cells; Arrow encoding requires \
-                     uniform columns (coerce mixed cells with Text.From or \
-                     Table.TransformColumnTypes first)",
-                    columns[col_idx]
-                )));
+                // Heterogeneous primitive columns (text + number, etc.) —
+                // coerce per cell to text. PQ writes these as text columns
+                // too; parquet's columnar format requires a uniform dtype,
+                // and text is the only safe target. Compound cells (list/
+                // record/table) still error via text_from_value — those
+                // genuinely can't round-trip through parquet.
+                let mut strings: Vec<Option<String>> = Vec::with_capacity(cells.len());
+                let mut has_null = false;
+                for cell in &cells {
+                    match super::stdlib::text::text_from_value(cell)? {
+                        Value::Null => {
+                            strings.push(None);
+                            has_null = true;
+                        }
+                        Value::Text(s) => strings.push(Some(s)),
+                        // text_from_value only ever returns Null or Text.
+                        other => unreachable!(
+                            "text_from_value returned non-text/null: {other:?}"
+                        ),
+                    }
+                }
+                use arrow::array::StringArray;
+                use arrow::datatypes::DataType;
+                fields.push(Field::new(
+                    columns[col_idx].clone(),
+                    DataType::Utf8,
+                    has_null,
+                ));
+                arrays.push(Arc::new(StringArray::from(strings)) as arrow::array::ArrayRef);
             }
         }
     }
@@ -2087,14 +2110,54 @@ mod odbc_sql_tests {
     }
 
     #[test]
-    fn rows_backed_mixed_column_still_errors() {
-        // Genuinely heterogeneous column (text + number) must still fail.
+    fn rows_backed_mixed_primitive_column_coerces_to_text() {
+        // Heterogeneous primitive cells (text + number) coerce to a text
+        // column on write — parquet's columnar format requires a uniform
+        // dtype and text is the only safe target. Matches PQ's behaviour
+        // when writing mixed-type columns to parquet.
         let t = Table::from_rows(
             vec!["mixed".into()],
-            vec![vec![Value::Text("a".into())], vec![Value::Number(1.0)]],
+            vec![
+                vec![Value::Text("a".into())],
+                vec![Value::Number(1.0)],
+                vec![Value::Null],
+                vec![Value::Logical(true)],
+            ],
         );
-        let err = t.try_to_arrow().expect_err("mixed column must not encode");
+        let batch = t.try_to_arrow().expect("mixed primitives should coerce");
+        assert_eq!(batch.num_rows(), 4);
+        assert_eq!(batch.num_columns(), 1);
+        assert_eq!(
+            batch.schema().field(0).data_type(),
+            &arrow::datatypes::DataType::Utf8
+        );
+        let col_dyn = batch.column(0);
+        assert!(col_dyn.is_null(2), "row 2 should be null");
+        let col = col_dyn
+            .as_any()
+            .downcast_ref::<arrow::array::StringArray>()
+            .expect("Utf8");
+        assert_eq!(col.value(0), "a");
+        assert_eq!(col.value(1), "1");
+        assert_eq!(col.value(3), "true");
+    }
+
+    #[test]
+    fn rows_backed_compound_column_still_errors() {
+        // Compound cells (list/record/table) can't be coerced to text via
+        // PQ's Text.From — try_to_arrow must propagate that error.
+        let t = Table::from_rows(
+            vec!["c".into()],
+            vec![
+                vec![Value::Text("ok".into())],
+                vec![Value::List(std::rc::Rc::new(vec![Value::Number(1.0)]))],
+            ],
+        );
+        let err = t.try_to_arrow().expect_err("compound cell must not encode");
         let msg = format!("{err:?}");
-        assert!(msg.contains("mixed"), "error should name the column: {msg}");
+        assert!(
+            msg.to_lowercase().contains("list") || msg.contains("convert"),
+            "error should mention List/convert, got: {msg}"
+        );
     }
 }

@@ -24,6 +24,7 @@ use super::common::{
     expect_table_lazy_ok, expect_text, expect_text_list, int_n_arg, invoke_builtin_callback,
     invoke_callback_with_host, one, three, two, type_mismatch, values_equal_primitive,
 };
+use super::text::text_from_value;
 
 pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
     vec![
@@ -2338,6 +2339,24 @@ fn cast_cells_to_type(
     ctx: &str,
 ) -> Result<Vec<Value>, MError> {
     let (target_dtype, target_nullable) = type_rep_to_datatype(t)?;
+    // `type text` cast is per-cell coercion via Text.From — never errors on
+    // heterogeneous columns. PQ workbooks routinely have CODE-style columns
+    // where Excel stores some cells as numbers and others as text; the
+    // ostensible `type text` cast is the user saying "make every cell text".
+    // Short-circuit before `infer_cells`, which would otherwise reject the
+    // column as mixed.
+    if matches!(target_dtype, DataType::Utf8) {
+        let _ = target_nullable; // text cast always produces a nullable column
+        let mut out = Vec::with_capacity(cells.len());
+        for cell in cells {
+            out.push(text_from_value(cell).map_err(|e| {
+                MError::Other(format!(
+                    "{ctx}: cast {col_name} to text failed: {e:?}"
+                ))
+            })?);
+        }
+        return Ok(out);
+    }
     let cell_refs: Vec<&Value> = cells.iter().collect();
     let (_, inferred_array) = infer_cells(&cell_refs)?.ok_or_else(|| {
         MError::Other(format!(
@@ -2346,7 +2365,11 @@ fn cast_cells_to_type(
     })?;
     let cast = cultural_cast(&inferred_array, &target_dtype, col_name, ctx)?;
     // Decode the cast result back to Values via a temporary single-column table.
-    let field = Field::new(col_name, target_dtype, target_nullable);
+    // Auto-relax the field to nullable when the cast introduced nulls (e.g.
+    // empty text → null on a `type number` cast). PQ is permissive here even
+    // for nominally non-nullable types like Currency.Type; matching that.
+    let needs_null = cast.null_count() > 0;
+    let field = Field::new(col_name, target_dtype, target_nullable || needs_null);
     let temp_batch = RecordBatch::try_new(Arc::new(Schema::new(vec![field])), vec![cast])
         .map_err(|e| MError::Other(format!("{ctx}: temp batch failed: {e}")))?;
     let temp_table = Table::from_arrow(temp_batch);

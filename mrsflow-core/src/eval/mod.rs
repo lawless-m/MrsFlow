@@ -3327,19 +3327,19 @@ mod tests {
     }
 
     #[test]
-    fn transform_column_types_mixed_column_errors() {
-        // Casting a heterogeneous (text + number) column to a specific type
-        // errors cleanly — matches PQ's typed-cast-on-mixed behaviour.
+    fn transform_column_types_text_cast_on_mixed_column_succeeds() {
+        // Heterogeneous (text + number) column cast to `type text` now
+        // succeeds via per-cell Text.From coercion, matching PQ. Previously
+        // this errored; that behaviour was wrong — corpus queries like
+        // cots/Customer Rebate rely on the coercion. The fully-mixed
+        // assertion is in transform_column_types_text_cast_coerces_mixed_column.
         let src = format!(
-            "Table.TransformColumnTypes({}, {{{{\"val\", type text}}}})",
+            "Table.RowCount(Table.TransformColumnTypes({}, {{{{\"val\", type text}}}}))",
             rows_backed_two_col_table()
         );
         match eval_str(&src) {
-            Err(MError::Other(msg)) => assert!(
-                msg.contains("heterogeneous") || msg.contains("cast"),
-                "expected cast error, got: {msg}"
-            ),
-            other => panic!("expected error, got {other:?}"),
+            Ok(Value::Number(n)) => assert_eq!(n, 3.0),
+            other => panic!("expected row count 3, got {other:?}"),
         }
     }
 
@@ -3389,6 +3389,102 @@ mod tests {
                 assert_eq!(cells, vec![Some(10.0), None, None, Some(20.0)]);
             }
             other => panic!("expected list, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn transform_column_types_text_cast_coerces_mixed_column() {
+        // `type text` cast is per-cell coercion via Text.From — never errors
+        // on heterogeneous columns. Surfaced by the cots/JBP/nisa Customer
+        // Rebate queries (CODE column has number + text cells in Excel).
+        let src = r#"
+            let
+                t = #table({"code"}, {{"ABC"}, {123}, {null}, {true}, {"X1"}}),
+                cast = Table.TransformColumnTypes(t, {{"code", type text}})
+            in
+                Table.Column(cast, "code")
+        "#;
+        match eval_str(src).unwrap() {
+            Value::List(xs) => {
+                let cells: Vec<Option<String>> = xs.iter().map(|v| match v {
+                    Value::Text(s) => Some(s.clone()),
+                    Value::Null => None,
+                    other => panic!("unexpected cell type: {other:?}"),
+                }).collect();
+                assert_eq!(
+                    cells,
+                    vec![
+                        Some("ABC".into()),
+                        Some("123".into()),
+                        None,
+                        Some("true".into()),
+                        Some("X1".into()),
+                    ]
+                );
+            }
+            other => panic!("expected list, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn transform_column_types_text_cast_handles_dates_numbers() {
+        // Various scalar kinds → text, mirroring Text.From per-cell. Confirms
+        // dates render as dd/MM/yyyy (en-GB default) and Number.From-style
+        // integer rendering kicks in (no trailing `.0`).
+        let src = r#"
+            let
+                t = #table({"v"}, {
+                    {#date(2025, 1, 31)},
+                    {42},
+                    {3.14},
+                    {false},
+                    {#duration(0, 1, 30, 0)}
+                }),
+                cast = Table.TransformColumnTypes(t, {{"v", type text}})
+            in
+                Table.Column(cast, "v")
+        "#;
+        match eval_str(src).unwrap() {
+            Value::List(xs) => {
+                let cells: Vec<String> = xs.iter().map(|v| match v {
+                    Value::Text(s) => s.clone(),
+                    other => panic!("expected text, got {other:?}"),
+                }).collect();
+                assert_eq!(
+                    cells,
+                    vec![
+                        "31/01/2025".to_string(),
+                        "42".to_string(),
+                        "3.14".to_string(),
+                        "false".to_string(),
+                        "01:30:00".to_string(),
+                    ]
+                );
+            }
+            other => panic!("expected list, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn transform_column_types_text_cast_rejects_compound() {
+        // `type text` on a column containing a List/Record/Table should still
+        // error — PQ rejects with "We cannot convert a value of type List to
+        // type Text." Our error wraps that message but preserves the cause.
+        let src = r#"
+            let
+                t = #table({"v"}, {{"ok"}, {{1, 2, 3}}}),
+                cast = Table.TransformColumnTypes(t, {{"v", type text}})
+            in
+                cast
+        "#;
+        match eval_str(src) {
+            Err(MError::Other(msg)) => {
+                assert!(
+                    msg.contains("cast v to text failed") && msg.contains("List"),
+                    "expected text-cast error mentioning List, got: {msg}"
+                );
+            }
+            other => panic!("expected error, got {other:?}"),
         }
     }
 

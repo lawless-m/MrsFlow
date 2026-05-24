@@ -374,8 +374,16 @@ fn check_utf8_encoding(arg: Option<&Value>, fname: &str) -> Result<(), MError> {
 }
 
 fn from(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+    text_from_value(&args[0])
+}
+
+/// PQ `Text.From` semantics, exposed for reuse by `Table.TransformColumnTypes`'
+/// `type text` cast path and by the Rows→Arrow writer when coercing
+/// heterogeneous columns. Takes a single Value and returns `Value::Text(...)`
+/// (or `Value::Null` for null input). Errors for compound values (list, record,
+/// table, function, type) and unhandled scalar kinds, matching PQ.
+pub(crate) fn text_from_value(v: &Value) -> Result<Value, MError> {
     use chrono::{Datelike, Timelike};
-    let v = &args[0];
     match v {
         Value::Null => Ok(Value::Null),
         Value::Text(s) => Ok(Value::Text(s.clone())),
