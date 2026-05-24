@@ -24,18 +24,7 @@ This file is the source of truth — if you fix one, delete the entry. If you fi
 
 ## Stdlib semantic gaps
 
-### S1. `Percentage.Type` cast doesn't divide by 100
-- **Symptom:** `Table.TransformColumnTypes: cast Growth Scale 1 to number failed on '3.10%': invalid float literal`.
-- **Hits:** `JBP/{Trigger Points 2023, 2024, WIth Profit 2023}`, `cots/Growth Rebates NISA`, `nisa/Growth Rebates NISA`.
-- **What we know:** PQ's `Percentage.Type` cast means "strip `%` and divide by 100". By the time we reach `parse_text_to_number`, the target type has already collapsed to `Float64` and we've lost the distinction between `Percentage.Type` and `type number` / `Currency.Type`. We can't just strip `%` because that silently inflates by 100×.
-- **What we don't know:** whether the original `TypeRep` is reachable at the cast site or whether we'd need to thread it through.
-- **Next step:** plumb the original `TypeRep` (or at minimum a "is_percentage" bit) into `cultural_cast` / `parse_text_to_number` so the parser knows to divide.
-
-### S2. `Float64 → Date32` cast not supported
-- **Symptom:** `Table.TransformColumnTypes: cast Date to Date32 failed: Cast error: Casting from Float64 to Date32 not supported`.
-- **Hits:** `cots/{GP PowerBI, Revenue PowerBI}`, `JBP/{GP PowerBI, Revenue PowerBI}`, `nisa/{GP PowerBI, Revenue PowerBI}`.
-- **What we know:** the source column is numeric (Excel/PQ's serial date — days since 1899-12-30). Arrow's built-in cast doesn't know that convention.
-- **Next step:** add a Float64→Date32 path in `cultural_cast` interpreting the f64 as Excel serial days.
+(none currently outstanding — S1 and S2 closed; see Recently fixed.)
 
 ## Notes on what is intentionally NOT a bug
 
@@ -59,3 +48,6 @@ This file is the source of truth — if you fix one, delete the entry. If you fi
 - ~~Empty text → null on numeric cast~~ — `""` and whitespace-only cells become null.
 - ~~`Text.Proper(null) = null`~~ — was rejecting nulls; now passes through.
 - ~~Heterogeneous-cell `type text` cast errors~~ — fixed in `b58382c`. `Table.TransformColumnTypes(_, {{"col", type text}})` now coerces per cell via `Text.From` rather than rejecting mixed columns. Also: the parquet writer (`rows_to_arrow`) coerces heterogeneous primitive columns to text on write instead of failing. Closed 5 of the 6 cluster cases; the remaining one (`JBP/PowerBI tab`) is filed under N1 — intentionally not fixed because the user's M is wrong.
+- ~~`Float64 → Date32` cast not supported (S2)~~ — fixed in `afb6893`. `cultural_cast` now interprets Float64 source as Excel/PQ serial days (since 1899-12-30) when target is Date32. Closed all 6 cluster cases (cots/JBP/nisa × GP PowerBI + Revenue PowerBI).
+- ~~`#table(type table [...], rows)` overload~~ — fixed in `c622d12`. The third constructor form (type-table first arg) now extracts column names from the TableOf TypeRep; declared per-column types are not enforced at construction time (PQ leniency). Closed 3 cluster cases (cots/JBP/nisa LastRefreshed).
+- ~~`Percentage.Type` cast doesn't divide by 100 (S1)~~ — fixed in `ff593e0`. Threaded an `is_percentage` bool through the cast pipeline; `parse_text_to_number` now strips `%` and divides by 100 only when the user-declared type is `Percentage.Type`. Unmarked `type number` casts on `"3.10%"` still error (no silent inflate-by-100). Closed all 5 cluster cases.
