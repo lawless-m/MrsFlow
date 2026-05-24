@@ -23,7 +23,18 @@ impl Indicator {
         // surfaces the driver issue cleanly; mrsflow-cli's columnar
         // dispatcher catches it via `catch_unwind` and falls back to
         // row-at-a-time, which uses SQLGetData and decodes correctly.
-        // See vendor/README.md.
+        //
+        // 2026-05-24: investigated the SQLLEN values DBISAM returns —
+        // confirmed they follow the pattern `0xffffffff_0000000N` where
+        // N is the real length. A naive low-32-bit rescue would work for
+        // these per-cell indicators, but DBISAM has a SECOND 32-bit-SQLLEN
+        // bug in `SQL_ATTR_ROWS_FETCHED_PTR` (always reports the rowset
+        // size, never the actual count). Rescuing the indicators alone
+        // exposes that second bug — half the rows come back as stale
+        // buffer garbage. Until odbc-api wires `SQL_ATTR_ROW_STATUS_PTR`
+        // we can't trust the columnar batch boundaries at all, so the
+        // panic + row-at-a-time fallback remains the only safe path. See
+        // KNOWN_BUGS.md §B1.
         match indicator {
             NULL_DATA => Indicator::Null,
             NO_TOTAL => Indicator::NoTotal,

@@ -6,12 +6,16 @@ This file is the source of truth — if you fix one, delete the entry. If you fi
 
 ## ODBC / DBISAM
 
-### B1. DBISAM columnar fetch panics on certain tables → slow row-at-a-time fallback
-- **Symptom:** `Odbc.Query: columnar fetch panicked for 'dsn=Exportmaster'; falling back to row-at-a-time. panic: ... TryFromIntError(())`. Query completes via fallback but slowly — wide tables with many rows take minutes (`Customer` 58s, `Product Table` 356s, `Ingredients Table` 53 min).
+### B1. DBISAM columnar fetch fundamentally broken; row-at-a-time fallback only safe path
+- **Symptom:** `Odbc.Query: columnar fetch panicked for 'dsn=Exportmaster'; falling back to row-at-a-time. panic: ... TryFromIntError(())`. Query completes via fallback but slowly — wide tables take minutes (`Customer` 58s, `Product Table` 356s, `Ingredients Table` 53 min).
 - **Hits:** `category/{Customer, Product Table, Ingredients Table, Main Product Category, Sub Product Category, Sub Sub Category}`, `cots/PRODGRP`, `JBP/PRODGRP`, `nisa/PRODGRP`.
-- **What we know:** the vendored odbc-api `Indicator::from_isize` panics on any negative SQLLEN that isn't `NULL_DATA` or `NO_TOTAL`. The vendor patch comment (`vendor/odbc-api/src/buffers/indicator.rs`) explicitly says swallowing the panic was tried and rejected — it silently lost rows. So the panic is the *correct* surface, and row-at-a-time fallback is the safe path.
-- **What we don't know:** which exact column or cell triggers the negative SQLLEN on each table. CS-EM2Parquet reads the same tables fine via System.Data.Odbc (which uses cell-by-cell `SQLGetData` — structurally similar to our row-at-a-time but with a managed driver layer that may massage the indicators).
-- **Next step:** the fast fix would be patching `Indicator::from_isize` to interpret driver-specific negative SQLLEN values correctly (matching whatever System.Data.Odbc does). Without that, the fallback works — just slowly.
+- **Diagnosis (investigated 2026-05-24):** DBISAM's ODBC driver has TWO independent 32-bit-SQLLEN bugs that compound:
+  1. **Indicator SQLLEN bug:** each per-cell indicator is written to 32 bits of a 64-bit slot. Sign-extension means a real length of N comes back as `0xffffffff_0000000N` = `-4294967296 + N`. Easy to fix: `value as i32 as isize` recovers the real length when `(value >> 32) == -1`.
+  2. **`SQL_ATTR_ROWS_FETCHED_PTR` bug:** the driver writes the rowset size (or never updates the pointer at all). Every batch reports `n_rows = 1024` regardless of how many rows actually came back. odbc-api iterates 0..n_rows trusting this; the unfilled tail of the buffer contains stale data from prior batches, which presents as half the rows being null (when the stale indicator happens to be `NULL_DATA = -1`) or junk strings.
+- **Why patching (1) alone doesn't help:** verified empirically (Sub Sub Category, 51823 rows, CHAR(8) `Group Code` column). With the indicator-rescue patch, columnar fetch produces 51823 rows but 25660 are null — driven entirely by bug (2), not bug (1). Rescue without fixing (2) silently drops half the rows.
+- **Why CS-EM2Parquet works:** it uses System.Data.Odbc, which under the hood calls `SQLFetch` + `SQLGetData` per row (no `SQL_ATTR_ROW_ARRAY_SIZE > 1`, no `RowsFetchedPtr` dependency). That's structurally what our row-at-a-time fallback already does — same correctness, same speed profile.
+- **What would actually fix it:** either (a) wire `SQL_ATTR_ROW_STATUS_PTR` (`odbc_sys::StatementAttribute::RowStatusPtr`) into odbc-api so we can mark per-slot validity and stop trusting `RowsFetchedPtr` — a non-trivial vendor patch; or (b) use a different bulk-fetch driver path that doesn't rely on these attributes. For now, the existing fallback is the correct path.
+- **What we have:** the cap-fix from commit `eca8963` prevents the 2 TiB allocator abort at bind time, so the panic is recoverable. The patch comment in `indicator.rs` is now accurate — keep the panic, accept the slow fallback.
 
 ### B2. `unsupported SQL type LongVarbinary` on memo columns
 - **Status:** fixed for `describe_columns` (no longer fast-fails). Query now reaches data fetch via columnar bind (capped at `CELL_CAP = 64 KiB`) — but most memo-bearing tables then hit B1 at fetch time and fall back. Cells exceeding 64 KiB are truncated; for DBISAM memo columns in this corpus that hasn't surfaced.
