@@ -31,6 +31,31 @@ pub trait IoHost {
         connection_string: &str,
         options: Option<&Value>,
     ) -> Result<Value, IoError>;
+    /// Run a SQL query directly against a DBISAM server using the
+    /// native wire protocol — backs `Exportmaster.Query`. Bypasses the
+    /// broken DBISAM ODBC driver entirely. Default impl returns
+    /// `IoError::NotSupported` so non-CLI shells (and CLI builds
+    /// without `--features exportmaster`) surface a clear error.
+    fn exportmaster_query(
+        &self,
+        host: &str,
+        sql: &str,
+        options: Option<&Value>,
+    ) -> Result<Value, IoError> {
+        let _ = (host, sql, options);
+        Err(IoError::NotSupported)
+    }
+    /// Open a DBISAM database via the native protocol and return a
+    /// navigation record — backs `Exportmaster.Database`. Default impl
+    /// returns `IoError::NotSupported`.
+    fn exportmaster_database(
+        &self,
+        host: &str,
+        options: Option<&Value>,
+    ) -> Result<Value, IoError> {
+        let _ = (host, options);
+        Err(IoError::NotSupported)
+    }
     /// Read a file's bytes verbatim — backs `File.Contents`.
     fn file_read(&self, path: &str) -> Result<Vec<u8>, IoError>;
     /// Last-modified timestamp as a fixed-offset datetime — backs `File.Modified`.

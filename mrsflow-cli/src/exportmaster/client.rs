@@ -16,7 +16,7 @@ use mrsflow_core::eval::Table;
 use super::crypto::encrypt_login;
 use super::framing;
 use super::ConnOpts;
-use super::cursor::{drive_cursor, find_row_starts};
+use super::cursor::{drive_cursor, find_row_starts_via_framing};
 use super::row::{decode_record, ColumnBuilders, RECORD_HEADER_LEN};
 use super::schema::parse as parse_schema;
 
@@ -134,13 +134,20 @@ impl Client {
         // producing garbage values when fed to decode_record.
         let combined = drive_cursor(self.stream_mut(), &columns, target_rows)?;
 
-        let starts = find_row_starts(&combined, &columns);
+        // Find row starts via the protocol §4 pre-record framing rather
+        // than pattern-matching null-flags. Each row is preceded by a
+        // fixed-structure index entry that ends in a 16-byte MD5 hash;
+        // the row's first byte is immediately after the hash.
+        let starts = find_row_starts_via_framing(&combined, &columns);
         let first_off = columns[0].row_offset as usize;
         let last_col = columns.last().unwrap();
         let row_size = (last_col.row_offset as usize - first_off) + 1 + last_col.max as usize;
 
-        // Dedup by first-column value (PoC's "seen_codes" set). Rows
-        // can appear multiple times across batches (server resends).
+        // Dedup by first-column value (rows can appear multiple times
+        // across batches when the server resends). Skip rows where the
+        // first column is null/empty — these are cursor end-of-data
+        // markers that share the row-framing pattern but carry no real
+        // data.
         use std::collections::HashSet;
         let mut seen = HashSet::new();
         let mut builders = ColumnBuilders::new(&columns, starts.len());
@@ -153,8 +160,10 @@ impl Client {
                 Ok(c) => c,
                 Err(_) => continue,
             };
-            // Use first column's text representation as the dedup key.
+            // Skip end-of-cursor sentinel rows (PK is null or empty).
             let key = match &cells[0] {
+                super::row::CellValue::Null => continue,
+                super::row::CellValue::Text(s) if s.is_empty() => continue,
                 super::row::CellValue::Text(s) => s.clone(),
                 other => format!("{other:?}"),
             };

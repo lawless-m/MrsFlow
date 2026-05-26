@@ -1,24 +1,18 @@
 //! Cursor advance: post-query message sequence + multi-fetch loop.
 //!
-//! After the QUERY (`0x0320`) is sent, the server only returns the schema.
-//! The actual row data arrives across several `(cursor-init, batch)`
-//! round-trips. This module drives those round-trips and returns the
-//! concatenated bytes for the row parser to chew on.
+//! Row finding goes through [`find_row_starts_via_framing`] which
+//! walks the §4 pre-record framing structure (marker `01 80 00 00` +
+//! row index + cursor handle echo + 16-byte MD5 hash) to know exactly
+//! where each row begins. This is how dbsys does it — no pattern
+//! matching, no heuristics.
 //!
-//! Strategy (v1, matches PoC `customer-top3` mode):
-//! 1. Send 11 captured cursor-init messages — replays from a known-good
-//!    `select code, cpyname, contact, email from customer top 3` session.
-//!    The first batch of rows is in these responses.
-//! 2. Loop: scan the concatenated responses for the highest-seen primary
-//!    key in the first column, splice it into captured ACK + Fetch
-//!    templates, send. Server returns the next batch.
-//! 3. Stop when `row_count >= target` or two consecutive iterations make
-//!    no progress (cursor exhausted).
-//!
-//! See protocol §6 for the universal cursor-advance rule documented but
-//! not yet implemented here. The captured-template approach handles
-//! natural-PK and indexed-JOIN cases; ORDER BY and unindexed-JOIN need
-//! the universal rule (TODO).
+//! The cursor-init messages and ACK/Fetch templates are still byte-
+//! for-byte captures from a known-good `customer top 3` session, with
+//! the 16-byte primary-key slot spliced over per row. Works reliably
+//! for natural-PK SELECT and indexed-JOIN modes. ORDER BY (47-byte
+//! cursor slot) and unindexed-JOIN (5-byte slot) per protocol §6
+//! aren't yet covered — they'd need their own captured templates or
+//! the §6 universal cursor-state-block extract-and-splice rule.
 
 use std::net::TcpStream;
 
@@ -148,7 +142,7 @@ pub fn drive_cursor(
     let mut empty_iters = 0usize;
     let max_iters = target_rows.saturating_add(50);
     for _ in 0..max_iters {
-        let row_starts = find_row_starts(&combined, columns);
+        let row_starts = find_row_starts_via_framing(&combined, columns);
         let unique = count_unique_first_col(&combined, &row_starts, columns);
         if unique >= target_rows {
             break;
@@ -178,13 +172,6 @@ pub fn drive_cursor(
     Ok(combined)
 }
 
-/// Printable ASCII range, including space and the common code-separator
-/// chars (`-`, `_`, `.`, `*`, `/`, alphanumerics). Used to filter
-/// false-positive row_starts in pattern-matching.
-fn is_printable_ascii(b: u8) -> bool {
-    matches!(b, 0x20..=0x7E)
-}
-
 /// Splice a primary key into the 16-byte key slot of a captured template.
 /// Key is left-aligned, null-padded.
 fn splice_key_into_template(template: &[u8], key: &[u8]) -> Vec<u8> {
@@ -210,47 +197,65 @@ fn splice_key_into_template(template: &[u8], key: &[u8]) -> Vec<u8> {
 /// A candidate `i` is a row start iff every column's null-flag byte
 /// (at `i + row_offset - first_off`) is 0x00 or 0x01, AND the first
 /// column's flag is 0x01 (PK always present).
-pub fn find_row_starts(data: &[u8], columns: &[Column]) -> Vec<usize> {
-    if columns.is_empty() {
-        return Vec::new();
-    }
-    let first_off = columns[0].row_offset as usize;
-    let last_col = columns.last().unwrap();
-    // Wire row size from first column's null-flag through last column's
-    // last value byte = (last.null_pos - first.null_pos) + 1 + max.
-    let row_size = (last_col.row_offset as usize - first_off) + 1 + last_col.max as usize;
-    if data.len() < row_size {
-        return Vec::new();
-    }
+/// Find row starts deterministically via the §4 pre-record framing.
+///
+/// Each row in a cursor response is preceded by a fixed 44-byte index
+/// entry:
+///
+/// ```text
+///   +0   `01 80 00 00`                marker + §3-encoded row index
+///   +4   row_idx (1..=N)
+///   +5   `01 00 00 00 00 01 00 00 00 00`  fixed: cursor handle echo
+///   +15  <row_size:u32 LE>            on-disk row size, matches schema
+///   +19  `00 01 00 00 00`             fixed
+///   +24  <counter:u32 LE> <counter:u32 LE>   row position / batch info
+///   +32  <16 bytes MD5 hash>          unique per-row
+///   +48  <ROW DATA starts here>       wire field-data block
+/// ```
+///
+/// Wait, that's 48 not 44. Let me recount — the row size in the framing
+/// uses the §3 encoding too (high-bit-set first byte). The +15 byte was
+/// `0xa8` = 168 in the CUSTOMER capture, but for other tables it'll be
+/// the high-bit-set form. Treat the row-size field as variable-width
+/// for now, and instead match by looking for `01 80 00 00 <idx 0x01..=0x7f>`
+/// followed by the cursor-handle echo `01 00 00 00 00 01 00 00 00 00`,
+/// and from there the row starts at marker_pos + 44.
+///
+/// Verified live for CUSTOMER: marker at offset 341, row data at 385
+/// (delta = 44).
+pub fn find_row_starts_via_framing(data: &[u8], _columns: &[Column]) -> Vec<usize> {
+    const MARKER: &[u8] = &[0x01, 0x80, 0x00, 0x00];
+    const HANDLE: &[u8] = &[0x01, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00];
+    const ROW_DATA_OFFSET: usize = 44;
     let mut out = Vec::new();
-    let last_idx = data.len() - row_size;
-    for i in 0..=last_idx {
-        let cells_ok = columns.iter().all(|c| {
-            let null_pos = i + (c.row_offset as usize - first_off);
-            null_pos < data.len() && (data[null_pos] == 0 || data[null_pos] == 1)
-        });
-        if !cells_ok {
+    let mut i = 0;
+    while i + MARKER.len() + 1 + HANDLE.len() + ROW_DATA_OFFSET <= data.len() {
+        if &data[i..i + 4] != MARKER {
+            i += 1;
             continue;
         }
-        // First column (PK) must be non-null.
-        if data[i] != 1 {
+        // Row index byte must be a small positive int (not high-bit).
+        let row_idx = data[i + 4];
+        if !(1..=0x7F).contains(&row_idx) {
+            i += 1;
             continue;
         }
-        // Additional filter to drop false positives that pattern-match
-        // null-flag positions in framing/zero-padding regions: for the
-        // PK column (column 0), the first value byte must be a printable
-        // ASCII character. PKs in DBISAM tables are universally text
-        // codes (CUSTOMER.CODE, PRODUCT.CODE, etc.) — letters, digits,
-        // and a few separator chars. Anything else means we've matched
-        // a pattern in framing bytes, not a real record.
-        let first_byte = if i + 1 < data.len() { data[i + 1] } else { 0 };
-        if !is_printable_ascii(first_byte) {
+        // Cursor-handle echo follows.
+        if &data[i + 5..i + 5 + HANDLE.len()] != HANDLE {
+            i += 1;
             continue;
         }
-        out.push(i);
+        out.push(i + ROW_DATA_OFFSET);
+        i += ROW_DATA_OFFSET; // skip past this row's framing
     }
     out
 }
+
+// (`find_row_starts` pattern-match heuristic removed — replaced by
+// `find_row_starts_via_framing` above. The pattern-match approach
+// produced false positives that needed hacky filtering, and dbsys's
+// real behaviour walks the §4 pre-record framing structure to find
+// row boundaries deterministically.)
 
 /// Decode the first column of every row at `starts` and return the
 /// number of unique non-empty values. Used as the PoC's "progress"

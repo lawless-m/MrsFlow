@@ -294,6 +294,50 @@ impl IoHost for CliIoHost {
         odbc_data_source_impl(connection_string, hierarchical)
     }
 
+    #[cfg(not(feature = "exportmaster"))]
+    fn exportmaster_query(
+        &self,
+        _host: &str,
+        _sql: &str,
+        _options: Option<&Value>,
+    ) -> Result<Value, IoError> {
+        Err(IoError::Other(
+            "Exportmaster.Query: built without exportmaster support — recompile mrsflow-cli with --features exportmaster".into(),
+        ))
+    }
+
+    #[cfg(feature = "exportmaster")]
+    fn exportmaster_query(
+        &self,
+        host: &str,
+        sql: &str,
+        options: Option<&Value>,
+    ) -> Result<Value, IoError> {
+        let opts = exportmaster_opts(host, options)?;
+        crate::exportmaster::query(&opts, sql)
+    }
+
+    #[cfg(not(feature = "exportmaster"))]
+    fn exportmaster_database(
+        &self,
+        _host: &str,
+        _options: Option<&Value>,
+    ) -> Result<Value, IoError> {
+        Err(IoError::Other(
+            "Exportmaster.Database: built without exportmaster support — recompile mrsflow-cli with --features exportmaster".into(),
+        ))
+    }
+
+    #[cfg(feature = "exportmaster")]
+    fn exportmaster_database(
+        &self,
+        host: &str,
+        options: Option<&Value>,
+    ) -> Result<Value, IoError> {
+        let opts = exportmaster_opts(host, options)?;
+        crate::exportmaster::database(&opts)
+    }
+
     #[cfg(not(feature = "mysql"))]
     fn mysql_database(
         &self,
@@ -940,6 +984,44 @@ fn cell_to_value(cell: &calamine::Data, delay_types: bool) -> Value {
 // MS Driver Manager on Windows) must be installed for compilation when
 // the feature is on; an actual ODBC driver must be installed at runtime
 // for any given DSN to resolve.
+
+// Build a ConnOpts for the native DBISAM client. `host` is the bare
+// hostname/IP (port comes from options or defaults to 12005). Required
+// User and Password come from `options` (the record literal passed as
+// the third arg to Exportmaster.Query); EncryptPassword defaults to
+// "elevatesoft" (the ex3win baseline).
+#[cfg(feature = "exportmaster")]
+fn exportmaster_opts(
+    host: &str,
+    options: Option<&Value>,
+) -> Result<crate::exportmaster::ConnOpts, IoError> {
+    let rec = match options {
+        Some(Value::Record(r)) => r,
+        _ => {
+            return Err(IoError::Other(
+                "Exportmaster: options record required (must include User and Password)".into(),
+            ));
+        }
+    };
+    let get_text = |name: &str| -> Option<String> {
+        rec.fields
+            .iter()
+            .find(|(n, _)| n == name)
+            .and_then(|(_, v)| match v {
+                Value::Text(s) => Some(s.clone()),
+                _ => None,
+            })
+    };
+    let user = get_text("User").ok_or_else(|| {
+        IoError::Other("Exportmaster: options.User (text) required".into())
+    })?;
+    let password = get_text("Password").ok_or_else(|| {
+        IoError::Other("Exportmaster: options.Password (text) required".into())
+    })?;
+    let mut opts = crate::exportmaster::ConnOpts::new(host, user, password);
+    opts.apply_options(options)?;
+    Ok(opts)
+}
 
 // Shared ODBC environment — one per process, lazily initialised. Used by
 // both the columnar and row-at-a-time query paths plus DataSource catalog

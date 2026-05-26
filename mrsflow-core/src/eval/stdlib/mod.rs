@@ -28,6 +28,7 @@ mod datetimezone;
 mod duration;
 mod parquet;
 mod odbc;
+mod exportmaster;
 mod splitter;
 mod combiner;
 mod replacer;
@@ -635,6 +636,7 @@ fn builtin_bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
         duration::bindings(),
         parquet::bindings(),
         odbc::bindings(),
+        exportmaster::bindings(),
         splitter::bindings(),
         combiner::bindings(),
         replacer::bindings(),
