@@ -40,10 +40,13 @@ const CURSOR_HANDLE: u32 = 1;
 /// preparation time for materialised cursors.
 const MAX_RECEIVE_POLLS: usize = 100;
 
-/// Drive a SELECT cursor to completion, accumulating row bytes into
-/// `out_rows`. Each row is a self-contained `Vec<u8>` of the on-disk
-/// record (header + column data) — caller slices from `+first_col.row_offset`
-/// to call `decode_record`.
+/// Drive a SELECT cursor to completion, invoking `on_row` once per
+/// decoded row. The row bytes are passed as a borrowed slice into the
+/// response buffer — the callback must consume them in place (e.g.
+/// decode into Arrow builders) since they're invalidated when the
+/// next batch arrives.
+///
+/// Returns the number of rows actually delivered.
 ///
 /// Flow (per `ANSWERS-TO-DEREK-2.md`):
 /// 1. `ExecuteStatement (0x032A)` — kicks off cursor execution
@@ -54,7 +57,7 @@ const MAX_RECEIVE_POLLS: usize = 100;
 ///
 /// Stops when:
 /// - a response carries `RESULT_END_OF_CURSOR (0x2202)`, OR
-/// - `target_rows` rows have been collected, OR
+/// - `target_rows` rows have been delivered, OR
 /// - the max-iterations safety bound trips
 pub fn drive_cursor(
     stream: &mut TcpStream,
@@ -62,8 +65,8 @@ pub fn drive_cursor(
     target_rows: usize,
     batch_size: u32,
     compression: bool,
-    out_rows: &mut Vec<Vec<u8>>,
-) -> Result<(), IoError> {
+    mut on_row: impl FnMut(&[u8]) -> Result<(), IoError>,
+) -> Result<usize, IoError> {
     use super::response::{
         body_reqcode, read_batch, read_record_block_batch, PACK_STREAM_OFFSET,
         REQCODE_POLLING_SENTINEL, RESULT_OK,
@@ -82,12 +85,16 @@ pub fn drive_cursor(
     }
 
     let record_size = compute_record_size(columns);
+    let mut rows_seen: usize = 0;
 
-    // Parse a response body, harvesting rows into out_rows. Returns
-    // true on end-of-cursor.
-    let process_body = |body: &[u8],
-                        kind: &ReplyKind,
-                        out_rows: &mut Vec<Vec<u8>>|
+    // Parse a response body, invoking `on_row` once per row. Returns
+    // true on end-of-cursor (response carries result_code != OK, or
+    // we've hit target_rows). Borrows row bytes directly from `body`
+    // — no per-row allocation.
+    let mut process_body = |body: &[u8],
+                            kind: &ReplyKind,
+                            rows_seen: &mut usize,
+                            on_row: &mut dyn FnMut(&[u8]) -> Result<(), IoError>|
      -> Result<bool, IoError> {
         if body.len() < PACK_STREAM_OFFSET + 6 || body_reqcode(body) == REQCODE_POLLING_SENTINEL {
             return Ok(false);
@@ -102,13 +109,12 @@ pub fn drive_cursor(
                 Ok(Some(b)) => b,
                 Ok(None) | Err(_) => return Ok(false),
             };
-            // Harvest rows even when result_code != OK: end-of-cursor
-            // responses still carry the FINAL batch of rows.
             for row in &batch.rows {
-                if out_rows.len() >= target_rows {
+                if *rows_seen >= target_rows {
                     return Ok(true);
                 }
-                out_rows.push(row.to_vec());
+                on_row(row)?;
+                *rows_seen += 1;
             }
             if batch.result_code != RESULT_OK {
                 return Ok(true);
@@ -131,12 +137,11 @@ pub fn drive_cursor(
     // Phase 1: ExecuteStatement.
     let r = framing::send_recv_auto(stream, &msg::build_execute_statement(CURSOR_HANDLE), compression)?;
     logr("ExecuteStatement", &r);
-    if process_body(&r, &ReplyKind::SingleRow, out_rows)? {
-        return Ok(());
+    if process_body(&r, &ReplyKind::SingleRow, &mut rows_seen, &mut on_row)? {
+        return Ok(rows_seen);
     }
 
-    // Phase 2: Receive poll loop. Re-issue Receive until the response
-    // is no longer the polling sentinel (reqcode 0x2C14, result_code 3).
+    // Phase 2: Receive poll loop.
     let mut poll_count = 0;
     loop {
         let r = framing::send_recv_auto(stream, &msg::build_receive(), compression)?;
@@ -152,8 +157,8 @@ pub fn drive_cursor(
                 } else { false }
             } else { false }
         };
-        if process_body(&r, &ReplyKind::SingleRow, out_rows)? {
-            return Ok(());
+        if process_body(&r, &ReplyKind::SingleRow, &mut rows_seen, &mut on_row)? {
+            return Ok(rows_seen);
         }
         if !is_sentinel && !is_not_ready_inner {
             break;
@@ -169,8 +174,8 @@ pub fn drive_cursor(
     // Phase 2.5: SetToBegin to position the cursor at row 1.
     let r = framing::send_recv_auto(stream, &msg::build_set_to_begin(CURSOR_HANDLE), compression)?;
     logr("SetToBegin", &r);
-    if process_body(&r, &ReplyKind::SingleRow, out_rows)? {
-        return Ok(());
+    if process_body(&r, &ReplyKind::SingleRow, &mut rows_seen, &mut on_row)? {
+        return Ok(rows_seen);
     }
 
     // Phase 3: ReadFirstRecordBlock — first batch of rows.
@@ -181,29 +186,29 @@ pub fn drive_cursor(
         compression,
     )?;
     logr("ReadFirstRecordBlock", &r);
-    if process_body(&r, &ReplyKind::RecordBlock, out_rows)? {
-        return Ok(());
+    if process_body(&r, &ReplyKind::RecordBlock, &mut rows_seen, &mut on_row)? {
+        return Ok(rows_seen);
     }
 
     // Phase 4: ReadNextRecordBlock loop.
     let max_batches = (target_rows / batch_size as usize) + 10;
     for _ in 0..max_batches {
-        if out_rows.len() >= target_rows {
+        if rows_seen >= target_rows {
             break;
         }
-        let remaining = target_rows.saturating_sub(out_rows.len()) as u32;
+        let remaining = target_rows.saturating_sub(rows_seen) as u32;
         let n = remaining.min(batch_size).max(1);
         let r = framing::send_recv_auto(
             stream,
             &msg::build_read_next_record_block(CURSOR_HANDLE, n),
             compression,
         )?;
-        if process_body(&r, &ReplyKind::RecordBlock, out_rows)? {
+        if process_body(&r, &ReplyKind::RecordBlock, &mut rows_seen, &mut on_row)? {
             break;
         }
     }
 
-    Ok(())
+    Ok(rows_seen)
 }
 
 /// Pattern-match row starts in a byte blob.

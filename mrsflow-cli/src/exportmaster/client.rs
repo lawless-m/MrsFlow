@@ -175,21 +175,21 @@ impl Client {
         let batch_size = self.batch_size;
         let compression = self.compression;
 
-        let mut rows = Vec::with_capacity(target_rows.min(1024));
-        drive_cursor(self.stream_mut(), &columns, target_rows, batch_size, compression, &mut rows)?;
-
-        let mut builders = ColumnBuilders::new(&columns, rows.len());
-        for row in &rows {
-            // Row points at the start of the on-disk record; column
-            // data begins at +first_off (= 25 for tables with first
-            // column at row_offset 25).
-            let col_end = first_off + col_data_span;
-            if col_end > row.len() {
-                continue;
-            }
-            let cells = decode_record(&row[first_off..col_end], &columns)?;
-            builders.push_row(cells)?;
-        }
+        // Decode rows straight into the column builders as they
+        // arrive — no per-row `Vec<u8>` allocation. The callback
+        // borrows row bytes from the current response buffer.
+        let mut builders = ColumnBuilders::new(&columns, target_rows.min(1024));
+        let col_end_offset = first_off + col_data_span;
+        let columns_ref = &columns;
+        drive_cursor(self.stream_mut(), &columns, target_rows, batch_size, compression,
+            |row: &[u8]| {
+                if col_end_offset > row.len() {
+                    return Ok(());
+                }
+                let cells = decode_record(&row[first_off..col_end_offset], columns_ref)?;
+                builders.push_row(cells)?;
+                Ok(())
+            })?;
 
         let batch = builders.finish()?;
         Ok(Value::Table(Table::from_arrow(batch)))
