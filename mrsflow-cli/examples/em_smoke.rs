@@ -207,6 +207,33 @@ fn main() {
             std::process::exit(1);
         }
     }
+
+    // Database navigation: SQLTables-equivalent. Expects 653 tables on
+    // NISAINT_CS (verified via pyodbc cursor.tables()).
+    eprintln!("\nDatabase test: list tables in catalog {}", opts.catalog);
+    let mut client = match Client::connect_and_login(&opts) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("FAIL login: {e:?}");
+            std::process::exit(1);
+        }
+    };
+    let started = std::time::Instant::now();
+    match client.list_tables() {
+        Ok(names) => {
+            eprintln!(
+                "  got {} tables (in {} ms)",
+                names.len(),
+                started.elapsed().as_millis()
+            );
+            eprintln!("  first 5: {:?}", &names.iter().take(5).collect::<Vec<_>>());
+            eprintln!("  last 5:  {:?}", &names.iter().rev().take(5).rev().collect::<Vec<_>>());
+        }
+        Err(e) => {
+            eprintln!("  FAIL: {e:?}");
+            std::process::exit(1);
+        }
+    }
 }
 
 #[cfg(not(feature = "exportmaster"))]

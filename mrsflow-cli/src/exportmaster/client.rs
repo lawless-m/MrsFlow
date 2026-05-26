@@ -16,8 +16,8 @@ use mrsflow_core::eval::Table;
 use super::crypto::encrypt_login;
 use super::framing;
 use super::ConnOpts;
-use super::cursor::{drive_cursor, find_row_starts_via_framing};
-use super::row::{decode_record, ColumnBuilders, RECORD_HEADER_LEN};
+use super::cursor::drive_cursor;
+use super::row::{decode_record, ColumnBuilders};
 use super::schema::parse as parse_schema;
 
 /// Captured Connect body (52 bytes) — replayed verbatim. Workstation
@@ -31,12 +31,12 @@ const CONNECT_BODY: &[u8] = &[
     0x00, 0x00, 0x00, 0x00,
 ];
 
-/// Session-setup messages sent immediately after a successful login.
-/// Replayed verbatim from a captured customer-top3 session. The 4th
-/// mentions `NISAINT_CS` (a collation name) — if we ever need to talk
-/// to a different DBISAM database with a different collation, this is
-/// the first place to look.
-const SESSION_SETUP_BODIES: &[&[u8]] = &[
+/// Fixed session-setup messages sent immediately after a successful
+/// login. C[2] and C[3] are replayed verbatim from capture; their
+/// internal field meanings are not fully decoded. C[4] (catalog
+/// attach, reqcode 0x003c) is built from `opts.catalog` so callers can
+/// target different databases. C[5] is a trailing handshake replay.
+const SESSION_SETUP_PRE: &[&[u8]] = &[
     // C[2] — 44-byte body
     &[
         0x00, 0x28, 0x00, 0x20, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
@@ -47,17 +47,39 @@ const SESSION_SETUP_BODIES: &[&[u8]] = &[
     &[
         0x00, 0x84, 0x03, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00,
     ],
-    // C[4] — 28-byte body, mentions `NISAINT_CS` (the database name)
-    &[
-        0x00, 0x3C, 0x00, 0x13, 0x00, 0x00, 0x00, 0x0A, 0x00, 0x00, 0x00, 0x4E, 0x49, 0x53, 0x41, 0x49,
-        0x4E, 0x54, 0x5F, 0x43, 0x53, 0x01, 0x00, 0x00, 0x00, 0x00, 0x64, 0x00,
-    ],
-    // C[5] — 20-byte body
-    &[
-        0x00, 0x16, 0x03, 0x08, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x49,
-        0x4E, 0x54, 0x5F, 0x43,
-    ],
 ];
+
+/// C[5] — 20-byte trailing session-setup body, sent after the catalog
+/// attach. The trailing `49 4E 54 5F 43` ("INT_C") appears in every
+/// session capture and is sent verbatim; its meaning hasn't been
+/// decoded but the server accepts it.
+const SESSION_SETUP_POST: &[u8] = &[
+    0x00, 0x16, 0x03, 0x08, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x49,
+    0x4E, 0x54, 0x5F, 0x43,
+];
+
+/// Build the catalog-attach message body (reqcode 0x003c) for the
+/// given catalog name. Layout decoded from an uncompressed capture
+/// of `pyodbc.connect(DSN=Exportmaster)`:
+///
+///   reqcode 0x003c BE | sub-flag 0x00 | inner_len LE u32 |
+///   inner_len bytes: [u32 LE name_len][catalog name][5-byte trailer
+///                     `01 00 00 00 00`] |
+///   trailing `0x64 0x00` (2 bytes)
+///
+/// Verified equivalent to the byte-for-byte replay of `NISAINT_CS`.
+fn build_catalog_attach_body(catalog: &str) -> Vec<u8> {
+    let name = catalog.as_bytes();
+    let inner_len = 4 + name.len() + 5;
+    let mut body = Vec::with_capacity(3 + 4 + inner_len + 2);
+    body.extend_from_slice(&[0x00, 0x3C, 0x00]);
+    body.extend_from_slice(&(inner_len as u32).to_le_bytes());
+    body.extend_from_slice(&(name.len() as u32).to_le_bytes());
+    body.extend_from_slice(name);
+    body.extend_from_slice(&[0x01, 0x00, 0x00, 0x00, 0x00]);
+    body.extend_from_slice(&[0x64, 0x00]);
+    body
+}
 
 /// An open, logged-in DBISAM session.
 pub struct Client {
@@ -83,10 +105,14 @@ impl Client {
         let login_body = build_login_body(&ct);
         let _ = framing::send_recv(&mut stream, &login_body)?;
 
-        // 3) Session-setup — 4 captured messages, in order.
-        for body in SESSION_SETUP_BODIES {
+        // 3) Session-setup — fixed pre messages, then catalog attach
+        //    (parameterised by opts.catalog), then trailing handshake.
+        for body in SESSION_SETUP_PRE {
             let _ = framing::send_recv(&mut stream, body)?;
         }
+        let catalog_body = build_catalog_attach_body(&opts.catalog);
+        let _ = framing::send_recv(&mut stream, &catalog_body)?;
+        let _ = framing::send_recv(&mut stream, SESSION_SETUP_POST)?;
 
         Ok(Self { stream })
     }
@@ -103,22 +129,15 @@ impl Client {
     /// Pipeline:
     /// 1. Send the query packet, get the schema response.
     /// 2. Parse the schema (772-byte column blocks).
-    /// 3. Drive the cursor: 11 replayed init messages + ACK/Fetch loop
-    ///    spliced with the highest-seen primary key.
-    /// 4. Pattern-find row starts in concatenated cursor bytes; decode
-    ///    each row with the schema; accumulate into per-column Arrow
-    ///    arrays.
+    /// 3. Drive the cursor — captured init messages + ACK/Fetch loop.
+    /// 4. Walk the response bytes via the universal `<u32 length>
+    ///    <payload>` framing rule (protocol §6c) — every chunk whose
+    ///    length equals `record_size` is one row. Decode and accumulate.
     /// 5. Wrap as Value::Table.
     ///
-    /// Live-verified against `SELECT CODE, CPYNAME, CONTACT, EMAIL FROM
-    /// CUSTOMER TOP 3` — returns the same three rows as the Python PoC:
-    ///   ("1",     "SaveCo",              "Mr McParland", "Wahmed@saveco.com")
-    ///   ("1-332", "Camara Ltd",          "Mrs Keswani",  "reita@camara.co.uk")
-    ///   ("1-680", "Innco Innflutninger", "Mr Jonsson",   "g.jons@innco.is")
-    ///
-    /// `target_rows` is the soft cap for the cursor loop (default
-    /// `usize::MAX` for "all rows", but the caller can cap when issuing
-    /// `SELECT … TOP N` to avoid over-fetching).
+    /// `target_rows` is the soft cap (default `usize::MAX` for "all
+    /// rows", but the caller can cap when issuing `SELECT … TOP N` to
+    /// avoid over-fetching).
     pub fn query_to_table(&mut self, sql: &str) -> Result<Value, IoError> {
         self.query_to_table_capped(sql, usize::MAX)
     }
@@ -126,55 +145,26 @@ impl Client {
     pub fn query_to_table_capped(&mut self, sql: &str, target_rows: usize) -> Result<Value, IoError> {
         let schema_resp = self.query_raw(sql)?;
         let (columns, _end_off) = parse_schema(&schema_resp)?;
-
-        // Drive the cursor; this returns the concatenated server bytes
-        // from the post-query fetch round-trips. Don't include the
-        // schema response in the row-search corpus — it contains index
-        // entries (PK-only) that the row-finder false-positives on,
-        // producing garbage values when fed to decode_record.
-        let combined = drive_cursor(self.stream_mut(), &columns, target_rows)?;
-
-        // Find row starts via the protocol §4 pre-record framing rather
-        // than pattern-matching null-flags. Each row is preceded by a
-        // fixed-structure index entry that ends in a 16-byte MD5 hash;
-        // the row's first byte is immediately after the hash.
-        let starts = find_row_starts_via_framing(&combined, &columns);
         let first_off = columns[0].row_offset as usize;
         let last_col = columns.last().unwrap();
-        let row_size = (last_col.row_offset as usize - first_off) + 1 + last_col.max as usize;
+        let col_data_span = (last_col.row_offset as usize - first_off) + 1 + last_col.max as usize;
 
-        // Dedup by first-column value (rows can appear multiple times
-        // across batches when the server resends). Skip rows where the
-        // first column is null/empty — these are cursor end-of-data
-        // markers that share the row-framing pattern but carry no real
-        // data.
-        use std::collections::HashSet;
-        let mut seen = HashSet::new();
-        let mut builders = ColumnBuilders::new(&columns, starts.len());
-        for &s in &starts {
-            let end = s + row_size;
-            if end > combined.len() {
+        let mut rows = Vec::with_capacity(target_rows.min(1024));
+        drive_cursor(self.stream_mut(), &columns, target_rows, &mut rows)?;
+
+        let mut builders = ColumnBuilders::new(&columns, rows.len());
+        for row in &rows {
+            // Row points at the start of the on-disk record; column
+            // data begins at +first_off (= 25 for tables with first
+            // column at row_offset 25).
+            let col_end = first_off + col_data_span;
+            if col_end > row.len() {
                 continue;
             }
-            let cells = match decode_record(&combined[s..end], &columns) {
-                Ok(c) => c,
-                Err(_) => continue,
-            };
-            // Skip end-of-cursor sentinel rows (PK is null or empty).
-            let key = match &cells[0] {
-                super::row::CellValue::Null => continue,
-                super::row::CellValue::Text(s) if s.is_empty() => continue,
-                super::row::CellValue::Text(s) => s.clone(),
-                other => format!("{other:?}"),
-            };
-            if !seen.insert(key) {
-                continue;
-            }
-            if seen.len() > target_rows {
-                break;
-            }
+            let cells = decode_record(&row[first_off..col_end], &columns)?;
             builders.push_row(cells)?;
         }
+
         let batch = builders.finish()?;
         Ok(Value::Table(Table::from_arrow(batch)))
     }
@@ -230,32 +220,137 @@ impl Client {
         )))
     }
 
-    /// Discover tables in the connected database and return them as an
-    /// M navigation record.
+    /// Issue the SQLTables-equivalent native request (reqcode 0x0032)
+    /// and return the list of table names. Layout decoded from an
+    /// uncompressed capture of `pyodbc.connect(DSN=Exportmaster)`
+    /// followed by `cursor.tables()`.
     ///
-    /// **Not yet implemented.** DBISAM 4 doesn't expose a SQL-queryable
-    /// system catalog (tried SYSTABLES, SYS.TABLES, Information.Tables,
-    /// SYSCATALOG, SHOW TABLES — all returned error responses from the
-    /// live server). ODBC's `SQLTables` API works against DBISAM, which
-    /// means the table-enumeration capability exists in the protocol —
-    /// just not via SQL. It's a dedicated request code we haven't
-    /// decoded yet.
+    /// Request body (20 bytes total):
+    ///   reqcode 0x0032 BE | sub-flag 0x00 | inner_len LE u32 = 8 |
+    ///   inner: `04 00 00 00 01 00 00 00` |
+    ///   trailing 5 bytes `49 4E 54 5F 43` (replayed verbatim)
     ///
-    /// Workaround options:
-    /// - Hand-author the table list in the M options record, then
-    ///   construct the nav record from that.
-    /// - Add `Exportmaster.Contents(path)` as a filesystem-based
-    ///   enumerator if the DBISAM data directory is reachable.
-    /// - Decode the table-list native request code and call it directly.
-    pub fn list_tables_as_navigation(&mut self, _opts: &ConnOpts) -> Result<Value, IoError> {
-        Err(IoError::Other(
-            "Exportmaster.Database: table enumeration not yet implemented \
-             (DBISAM has no SQL-queryable system catalog; the native protocol \
-             request code for SQLTables-equivalent isn't yet decoded). Use \
-             Exportmaster.Query with explicit SQL for now."
-                .into(),
-        ))
+    /// Response body header is 11 bytes; the table count is a u32 LE at
+    /// offset 7. Then `count` entries of `[u32 LE name_len][ASCII name]`.
+    ///
+    /// Live-verified against `NISAINT_CS` on rivsem01: returns 653 table
+    /// names matching `pyodbc cursor.tables()`.
+    pub fn list_tables(&mut self) -> Result<Vec<String>, IoError> {
+        const SQLTABLES_BODY: &[u8] = &[
+            0x00, 0x32, 0x00, 0x08, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
+            0x49, 0x4E, 0x54, 0x5F, 0x43,
+        ];
+        let resp = framing::send_recv(&mut self.stream, SQLTABLES_BODY)?;
+        parse_sqltables_response(&resp)
     }
+
+    /// Discover tables in the connected database and return them as an
+    /// M navigation table. Shape matches `Odbc.DataSource` /
+    /// `MySQL.Database`: columns `Name, Data, ItemKind, ItemName,
+    /// IsLeaf` where each `Data` is a thunk that, on force, runs
+    /// `SELECT * FROM <table>` via a fresh `Client`.
+    ///
+    /// **Known limitation — cursor sub-protocol undecoded.** Forcing a
+    /// `Data` thunk only works for tables whose cursor advance matches
+    /// the CUSTOMER-shape capture we replay (single-column PK, simple
+    /// SELECT). Tables with composite keys or multi-table joins produce
+    /// a different cursor-advance sequence (0x0080/0x008a index-tuple
+    /// pairs per row) that we don't yet generate. The thunk surfaces
+    /// the underlying error verbatim; users who hit this need to call
+    /// `Exportmaster.Query(host, sql, opts)` with explicit SQL.
+    ///
+    /// See `Derek/DBISAM-PROTOCOL.md` §7 — decoding the cursor advance
+    /// is listed as the top open question.
+    pub fn list_tables_as_navigation(&mut self, opts: &ConnOpts) -> Result<Value, IoError> {
+        use std::cell::RefCell;
+        use std::rc::Rc;
+
+        use mrsflow_core::eval::{MError, ThunkState};
+
+        let names = self.list_tables()?;
+
+        let cols = vec![
+            "Name".to_string(),
+            "Data".to_string(),
+            "ItemKind".to_string(),
+            "ItemName".to_string(),
+            "IsLeaf".to_string(),
+        ];
+        let mut rows: Vec<Vec<Value>> = Vec::with_capacity(names.len());
+        for name in names {
+            let opts_for_thunk = opts.clone();
+            let table_for_thunk = name.clone();
+            let fetcher: Rc<dyn Fn() -> Result<Value, MError>> = Rc::new(move || {
+                let sql = format!("SELECT * FROM {}", table_for_thunk);
+                let mut c = Client::connect_and_login(&opts_for_thunk)
+                    .map_err(|e| MError::Other(format!("Exportmaster connect: {e:?}")))?;
+                c.query_to_table(&sql)
+                    .map_err(|e| MError::Other(format!("Exportmaster fetch: {e:?}")))
+            });
+            let data = Value::Thunk(Rc::new(RefCell::new(ThunkState::Native(fetcher))));
+            rows.push(vec![
+                Value::Text(name.clone()),
+                data,
+                Value::Text("Table".to_string()),
+                Value::Text(name),
+                Value::Logical(true),
+            ]);
+        }
+        Ok(Value::Table(Table::from_rows(cols, rows)))
+    }
+}
+
+/// Parse the bulk SQLTables response. `resp` is the body of the first
+/// server message returned after `SQLTABLES_BODY`. Layout (per
+/// `Derek/DBISAM-PROTOCOL.md` SQLTables-response section):
+///
+///   `[reqcode:u16 BE = 0x0000][inner_len:u16 BE]` envelope, then
+///   `[3-byte type flag][4 unknown bytes][u32 LE count]` header (11
+///   bytes total), then `count` entries of `[u32 LE name_len][ASCII name]`.
+fn parse_sqltables_response(resp: &[u8]) -> Result<Vec<String>, IoError> {
+    if resp.len() < 15 {
+        return Err(IoError::Other(format!(
+            "Exportmaster.Database: SQLTables response too short ({} bytes)",
+            resp.len()
+        )));
+    }
+    // Skip 4-byte envelope (reqcode u16 BE + inner_len u16 BE) and the
+    // 11-byte payload header — count is the u32 LE at payload offset 7
+    // (== response offset 11).
+    let count_off = 4 + 7;
+    let count = u32::from_le_bytes([
+        resp[count_off],
+        resp[count_off + 1],
+        resp[count_off + 2],
+        resp[count_off + 3],
+    ]) as usize;
+    if count > 1_000_000 {
+        return Err(IoError::Other(format!(
+            "Exportmaster.Database: implausible table count {count} — wire layout may have changed"
+        )));
+    }
+    let mut pos = 4 + 11;
+    let mut names = Vec::with_capacity(count);
+    for k in 0..count {
+        if pos + 4 > resp.len() {
+            return Err(IoError::Other(format!(
+                "Exportmaster.Database: truncated at name {k}/{count}"
+            )));
+        }
+        let slen = u32::from_le_bytes([resp[pos], resp[pos + 1], resp[pos + 2], resp[pos + 3]]) as usize;
+        pos += 4;
+        if slen == 0 || slen > 256 || pos + slen > resp.len() {
+            return Err(IoError::Other(format!(
+                "Exportmaster.Database: bad name length {slen} at name {k}"
+            )));
+        }
+        let name = std::str::from_utf8(&resp[pos..pos + slen])
+            .map_err(|_| IoError::Other(format!("Exportmaster.Database: non-utf8 name at {k}")))?
+            .to_string();
+        names.push(name);
+        pos += slen;
+    }
+    Ok(names)
 }
 
 /// Two post-query messages sent after a `count(*)` query to coax the

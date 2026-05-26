@@ -25,9 +25,13 @@ pub mod blob;
 pub mod client;
 pub mod crypto;
 pub mod cursor;
+pub mod cursor_info;
 pub mod framing;
+pub mod msg;
+pub mod response;
 pub mod row;
 pub mod schema;
+pub mod wire;
 
 // Re-export pub items in a flat namespace for examples and downstream
 // callers — keeps the surface predictable as the internal layout evolves.
@@ -45,6 +49,9 @@ pub struct ConnOpts {
     pub user: String,
     pub password: String,
     pub encrypt_password: String,
+    /// DBISAM catalog name attached during session setup (request 0x003c).
+    /// Default `NISAINT_CS` matches the only catalog we've tested against.
+    pub catalog: String,
 }
 
 impl ConnOpts {
@@ -58,12 +65,14 @@ impl ConnOpts {
             user: user.into(),
             password: password.into(),
             encrypt_password: "elevatesoft".to_string(),
+            catalog: "NISAINT_CS".to_string(),
         }
     }
 
     /// Read an M record value and overlay any present fields on `self`.
-    /// Recognised fields: `Port` (number), `EncryptPassword` (text). The
-    /// required `User` / `Password` are extracted by the caller.
+    /// Recognised fields: `Port` (number), `EncryptPassword` (text),
+    /// `Catalog` (text). The required `User` / `Password` are extracted
+    /// by the caller.
     pub fn apply_options(&mut self, opts: Option<&Value>) -> Result<(), IoError> {
         let Some(Value::Record(r)) = opts else { return Ok(()) };
         for (name, v) in r.fields.iter() {
@@ -76,6 +85,11 @@ impl ConnOpts {
                 "EncryptPassword" => {
                     if let Value::Text(s) = v {
                         self.encrypt_password = s.clone();
+                    }
+                }
+                "Catalog" => {
+                    if let Value::Text(s) = v {
+                        self.catalog = s.clone();
                     }
                 }
                 _ => {} // unknown options ignored — same as PQ

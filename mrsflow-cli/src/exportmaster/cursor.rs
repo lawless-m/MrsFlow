@@ -1,187 +1,225 @@
-//! Cursor advance: post-query message sequence + multi-fetch loop.
+//! Cursor advance: post-query message sequence + batched fetch loop.
 //!
-//! Row finding goes through [`find_row_starts_via_framing`] which
-//! walks the §4 pre-record framing structure (marker `01 80 00 00` +
-//! row index + cursor handle echo + 16-byte MD5 hash) to know exactly
-//! where each row begins. This is how dbsys does it — no pattern
-//! matching, no heuristics.
+//! Per Derek's disassembly (ANSWERS-TO-DEREK-2.md), the correct flow
+//! after PrepareStatement (0x0320) returns the schema is:
 //!
-//! The cursor-init messages and ACK/Fetch templates are still byte-
-//! for-byte captures from a known-good `customer top 3` session, with
-//! the 16-byte primary-key slot spliced over per row. Works reliably
-//! for natural-PK SELECT and indexed-JOIN modes. ORDER BY (47-byte
-//! cursor slot) and unindexed-JOIN (5-byte slot) per protocol §6
-//! aren't yet covered — they'd need their own captured templates or
-//! the §6 universal cursor-state-block extract-and-splice rule.
+//! ```text
+//! 0x032A ExecuteStatement       ← kicks off cursor execution
+//! 0x030C Receive (LOOP)         ← poll until server signals "ready"
+//! 0x050A ReadFirstRecordBlock   ← batched read, N rows in one round-trip
+//! 0x04F6 ReadNextRecordBlock    ← repeat until end-of-cursor
+//! 0x00A0 CloseCursor            ← cleanup
+//! ```
+//!
+//! The Receive poll is critical for ARCVCFG and other composite-key /
+//! materialised cursors — the server returns reqcode `0x2C14` with
+//! `result_code = RESULT_NOT_READY (0x0003)` while it's still preparing
+//! the result set, and we have to re-issue Receive until we get back
+//! a proper cursor-info response.
+//!
+//! All bodies are generated via `msg::` builders. Cursor handle is
+//! `1` per-session (sequential, only one cursor per Client).
 
 use std::net::TcpStream;
 
 use mrsflow_core::eval::IoError;
 
 use super::framing;
-use super::row::{decode_record, CellValue, RECORD_HEADER_LEN};
+use super::msg;
 use super::schema::Column;
 
-/// Captured cursor-init message sequence (PoC `POST_QUERY_CUSTOMER_TOP3`).
-/// 11 messages; replayed verbatim on every query. The 16-byte primary-key
-/// slots inside some of these messages happen to contain customer codes
-/// from the original capture (`1`, `1-680`) — they're substituted with
-/// the actual PK as we advance via [`splice_key_into_template`].
+
+/// Per-session cursor handle. Currently always 1 since we open at most
+/// one cursor per Client (one Client per query). Per Derek's analysis,
+/// this is sequential per-session, not per-query.
+const CURSOR_HANDLE: u32 = 1;
+
+/// Default batch size for ReadFirstRecordBlock / ReadNextRecordBlock.
+/// Larger batches = fewer round-trips but more bytes in flight per
+/// response. 500 is the Derek-suggested ballpark.
+const DEFAULT_BATCH_SIZE: u32 = 500;
+
+/// Max poll iterations on Receive before giving up. The server is
+/// usually ready after 1-3 polls; 100 is well above any observed
+/// preparation time for materialised cursors.
+const MAX_RECEIVE_POLLS: usize = 100;
+
+/// Drive a SELECT cursor to completion, accumulating row bytes into
+/// `out_rows`. Each row is a self-contained `Vec<u8>` of the on-disk
+/// record (header + column data) — caller slices from `+first_col.row_offset`
+/// to call `decode_record`.
 ///
-/// Bytes lifted verbatim from `dbisam_client.py:POST_QUERY_CUSTOMER_TOP3`.
-const CURSOR_INIT_BODIES: &[&[u8]] = &[
-    &[
-        0x00, 0x2A, 0x03, 0x22, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x02,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x01,
-        0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x50, 0x59, 0x4E,
-    ],
-    &[
-        0x00, 0x0C, 0x03, 0x05, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00,
-    ],
-    &[
-        0x00, 0xBE, 0x00, 0x08, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x02,
-        0x00, 0x00, 0x00, 0x00,
-    ],
-    &[
-        0x00, 0xFA, 0x00, 0x2F, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x11,
-        0x00, 0x00, 0x00, 0x01, 0x31, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
-        0x80, 0x00, 0x00, 0x01, 0x01, 0x00, 0x00, 0x00, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x04, 0x00,
-        0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x43, 0x54, 0x2C, 0x20, 0x45, 0x4D,
-    ],
-    &[
-        0x00, 0xFA, 0x00, 0x2F, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x11,
-        0x00, 0x00, 0x00, 0x01, 0x31, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
-        0x80, 0x00, 0x00, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x04, 0x00,
-        0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x43, 0x54, 0x2C, 0x20, 0x45, 0x4D,
-    ],
-    &[
-        0x00, 0x54, 0x01, 0x27, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x11,
-        0x00, 0x00, 0x00, 0x01, 0x31, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
-        0x80, 0x00, 0x00, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x04, 0x00,
-        0x00, 0x00, 0x20, 0x00,
-    ],
-    &[
-        0x00, 0x04, 0x01, 0x2F, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x11,
-        0x00, 0x00, 0x00, 0x01, 0x31, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
-        0x80, 0x00, 0x00, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x04, 0x00,
-        0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x43, 0x54, 0x2C, 0x20, 0x45, 0x4D,
-    ],
-    &[
-        0x00, 0x54, 0x01, 0x27, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x11,
-        0x00, 0x00, 0x00, 0x01, 0x31, 0x2D, 0x36, 0x38, 0x30, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
-        0x80, 0x00, 0x00, 0x03, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x04, 0x00,
-        0x00, 0x00, 0x20, 0x00,
-    ],
-    &[
-        0x00, 0xFA, 0x00, 0x2F, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x11,
-        0x00, 0x00, 0x00, 0x01, 0x31, 0x2D, 0x36, 0x38, 0x30, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
-        0x80, 0x00, 0x00, 0x03, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x04, 0x00,
-        0x00, 0x00, 0x21, 0x00, 0x00, 0x00, 0x43, 0x54, 0x2C, 0x20, 0x45, 0x4D,
-    ],
-    &[
-        0x00, 0x54, 0x01, 0x27, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x11,
-        0x00, 0x00, 0x00, 0x01, 0x31, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
-        0x80, 0x00, 0x00, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x04, 0x00,
-        0x00, 0x00, 0x21, 0x00,
-    ],
-    &[
-        0x00, 0x04, 0x01, 0x2F, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x11,
-        0x00, 0x00, 0x00, 0x01, 0x31, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
-        0x80, 0x00, 0x00, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x04, 0x00,
-        0x00, 0x00, 0x21, 0x00, 0x00, 0x00, 0x43, 0x54, 0x2C, 0x20, 0x45, 0x4D,
-    ],
-];
-
-/// ACK template (PoC `ACK_TEMPLATE_C14`, 52 bytes). The 16-byte PK
-/// slot is at offset 20.
-const ACK_TEMPLATE: &[u8] = &[
-    0x00, 0x54, 0x01, 0x27, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x11,
-    0x00, 0x00, 0x00, 0x01, 0x31, 0x2D, 0x36, 0x38, 0x30, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
-    0x80, 0x00, 0x00, 0x03, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x04, 0x00,
-    0x00, 0x00, 0x21, 0x00,
-];
-
-/// Fetch template (PoC `FETCH_TEMPLATE_C15`, 60 bytes). The 16-byte PK
-/// slot is at offset 20.
-const FETCH_TEMPLATE: &[u8] = &[
-    0x00, 0xFA, 0x00, 0x2F, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x11,
-    0x00, 0x00, 0x00, 0x01, 0x31, 0x2D, 0x36, 0x38, 0x30, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
-    0x80, 0x00, 0x00, 0x03, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x04, 0x00,
-    0x00, 0x00, 0x21, 0x00, 0x00, 0x00, 0x43, 0x54, 0x2C, 0x20, 0x45, 0x4D,
-];
-
-/// Offset of the 16-byte primary-key slot in both ACK_TEMPLATE and
-/// FETCH_TEMPLATE.
-const KEY_SLOT_OFFSET: usize = 20;
-const KEY_SLOT_LEN: usize = 16;
-
-/// Drive a SELECT cursor to completion, returning concatenated server
-/// bytes that contain the rows.
+/// Flow (per `ANSWERS-TO-DEREK-2.md`):
+/// 1. `ExecuteStatement (0x032A)` — kicks off cursor execution
+/// 2. `Receive (0x030C)` loop until server stops sending the
+///    "not ready, poll again" sentinel (reqcode 0x2C14, result_code 3)
+/// 3. `ReadFirstRecordBlock (0x050A)` — first batch of rows
+/// 4. `ReadNextRecordBlock (0x04F6)` loop until end-of-cursor
 ///
-/// `target_rows` is a soft cap — we stop once we've decoded that many
-/// unique rows. Set to `usize::MAX` for "all".
-///
-/// Returns the concatenated server responses (post-query messages +
-/// fetch responses). The caller scans them via [`find_row_starts`] +
-/// [`decode_record`] to materialise rows.
+/// Stops when:
+/// - a response carries `RESULT_END_OF_CURSOR (0x2202)`, OR
+/// - `target_rows` rows have been collected, OR
+/// - the max-iterations safety bound trips
 pub fn drive_cursor(
     stream: &mut TcpStream,
     columns: &[Column],
     target_rows: usize,
-) -> Result<Vec<u8>, IoError> {
-    let mut combined = Vec::new();
+    out_rows: &mut Vec<Vec<u8>>,
+) -> Result<(), IoError> {
+    use super::response::{
+        body_reqcode, read_batch, read_record_block_batch, PACK_STREAM_OFFSET,
+        REQCODE_POLLING_SENTINEL, RESULT_OK,
+    };
+    use super::wire::Walker;
 
-    // Phase 1: send the 11 captured cursor-init messages.
-    for body in CURSOR_INIT_BODIES {
-        let r = framing::send_recv(stream, body)?;
-        combined.extend_from_slice(&r);
+    /// Which response shape to expect when parsing a server reply.
+    enum ReplyKind {
+        /// Single-row response (GetNextRecord etc): cursor-info + N
+        /// row Pack units each `record_size` bytes.
+        SingleRow,
+        /// Batched response (ReadFirstRecordBlock / ReadNextRecordBlock):
+        /// cursor-info + 1 Pack buffer containing N rows + 2 trailing
+        /// buffers (bookmarks, flags).
+        RecordBlock,
     }
 
-    // Phase 2: loop, splicing the last-seen PK into ACK + Fetch templates.
-    let mut prev_count = 0usize;
-    let mut empty_iters = 0usize;
-    let max_iters = target_rows.saturating_add(50);
-    for _ in 0..max_iters {
-        let row_starts = find_row_starts_via_framing(&combined, columns);
-        let unique = count_unique_first_col(&combined, &row_starts, columns);
-        if unique >= target_rows {
+    let record_size = compute_record_size(columns);
+
+    // Parse a response body, harvesting rows into out_rows. Returns
+    // true on end-of-cursor.
+    let process_body = |body: &[u8],
+                        kind: &ReplyKind,
+                        out_rows: &mut Vec<Vec<u8>>|
+     -> Result<bool, IoError> {
+        if body.len() < PACK_STREAM_OFFSET + 6 || body_reqcode(body) == REQCODE_POLLING_SENTINEL {
+            return Ok(false);
+        }
+        let mut walker = Walker::new(body, PACK_STREAM_OFFSET);
+        loop {
+            let batch_res = match kind {
+                ReplyKind::SingleRow => read_batch(&mut walker, record_size),
+                ReplyKind::RecordBlock => read_record_block_batch(&mut walker, record_size),
+            };
+            let batch = match batch_res {
+                Ok(Some(b)) => b,
+                Ok(None) | Err(_) => return Ok(false),
+            };
+            // Harvest rows even when result_code != OK: end-of-cursor
+            // responses still carry the FINAL batch of rows.
+            for row in &batch.rows {
+                if out_rows.len() >= target_rows {
+                    return Ok(true);
+                }
+                out_rows.push(row.to_vec());
+            }
+            if batch.result_code != RESULT_OK {
+                return Ok(true);
+            }
+            if walker.position() >= body.len() {
+                return Ok(false);
+            }
+        }
+    };
+
+    let debug = std::env::var("EM_DEBUG").is_ok();
+    let logr = |label: &str, r: &[u8]| {
+        if debug {
+            eprintln!("em: {} resp={} bytes rc=0x{:04x} first 80: {}", label, r.len(),
+                body_reqcode(r),
+                r[..r.len().min(80)].iter().map(|b| format!("{:02x}", b)).collect::<String>());
+        }
+    };
+
+    // Phase 1: ExecuteStatement.
+    let r = framing::send_recv(stream, &msg::build_execute_statement(CURSOR_HANDLE))?;
+    logr("ExecuteStatement", &r);
+    if process_body(&r, &ReplyKind::SingleRow, out_rows)? {
+        return Ok(());
+    }
+
+    // Phase 2: Receive poll loop. Re-issue Receive until the response
+    // is no longer the polling sentinel (reqcode 0x2C14, result_code 3).
+    // ExecuteStatement above counts as the first "poll" — its response
+    // is also the sentinel, so the cursor is in the "preparing" state
+    // when we get here.
+    let mut poll_count = 0;
+    loop {
+        let r = framing::send_recv(stream, &msg::build_receive())?;
+        logr(&format!("Receive[{}]", poll_count), &r);
+        let is_sentinel = body_reqcode(&r) == REQCODE_POLLING_SENTINEL;
+        // Also treat result_code 3 inside a "normal" response as "not
+        // ready". The doc says the sentinel is reqcode 0x2C14 + result 3,
+        // but both pieces are diagnostic.
+        let is_not_ready_inner = {
+            // Look at the first 2 bytes of the first Pack unit (the
+            // result-code unit) without fully parsing.
+            let pack_start = PACK_STREAM_OFFSET;
+            if r.len() >= pack_start + 6 {
+                let len = u32::from_le_bytes([r[pack_start], r[pack_start+1], r[pack_start+2], r[pack_start+3]]);
+                if len == 2 {
+                    let rc = u16::from_le_bytes([r[pack_start+4], r[pack_start+5]]);
+                    rc == super::response::RESULT_NOT_READY
+                } else { false }
+            } else { false }
+        };
+        if process_body(&r, &ReplyKind::SingleRow, out_rows)? {
+            return Ok(());
+        }
+        if !is_sentinel && !is_not_ready_inner {
             break;
         }
-        if unique == prev_count {
-            empty_iters += 1;
-            if empty_iters > 3 {
-                break; // cursor exhausted
-            }
-        } else {
-            empty_iters = 0;
+        poll_count += 1;
+        if poll_count >= MAX_RECEIVE_POLLS {
+            return Err(IoError::Other(format!(
+                "Exportmaster: cursor still 'not ready' after {MAX_RECEIVE_POLLS} Receive polls"
+            )));
         }
-        prev_count = unique;
-
-        let last_key = last_first_col_value(&combined, &row_starts, columns)
-            .unwrap_or_else(|| b"1".to_vec());
-
-        let ack = splice_key_into_template(ACK_TEMPLATE, &last_key);
-        let r_ack = framing::send_recv(stream, &ack)?;
-        combined.extend_from_slice(&r_ack);
-
-        let fetch = splice_key_into_template(FETCH_TEMPLATE, &last_key);
-        let r_fetch = framing::send_recv(stream, &fetch)?;
-        combined.extend_from_slice(&r_fetch);
     }
 
-    Ok(combined)
-}
-
-/// Splice a primary key into the 16-byte key slot of a captured template.
-/// Key is left-aligned, null-padded.
-fn splice_key_into_template(template: &[u8], key: &[u8]) -> Vec<u8> {
-    let mut out = template.to_vec();
-    let n = key.len().min(KEY_SLOT_LEN);
-    for byte in &mut out[KEY_SLOT_OFFSET..KEY_SLOT_OFFSET + KEY_SLOT_LEN] {
-        *byte = 0;
+    // Phase 2.5: SetToBegin to position the cursor at row 1.
+    // ReadFirstRecordBlock reads from the current position; without
+    // SetToBegin, the cursor is at end-of-data and EoC is returned
+    // immediately.
+    let r = framing::send_recv(stream, &msg::build_set_to_begin(CURSOR_HANDLE))?;
+    logr("SetToBegin", &r);
+    if process_body(&r, &ReplyKind::SingleRow, out_rows)? {
+        return Ok(());
     }
-    out[KEY_SLOT_OFFSET..KEY_SLOT_OFFSET + n].copy_from_slice(&key[..n]);
-    out
+
+    // Phase 3: ReadFirstRecordBlock — first batch of rows.
+    let first_n = (target_rows as u32).min(DEFAULT_BATCH_SIZE).max(1);
+    let r = framing::send_recv(
+        stream,
+        &msg::build_read_first_record_block(CURSOR_HANDLE, first_n),
+    )?;
+    logr("ReadFirstRecordBlock", &r);
+    if debug {
+        // Dump full body to disk for offline analysis.
+        let _ = std::fs::write(".em_tmp/rfb_resp.bin", &r);
+        eprintln!("em:   (full body dumped to .em_tmp/rfb_resp.bin)");
+    }
+    if process_body(&r, &ReplyKind::RecordBlock, out_rows)? {
+        return Ok(());
+    }
+
+    // Phase 4: ReadNextRecordBlock loop.
+    let max_batches = (target_rows / DEFAULT_BATCH_SIZE as usize) + 10;
+    for _ in 0..max_batches {
+        if out_rows.len() >= target_rows {
+            break;
+        }
+        let remaining = target_rows.saturating_sub(out_rows.len()) as u32;
+        let n = remaining.min(DEFAULT_BATCH_SIZE).max(1);
+        let r = framing::send_recv(
+            stream,
+            &msg::build_read_next_record_block(CURSOR_HANDLE, n),
+        )?;
+        if process_body(&r, &ReplyKind::RecordBlock, out_rows)? {
+            break;
+        }
+    }
+
+    Ok(())
 }
 
 /// Pattern-match row starts in a byte blob.
@@ -197,114 +235,53 @@ fn splice_key_into_template(template: &[u8], key: &[u8]) -> Vec<u8> {
 /// A candidate `i` is a row start iff every column's null-flag byte
 /// (at `i + row_offset - first_off`) is 0x00 or 0x01, AND the first
 /// column's flag is 0x01 (PK always present).
-/// Find row starts deterministically via the §4 pre-record framing.
+/// Find row data starts deterministically via the universal `<u32 LE
+/// length><payload>` framing rule (protocol §6c, derived from
+/// `TDataSession.Unpack` BPL disassembly).
 ///
-/// Each row in a cursor response is preceded by a fixed 44-byte index
-/// entry:
+/// Every piece of data on the wire is `<u32 LE length><length bytes>`.
+/// Row records are one such unit with `length == record_size`, where:
 ///
 /// ```text
-///   +0   `01 80 00 00`                marker + §3-encoded row index
-///   +4   row_idx (1..=N)
-///   +5   `01 00 00 00 00 01 00 00 00 00`  fixed: cursor handle echo
-///   +15  <row_size:u32 LE>            on-disk row size, matches schema
-///   +19  `00 01 00 00 00`             fixed
-///   +24  <counter:u32 LE> <counter:u32 LE>   row position / batch info
-///   +32  <16 bytes MD5 hash>          unique per-row
-///   +48  <ROW DATA starts here>       wire field-data block
+/// record_size = last_col.row_offset + last_col.max + 1
 /// ```
 ///
-/// Wait, that's 48 not 44. Let me recount — the row size in the framing
-/// uses the §3 encoding too (high-bit-set first byte). The +15 byte was
-/// `0xa8` = 168 in the CUSTOMER capture, but for other tables it'll be
-/// the high-bit-set form. Treat the row-size field as variable-width
-/// for now, and instead match by looking for `01 80 00 00 <idx 0x01..=0x7f>`
-/// followed by the cursor-handle echo `01 00 00 00 00 01 00 00 00 00`,
-/// and from there the row starts at marker_pos + 44.
+/// `record_size` is the full on-disk record width — it INCLUDES the
+/// 25-byte on-disk header (because `last_col.row_offset` is in on-disk
+/// coordinates that count from the start of the header). The first
+/// column's null-flag therefore lives at `byte_after_length_prefix +
+/// columns[0].row_offset`, which for CUSTOMER is `+25`.
 ///
-/// Verified live for CUSTOMER: marker at offset 341, row data at 385
-/// (delta = 44).
-pub fn find_row_starts_via_framing(data: &[u8], _columns: &[Column]) -> Vec<usize> {
-    const MARKER: &[u8] = &[0x01, 0x80, 0x00, 0x00];
-    const HANDLE: &[u8] = &[0x01, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00];
-    const ROW_DATA_OFFSET: usize = 44;
+/// Returns offsets into `data` pointing at the **first column's null-
+/// flag** (skipping past both the 4-byte length prefix and the 25-byte
+/// on-disk header), so that `decode_record` can be called directly on
+/// `&data[off..off + col_data_span]`.
+///
+/// Algorithm: scan the response, read `u32 LE` at each position; when
+/// it equals `record_size` treat the next `record_size` bytes as one
+/// row record. Non-matching lengths are skipped — they're cursor
+/// metadata (also length-prefixed but variable-size).
+pub fn find_row_starts_via_framing(data: &[u8], columns: &[Column]) -> Vec<usize> {
+    let record_size = compute_record_size(columns);
+    let header_len = columns[0].row_offset as usize;
     let mut out = Vec::new();
     let mut i = 0;
-    while i + MARKER.len() + 1 + HANDLE.len() + ROW_DATA_OFFSET <= data.len() {
-        if &data[i..i + 4] != MARKER {
+    while i + 4 + record_size <= data.len() {
+        let length = u32::from_le_bytes([data[i], data[i + 1], data[i + 2], data[i + 3]]) as usize;
+        if length == record_size {
+            out.push(i + 4 + header_len);
+            i += 4 + record_size;
+        } else {
             i += 1;
-            continue;
         }
-        // Row index byte must be a small positive int (not high-bit).
-        let row_idx = data[i + 4];
-        if !(1..=0x7F).contains(&row_idx) {
-            i += 1;
-            continue;
-        }
-        // Cursor-handle echo follows.
-        if &data[i + 5..i + 5 + HANDLE.len()] != HANDLE {
-            i += 1;
-            continue;
-        }
-        out.push(i + ROW_DATA_OFFSET);
-        i += ROW_DATA_OFFSET; // skip past this row's framing
     }
     out
 }
 
-// (`find_row_starts` pattern-match heuristic removed — replaced by
-// `find_row_starts_via_framing` above. The pattern-match approach
-// produced false positives that needed hacky filtering, and dbsys's
-// real behaviour walks the §4 pre-record framing structure to find
-// row boundaries deterministically.)
-
-/// Decode the first column of every row at `starts` and return the
-/// number of unique non-empty values. Used as the PoC's "progress"
-/// metric for the cursor loop.
-fn count_unique_first_col(data: &[u8], starts: &[usize], columns: &[Column]) -> usize {
-    use std::collections::HashSet;
-    let mut seen = HashSet::new();
-    let first_off = columns[0].row_offset as usize;
-    let last_col = columns.last().unwrap();
-    let row_size = (last_col.row_offset as usize - first_off) + 1 + last_col.max as usize;
-    for &s in starts {
-        let end = s + row_size;
-        if end > data.len() {
-            continue;
-        }
-        if let Ok(cells) = decode_record(&data[s..end], &columns[..1]) {
-            if let Some(CellValue::Text(text)) = cells.into_iter().next() {
-                if !text.is_empty() {
-                    seen.insert(text);
-                }
-            }
-        }
-    }
-    seen.len()
+/// Total on-disk record width per protocol §6c: row_offset of last
+/// column + that column's max bytes + 1 byte for its null-flag.
+pub(super) fn compute_record_size(columns: &[Column]) -> usize {
+    let last = columns.last().expect("schema must have at least one column");
+    last.row_offset as usize + last.max as usize + 1
 }
 
-/// Return the first-column text of the last row in physical order.
-/// "Last" = highest offset, since server batches arrive in cursor-advance
-/// order (the protocol's natural-PK mode).
-fn last_first_col_value(
-    data: &[u8],
-    starts: &[usize],
-    columns: &[Column],
-) -> Option<Vec<u8>> {
-    let first_off = columns[0].row_offset as usize;
-    let last_col = columns.last().unwrap();
-    let row_size = (last_col.row_offset as usize - first_off) + 1 + last_col.max as usize;
-    for &s in starts.iter().rev() {
-        let end = s + row_size;
-        if end > data.len() {
-            continue;
-        }
-        if let Ok(cells) = decode_record(&data[s..end], &columns[..1]) {
-            if let Some(CellValue::Text(text)) = cells.into_iter().next() {
-                if !text.is_empty() {
-                    return Some(text.into_bytes());
-                }
-            }
-        }
-    }
-    None
-}
