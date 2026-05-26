@@ -113,38 +113,46 @@ fn decode_field(col: &Column, bytes: &[u8]) -> Result<CellValue, IoError> {
         }
         Date => {
             // 4-byte LE u32, days since 0001-01-01 (proleptic Gregorian).
+            // Out-of-range values (garbage / sentinel rows in wide tables)
+            // surface as Null rather than killing the query.
             let days = u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
-            // chrono's epoch is 1970-01-01; convert via the 0001-01-01 anchor.
             let base = NaiveDate::from_ymd_opt(1, 1, 1).expect("0001-01-01 is valid");
-            let date = base
-                .checked_add_days(chrono::Days::new(days as u64))
-                .ok_or_else(|| IoError::Other(format!(
-                    "Exportmaster: Date column {} out of range: {} days from 0001-01-01",
-                    col.name, days
-                )))?;
-            CellValue::Date(date)
+            match base.checked_add_days(chrono::Days::new(days as u64)) {
+                Some(date) => CellValue::Date(date),
+                None => CellValue::Null,
+            }
         }
         DateTime => {
             // 8-byte LE binary64 double, days since 1899-12-30 (Delphi TDateTime).
+            // Out-of-range / NaN / sentinel values surface as Null rather
+            // than killing the query — wide tables often contain "0000-00-00"
+            // garbage rows whose payload is uninitialised memory.
             let serial = f64::from_le_bytes(bytes[..8].try_into().unwrap());
-            let epoch = NaiveDate::from_ymd_opt(1899, 12, 30).unwrap();
-            let whole_days = serial.trunc() as i64;
-            let frac = serial - whole_days as f64;
-            let date = epoch
-                .checked_add_signed(chrono::Duration::days(whole_days))
-                .ok_or_else(|| IoError::Other(format!(
-                    "Exportmaster: DateTime column {} day out of range: {}",
-                    col.name, whole_days
-                )))?;
-            let micros = (frac.abs() * 86_400_000_000.0).round() as u64;
-            let secs = (micros / 1_000_000) as u32;
-            let us_part = (micros % 1_000_000) as u32;
-            let time = NaiveTime::from_num_seconds_from_midnight_opt(secs, us_part * 1000)
-                .ok_or_else(|| IoError::Other(format!(
-                    "Exportmaster: DateTime column {} time out of range: {} micros",
-                    col.name, micros
-                )))?;
-            CellValue::DateTime(NaiveDateTime::new(date, time))
+            // chrono::Duration::days panics outside ~i64::MAX/86_400_000 ms,
+            // and NaiveDate's valid range is [-262144, 262143] years. Clamp
+            // whole_days to chrono::Days::new's safe range conservatively.
+            if !serial.is_finite() {
+                CellValue::Null
+            } else {
+                let whole_days = serial.trunc() as i64;
+                // chrono::Days range is conservative: keep whole_days within
+                // ±100 million (~270k years), well inside chrono's limits.
+                if whole_days.abs() > 100_000_000 {
+                    CellValue::Null
+                } else {
+                    let epoch = NaiveDate::from_ymd_opt(1899, 12, 30).unwrap();
+                    let date_opt = epoch.checked_add_signed(chrono::Duration::days(whole_days));
+                    let frac = serial - whole_days as f64;
+                    let micros = (frac.abs() * 86_400_000_000.0).round() as u64;
+                    let secs = (micros / 1_000_000) as u32;
+                    let us_part = (micros % 1_000_000) as u32;
+                    let time_opt = NaiveTime::from_num_seconds_from_midnight_opt(secs, us_part * 1000);
+                    match (date_opt, time_opt) {
+                        (Some(date), Some(time)) => CellValue::DateTime(NaiveDateTime::new(date, time)),
+                        _ => CellValue::Null,
+                    }
+                }
+            }
         }
         Time => {
             // 4-byte LE u32, milliseconds since midnight.
