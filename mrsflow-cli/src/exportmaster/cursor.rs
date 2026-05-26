@@ -34,10 +34,6 @@ use super::schema::Column;
 /// this is sequential per-session, not per-query.
 const CURSOR_HANDLE: u32 = 1;
 
-/// Default batch size for ReadFirstRecordBlock / ReadNextRecordBlock.
-/// Larger batches = fewer round-trips but more bytes in flight per
-/// response. 500 is the Derek-suggested ballpark.
-const DEFAULT_BATCH_SIZE: u32 = 500;
 
 /// Max poll iterations on Receive before giving up. The server is
 /// usually ready after 1-3 polls; 100 is well above any observed
@@ -64,6 +60,8 @@ pub fn drive_cursor(
     stream: &mut TcpStream,
     columns: &[Column],
     target_rows: usize,
+    batch_size: u32,
+    compression: bool,
     out_rows: &mut Vec<Vec<u8>>,
 ) -> Result<(), IoError> {
     use super::response::{
@@ -131,7 +129,7 @@ pub fn drive_cursor(
     };
 
     // Phase 1: ExecuteStatement.
-    let r = framing::send_recv(stream, &msg::build_execute_statement(CURSOR_HANDLE))?;
+    let r = framing::send_recv_auto(stream, &msg::build_execute_statement(CURSOR_HANDLE), compression)?;
     logr("ExecuteStatement", &r);
     if process_body(&r, &ReplyKind::SingleRow, out_rows)? {
         return Ok(());
@@ -139,20 +137,12 @@ pub fn drive_cursor(
 
     // Phase 2: Receive poll loop. Re-issue Receive until the response
     // is no longer the polling sentinel (reqcode 0x2C14, result_code 3).
-    // ExecuteStatement above counts as the first "poll" — its response
-    // is also the sentinel, so the cursor is in the "preparing" state
-    // when we get here.
     let mut poll_count = 0;
     loop {
-        let r = framing::send_recv(stream, &msg::build_receive())?;
+        let r = framing::send_recv_auto(stream, &msg::build_receive(), compression)?;
         logr(&format!("Receive[{}]", poll_count), &r);
         let is_sentinel = body_reqcode(&r) == REQCODE_POLLING_SENTINEL;
-        // Also treat result_code 3 inside a "normal" response as "not
-        // ready". The doc says the sentinel is reqcode 0x2C14 + result 3,
-        // but both pieces are diagnostic.
         let is_not_ready_inner = {
-            // Look at the first 2 bytes of the first Pack unit (the
-            // result-code unit) without fully parsing.
             let pack_start = PACK_STREAM_OFFSET;
             if r.len() >= pack_start + 6 {
                 let len = u32::from_le_bytes([r[pack_start], r[pack_start+1], r[pack_start+2], r[pack_start+3]]);
@@ -177,42 +167,36 @@ pub fn drive_cursor(
     }
 
     // Phase 2.5: SetToBegin to position the cursor at row 1.
-    // ReadFirstRecordBlock reads from the current position; without
-    // SetToBegin, the cursor is at end-of-data and EoC is returned
-    // immediately.
-    let r = framing::send_recv(stream, &msg::build_set_to_begin(CURSOR_HANDLE))?;
+    let r = framing::send_recv_auto(stream, &msg::build_set_to_begin(CURSOR_HANDLE), compression)?;
     logr("SetToBegin", &r);
     if process_body(&r, &ReplyKind::SingleRow, out_rows)? {
         return Ok(());
     }
 
     // Phase 3: ReadFirstRecordBlock — first batch of rows.
-    let first_n = (target_rows as u32).min(DEFAULT_BATCH_SIZE).max(1);
-    let r = framing::send_recv(
+    let first_n = (target_rows as u32).min(batch_size).max(1);
+    let r = framing::send_recv_auto(
         stream,
         &msg::build_read_first_record_block(CURSOR_HANDLE, first_n),
+        compression,
     )?;
     logr("ReadFirstRecordBlock", &r);
-    if debug {
-        // Dump full body to disk for offline analysis.
-        let _ = std::fs::write(".em_tmp/rfb_resp.bin", &r);
-        eprintln!("em:   (full body dumped to .em_tmp/rfb_resp.bin)");
-    }
     if process_body(&r, &ReplyKind::RecordBlock, out_rows)? {
         return Ok(());
     }
 
     // Phase 4: ReadNextRecordBlock loop.
-    let max_batches = (target_rows / DEFAULT_BATCH_SIZE as usize) + 10;
+    let max_batches = (target_rows / batch_size as usize) + 10;
     for _ in 0..max_batches {
         if out_rows.len() >= target_rows {
             break;
         }
         let remaining = target_rows.saturating_sub(out_rows.len()) as u32;
-        let n = remaining.min(DEFAULT_BATCH_SIZE).max(1);
-        let r = framing::send_recv(
+        let n = remaining.min(batch_size).max(1);
+        let r = framing::send_recv_auto(
             stream,
             &msg::build_read_next_record_block(CURSOR_HANDLE, n),
+            compression,
         )?;
         if process_body(&r, &ReplyKind::RecordBlock, out_rows)? {
             break;

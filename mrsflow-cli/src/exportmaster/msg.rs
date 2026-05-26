@@ -95,6 +95,35 @@ impl MsgBuilder {
 
 // ---- Concrete request builders for SELECT-only flow ----
 
+/// Connect handshake body (reqcode 0x0000, the very first message
+/// after TCP connect). Per `DBISAM-PROTOCOL.md` §6g, 4 Pack fields:
+///   1. u64 client version (= 0xAB7C — stable for DBISAM 4.39)
+///   2. u8 RemoteCompression flag (1 = wire compression on)
+///   3. AnsiString `<hostname><N>` — hostname + per-connection suffix
+///   4. u32 random session nonce
+///
+/// Followed by 5 trailing zero bytes (padding).
+///
+/// `hostname` is the workstation name embedded in field 3; we use a
+/// fixed value because the server doesn't validate it strictly.
+/// `nonce` is whatever 4 bytes the caller wants — server stores it
+/// but doesn't echo it back in a way that matters for SELECT flow.
+pub fn build_connect(_compression: bool, hostname: &str, nonce: u32) -> Vec<u8> {
+    // Per live-capture analysis of a dbsys session with RemoteCompression=9:
+    // the Connect message's INNER field 2 is always 0. The session's
+    // compression behaviour is determined by the OUTER body[0] flag
+    // byte applied at the framing layer, not by this inner field.
+    // Keep the parameter for API stability, but ignore.
+    let mut m = MsgBuilder::new(0x0000); // CONNECT reqcode = 0
+    m.pack(&0xAB7Cu64.to_le_bytes()); // field 1: version
+    m.pack_u8(0); // field 2: always 0 per capture
+    m.pack(hostname.as_bytes()); // field 3: hostname
+    m.pack_u32(nonce); // field 4: nonce
+    let mut body = m.finish();
+    body.extend_from_slice(&[0, 0, 0, 0]); // 4 trailing zero bytes (padding)
+    body
+}
+
 /// `TQueryStatement.PrepareStatement` (reqcode 0x0320). Sends the SQL
 /// to be prepared; server responds with PackResultSetInfo (temp table
 /// name) + PackResultSetFields (column schema) + PackCursorInfo

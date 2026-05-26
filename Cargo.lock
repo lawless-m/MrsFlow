@@ -1967,6 +1967,7 @@ dependencies = [
  "calamine",
  "cbc",
  "chrono",
+ "flate2",
  "image",
  "md-5 0.10.6",
  "mrsflow-core",

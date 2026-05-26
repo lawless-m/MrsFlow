@@ -20,17 +20,6 @@ use super::cursor::drive_cursor;
 use super::row::{decode_record, ColumnBuilders};
 use super::schema::parse as parse_schema;
 
-/// Captured Connect body (52 bytes) — replayed verbatim. Workstation
-/// name `RIVSEM048692` is embedded in the middle; we send it as-is
-/// because the PoC does the same and it works. Substituting the local
-/// hostname is a follow-up if it turns out the server cares.
-const CONNECT_BODY: &[u8] = &[
-    0x00, 0x00, 0x00, 0x29, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x7C, 0xAB, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x0C, 0x00, 0x00, 0x00, 0x52, 0x49, 0x56, 0x53,
-    0x45, 0x4D, 0x30, 0x34, 0x38, 0x36, 0x39, 0x32, 0x04, 0x00, 0x00, 0x00, 0xE8, 0x1B, 0xA2, 0xE5,
-    0x00, 0x00, 0x00, 0x00,
-];
-
 /// Fixed session-setup messages sent immediately after a successful
 /// login. C[2] and C[3] are replayed verbatim from capture; their
 /// internal field meanings are not fully decoded. C[4] (catalog
@@ -84,6 +73,14 @@ fn build_catalog_attach_body(catalog: &str) -> Vec<u8> {
 /// An open, logged-in DBISAM session.
 pub struct Client {
     stream: TcpStream,
+    /// Whether to deflate every subsequent body before sending and
+    /// inflate every received body. Set during `connect_and_login`
+    /// based on `ConnOpts::compression`. The Connect message itself
+    /// is always uncompressed (the server doesn't know the flag yet).
+    compression: bool,
+    /// Batch size for ReadFirstRecordBlock / ReadNextRecordBlock,
+    /// forwarded to `drive_cursor`.
+    pub(super) batch_size: u32,
 }
 
 impl Client {
@@ -92,9 +89,25 @@ impl Client {
     pub fn connect_and_login(opts: &ConnOpts) -> Result<Self, IoError> {
         let mut stream = framing::connect(&opts.host, opts.port)?;
 
-        // 1) Connect — replay captured body, ignore the server's reply
-        //    (we don't decode it yet).
-        let _ = framing::send_recv(&mut stream, CONNECT_BODY)?;
+        // 1) Connect — built from opts so the compression flag is set
+        //    correctly. Per capture analysis, Connect itself is also
+        //    compressed when RemoteCompression is on (the server
+        //    detects the comp byte and inflates accordingly).
+        let connect_body = super::msg::build_connect(
+            opts.compression,
+            "RIVSEM048692", // stable hostname suffix — server doesn't validate strictly
+            0xE5A21BE8,     // fixed nonce — server stores but doesn't echo
+        );
+        let _ = framing::send_recv_auto(&mut stream, &connect_body, opts.compression)?;
+
+        // From here on, if compression is enabled, every body is deflated.
+        let send = |stream: &mut TcpStream, body: &[u8]| -> Result<Vec<u8>, IoError> {
+            if opts.compression {
+                framing::send_recv_compressed(stream, body)
+            } else {
+                framing::send_recv(stream, body)
+            }
+        };
 
         // 2) Login — construct from cracked crypto.
         let ct = encrypt_login(
@@ -103,24 +116,35 @@ impl Client {
             opts.encrypt_password.as_bytes(),
         );
         let login_body = build_login_body(&ct);
-        let _ = framing::send_recv(&mut stream, &login_body)?;
+        let _ = send(&mut stream, &login_body)?;
 
         // 3) Session-setup — fixed pre messages, then catalog attach
         //    (parameterised by opts.catalog), then trailing handshake.
         for body in SESSION_SETUP_PRE {
-            let _ = framing::send_recv(&mut stream, body)?;
+            let _ = send(&mut stream, body)?;
         }
         let catalog_body = build_catalog_attach_body(&opts.catalog);
-        let _ = framing::send_recv(&mut stream, &catalog_body)?;
-        let _ = framing::send_recv(&mut stream, SESSION_SETUP_POST)?;
+        let _ = send(&mut stream, &catalog_body)?;
+        let _ = send(&mut stream, SESSION_SETUP_POST)?;
 
-        Ok(Self { stream })
+        Ok(Self {
+            stream,
+            compression: opts.compression,
+            batch_size: opts.batch_size,
+        })
     }
 
     /// Borrow the underlying stream. Submodules use this for query and
     /// cursor work. Crate-internal only.
     pub(super) fn stream_mut(&mut self) -> &mut TcpStream {
         &mut self.stream
+    }
+
+    /// Whether this session uses wire compression. Submodules consult
+    /// this to choose between `framing::send_recv` and
+    /// `framing::send_recv_compressed`.
+    pub(super) fn compression(&self) -> bool {
+        self.compression
     }
 
     /// Execute `sql` and materialise the full result as a Value::Table.
@@ -148,9 +172,11 @@ impl Client {
         let first_off = columns[0].row_offset as usize;
         let last_col = columns.last().unwrap();
         let col_data_span = (last_col.row_offset as usize - first_off) + 1 + last_col.max as usize;
+        let batch_size = self.batch_size;
+        let compression = self.compression;
 
         let mut rows = Vec::with_capacity(target_rows.min(1024));
-        drive_cursor(self.stream_mut(), &columns, target_rows, &mut rows)?;
+        drive_cursor(self.stream_mut(), &columns, target_rows, batch_size, compression, &mut rows)?;
 
         let mut builders = ColumnBuilders::new(&columns, rows.len());
         for row in &rows {
@@ -175,7 +201,7 @@ impl Client {
     /// hook the smoke test uses to exercise [`super::schema::parse`].
     pub fn query_raw(&mut self, sql: &str) -> Result<Vec<u8>, IoError> {
         let body = build_query_body(sql);
-        framing::send_recv(&mut self.stream, &body)
+        framing::send_recv_auto(&mut self.stream, &body, self.compression)
     }
 
     /// Issue a `SELECT COUNT(*) FROM <table>` and return the integer
@@ -187,14 +213,14 @@ impl Client {
     /// matching the Python PoC and protocol doc §3.
     pub fn count(&mut self, sql: &str) -> Result<u32, IoError> {
         let query_body = build_query_body(sql);
-        let query_resp = framing::send_recv(&mut self.stream, &query_body)?;
+        let query_resp = framing::send_recv_auto(&mut self.stream, &query_body, self.compression)?;
 
         // The count comes back across a few round-trips. The PoC sends
         // two follow-up messages after the query and then scans the
         // concatenated response for the 0x80 + 3-byte BE pattern.
         let mut combined = query_resp;
         for body in POST_QUERY_BODIES_COUNT {
-            let r = framing::send_recv(&mut self.stream, body)?;
+            let r = framing::send_recv_auto(&mut self.stream, body, self.compression)?;
             combined.extend_from_slice(&r);
         }
 
@@ -240,7 +266,7 @@ impl Client {
             0x00, 0x32, 0x00, 0x08, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
             0x49, 0x4E, 0x54, 0x5F, 0x43,
         ];
-        let resp = framing::send_recv(&mut self.stream, SQLTABLES_BODY)?;
+        let resp = framing::send_recv_auto(&mut self.stream, SQLTABLES_BODY, self.compression)?;
         parse_sqltables_response(&resp)
     }
 

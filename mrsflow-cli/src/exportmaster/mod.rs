@@ -52,6 +52,14 @@ pub struct ConnOpts {
     /// DBISAM catalog name attached during session setup (request 0x003c).
     /// Default `NISAINT_CS` matches the only catalog we've tested against.
     pub catalog: String,
+    /// Wire compression (Zlib deflate end-to-end). Maps to Connect
+    /// handshake field 2 per `DBISAM-PROTOCOL.md` §6g.
+    /// Default `true` — schema-heavy responses see 3-10× reduction.
+    pub compression: bool,
+    /// Number of rows requested per ReadFirstRecordBlock /
+    /// ReadNextRecordBlock call. Bigger = fewer round trips but
+    /// larger responses. Default 5000.
+    pub batch_size: u32,
 }
 
 impl ConnOpts {
@@ -66,13 +74,20 @@ impl ConnOpts {
             password: password.into(),
             encrypt_password: "elevatesoft".to_string(),
             catalog: "NISAINT_CS".to_string(),
+            // Default off: on LAN the deflate/inflate CPU cost dominates
+            // the bandwidth saving (measured 8m12s with compression vs
+            // 2m36s without, for `SELECT * FROM ANALYSIS` over a fast
+            // LAN). Opt in via `[Compression=true]` for slow/remote
+            // links where bandwidth dominates.
+            compression: false,
+            batch_size: 5000,
         }
     }
 
     /// Read an M record value and overlay any present fields on `self`.
     /// Recognised fields: `Port` (number), `EncryptPassword` (text),
-    /// `Catalog` (text). The required `User` / `Password` are extracted
-    /// by the caller.
+    /// `Catalog` (text), `Compression` (logical), `BatchSize` (number).
+    /// The required `User` / `Password` are extracted by the caller.
     pub fn apply_options(&mut self, opts: Option<&Value>) -> Result<(), IoError> {
         let Some(Value::Record(r)) = opts else { return Ok(()) };
         for (name, v) in r.fields.iter() {
@@ -90,6 +105,18 @@ impl ConnOpts {
                 "Catalog" => {
                     if let Value::Text(s) = v {
                         self.catalog = s.clone();
+                    }
+                }
+                "Compression" => {
+                    if let Value::Logical(b) = v {
+                        self.compression = *b;
+                    }
+                }
+                "BatchSize" => {
+                    if let Value::Number(n) = v {
+                        if *n >= 1.0 && *n <= 100_000.0 {
+                            self.batch_size = *n as u32;
+                        }
                     }
                 }
                 _ => {} // unknown options ignored — same as PQ

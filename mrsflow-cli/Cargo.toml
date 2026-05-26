@@ -36,7 +36,7 @@ sql = ["dep:tiberius", "dep:tokio", "dep:tokio-util", "dep:rustls"]
 # DBISAM-PROTOCOL.md) — bypasses the broken ODBC driver entirely.
 # Pure-Rust deps: `blowfish` for the login cipher, `md-5` for the key
 # derivation, `cbc` for CBC mode. No system libraries needed.
-exportmaster = ["dep:blowfish", "dep:md-5", "dep:cbc"]
+exportmaster = ["dep:blowfish", "dep:md-5", "dep:cbc", "dep:flate2"]
 
 [dependencies]
 mrsflow-core = { path = "../mrsflow-core" }
@@ -91,6 +91,9 @@ tokio-util = { version = "0.7", default-features = false, features = ["compat"],
 blowfish = { version = "0.9", optional = true }
 md-5     = { version = "0.10", optional = true }
 cbc      = { version = "0.1", optional = true }
+# Zlib deflate/inflate for the optional RemoteCompression wire wrapper
+# (DBISAM `TDBISAMSession.RemoteCompression`, decoded in §6g).
+flate2   = { version = "1", optional = true }
 
 [[bin]]
 name = "mrsflow"
