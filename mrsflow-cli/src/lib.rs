@@ -1,6 +1,9 @@
 //! CLI shell for mrsflow. Implements the `IoHost` trait against the real
 //! filesystem and the `parquet` crate. ODBC plumbing lands in eval-8.
 
+#[cfg(feature = "exportmaster")]
+pub mod exportmaster;
+
 use std::collections::HashMap;
 use std::fs::File;
 use std::path::{Path, PathBuf};
