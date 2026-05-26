@@ -30,16 +30,34 @@ fn main() {
     let mut opts = ConnOpts::new(host, user, password);
     opts.encrypt_password = encrypt.to_string();
 
-    eprintln!("Connecting to {}:{}...", opts.host, opts.port);
-    let started = std::time::Instant::now();
-    match Client::connect_and_login(&opts) {
-        Ok(_) => eprintln!(
-            "OK: connect + login + session-setup completed in {} ms",
-            started.elapsed().as_millis()
-        ),
-        Err(e) => {
-            eprintln!("FAIL: {e:?}");
-            std::process::exit(1);
+    eprintln!("Smoke test against {}:{}", opts.host, opts.port);
+    // count(*) smoke: two documented values per protocol §3. One
+    // connection per query — matches the PoC's lifecycle and the v1
+    // Exportmaster.Query() shape (each M call is independent).
+    for (sql, expected) in [
+        ("select count(*) from product", 146_728u32),
+        ("select count(*) from analysis", 4_238_476u32),
+    ] {
+        let started = std::time::Instant::now();
+        let mut client = match Client::connect_and_login(&opts) {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!("FAIL login: {e:?}");
+                std::process::exit(1);
+            }
+        };
+        match client.count(sql) {
+            Ok(n) => {
+                let ok = if n == expected { "OK" } else { "MISMATCH" };
+                eprintln!(
+                    "{ok}: {sql} = {n} (expected {expected}, in {} ms)",
+                    started.elapsed().as_millis()
+                );
+            }
+            Err(e) => {
+                eprintln!("FAIL count: {e:?}");
+                std::process::exit(1);
+            }
         }
     }
 }
