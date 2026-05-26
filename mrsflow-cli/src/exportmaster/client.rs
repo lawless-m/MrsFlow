@@ -231,11 +231,29 @@ impl Client {
     }
 
     /// Discover tables in the connected database and return them as an
-    /// M navigation record. Real DBISAM has `SELECT * FROM SYSTABLES`
-    /// for this; we'll port it once query_to_table works.
+    /// M navigation record.
+    ///
+    /// **Not yet implemented.** DBISAM 4 doesn't expose a SQL-queryable
+    /// system catalog (tried SYSTABLES, SYS.TABLES, Information.Tables,
+    /// SYSCATALOG, SHOW TABLES — all returned error responses from the
+    /// live server). ODBC's `SQLTables` API works against DBISAM, which
+    /// means the table-enumeration capability exists in the protocol —
+    /// just not via SQL. It's a dedicated request code we haven't
+    /// decoded yet.
+    ///
+    /// Workaround options:
+    /// - Hand-author the table list in the M options record, then
+    ///   construct the nav record from that.
+    /// - Add `Exportmaster.Contents(path)` as a filesystem-based
+    ///   enumerator if the DBISAM data directory is reachable.
+    /// - Decode the table-list native request code and call it directly.
     pub fn list_tables_as_navigation(&mut self, _opts: &ConnOpts) -> Result<Value, IoError> {
         Err(IoError::Other(
-            "Exportmaster.Database: navigation path not yet implemented".into(),
+            "Exportmaster.Database: table enumeration not yet implemented \
+             (DBISAM has no SQL-queryable system catalog; the native protocol \
+             request code for SQLTables-equivalent isn't yet decoded). Use \
+             Exportmaster.Query with explicit SQL for now."
+                .into(),
         ))
     }
 }
