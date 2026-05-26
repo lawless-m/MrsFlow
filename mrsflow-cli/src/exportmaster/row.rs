@@ -52,36 +52,21 @@ pub enum CellValue {
 
 /// Decode one record into per-column [`CellValue`]s, one per schema column.
 ///
-/// `record` points to the **first column's null-flag byte on the wire**
-/// (one byte before the first column's value).
+/// `record` points to the **first column's null-flag byte on the wire**.
 ///
-/// Layout (verified against CUSTOMER): each field occupies one null-flag
-/// byte followed by `max` value bytes. The schema's `row_offset` is the
-/// **value-start position** in the on-disk record (not the null-flag
-/// position). Wire-relative value position = `row_offset - first_offset`
-/// where `first_offset` = CODE.row_offset (typically 25). The null-flag
-/// for that field sits at `value_pos - 1`.
-///
-/// Returns `IoError::Other` if a field's bytes don't decode — e.g. a
-/// Date with negative days. Per-field decode errors are surfaced; a
-/// partial row is not returned.
+/// Schema arithmetic (confirmed against live wire capture):
+/// - `c.row_offset` is the position of the field's null-flag byte
+///   within the on-disk record.
+/// - Each field is `1 (null-flag) + max (value)` bytes.
+/// - On the wire, the on-disk header (25 bytes for CUSTOMER) is absent;
+///   wire null-flag = `row_offset - first_col.row_offset`.
+/// - Value starts one byte past the null-flag and is `max` bytes long.
 pub fn decode_record(record: &[u8], columns: &[Column]) -> Result<Vec<CellValue>, IoError> {
     let first_offset = columns.first().map(|c| c.row_offset as usize).unwrap_or(0);
     let mut out = Vec::with_capacity(columns.len());
     for c in columns {
-        // Wire-relative value-start position.
-        let value_pos = (c.row_offset as usize).saturating_sub(first_offset);
-        // Null-flag sits one byte before the value.
-        let null_pos = if value_pos == 0 { 0 } else { value_pos - 1 };
-        // First column: null-flag at byte 0, value at byte 1.
-        // Subsequent columns: null-flag at value_pos - 1, value at value_pos.
-        // Unify: read null-flag at null_pos for all (the +1 offset between
-        // first column's null-flag (0) and its value (1) is baked in).
-        let (null_pos, value_start) = if c.row_offset as usize == first_offset {
-            (0, 1)
-        } else {
-            (null_pos, value_pos)
-        };
+        let null_pos = (c.row_offset as usize).saturating_sub(first_offset);
+        let value_start = null_pos + 1;
         if null_pos >= record.len() {
             return Err(IoError::Other(format!(
                 "Exportmaster: row truncated; column {} (null at {}) past end (len {})",
@@ -99,7 +84,6 @@ pub fn decode_record(record: &[u8], columns: &[Column]) -> Result<Vec<CellValue>
                 c.name, null_pos
             )));
         }
-        // Value occupies `max` bytes starting at value_start.
         let value_len = c.max as usize;
         let avail = record.len().saturating_sub(value_start);
         if value_len > avail {

@@ -110,18 +110,11 @@ impl Client {
     ///    arrays.
     /// 5. Wrap as Value::Table.
     ///
-    /// **Known-broken**: step 4 currently produces tables with the right
-    /// shape (rowcount × colcount) but garbage cell values. Root cause
-    /// not fully decoded: on the wire, fields appear packed with extra
-    /// zero-byte gaps between them that the schema's `row_offset` /
-    /// `max` arithmetic doesn't account for. For example CUSTOMER's
-    /// CPYNAME (max=41) is followed by 7 zero bytes before CONTACT's
-    /// null-flag — the schema says CONTACT.row_offset = 79 (i.e.
-    /// CPYNAME.row_offset + max + 1 = 37 + 41 + 1 = 79) but wire
-    /// position is +7 further out. Possibilities: per-column padding
-    /// rules per ftType, or row_offset means something subtly different
-    /// from "value-start position in the on-disk record". Needs more
-    /// captures + cross-reference against the Delphi `TDataset` source.
+    /// Live-verified against `SELECT CODE, CPYNAME, CONTACT, EMAIL FROM
+    /// CUSTOMER TOP 3` — returns the same three rows as the Python PoC:
+    ///   ("1",     "SaveCo",              "Mr McParland", "Wahmed@saveco.com")
+    ///   ("1-332", "Camara Ltd",          "Mrs Keswani",  "reita@camara.co.uk")
+    ///   ("1-680", "Innco Innflutninger", "Mr Jonsson",   "g.jons@innco.is")
     ///
     /// `target_rows` is the soft cap for the cursor loop (default
     /// `usize::MAX` for "all rows", but the caller can cap when issuing
@@ -144,7 +137,7 @@ impl Client {
         let starts = find_row_starts(&combined, &columns);
         let first_off = columns[0].row_offset as usize;
         let last_col = columns.last().unwrap();
-        let row_size = (last_col.row_offset as usize - first_off) + last_col.max as usize;
+        let row_size = (last_col.row_offset as usize - first_off) + 1 + last_col.max as usize;
 
         // Dedup by first-column value (PoC's "seen_codes" set). Rows
         // can appear multiple times across batches (server resends).
