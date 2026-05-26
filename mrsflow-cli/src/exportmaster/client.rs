@@ -102,6 +102,15 @@ impl Client {
         ))
     }
 
+    /// Issue a `SELECT … FROM <table>` and return the raw schema-bearing
+    /// response (the first server message after the query packet). Used
+    /// by callers that want to parse the schema themselves; also the
+    /// hook the smoke test uses to exercise [`super::schema::parse`].
+    pub fn query_raw(&mut self, sql: &str) -> Result<Vec<u8>, IoError> {
+        let body = build_query_body(sql);
+        framing::send_recv(&mut self.stream, &body)
+    }
+
     /// Issue a `SELECT COUNT(*) FROM <table>` and return the integer
     /// result. Sized at 32 bits — DBISAM count(*) caps there (the count
     /// values observed in captures are encoded as 0x80 + 3-byte BE,

@@ -29,6 +29,9 @@ pub mod framing;
 pub mod row;
 pub mod schema;
 
+// Re-export pub items in a flat namespace for examples and downstream
+// callers — keeps the surface predictable as the internal layout evolves.
+
 pub use client::Client;
 
 use mrsflow_core::eval::{IoError, Value};

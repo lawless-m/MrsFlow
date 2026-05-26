@@ -12,7 +12,7 @@
 
 #[cfg(feature = "exportmaster")]
 fn main() {
-    use mrsflow_cli::exportmaster::{Client, ConnOpts};
+    use mrsflow_cli::exportmaster::{schema, Client, ConnOpts};
 
     let args: Vec<String> = std::env::args().collect();
     if args.len() < 4 {
@@ -58,6 +58,52 @@ fn main() {
                 eprintln!("FAIL count: {e:?}");
                 std::process::exit(1);
             }
+        }
+    }
+
+    // Schema test: parse the column descriptors for `SELECT * FROM product TOP 1`
+    // and print the first 12 columns. Per PoC, product has 163 columns
+    // starting with CODE/COMMOD/GROUP/DESC1/DESC2/DESC3/DESC4/DESC5/
+    // LONGDESC/PRICE/PUNIT/PRICEPER.
+    eprintln!("\nSchema test: SELECT * FROM product TOP 1");
+    let mut client = match Client::connect_and_login(&opts) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("FAIL login: {e:?}");
+            std::process::exit(1);
+        }
+    };
+    let raw = match client.query_raw("select * from product top 1") {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("FAIL query: {e:?}");
+            std::process::exit(1);
+        }
+    };
+    eprintln!("  raw response: {} bytes", raw.len());
+    match schema::parse(&raw) {
+        Ok((cols, end_off)) => {
+            eprintln!("  parsed: {} columns, schema region ends at {}", cols.len(), end_off);
+            for (i, c) in cols.iter().enumerate().take(12) {
+                eprintln!(
+                    "    [{i:>3}] {:<14} ord={:<3} type={:?} decl={} max={} row_off={}",
+                    c.name, c.ord, c.field_type, c.decl, c.max, c.row_offset
+                );
+            }
+            let expected_n = 163;
+            if cols.len() == expected_n {
+                eprintln!("  OK: column count {} matches doc expectation", cols.len());
+            } else {
+                eprintln!(
+                    "  MISMATCH: got {} columns, expected {}",
+                    cols.len(),
+                    expected_n
+                );
+            }
+        }
+        Err(e) => {
+            eprintln!("  FAIL parse: {e:?}");
+            std::process::exit(1);
         }
     }
 }
