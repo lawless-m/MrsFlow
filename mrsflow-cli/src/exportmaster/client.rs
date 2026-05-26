@@ -11,9 +11,14 @@ use std::net::TcpStream;
 
 use mrsflow_core::eval::{IoError, Value};
 
+use mrsflow_core::eval::Table;
+
 use super::crypto::encrypt_login;
 use super::framing;
-use super::{ConnOpts};
+use super::ConnOpts;
+use super::cursor::{drive_cursor, find_row_starts};
+use super::row::{decode_record, ColumnBuilders, RECORD_HEADER_LEN};
+use super::schema::parse as parse_schema;
 
 /// Captured Connect body (52 bytes) — replayed verbatim. Workstation
 /// name `RIVSEM048692` is embedded in the middle; we send it as-is
@@ -93,13 +98,83 @@ impl Client {
     }
 
     /// Execute `sql` and materialise the full result as a Value::Table.
-    /// Wired up in subsequent commits — for v1 we only support a single
-    /// SELECT per Client (no statement reuse, matching the PoC).
-    pub fn query_to_table(&mut self, _sql: &str) -> Result<Value, IoError> {
-        // TODO: implement once schema.rs + row.rs + cursor.rs land.
-        Err(IoError::Other(
-            "Exportmaster.Query: query path not yet implemented (login succeeded)".into(),
-        ))
+    /// One Client per query (matches the Exportmaster.Query M call shape).
+    ///
+    /// Pipeline:
+    /// 1. Send the query packet, get the schema response.
+    /// 2. Parse the schema (772-byte column blocks).
+    /// 3. Drive the cursor: 11 replayed init messages + ACK/Fetch loop
+    ///    spliced with the highest-seen primary key.
+    /// 4. Pattern-find row starts in concatenated cursor bytes; decode
+    ///    each row with the schema; accumulate into per-column Arrow
+    ///    arrays.
+    /// 5. Wrap as Value::Table.
+    ///
+    /// **Known-broken**: step 4 currently produces tables with the right
+    /// shape (rowcount × colcount) but garbage cell values. Root cause
+    /// not fully decoded: on the wire, fields appear packed with extra
+    /// zero-byte gaps between them that the schema's `row_offset` /
+    /// `max` arithmetic doesn't account for. For example CUSTOMER's
+    /// CPYNAME (max=41) is followed by 7 zero bytes before CONTACT's
+    /// null-flag — the schema says CONTACT.row_offset = 79 (i.e.
+    /// CPYNAME.row_offset + max + 1 = 37 + 41 + 1 = 79) but wire
+    /// position is +7 further out. Possibilities: per-column padding
+    /// rules per ftType, or row_offset means something subtly different
+    /// from "value-start position in the on-disk record". Needs more
+    /// captures + cross-reference against the Delphi `TDataset` source.
+    ///
+    /// `target_rows` is the soft cap for the cursor loop (default
+    /// `usize::MAX` for "all rows", but the caller can cap when issuing
+    /// `SELECT … TOP N` to avoid over-fetching).
+    pub fn query_to_table(&mut self, sql: &str) -> Result<Value, IoError> {
+        self.query_to_table_capped(sql, usize::MAX)
+    }
+
+    pub fn query_to_table_capped(&mut self, sql: &str, target_rows: usize) -> Result<Value, IoError> {
+        let schema_resp = self.query_raw(sql)?;
+        let (columns, _end_off) = parse_schema(&schema_resp)?;
+
+        // Drive the cursor; this returns the concatenated server bytes
+        // from the post-query fetch round-trips. Don't include the
+        // schema response in the row-search corpus — it contains index
+        // entries (PK-only) that the row-finder false-positives on,
+        // producing garbage values when fed to decode_record.
+        let combined = drive_cursor(self.stream_mut(), &columns, target_rows)?;
+
+        let starts = find_row_starts(&combined, &columns);
+        let first_off = columns[0].row_offset as usize;
+        let last_col = columns.last().unwrap();
+        let row_size = (last_col.row_offset as usize - first_off) + last_col.max as usize;
+
+        // Dedup by first-column value (PoC's "seen_codes" set). Rows
+        // can appear multiple times across batches (server resends).
+        use std::collections::HashSet;
+        let mut seen = HashSet::new();
+        let mut builders = ColumnBuilders::new(&columns, starts.len());
+        for &s in &starts {
+            let end = s + row_size;
+            if end > combined.len() {
+                continue;
+            }
+            let cells = match decode_record(&combined[s..end], &columns) {
+                Ok(c) => c,
+                Err(_) => continue,
+            };
+            // Use first column's text representation as the dedup key.
+            let key = match &cells[0] {
+                super::row::CellValue::Text(s) => s.clone(),
+                other => format!("{other:?}"),
+            };
+            if !seen.insert(key) {
+                continue;
+            }
+            if seen.len() > target_rows {
+                break;
+            }
+            builders.push_row(cells)?;
+        }
+        let batch = builders.finish()?;
+        Ok(Value::Table(Table::from_arrow(batch)))
     }
 
     /// Issue a `SELECT … FROM <table>` and return the raw schema-bearing

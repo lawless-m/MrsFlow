@@ -50,48 +50,65 @@ pub enum CellValue {
     BlobHandle([u8; 8]),
 }
 
-/// Decode one record into per-column [`CellValue`]s, one per schema column
-/// (in schema order). `record` is the full record starting at the +0
-/// header byte; columns walk it via their `row_offset`.
+/// Decode one record into per-column [`CellValue`]s, one per schema column.
+///
+/// `record` points to the **first column's null-flag byte on the wire**
+/// (one byte before the first column's value).
+///
+/// Layout (verified against CUSTOMER): each field occupies one null-flag
+/// byte followed by `max` value bytes. The schema's `row_offset` is the
+/// **value-start position** in the on-disk record (not the null-flag
+/// position). Wire-relative value position = `row_offset - first_offset`
+/// where `first_offset` = CODE.row_offset (typically 25). The null-flag
+/// for that field sits at `value_pos - 1`.
 ///
 /// Returns `IoError::Other` if a field's bytes don't decode — e.g. a
-/// Date with negative days, or a String with non-UTF8 bytes the lossy
-/// path can't repair. Per-field decode errors are surfaced; a partial
-/// row is not returned.
+/// Date with negative days. Per-field decode errors are surfaced; a
+/// partial row is not returned.
 pub fn decode_record(record: &[u8], columns: &[Column]) -> Result<Vec<CellValue>, IoError> {
+    let first_offset = columns.first().map(|c| c.row_offset as usize).unwrap_or(0);
     let mut out = Vec::with_capacity(columns.len());
     for c in columns {
-        let pos = RECORD_HEADER_LEN + c.row_offset as usize;
-        if pos >= record.len() {
+        // Wire-relative value-start position.
+        let value_pos = (c.row_offset as usize).saturating_sub(first_offset);
+        // Null-flag sits one byte before the value.
+        let null_pos = if value_pos == 0 { 0 } else { value_pos - 1 };
+        // First column: null-flag at byte 0, value at byte 1.
+        // Subsequent columns: null-flag at value_pos - 1, value at value_pos.
+        // Unify: read null-flag at null_pos for all (the +1 offset between
+        // first column's null-flag (0) and its value (1) is baked in).
+        let (null_pos, value_start) = if c.row_offset as usize == first_offset {
+            (0, 1)
+        } else {
+            (null_pos, value_pos)
+        };
+        if null_pos >= record.len() {
             return Err(IoError::Other(format!(
-                "Exportmaster: row truncated; column {} (offset {}) past end (len {})",
-                c.name, pos, record.len()
+                "Exportmaster: row truncated; column {} (null at {}) past end (len {})",
+                c.name, null_pos, record.len()
             )));
         }
-        let null_flag = record[pos];
+        let null_flag = record[null_pos];
         if null_flag == 0 {
             out.push(CellValue::Null);
             continue;
         }
         if null_flag != 1 {
             return Err(IoError::Other(format!(
-                "Exportmaster: bad null-indicator 0x{null_flag:02X} for column {}",
-                c.name
+                "Exportmaster: bad null-indicator 0x{null_flag:02X} for column {} at offset {}",
+                c.name, null_pos
             )));
         }
-        // Value bytes start one past the null flag and span at most `max`
-        // (the on-disk storage width). For variable-length types like
-        // String, the trailing bytes are zero-padding to fill `max`.
-        let value_start = pos + 1;
-        let max = c.max as usize;
+        // Value occupies `max` bytes starting at value_start.
+        let value_len = c.max as usize;
         let avail = record.len().saturating_sub(value_start);
-        if max > avail {
+        if value_len > avail {
             return Err(IoError::Other(format!(
                 "Exportmaster: row truncated within column {}: need {} bytes, have {}",
-                c.name, max, avail
+                c.name, value_len, avail
             )));
         }
-        let bytes = &record[value_start..value_start + max];
+        let bytes = &record[value_start..value_start + value_len];
         out.push(decode_field(c, bytes)?);
     }
     Ok(out)
@@ -102,12 +119,11 @@ fn decode_field(col: &Column, bytes: &[u8]) -> Result<CellValue, IoError> {
     Ok(match col.field_type {
         Calculated => CellValue::Null, // no storage
         String => {
-            // ASCII chars, null-terminated within the max-width buffer.
-            // Strip everything from first 0x00 byte onward (matches PoC).
+            // On-disk ftString: ASCII chars, null-terminated within a
+            // (max - 1)-byte value buffer. No length prefix on the
+            // wire — the null flag handled separately, and any trailing
+            // bytes past the first 0x00 are zero-padding.
             let end = bytes.iter().position(|&b| b == 0).unwrap_or(bytes.len());
-            // Lossy decode handles non-ASCII high-bytes (DBISAM 4 stores
-            // 8-bit codepage data; we don't yet handle column-level
-            // encoding overrides — see protocol §6a note on locale).
             let s = std::string::String::from_utf8_lossy(&bytes[..end]).into_owned();
             CellValue::Text(s)
         }

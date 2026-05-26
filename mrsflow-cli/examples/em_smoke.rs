@@ -151,25 +151,59 @@ fn main() {
                         eprintln!("    [{i:>2}] {:<14} = {:?}", col.name, cell);
                     }
                 }
-                None => {
-                    eprintln!("  WARN: no decodable row found in post-schema region");
-                    // Dump the first 256 bytes after the schema region
-                    // so we can see whether row data is even here.
-                    eprintln!("  post-schema dump ({} bytes total starting at offset {}):", raw.len() - end_off, end_off);
-                    let tail = &raw[end_off..(end_off + 256).min(raw.len())];
-                    for (i, chunk) in tail.chunks(32).enumerate() {
-                        let hex: String = chunk.iter().map(|b| format!("{:02x} ", b)).collect();
-                        let ascii: String = chunk
-                            .iter()
-                            .map(|&b| if (32..127).contains(&b) { b as char } else { '.' })
-                            .collect();
-                        eprintln!("    +{:04x}: {hex} {ascii}", end_off + i * 32);
-                    }
-                }
+                None => eprintln!("  (no decodable row in single-packet response; needs cursor)"),
             }
         }
         Err(e) => {
             eprintln!("  FAIL parse: {e:?}");
+            std::process::exit(1);
+        }
+    }
+
+    // Full row-fetch test: query customer top 3, materialize as a table.
+    eprintln!("\nFull-query test: SELECT CODE, CPYNAME, CONTACT, EMAIL FROM CUSTOMER TOP 3");
+    let mut client = match Client::connect_and_login(&opts) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("FAIL login: {e:?}");
+            std::process::exit(1);
+        }
+    };
+    let started = std::time::Instant::now();
+    match client.query_to_table_capped(
+        "select CODE, CPYNAME, CONTACT, EMAIL FROM CUSTOMER TOP 3",
+        3,
+    ) {
+        Ok(mrsflow_core::eval::Value::Table(t)) => {
+            eprintln!(
+                "  got {} rows × {} cols (in {} ms)",
+                t.num_rows(),
+                t.num_columns(),
+                started.elapsed().as_millis()
+            );
+            let names = t.column_names();
+            eprintln!("  columns: {:?}", names);
+            use arrow::array::{Array, StringArray};
+            for r in 0..t.num_rows().min(3) {
+                let row: Vec<String> = (0..t.num_columns())
+                    .map(|c| match &t.repr {
+                        mrsflow_core::eval::value::TableRepr::Arrow(b) => {
+                            let arr = b.column(c);
+                            if let Some(sa) = arr.as_any().downcast_ref::<StringArray>() {
+                                if sa.is_null(r) { "<null>".to_string() } else { sa.value(r).to_string() }
+                            } else {
+                                format!("({:?})", arr.data_type())
+                            }
+                        }
+                        _ => "<not arrow>".to_string(),
+                    })
+                    .collect();
+                eprintln!("    [{r}] {:?}", row);
+            }
+        }
+        Ok(other) => eprintln!("  unexpected value type: {other:?}"),
+        Err(e) => {
+            eprintln!("  FAIL: {e:?}");
             std::process::exit(1);
         }
     }
