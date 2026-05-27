@@ -1542,6 +1542,10 @@ fn arrow_cell_to_value(
             Ok(Value::Date(dt))
         }
         DataType::Null => Ok(Value::Null),
+        DataType::Binary => {
+            let a = array.as_any().downcast_ref::<BinaryArray>().expect("Binary");
+            Ok(Value::Binary(a.value(row).to_vec()))
+        }
         _ => Err(MError::NotImplemented("unsupported cell type")),
     }
 }

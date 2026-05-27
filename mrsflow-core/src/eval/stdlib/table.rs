@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use arrow::array::{
-    Array, ArrayRef, BooleanArray, Date32Array, Decimal128Array, Decimal256Array,
+    Array, ArrayRef, BinaryArray, BooleanArray, Date32Array, Decimal128Array, Decimal256Array,
     DurationMicrosecondArray, Float32Array, Float64Array, Int16Array, Int32Array,
     Int64Array, Int8Array, NullArray, StringArray, TimestampMicrosecondArray,
     UInt16Array, UInt32Array, UInt64Array, UInt8Array,
@@ -1315,6 +1315,10 @@ pub fn cell_to_value(table: &Table, col: usize, row: usize) -> Result<Value, MEr
                 ),
             };
             Ok(Value::Duration(d))
+        }
+        DataType::Binary => {
+            let a = array.as_any().downcast_ref::<BinaryArray>().expect("Binary");
+            Ok(Value::Binary(a.value(row).to_vec()))
         }
         _other => Err(MError::NotImplemented("unsupported cell type")),
     }
@@ -6885,5 +6889,31 @@ fn resolve_field_generic(
         }
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use arrow::array::BinaryBuilder;
+
+    #[test]
+    fn cell_to_value_decodes_binary_column() {
+        let schema = Arc::new(Schema::new(vec![Field::new("blob", DataType::Binary, true)]));
+        let mut b = BinaryBuilder::new();
+        b.append_value(b"hello");
+        b.append_null();
+        let arr = b.finish();
+        let batch = RecordBatch::try_new(schema, vec![Arc::new(arr)]).unwrap();
+        let table = Table::from_arrow(batch);
+
+        match cell_to_value(&table, 0, 0).expect("row 0") {
+            Value::Binary(v) => assert_eq!(v, b"hello".to_vec()),
+            other => panic!("expected Value::Binary, got {other:?}"),
+        }
+        match cell_to_value(&table, 0, 1).expect("row 1") {
+            Value::Null => {}
+            other => panic!("expected Value::Null for null cell, got {other:?}"),
+        }
+    }
 }
 
