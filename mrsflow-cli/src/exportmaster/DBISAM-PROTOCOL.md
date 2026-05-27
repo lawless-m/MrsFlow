@@ -1304,6 +1304,83 @@ not enough; combine §7 (Prepare → Execute → poll → Reset) with §6
 (SetToBegin + fetch loop). The phase boundary is after Execute's
 final non-PollNotReady response.
 
+### 7m. Parameter binding (`?` placeholders) ✅
+
+DBISAM supports standard `?`-style positional parameters in SQL. None
+of the captures we have happen to use them (all observed
+`ExecuteStatement` bodies have `param_count = 0` — the `02 00 00 00 00 00`
+sequence at body offset 8), but the wire format is fully decoded from
+disassembly of `TDataSession.PackParameters` (RVA 0x07CB78).
+
+`PackParameters` is called by `ExecuteStatement` right after the
+statement handle is packed. Its output occupies the section between
+the handle and the trailing bool flags of §7c. Wire layout:
+
+```
+<u32 len=2><u16 param_count>                ; parameter count
+
+for each parameter (count times):
+    <u32 len=768><768-byte TFieldDefinition>  ; same as §6e
+
+for each parameter VALUE (count times):
+    if def.sub_type == 3 (blob/memo):
+        <u32 len=def.max+1><null_flag + 8-byte blob handle>
+        <u32 len=blob_payload_len><blob bytes>      ; out-of-band blob data
+    else:
+        <u32 len=def.max+1><null_flag + value bytes>
+```
+
+Parameter VALUES use the **same per-field encoding as row data** (see
+§6c "Row records on the wire"): one null-flag byte (`0x00` for NULL,
+`0x01` for not-null) followed by exactly `def.max` bytes of value at
+the field's declared on-disk width. Blob parameters additionally send
+their referenced bytes inline as a second Pack unit.
+
+The field definitions are taken from the client's `TDBISAMParams`
+collection (the user-facing parameter binding API) and built by
+`TDBISAMParams.GetNativeBuffer` (RVA 0x0407E0) — which is what raises
+the error `"No parameter type for parameter '%s'"` if the client tries
+to execute without setting a value first.
+
+**Worked example** for `SELECT * FROM customer WHERE code = ?` bound
+with the string `"01234"` (assume parameter declared as `String(30)`,
+so `max = 30`):
+
+```
+PackParameters output:
+
+  02 00 00 00          ; length-prefix = 2
+  01 00                ; param_count = 1
+
+  00 03 00 00          ; length-prefix = 768 (0x300)
+  <768 bytes>          ; TFieldDefinition: name="Param0" (or however the
+                       ;   client names it), sub_type=1 (ftString),
+                       ;   max=31, row_offset=0, …
+                       ; (positions per §6e)
+
+  1F 00 00 00          ; length-prefix = 31 = max+1
+  01                   ; null-flag: not-null
+  30 31 32 33 34 00 …  ; "01234" padded to 30 bytes with 0x00
+```
+
+For NULL parameters, the value Pack is just `<u32 len=max+1><00 + max
+zero bytes>` — the null-flag byte is what marks it NULL, the value
+bytes are unread.
+
+For a SELECT-only Rust port, parameters are useful for:
+- Server-side filtering with the right index plan (avoids fetching
+  rows the WHERE clause would discard client-side)
+- Avoiding SQL-injection concerns when extracting based on user input
+
+Implementation order for the client:
+1. Send `0x0320 PrepareStatement` with the SQL containing `?`s.
+2. Receive the prepared schema (which includes the parameter
+   descriptions — server-inferred from the WHERE column types).
+3. Build a `<u16 count>` + N×`TFieldDefinition` + N×value-block payload
+   as above and send as `0x032A ExecuteStatement`.
+4. Fetch rows via `§6h ReadFirstRecordBlock` / `ReadNextRecordBlock`
+   as normal.
+
 ### 7l. Transaction primitives ✅
 
 Three dedicated wire reqcodes for explicit transaction control, all
