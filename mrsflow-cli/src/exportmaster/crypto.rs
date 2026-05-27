@@ -1,7 +1,7 @@
 //! DBISAM login crypto: Blowfish-CBC with IV=0 and key=MD5(encrypt_password).
 //!
 //! Recovered from `dbsys.exe` BPL disassembly + dictionary attack against
-//! the captured login bytes — see Derek/DBISAM-PROTOCOL.md §5.
+//! the captured login bytes — see DBISAM-PROTOCOL.md §5.
 
 use blowfish::Blowfish;
 use cbc::cipher::{BlockEncryptMut, KeyIvInit};
@@ -57,7 +57,7 @@ pub fn encrypt_login(username: &[u8], password: &[u8], encrypt_password: &[u8]) 
 mod tests {
     use super::*;
 
-    /// Worked example from Derek/DBISAM-PROTOCOL.md §5:
+    /// Worked example from DBISAM-PROTOCOL.md §5:
     /// user `e3user`, password `e3usernew`, encrypt password `elevatesoft`.
     #[test]
     fn login_ciphertext_matches_doc_worked_example() {

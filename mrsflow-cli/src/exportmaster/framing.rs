@@ -2,7 +2,7 @@
 //!
 //! Every message on the wire is:
 //!     <16-byte session GUID> <u32 LE total_len> <body>
-//! where `total_len = 20 + len(body)`. See Derek/DBISAM-PROTOCOL.md §2.
+//! where `total_len = 20 + len(body)`. See DBISAM-PROTOCOL.md §2.
 //!
 //! The 16-byte GUID is a constant in the captured sessions; we treat it
 //! as a fixed protocol marker. (Hypothesis: it's a client-runtime

@@ -1,6 +1,6 @@
 //! Cursor info: the 10-field structure the server writes after each
 //! query/fetch (`TServerThread.PackCursorInfo`, RVA 0x49810, per
-//! `Derek/DBISAM-PROTOCOL.md` §6d).
+//! `DBISAM-PROTOCOL.md` §6d).
 //!
 //! Each field is one wire unit (`<u32 LE length><payload>`). The 8th
 //! field — the **bookmark** — is the opaque cursor position the client

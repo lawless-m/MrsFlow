@@ -5,7 +5,7 @@
 //! replays from the PoC's captured `dbsys.exe` session. We don't yet
 //! understand every field in them; treating them as opaque blobs is
 //! what the PoC does and what we know works against the live server.
-//! Decoding them properly is open work — Derek/DBISAM-PROTOCOL.md §7.
+//! Decoding them properly is open work — DBISAM-PROTOCOL.md §7.
 
 use std::net::TcpStream;
 
@@ -194,7 +194,7 @@ impl Client {
         // Release the server-side cursor + materialised temp table.
         // The full sequence DBSYS uses to clear the pin that materialised
         // SELECTs leave on their source table (see KNOWN_BUGS.md B3 and
-        // Derek/DBISAM-PROTOCOL.md §7f / §7k):
+        // DBISAM-PROTOCOL.md §7f / §7k):
         //   1. CloseCursor (0x00A0) releases the cursor itself
         //   2. ResetStatement (0x0334) closes the statement transaction
         //   3. RemoveAllRemoteMemoryTables (0x0029) drops every temp
@@ -247,7 +247,7 @@ impl Client {
         let debug = std::env::var("EM_DML_DEBUG").is_ok();
         if debug { eprintln!("[em-dml] sql: {sql:?}  is_ddl: {is_ddl}"); }
 
-        // Begin-DML marker (0x0316) per Derek/DBISAM-PROTOCOL.md §7a.
+        // Begin-DML marker (0x0316) per DBISAM-PROTOCOL.md §7a.
         let begin_body = super::msg::build_begin_dml(1);
         let begin_resp = framing::send_recv_auto(&mut self.stream, &begin_body, self.compression)?;
         if debug { eprintln!("[em-dml] begin (0x0316) resp ({} bytes): {}", begin_resp.len(), hex_dump(&begin_resp)); }
@@ -257,7 +257,7 @@ impl Client {
             framing::send_recv_auto(&mut self.stream, &prepare_body, self.compression)?;
         if debug { eprintln!("[em-dml] prepare (0x0320) resp ({} bytes): {}", prepare_resp.len(), hex_dump(&prepare_resp)); }
 
-        // PrepareError path (Derek/DBISAM-PROTOCOL.md §7f): server returns
+        // PrepareError path (DBISAM-PROTOCOL.md §7f): server returns
         // 0x2B02 with the offending identifier (unknown table, bad column,
         // etc.). Skip ExecuteStatement, send ResetStatement to close the
         // transaction, surface the identifier in the error message.
@@ -276,7 +276,7 @@ impl Client {
         // produces a result cursor" — false for pure DDL (no cursor),
         // true for DML which surfaces a cursor for the rows-affected
         // count. See `build_execute_statement{,_ddl}` doc-comments and
-        // Derek/DBISAM-PROTOCOL.md §7k.
+        // DBISAM-PROTOCOL.md §7k.
         let exec_body = if is_ddl {
             super::msg::build_execute_statement_ddl(1)
         } else {
@@ -409,7 +409,7 @@ impl Client {
     /// the underlying error verbatim; users who hit this need to call
     /// `Exportmaster.Query(host, sql, opts)` with explicit SQL.
     ///
-    /// See `Derek/DBISAM-PROTOCOL.md` §7 — decoding the cursor advance
+    /// See `DBISAM-PROTOCOL.md` §7 — decoding the cursor advance
     /// is listed as the top open question.
     pub fn list_tables_as_navigation(&mut self, opts: &ConnOpts) -> Result<Value, IoError> {
         use std::cell::RefCell;
@@ -452,7 +452,7 @@ impl Client {
 
 /// Parse the bulk SQLTables response. `resp` is the body of the first
 /// server message returned after `SQLTABLES_BODY`. Layout (per
-/// `Derek/DBISAM-PROTOCOL.md` SQLTables-response section):
+/// `DBISAM-PROTOCOL.md` SQLTables-response section):
 ///
 ///   `[reqcode:u16 BE = 0x0000][inner_len:u16 BE]` envelope, then
 ///   `[3-byte type flag][4 unknown bytes][u32 LE count]` header (11
@@ -544,7 +544,7 @@ fn body_reqcode(body: &[u8]) -> Option<u16> {
 }
 
 /// Parse a DML final-response body into the affected row count.
-/// Per Derek/DBISAM-PROTOCOL.md §7d, the inner section is:
+/// Per DBISAM-PROTOCOL.md §7d, the inner section is:
 ///   +0   u32 LE = 8        length-prefix
 ///   +4   f64 LE            execution time in seconds (informational)
 ///   +12  u32 LE = 4        length-prefix
@@ -569,7 +569,7 @@ fn parse_dml_result(body: &[u8]) -> Result<u32, IoError> {
 }
 
 /// Parse the offending identifier from a `PrepareError` (0x2B02) body.
-/// Per Derek/DBISAM-PROTOCOL.md §7f, the inner section is:
+/// Per DBISAM-PROTOCOL.md §7f, the inner section is:
 ///   +0..+8   8 zero bytes (timing slot, unused on parse failure)
 ///   +8       u32 LE identifier length
 ///   +12      ASCII identifier (table/column/keyword the parser choked on)
@@ -667,7 +667,7 @@ mod tests {
 
     #[test]
     fn parse_dml_result_extracts_affected_count_at_offset_16() {
-        // Per Derek/DBISAM-PROTOCOL.md §7d:
+        // Per DBISAM-PROTOCOL.md §7d:
         //   inner +0..+4   u32 LE = 8        length-prefix
         //   inner +4..+12  f64 LE            execution time (ignored here)
         //   inner +12..+16 u32 LE = 4        length-prefix
@@ -690,7 +690,7 @@ mod tests {
 
     #[test]
     fn parse_prepare_error_extracts_identifier_at_offset_12() {
-        // Per Derek/DBISAM-PROTOCOL.md §7f:
+        // Per DBISAM-PROTOCOL.md §7f:
         //   inner +0..+8   8 zero bytes (unused timing slot)
         //   inner +8..+12  u32 LE identifier length
         //   inner +12..    identifier bytes

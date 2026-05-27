@@ -2,7 +2,7 @@
 //! response into typed [`Column`] descriptors. See protocol §4 + §6b.
 //!
 //! PoC reference: dbisam_client.py L411-435 (`parse schema`), and the
-//! full type table in `Derek/DBISAM-PROTOCOL.md` §6b.
+//! full type table in `DBISAM-PROTOCOL.md` §6b.
 
 use mrsflow_core::eval::IoError;
 

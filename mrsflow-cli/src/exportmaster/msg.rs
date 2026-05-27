@@ -1,7 +1,7 @@
 //! Pack-stream message builders for client→server requests.
 //!
 //! Every body is `<flag:u8=0><reqcode:u16 LE><inner_len:u32 LE><pack stream>`
-//! per `Derek/DBISAM-PROTOCOL.md` §6c + §6g + ANSWERS-TO-DEREK.md.
+//! per `DBISAM-PROTOCOL.md` §6c + §6g + ANSWERS-TO-DEREK.md.
 //!
 //! Pack stream is sequential `<u32 LE length><payload>` units; what each
 //! unit means depends on the reqcode's `DoXxx` handler on the server.
@@ -177,7 +177,7 @@ pub fn build_prepare_statement(sql: &str) -> Vec<u8> {
 
 /// `TQueryStatement.ExecuteStatement` (reqcode 0x032A) — result-cursor
 /// flavour. Inner-body offset +23 is `0x01` here. Per
-/// Derek/DBISAM-PROTOCOL.md §7k, that byte is the 6th positional bool
+/// DBISAM-PROTOCOL.md §7k, that byte is the 6th positional bool
 /// arg of `ExecuteStatement` set by `GetQueryCursor` and reduces to
 /// **"this statement produces a result cursor"** — true for
 /// SELECT/INSERT/UPDATE/DELETE (all of which surface a cursor for
@@ -196,7 +196,7 @@ pub fn build_execute_statement(cursor_handle: u32) -> Vec<u8> {
 
 /// `TQueryStatement.ExecuteStatement` (reqcode 0x032A) — no-cursor
 /// flavour. Inner-body offset +23 is `0x00` here vs `0x01` in the
-/// default [`build_execute_statement`]; per Derek/DBISAM-PROTOCOL.md
+/// default [`build_execute_statement`]; per DBISAM-PROTOCOL.md
 /// §7k that byte means **"this statement produces a result cursor"**,
 /// false for pure DDL (CREATE / ALTER / DROP / TRUNCATE). Same 34-byte
 /// body otherwise.
@@ -265,7 +265,7 @@ pub fn build_close_cursor(cursor_handle: u32) -> Vec<u8> {
 /// `TDataSession.RemoveAllRemoteMemoryTables` (reqcode 0x0029). Bulk-
 /// releases every server-side temp table backing materialised SELECT
 /// results in this session — empty inner body, just the reqcode.
-/// Per Derek/DBISAM-PROTOCOL.md §7f + §7k: materialised SELECTs pin
+/// Per DBISAM-PROTOCOL.md §7f + §7k: materialised SELECTs pin
 /// their source table via `TDataTable.UseCount`, which blocks DDL
 /// (DROP/ALTER) with `0x2B05` until the temp cursors close. Sending
 /// `0x0029` after a SELECT clears the pin so a subsequent DROP can
@@ -275,7 +275,7 @@ pub fn build_remove_all_remote_memory_tables() -> Vec<u8> {
 }
 
 /// Begin-DML marker (reqcode 0x0316). Sent before every PrepareStatement
-/// in DBSYS captures (DML and DDL alike — see Derek/DBISAM-PROTOCOL.md
+/// in DBSYS captures (DML and DDL alike — see DBISAM-PROTOCOL.md
 /// §7a). Captured body is a single Pack unit carrying the cursor handle
 /// (`04 00 00 00 01 00 00 00` for handle=1). Server replies with an ack.
 pub fn build_begin_dml(cursor_handle: u32) -> Vec<u8> {
@@ -394,7 +394,7 @@ mod tests {
     #[test]
     fn execute_statement_ddl_differs_at_offset_30() {
         // Inner offset +23 (= outer offset 30 after the 7-byte header) is
-        // the DDL/DML flavour byte per Derek/DBISAM-PROTOCOL.md §7h:
+        // the DDL/DML flavour byte per DBISAM-PROTOCOL.md §7h:
         // 0x00 for DDL, 0x01 for DML. Everything else is identical.
         let dml = build_execute_statement(1);
         let ddl = build_execute_statement_ddl(1);

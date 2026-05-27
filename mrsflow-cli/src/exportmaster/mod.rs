@@ -3,7 +3,9 @@
 //! Talks directly to `dbsrvr.exe` over TCP, bypassing DBISAM's broken
 //! ODBC driver (see `KNOWN_BUGS.md` §B1). Reverse-engineered from packet
 //! captures + binary disassembly — protocol notes live in
-//! `Derek/DBISAM-PROTOCOL.md` in the sibling Derek repo.
+//! `DBISAM-PROTOCOL.md` next to this file (vendored snapshot from the
+//! Derek reverse-engineering repo at
+//! dw.ramsden-international.com/matthew.heath/Derek).
 //!
 //! The public surface for the rest of mrsflow-cli is `query()` and
 //! `database()` (this file). Internals split by concern:
@@ -69,7 +71,7 @@ pub struct ConnOpts {
 
 impl ConnOpts {
     /// Defaults match the ex3win / dbsys.exe baseline documented in
-    /// `Derek/DBISAM-PROTOCOL.md` §5 (`elevatesoft` encrypt password).
+    /// `DBISAM-PROTOCOL.md` §5 (`elevatesoft` encrypt password).
     /// User and password have no sensible default — caller must supply.
     pub fn new(host: impl Into<String>, user: impl Into<String>, password: impl Into<String>) -> Self {
         Self {
@@ -150,7 +152,7 @@ pub fn query(opts: &ConnOpts, sql: &str) -> Result<Value, IoError> {
     if is_no_result_statement(sql) {
         let ddl = is_ddl(sql);
         let affected = client.execute_dml(sql, ddl)?;
-        // Per Derek/DBISAM-PROTOCOL.md §7h, DDL has no meaningful row
+        // Per DBISAM-PROTOCOL.md §7h, DDL has no meaningful row
         // count. Observed with the DML-flavoured ExecuteStatement,
         // DROP returned `0x74726168` ("hart" ASCII) at the count offset
         // — likely an adjacent field bleed-through. Normalise DDL to 0.
@@ -181,7 +183,7 @@ fn first_keyword(sql: &str) -> &str {
 /// True for SQL that produces no result set on DBISAM — DML
 /// (UPDATE/INSERT/DELETE) and DDL (CREATE/ALTER/DROP/TRUNCATE). All of
 /// these travel the byte-identical wire path documented in
-/// Derek/DBISAM-PROTOCOL.md §7, so the client dispatches them through
+/// DBISAM-PROTOCOL.md §7, so the client dispatches them through
 /// the same `execute_dml` poll-and-finalise loop.
 fn is_no_result_statement(sql: &str) -> bool {
     let kw = first_keyword(sql);
