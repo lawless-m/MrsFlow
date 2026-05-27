@@ -255,6 +255,18 @@ pub fn build_close_cursor(cursor_handle: u32) -> Vec<u8> {
     m.finish()
 }
 
+/// `TDataSession.RemoveAllRemoteMemoryTables` (reqcode 0x0029). Bulk-
+/// releases every server-side temp table backing materialised SELECT
+/// results in this session — empty inner body, just the reqcode.
+/// Per Derek/DBISAM-PROTOCOL.md §7f + §7k: materialised SELECTs pin
+/// their source table via `TDataTable.UseCount`, which blocks DDL
+/// (DROP/ALTER) with `0x2B05` until the temp cursors close. Sending
+/// `0x0029` after a SELECT clears the pin so a subsequent DROP can
+/// proceed (RVA 0x07949C, identified by BPL disassembly).
+pub fn build_remove_all_remote_memory_tables() -> Vec<u8> {
+    MsgBuilder::new(0x0029).finish()
+}
+
 /// Begin-DML marker (reqcode 0x0316). Sent before every PrepareStatement
 /// in DBSYS captures (DML and DDL alike — see Derek/DBISAM-PROTOCOL.md
 /// §7a). Captured body is a single Pack unit carrying the cursor handle
@@ -363,6 +375,13 @@ mod tests {
     #[test]
     fn close_cursor_layout() {
         single_handle_body_matches(&build_close_cursor(1), reqcode::CLOSE_CURSOR);
+    }
+
+    #[test]
+    fn remove_all_remote_memory_tables_is_just_the_header() {
+        // No body — only flag + reqcode + inner_len(=0). 7 bytes total.
+        let body = build_remove_all_remote_memory_tables();
+        assert_eq!(body, vec![0x00, 0x29, 0x00, 0x00, 0x00, 0x00, 0x00]);
     }
 
     #[test]

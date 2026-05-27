@@ -192,15 +192,22 @@ impl Client {
             })?;
 
         // Release the server-side cursor + materialised temp table.
-        // Without this, prior SELECTs leave server state that blocks any
-        // subsequent DROP TABLE on the source table with a 0x2B05
-        // ExecuteError. Two-step cleanup matches DBSYS's wrap-up shape:
+        // The full sequence DBSYS uses to clear the pin that materialised
+        // SELECTs leave on their source table (see KNOWN_BUGS.md B3 and
+        // Derek/DBISAM-PROTOCOL.md §7f / §7k):
         //   1. CloseCursor (0x00A0) releases the cursor itself
         //   2. ResetStatement (0x0334) closes the statement transaction
+        //   3. RemoveAllRemoteMemoryTables (0x0029) drops every temp
+        //      table the session is holding — this is what decrements
+        //      `TDataTable.UseCount` back to 0 on the source table, so
+        //      a subsequent DROP / ALTER on the same table doesn't
+        //      come back with `0x2B05 ExecuteError (locked)`.
         let close_body = super::msg::build_close_cursor(1);
         let _ = framing::send_recv_auto(self.stream_mut(), &close_body, compression);
         let reset_body = super::msg::build_reset_statement(1);
         let _ = framing::send_recv_auto(self.stream_mut(), &reset_body, compression);
+        let release_body = super::msg::build_remove_all_remote_memory_tables();
+        let _ = framing::send_recv_auto(self.stream_mut(), &release_body, compression);
 
         let batch = builders.finish()?;
         Ok(Value::Table(Table::from_arrow(batch)))
