@@ -1423,75 +1423,119 @@ on success / auto-rolled-back on exception). For a SELECT-only Rust
 port we never need to issue any of these reqcodes; tracked here for
 completeness of the wire-protocol spec.
 
-### 7k. Resolved items (previously unknowns)
-
-Originally this section listed four open questions about the SQL DML
-path; all four were closed by BPL disassembly. They're folded into the
-sections they belong to:
-
-- **Prepare/Execute `4 / 1` constants** → §7b, §7c (length-prefix +
-  small-int payload per the §6c universal framing rule)
-- **Multi-statement transactions** → §7l (`0x006E` / `0x0078` / `0x0082`
-  are the real reqcodes; `0x0316` / `0x0334` are per-statement wrappers,
-  not tx control)
-- **ExecuteStatement byte +23 DDL vs DML** → §7h ("wants result
-  cursor" bool from `GetQueryCursor`)
-- **Cursor-pin release on source table** → §7l-adjacent / closed in §8
-  (`0x0029 RemoveAllRemoteMemoryTables`)
-
 ---
 
-## 8. Open questions / next steps
+## 8. Status, reqcode index, and notable invariants
 
-The protocol is decoded sufficiently for a SELECT-only extraction client.
-Remaining minor items:
+The protocol is **fully decoded** for a SELECT-only extraction client.
+No open RE questions remain; everything outstanding is implementation
+work. This section consolidates the wire constants and load-bearing
+invariants discovered along the way so a port doesn't have to grep the
+whole document.
 
-- [x] The recurring `"19880"` cursor handle string is the **server-assigned
-      temp table name** holding the SELECT's materialized result set.
-      `TDataCursor.SetTableName` writes it to cursor `[+0x14]`, and
-      `PackResultSetInfo` packs that field as the cursor's table-name string.
-      Observed counter increments per query: 19880 → 19882 → 19883 → 19884.
-      This confirms DBISAM materializes SELECT results into a server-side
-      named temp table (enabling scrollable cursors / re-fetch without
-      re-running the query) rather than purely streaming results.
-- [x] Confirm the 16-byte `8a be 8e 59…` prefix isn't an Npcap loopback
-      artifact — it's a **real protocol magic number**, validated strictly
-      by the server (sending zeros / random / 0xFF → connection reset; only
-      the exact GUID `{598EBE8A-6423-40CB-3D71-D2E3BC64D001}` is accepted).
-      Not found as contiguous bytes in dbsys.exe, dbsrvr.exe, or the BPLs —
-      likely constructed at runtime byte-by-byte from RTTI or scattered
-      MOV-byte-immediate constants. Production client must include it
-      verbatim in every message.
+### Reqcode index
 
-Closed items:
+| Reqcode | Direction | Name | Section |
+|---:|---|---|---|
+| `0x0000` | C↔S | Connect handshake | §6g |
+| `0x0014` | C→S | Login (Blowfish-CBC ciphertext) | §5 |
+| `0x0028` | C→S | (session config — observed, not decoded body) | §5 (mermaid) |
+| `0x0029` | C→S | RemoveAllRemoteMemoryTables (release SELECT temp-table pins) | §7l |
+| `0x003C` | C→S | SelectDatabase | §5 (mermaid) |
+| `0x0046` | C→S | CloseDataDirectory | §6h-related |
+| `0x006E` | C→S | StartTransaction (optional table-lock list) | §7l |
+| `0x0078` | C→S | CommitTransaction (+ 2 flag bytes) | §7l |
+| `0x0082` | C→S | RollbackTransaction | §7l |
+| `0x0096` | C→S | OpenCursor | §6h |
+| `0x00A0` | C→S | CloseCursor | §6h |
+| `0x00BE` | C→S | SetToBegin (cursor reset) | §6 |
+| `0x00FA` | C→S | GetNextRecord (single-row forward) | §6 |
+| `0x0104` | C→S | GetPriorRecord (single-row backward) | §6 |
+| `0x0154` | C→S | SetToBookmark (seek) | §6 |
+| `0x0208` | C→S | DeleteTable (direct DROP primitive) | §6h, §7f |
+| `0x0280` | C↔S | OpenBlob / read blob payload | §6a |
+| `0x028A` | C↔S | CloseBlob | §6a |
+| `0x030C` | C→S | Receive (poll for response continuation) | §6 |
+| `0x0316` | C→S | BeginDML (per-statement open wrapper) | §7a |
+| `0x0320` | C→S | PrepareStatement | §7b |
+| `0x032A` | C→S | ExecuteStatement | §7c, §7m |
+| `0x0334` | C→S | ResetStatement (per-statement close wrapper) | §7a |
+| `0x0384` | C→S | ListDatabases | §5 (mermaid) |
+| `0x04C4` | C→S | DisconnectRemoteSession | §6h-related |
+| `0x04F6` | C→S | ReadNextRecordBlock (batch forward) | §6h |
+| `0x050A` | C→S | ReadFirstRecordBlock (first batch) | §6h |
+| `0x053C` | C→S | AddRecordBlock (INSERT row, batch shape) | §6h |
+| `0x2202` | S→C | EndOfCursor (status word in fetch response) | §6f |
+| `0x2B02` | S→C | PrepareError | §7f |
+| `0x2B05` | S→C | ExecuteError (e.g. `UseCount > 0` for DROP) | §7f |
+| `0x2C14` | S→C | PollNotReady (long-running op continuation) | §7e |
+| `0x2C18` | S→C | InsufficientRights | §7f-related |
 
-- [x] Cursor advance protocol — §6, §6d (bookmark is field #8 of cursor info)
-- [x] End-of-cursor signal — §6f (result code 0x2202 in first Pack field)
-- [x] Field-def wire format — §6e (768-byte struct with offset table)
-- [x] Universal wire framing — §6c (<u32 length><data> rule)
-- [x] Field type codes — §6b (12 sub codes + 2 refinement bytes)
-- [x] Cursor-pin release reqcode — §7k (`0x0029` `RemoveAllRemoteMemoryTables`,
-      session-scoped)
-- [x] 28 KB schema→rows mystery block — §4 (it's the packed `CursorInfo`
-      state, dominated by the read-ahead buffer at cursor `+0x4684`)
-- [x] 76-byte pre-record framing — §4 (it's the bookmark array, sent as a
-      separate Pack unit, not interleaved)
-- [x] Table-cursor read reqcodes — §6h (`0x050A` `ReadFirstRecordBlock`,
-      `0x04F6` `ReadNextRecordBlock`, `0x0096` `OpenCursor`,
-      `0x00A0` `CloseCursor`)
-- [x] Single-record cursor navigation reqcodes — §6 (`0x00BE` `SetToBegin`,
-      `0x00FA` `GetNextRecord`, `0x0104` `GetPriorRecord`,
-      `0x0154` `SetToBookmark`, `0x030C` `Receive`)
-- [x] Transaction primitives — §7l (`0x006E` `StartTransaction`
-      with optional table-lock list, `0x0078` `CommitTransaction`,
-      `0x0082` `RollbackTransaction`; `ExecuteStatement` also
-      auto-begins an implicit per-statement tx if one isn't already in
-      progress)
-- [x] DROP TABLE rejection condition — §7f (`TDataTable.UseCount > 0`)
-      plus direct DROP wire reqcode `0x0208`
-- [x] SQL fetch reqcode names (`0x0104 = GetPriorRecord`,
-      `0x0154 = SetToBookmark`) — §6, decoded by BPL scan for
-      `mov dx, 0x0104` / `mov dx, 0x0154` patterns
+### Notable invariants (the things a port has to get exactly right)
+
+1. **16-byte session GUID prefix `8a be 8e 59 23 64 cb 40 3d 71 d2 e3 bc 64 d0 01`**
+   — a real protocol magic number, NOT an Npcap loopback artifact.
+   Strictly validated: any other 16 bytes (zeros, random, all-`0xFF`)
+   trigger a connection reset. Not found as a contiguous byte run in
+   any binary; constructed at runtime byte-by-byte (likely RTTI or
+   scattered MOV-byte-immediates). Production client must prepend it
+   verbatim to every message.
+
+2. **Universal `<u32 LE length><data>` framing** for every value on the
+   wire (§6c). There is no per-field type tag; semantics come from
+   message + position.
+
+3. **`"19880"` temp-table-name** appearing in SELECT responses is the
+   server-assigned name of the materialised result table. The server
+   increments the counter per query (19880 → 19882 → 19883 → …) and
+   the cursor stores it at `cursor[+0x14]` (the `TableName` field).
+   Materialisation is what enables scrollable cursors and re-fetch
+   without re-running the query — and what causes `UseCount > 0` to
+   block a follow-up DROP on the source table (§7f).
+
+4. **Bookmark is cursor-info field #8** (§6d) and is sufficient on its
+   own for forward iteration of any cursor type. The client never needs
+   to interpret bookmark contents — just echo them back into the next
+   fetch's slot.
+
+5. **Records on the wire are literally the on-disk fixed-width
+   layout**, no transforms (§6c + §4 row layout). Field positions
+   come from the schema's `row_offset` / `max`; each field has a
+   1-byte null-flag + `max` bytes of value.
+
+6. **Result code `0x2202`** in the first Pack unit of a fetch response
+   = end-of-cursor (§6f). Check this immediately; don't pattern-match
+   on row count or look for "empty" cursor state otherwise.
+
+7. **DROP / ALTER is gated on `TDataTable.UseCount`** (§7f). For
+   SELECT-only clients this never matters; if you ever introduce
+   DDL, issue `0x0029` first to release any materialised-temp-table
+   pins.
+
+### Implementation order for a Rust SELECT-only extractor
+
+1. TCP connect to `dbsrvr.exe`'s port (12005 default).
+2. Send Connect (`0x0000`, §6g) → receive `DBISAMVCLCSSRC` banner.
+3. Send Login (`0x0014`, §5 — Blowfish-CBC of `MD5(encrypt_pwd)`).
+4. (Optional) `0x0028 Config`, `0x0384 ListDatabases`, `0x003C SelectDatabase`.
+5. Per-query: `0x0316 BeginDML` → `0x0320 PrepareStatement` → `0x032A
+   ExecuteStatement` (optionally with `?` parameters, §7m) → poll
+   loop on `0x2C14` if returned (§7e) → `0x0334 ResetStatement`.
+6. Fetch rows: use `0x050A ReadFirstRecordBlock` + `0x04F6
+   ReadNextRecordBlock` (§6h) — *not* `0x00FA GetNextRecord` (that's
+   one-record-at-a-time, what dbsys's grid does as the user scrolls).
+   Check the status u16 for `0x2202` at the start of each response
+   (§6f).
+7. Decode rows using the schema's per-field `row_offset` + `max` (§6e).
+   For string fields, decode using the cursor's locale-mapped codepage
+   (CP1252 for ex3win; see §6a).
+8. For memo/blob fields (`sub == 3`), follow the 8-byte handle with a
+   `0x0280 OpenBlob` round-trip per blob (§6a).
+9. Close cleanly: `0x0029 RemoveAllRemoteMemoryTables` (optional,
+   tidies temp tables) → `0x04C4 DisconnectRemoteSession` → TCP close.
+
+Steps 5–8 are the inner loop; everything else is one-shot session
+setup/teardown.
 
 ---
 

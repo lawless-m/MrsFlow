@@ -177,7 +177,7 @@ pub fn build_prepare_statement(sql: &str) -> Vec<u8> {
 
 /// `TQueryStatement.ExecuteStatement` (reqcode 0x032A) — result-cursor
 /// flavour. Inner-body offset +23 is `0x01` here. Per
-/// DBISAM-PROTOCOL.md §7k, that byte is the 6th positional bool
+/// DBISAM-PROTOCOL.md §7h, that byte is the 6th positional bool
 /// arg of `ExecuteStatement` set by `GetQueryCursor` and reduces to
 /// **"this statement produces a result cursor"** — true for
 /// SELECT/INSERT/UPDATE/DELETE (all of which surface a cursor for
@@ -188,7 +188,7 @@ pub fn build_execute_statement(cursor_handle: u32) -> Vec<u8> {
     m.pack_u32(cursor_handle); // cursor handle (= 1 for our single-cursor sessions)
     m.pack(&[0x00, 0x00]); // 2-byte payload (TBD — captured constant)
     m.pack_u8(0x00);
-    m.pack_u8(0x01); // produces-cursor = true (see §7k)
+    m.pack_u8(0x01); // produces-cursor = true (see §7h)
     m.pack_u8(0x00);
     m.pack_u8(0x00);
     m.finish()
@@ -197,7 +197,7 @@ pub fn build_execute_statement(cursor_handle: u32) -> Vec<u8> {
 /// `TQueryStatement.ExecuteStatement` (reqcode 0x032A) — no-cursor
 /// flavour. Inner-body offset +23 is `0x00` here vs `0x01` in the
 /// default [`build_execute_statement`]; per DBISAM-PROTOCOL.md
-/// §7k that byte means **"this statement produces a result cursor"**,
+/// §7h that byte means **"this statement produces a result cursor"**,
 /// false for pure DDL (CREATE / ALTER / DROP / TRUNCATE). Same 34-byte
 /// body otherwise.
 pub fn build_execute_statement_ddl(cursor_handle: u32) -> Vec<u8> {
@@ -205,7 +205,7 @@ pub fn build_execute_statement_ddl(cursor_handle: u32) -> Vec<u8> {
     m.pack_u32(cursor_handle);
     m.pack(&[0x00, 0x00]);
     m.pack_u8(0x00);
-    m.pack_u8(0x00); // produces-cursor = false (DDL, see §7k)
+    m.pack_u8(0x00); // produces-cursor = false (DDL, see §7h)
     m.pack_u8(0x00);
     m.pack_u8(0x00);
     m.finish()
@@ -265,7 +265,7 @@ pub fn build_close_cursor(cursor_handle: u32) -> Vec<u8> {
 /// `TDataSession.RemoveAllRemoteMemoryTables` (reqcode 0x0029). Bulk-
 /// releases every server-side temp table backing materialised SELECT
 /// results in this session — empty inner body, just the reqcode.
-/// Per DBISAM-PROTOCOL.md §7f + §7k: materialised SELECTs pin
+/// Per DBISAM-PROTOCOL.md §7f + §7l: materialised SELECTs pin
 /// their source table via `TDataTable.UseCount`, which blocks DDL
 /// (DROP/ALTER) with `0x2B05` until the temp cursors close. Sending
 /// `0x0029` after a SELECT clears the pin so a subsequent DROP can

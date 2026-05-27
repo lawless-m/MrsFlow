@@ -194,7 +194,7 @@ impl Client {
         // Release the server-side cursor + materialised temp table.
         // The full sequence DBSYS uses to clear the pin that materialised
         // SELECTs leave on their source table (see KNOWN_BUGS.md B3 and
-        // DBISAM-PROTOCOL.md §7f / §7k):
+        // DBISAM-PROTOCOL.md §7f / §7l):
         //   1. CloseCursor (0x00A0) releases the cursor itself
         //   2. ResetStatement (0x0334) closes the statement transaction
         //   3. RemoveAllRemoteMemoryTables (0x0029) drops every temp
@@ -276,7 +276,7 @@ impl Client {
         // produces a result cursor" — false for pure DDL (no cursor),
         // true for DML which surfaces a cursor for the rows-affected
         // count. See `build_execute_statement{,_ddl}` doc-comments and
-        // DBISAM-PROTOCOL.md §7k.
+        // DBISAM-PROTOCOL.md §7h.
         let exec_body = if is_ddl {
             super::msg::build_execute_statement_ddl(1)
         } else {
