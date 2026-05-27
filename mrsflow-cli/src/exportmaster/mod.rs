@@ -20,6 +20,11 @@
 //!               cursor-state block from server responses into the next
 //!               client fetch.
 //! - `blob`    — opaque blob/memo handles + the `0x0280` fetch reqcode.
+//!
+//! Debug logging: set `EM_DML_DEBUG=1` to dump per-step request/response
+//! bytes for the DML/DDL execute path (BeginDML, PrepareStatement,
+//! ExecuteStatement, ResetStatement). Useful when a write-path query
+//! fails with a server reqcode the parser doesn't recognise.
 
 pub mod blob;
 pub mod client;
@@ -38,7 +43,7 @@ pub mod wire;
 
 pub use client::Client;
 
-use mrsflow_core::eval::{IoError, Value};
+use mrsflow_core::eval::{EnvNode, IoError, Record, Value};
 
 /// Connection options parsed from M's optional record argument
 /// (`Exportmaster.Query(host, sql, [User=…, Password=…, …])`).
@@ -126,12 +131,71 @@ impl ConnOpts {
     }
 }
 
-/// Run `sql` and return a `Value::Table`. Connects, logs in, executes,
-/// drains the cursor, disconnects. One TCP session per call (matches the
-/// `Odbc.Query` lifecycle — no connection pooling for v1).
+/// Run `sql` and return a result `Value`. Connects, logs in, executes,
+/// disconnects. One TCP session per call (matches the `Odbc.Query`
+/// lifecycle — no connection pooling for v1).
+///
+/// Dispatches on the first SQL keyword:
+/// - DML (`UPDATE` / `INSERT` / `DELETE`) and DDL (`CREATE` / `ALTER`
+///   / `DROP` / `TRUNCATE`) → returns `Value::Record` with
+///   `[RowsAffected = N]` via the poll-and-finalise path
+///   ([`Client::execute_dml`]). DDL uses the same wire flow as DML
+///   on DBISAM (Derek/dbisam-capture-autoinc.pcapng confirms: 0x0316
+///   → 0x0320 → 0x032A → 0x0334 for `CREATE TABLE`); the affected
+///   count for DDL is whatever the server reports (typically 0).
+/// - Anything else (SELECT, EXEC, ...) → returns `Value::Table` via
+///   the cursor-fetch path ([`Client::query_to_table`]).
 pub fn query(opts: &ConnOpts, sql: &str) -> Result<Value, IoError> {
     let mut client = Client::connect_and_login(opts)?;
-    client.query_to_table(sql)
+    if is_no_result_statement(sql) {
+        let ddl = is_ddl(sql);
+        let affected = client.execute_dml(sql, ddl)?;
+        // Per Derek/DBISAM-PROTOCOL.md §7h, DDL has no meaningful row
+        // count. Observed with the DML-flavoured ExecuteStatement,
+        // DROP returned `0x74726168` ("hart" ASCII) at the count offset
+        // — likely an adjacent field bleed-through. Normalise DDL to 0.
+        let reported = if ddl { 0 } else { affected };
+        Ok(rows_affected_record(reported))
+    } else {
+        client.query_to_table(sql)
+    }
+}
+
+fn is_ddl(sql: &str) -> bool {
+    matches!(
+        first_keyword(sql).to_ascii_uppercase().as_str(),
+        "CREATE" | "ALTER" | "DROP" | "TRUNCATE"
+    )
+}
+
+/// First non-whitespace ASCII-alpha run from `sql` — the SQL command
+/// keyword used for read-vs-write dispatch.
+fn first_keyword(sql: &str) -> &str {
+    let trimmed = sql.trim_start();
+    let end = trimmed
+        .find(|c: char| !c.is_ascii_alphabetic())
+        .unwrap_or(trimmed.len());
+    &trimmed[..end]
+}
+
+/// True for SQL that produces no result set on DBISAM — DML
+/// (UPDATE/INSERT/DELETE) and DDL (CREATE/ALTER/DROP/TRUNCATE). All of
+/// these travel the byte-identical wire path documented in
+/// Derek/DBISAM-PROTOCOL.md §7, so the client dispatches them through
+/// the same `execute_dml` poll-and-finalise loop.
+fn is_no_result_statement(sql: &str) -> bool {
+    let kw = first_keyword(sql);
+    matches!(
+        kw.to_ascii_uppercase().as_str(),
+        "UPDATE" | "INSERT" | "DELETE" | "CREATE" | "ALTER" | "DROP" | "TRUNCATE"
+    )
+}
+
+fn rows_affected_record(n: u32) -> Value {
+    Value::Record(Record {
+        fields: vec![("RowsAffected".to_string(), Value::Number(n as f64))],
+        env: EnvNode::empty(),
+    })
 }
 
 /// Return a navigation `Value::Record` listing tables in the connected
@@ -143,4 +207,60 @@ pub fn query(opts: &ConnOpts, sql: &str) -> Result<Value, IoError> {
 pub fn database(opts: &ConnOpts) -> Result<Value, IoError> {
     let mut client = Client::connect_and_login(opts)?;
     client.list_tables_as_navigation(opts)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{first_keyword, is_ddl, is_no_result_statement};
+
+    #[test]
+    fn first_keyword_strips_leading_whitespace_and_stops_at_punctuation() {
+        assert_eq!(first_keyword("SELECT * FROM t"), "SELECT");
+        assert_eq!(first_keyword("  select 1"), "select");
+        assert_eq!(first_keyword("\n\tUPDATE x SET y=1"), "UPDATE");
+        assert_eq!(first_keyword(""), "");
+        assert_eq!(first_keyword("   "), "");
+        // First non-alpha terminates the keyword.
+        assert_eq!(first_keyword("DROP\tTABLE foo"), "DROP");
+    }
+
+    #[test]
+    fn is_no_result_statement_covers_dml_and_ddl() {
+        for sql in [
+            "UPDATE customer SET pay2 = 'x'",
+            "insert into t values (1)",
+            "DELETE FROM t",
+            "CREATE TABLE t (pk autoinc)",
+            "alter table t add column c int",
+            "drop table t",
+            "TRUNCATE TABLE t",
+            "  Update t SET v=1", // leading whitespace + mixed case
+        ] {
+            assert!(is_no_result_statement(sql), "expected execute-only: {sql:?}");
+        }
+
+        for sql in ["SELECT * FROM t", "select 1", "exec sp_foo", ""] {
+            assert!(!is_no_result_statement(sql), "expected cursor path: {sql:?}");
+        }
+    }
+
+    #[test]
+    fn is_ddl_only_matches_ddl_keywords() {
+        for sql in [
+            "CREATE TABLE t (pk autoinc)",
+            "drop TABLE t",
+            "ALTER TABLE t ADD c int",
+            "truncate table t",
+        ] {
+            assert!(is_ddl(sql), "expected DDL: {sql:?}");
+        }
+        for sql in [
+            "UPDATE t SET x=1",
+            "INSERT INTO t VALUES (1)",
+            "DELETE FROM t",
+            "SELECT * FROM t",
+        ] {
+            assert!(!is_ddl(sql), "expected NOT DDL: {sql:?}");
+        }
+    }
 }

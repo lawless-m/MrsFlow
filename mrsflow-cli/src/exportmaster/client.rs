@@ -191,6 +191,17 @@ impl Client {
                 Ok(())
             })?;
 
+        // Release the server-side cursor + materialised temp table.
+        // Without this, prior SELECTs leave server state that blocks any
+        // subsequent DROP TABLE on the source table with a 0x2B05
+        // ExecuteError. Two-step cleanup matches DBSYS's wrap-up shape:
+        //   1. CloseCursor (0x00A0) releases the cursor itself
+        //   2. ResetStatement (0x0334) closes the statement transaction
+        let close_body = super::msg::build_close_cursor(1);
+        let _ = framing::send_recv_auto(self.stream_mut(), &close_body, compression);
+        let reset_body = super::msg::build_reset_statement(1);
+        let _ = framing::send_recv_auto(self.stream_mut(), &reset_body, compression);
+
         let batch = builders.finish()?;
         Ok(Value::Table(Table::from_arrow(batch)))
     }
@@ -202,6 +213,107 @@ impl Client {
     pub fn query_raw(&mut self, sql: &str) -> Result<Vec<u8>, IoError> {
         let body = build_query_body(sql);
         framing::send_recv_auto(&mut self.stream, &body, self.compression)
+    }
+
+    /// Execute a DML statement (UPDATE / INSERT / DELETE) and return
+    /// the affected row count.
+    ///
+    /// Wire flow reverse-engineered from a DBSYS UPDATE capture
+    /// (`Derek/dbisam-capture-update.pcapng`, decoded via
+    /// `Derek/decode_update.py`):
+    ///
+    /// 1. `PrepareStatement` (0x0320) carrying the SQL — same body
+    ///    shape as the SELECT path.
+    /// 2. `ExecuteStatement` (0x032A) — kicks off server-side work.
+    /// 3. Loop: send `Receive` (0x030C) and read the response. While
+    ///    the response reqcode is `PollNotReady` (0x2C14), keep
+    ///    polling — the server's progress counter (offset 10 of the
+    ///    inner body) ticks up by 5 each cycle, reaching 100 at
+    ///    completion.
+    /// 4. The first non-poll response carries two Pack units:
+    ///    `<u32 len=8><8-byte TDateTime mtime>` then
+    ///    `<u32 len=4><u32 affected_count>`.
+    /// 5. `ResetStatement` (0x0334) finalises / commits the work.
+    ///    Skipping it leaves the operation uncommitted — the server
+    ///    rolls back on disconnect.
+    pub fn execute_dml(&mut self, sql: &str, is_ddl: bool) -> Result<u32, IoError> {
+        let debug = std::env::var("EM_DML_DEBUG").is_ok();
+        if debug { eprintln!("[em-dml] sql: {sql:?}  is_ddl: {is_ddl}"); }
+
+        // Begin-DML marker (0x0316) per Derek/DBISAM-PROTOCOL.md §7a.
+        let begin_body = super::msg::build_begin_dml(1);
+        let begin_resp = framing::send_recv_auto(&mut self.stream, &begin_body, self.compression)?;
+        if debug { eprintln!("[em-dml] begin (0x0316) resp ({} bytes): {}", begin_resp.len(), hex_dump(&begin_resp)); }
+
+        let prepare_body = build_query_body(sql);
+        let prepare_resp =
+            framing::send_recv_auto(&mut self.stream, &prepare_body, self.compression)?;
+        if debug { eprintln!("[em-dml] prepare (0x0320) resp ({} bytes): {}", prepare_resp.len(), hex_dump(&prepare_resp)); }
+
+        // PrepareError path (Derek/DBISAM-PROTOCOL.md §7f): server returns
+        // 0x2B02 with the offending identifier (unknown table, bad column,
+        // etc.). Skip ExecuteStatement, send ResetStatement to close the
+        // transaction, surface the identifier in the error message.
+        const PREPARE_ERROR: u16 = 0x2B02;
+        if body_reqcode(&prepare_resp) == Some(PREPARE_ERROR) {
+            let ident = parse_prepare_error(&prepare_resp)
+                .unwrap_or_else(|| "<unparseable>".to_string());
+            let reset_body = super::msg::build_reset_statement(1);
+            let _ = framing::send_recv_auto(&mut self.stream, &reset_body, self.compression);
+            return Err(IoError::Other(format!(
+                "Exportmaster: DBISAM PrepareStatement rejected SQL — offending identifier: {ident:?}"
+            )));
+        }
+
+        let exec_body = if is_ddl {
+            super::msg::build_execute_statement_ddl(1)
+        } else {
+            super::msg::build_execute_statement(1)
+        };
+        if debug { eprintln!("[em-dml] execute (0x032A) body ({} bytes): {}", exec_body.len(), hex_dump(&exec_body)); }
+        let mut resp =
+            framing::send_recv_auto(&mut self.stream, &exec_body, self.compression)?;
+        if debug { eprintln!("[em-dml] execute (0x032A) resp ({} bytes): {}", resp.len(), hex_dump(&resp)); }
+
+        // Catch the wider `0x2B__` error family (e.g. 0x2B05 ExecuteError
+        // observed when DROP TABLE is rejected — see conversation
+        // forensics 2026-05-27). Body shape matches PrepareError:
+        // 8 zero bytes + length-prefixed identifier. Close the
+        // transaction with ResetStatement and surface a real error.
+        if let Some(code) = body_reqcode(&resp) {
+            if (code & 0xFF00) == 0x2B00 && code != 0x2B02 {
+                let ident = parse_prepare_error(&resp)
+                    .unwrap_or_else(|| "<unparseable>".to_string());
+                let reset_body = super::msg::build_reset_statement(1);
+                let _ = framing::send_recv_auto(&mut self.stream, &reset_body, self.compression);
+                return Err(IoError::Other(format!(
+                    "Exportmaster: DBISAM ExecuteStatement rejected — reqcode 0x{code:04X}, identifier: {ident:?}"
+                )));
+            }
+        }
+
+        const POLL_NOT_READY: u16 = 0x2C14;
+        const MAX_POLLS: usize = 600;
+        let receive_body = super::msg::build_receive();
+        let mut polls = 0;
+        while body_reqcode(&resp) == Some(POLL_NOT_READY) {
+            if polls >= MAX_POLLS {
+                return Err(IoError::Other(format!(
+                    "Exportmaster: DML still polling after {polls} Receive cycles"
+                )));
+            }
+            resp =
+                framing::send_recv_auto(&mut self.stream, &receive_body, self.compression)?;
+            polls += 1;
+        }
+
+        let affected = parse_dml_result(&resp)?;
+
+        let reset_body = super::msg::build_reset_statement(1);
+        let reset_resp = framing::send_recv_auto(&mut self.stream, &reset_body, self.compression)?;
+        if debug { eprintln!("[em-dml] reset (0x0334) resp ({} bytes): {}", reset_resp.len(), hex_dump(&reset_resp)); }
+
+        Ok(affected)
     }
 
     /// Issue a `SELECT COUNT(*) FROM <table>` and return the integer
@@ -395,6 +507,75 @@ const POST_QUERY_BODIES_COUNT: &[&[u8]] = &[
     ],
 ];
 
+/// Render a body as space-separated hex bytes (capped) for debug logs.
+fn hex_dump(body: &[u8]) -> String {
+    const MAX: usize = 96;
+    let n = body.len().min(MAX);
+    let mut s = String::with_capacity(n * 3 + 16);
+    for (i, b) in body[..n].iter().enumerate() {
+        if i > 0 && i % 16 == 0 { s.push_str(" | "); }
+        s.push_str(&format!("{b:02X} "));
+    }
+    if body.len() > MAX { s.push_str(&format!("... +{} more", body.len() - MAX)); }
+    s
+}
+
+/// Extract the reqcode (u16 LE) from a response body. The body
+/// layout is `[flag u8][reqcode u16 LE][inner_len u32 LE][...]`;
+/// returns `None` if the body is too short to contain a reqcode.
+fn body_reqcode(body: &[u8]) -> Option<u16> {
+    if body.len() < 3 {
+        None
+    } else {
+        Some(u16::from_le_bytes([body[1], body[2]]))
+    }
+}
+
+/// Parse a DML final-response body into the affected row count.
+/// Per Derek/DBISAM-PROTOCOL.md §7d, the inner section is:
+///   +0   u32 LE = 8        length-prefix
+///   +4   f64 LE            execution time in seconds (informational)
+///   +12  u32 LE = 4        length-prefix
+///   +16  u32 LE            rows affected
+/// `body[0..7]` is the `[flag][reqcode][inner_len]` envelope; doc
+/// offsets are relative to inner, so we add 7 to reach them.
+fn parse_dml_result(body: &[u8]) -> Result<u32, IoError> {
+    let count_off = 7 + 16;
+    if body.len() < count_off + 4 {
+        return Err(IoError::Other(format!(
+            "Exportmaster: DML result body too short ({} bytes, need {}+)",
+            body.len(),
+            count_off + 4
+        )));
+    }
+    Ok(u32::from_le_bytes([
+        body[count_off],
+        body[count_off + 1],
+        body[count_off + 2],
+        body[count_off + 3],
+    ]))
+}
+
+/// Parse the offending identifier from a `PrepareError` (0x2B02) body.
+/// Per Derek/DBISAM-PROTOCOL.md §7f, the inner section is:
+///   +0..+8   8 zero bytes (timing slot, unused on parse failure)
+///   +8       u32 LE identifier length
+///   +12      ASCII identifier (table/column/keyword the parser choked on)
+fn parse_prepare_error(body: &[u8]) -> Option<String> {
+    if body.len() < 7 + 12 {
+        return None;
+    }
+    let inner = &body[7..];
+    let ident_len =
+        u32::from_le_bytes([inner[8], inner[9], inner[10], inner[11]]) as usize;
+    if ident_len == 0 || ident_len > 256 || 12 + ident_len > inner.len() {
+        return None;
+    }
+    std::str::from_utf8(&inner[12..12 + ident_len])
+        .ok()
+        .map(String::from)
+}
+
 /// Build a QUERY message body for the given SQL.
 ///
 /// Matches the captured `select count(*) from analysis\r\n` packet
@@ -444,4 +625,80 @@ fn build_login_body(ct: &[u8]) -> Vec<u8> {
     body.extend_from_slice(ct);
     body.push(0x00);
     body
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Helper: assemble a fake response body `[flag][reqcode LE][inner_len LE][...inner]`
+    /// for unit-testing the parsers in isolation.
+    fn make_response(reqcode: u16, inner: &[u8]) -> Vec<u8> {
+        let mut body = Vec::with_capacity(7 + inner.len());
+        body.push(0x00); // flag
+        body.extend_from_slice(&reqcode.to_le_bytes());
+        body.extend_from_slice(&(inner.len() as u32).to_le_bytes());
+        body.extend_from_slice(inner);
+        body
+    }
+
+    #[test]
+    fn body_reqcode_reads_bytes_1_and_2_as_u16_le() {
+        let body = make_response(0x2C14, &[]);
+        assert_eq!(body_reqcode(&body), Some(0x2C14));
+        let body = make_response(0x2B05, &[]);
+        assert_eq!(body_reqcode(&body), Some(0x2B05));
+        // Too short → None.
+        assert_eq!(body_reqcode(&[]), None);
+        assert_eq!(body_reqcode(&[0x00, 0x14]), None);
+    }
+
+    #[test]
+    fn parse_dml_result_extracts_affected_count_at_offset_16() {
+        // Per Derek/DBISAM-PROTOCOL.md §7d:
+        //   inner +0..+4   u32 LE = 8        length-prefix
+        //   inner +4..+12  f64 LE            execution time (ignored here)
+        //   inner +12..+16 u32 LE = 4        length-prefix
+        //   inner +16..+20 u32 LE            rows affected
+        let mut inner = Vec::new();
+        inner.extend_from_slice(&8u32.to_le_bytes()); // len-prefix
+        inner.extend_from_slice(&0.485f64.to_le_bytes()); // timing
+        inner.extend_from_slice(&4u32.to_le_bytes()); // len-prefix
+        inner.extend_from_slice(&9360u32.to_le_bytes()); // affected
+        let body = make_response(0x0000, &inner);
+        assert_eq!(parse_dml_result(&body).unwrap(), 9360);
+    }
+
+    #[test]
+    fn parse_dml_result_rejects_truncated_body() {
+        // 7-byte header alone, nothing inside.
+        let body = make_response(0x0000, &[]);
+        assert!(parse_dml_result(&body).is_err());
+    }
+
+    #[test]
+    fn parse_prepare_error_extracts_identifier_at_offset_12() {
+        // Per Derek/DBISAM-PROTOCOL.md §7f:
+        //   inner +0..+8   8 zero bytes (unused timing slot)
+        //   inner +8..+12  u32 LE identifier length
+        //   inner +12..    identifier bytes
+        let mut inner = Vec::new();
+        inner.extend_from_slice(&[0u8; 8]); // zero timing
+        inner.extend_from_slice(&8u32.to_le_bytes()); // ident length
+        inner.extend_from_slice(b"MikaTest"); // ident
+        inner.extend_from_slice(&[0u8; 4]); // trailing zeros (server pads)
+        let body = make_response(0x2B02, &inner);
+        assert_eq!(parse_prepare_error(&body), Some("MikaTest".to_string()));
+    }
+
+    #[test]
+    fn parse_prepare_error_returns_none_for_oversize_or_bogus_length() {
+        // Ridiculously large identifier length → reject.
+        let mut inner = Vec::new();
+        inner.extend_from_slice(&[0u8; 8]);
+        inner.extend_from_slice(&999u32.to_le_bytes()); // > 256 cap
+        inner.extend_from_slice(b"short");
+        let body = make_response(0x2B02, &inner);
+        assert_eq!(parse_prepare_error(&body), None);
+    }
 }

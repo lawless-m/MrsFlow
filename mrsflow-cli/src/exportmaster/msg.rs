@@ -189,6 +189,21 @@ pub fn build_execute_statement(cursor_handle: u32) -> Vec<u8> {
     m.finish()
 }
 
+/// `TQueryStatement.ExecuteStatement` (reqcode 0x032A) — DDL flavour.
+/// Per Derek/DBISAM-PROTOCOL.md §7h, DDL's ExecuteStatement boilerplate
+/// differs from DML at inner-body offset +23: `0x00` here vs `0x01` for
+/// DML. Same 34-byte body otherwise.
+pub fn build_execute_statement_ddl(cursor_handle: u32) -> Vec<u8> {
+    let mut m = MsgBuilder::new(reqcode::EXECUTE_STATEMENT);
+    m.pack_u32(cursor_handle);
+    m.pack(&[0x00, 0x00]);
+    m.pack_u8(0x00);
+    m.pack_u8(0x00); // DDL flavour byte (DML uses 0x01 here)
+    m.pack_u8(0x00);
+    m.pack_u8(0x00);
+    m.finish()
+}
+
 /// `TDataCursor.Receive` (reqcode 0x030C). Batched receive during
 /// initial result-set transfer. Captured body is a single `<u32 len=1>
 /// <0x00>` unit.
@@ -217,6 +232,38 @@ pub fn build_get_next_record(cursor_handle: u32, bookmark: &[u8], counter: u32) 
     m.pack_u8(0x00);
     m.pack_u8(0x00);
     m.pack_u32(counter);
+    m.finish()
+}
+
+/// `TQueryStatement.ResetStatement` (reqcode 0x0334). Finalises a
+/// statement after execution — captured body is a single Pack unit
+/// carrying the cursor handle (`04 00 00 00 01 00 00 00` for handle=1).
+/// Sent after the DML poll loop completes; commits/releases the work.
+pub fn build_reset_statement(cursor_handle: u32) -> Vec<u8> {
+    let mut m = MsgBuilder::new(reqcode::RESET_STATEMENT);
+    m.pack_u32(cursor_handle);
+    m.finish()
+}
+
+/// `TDataCursor.CloseCursor` (reqcode 0x00A0). Releases a server-side
+/// cursor (and its backing temp table from a SELECT materialisation).
+/// Captured body shape unverified; following the universal pattern of
+/// "Pack u32 cursor_handle" used by every other cursor op.
+pub fn build_close_cursor(cursor_handle: u32) -> Vec<u8> {
+    let mut m = MsgBuilder::new(reqcode::CLOSE_CURSOR);
+    m.pack_u32(cursor_handle);
+    m.finish()
+}
+
+/// Begin-DML marker (reqcode 0x0316). Sent before every PrepareStatement
+/// in DBSYS captures (DML and DDL alike — see Derek/DBISAM-PROTOCOL.md
+/// §7a). Captured body is a single Pack unit carrying the cursor handle
+/// (`04 00 00 00 01 00 00 00` for handle=1). Server replies with an ack.
+pub fn build_begin_dml(cursor_handle: u32) -> Vec<u8> {
+    // Reqcode constant isn't in our `reqcode` subset yet; pass the
+    // literal to keep this builder self-contained.
+    let mut m = MsgBuilder::new(0x0316);
+    m.pack_u32(cursor_handle);
     m.finish()
 }
 
@@ -289,5 +336,49 @@ mod tests {
         // 7-byte header + 1 Pack unit (4 len + 4 payload) = 15 bytes
         assert_eq!(body.len(), 15);
         assert_eq!(&body[1..3], &[0xBE, 0x00]); // reqcode 0x00BE LE
+    }
+
+    /// Body shape for the single-Pack-u32(handle) family — used by
+    /// BeginDML, ResetStatement, and CloseCursor. All three are
+    /// captured as `04 00 00 00 01 00 00 00` for handle=1.
+    fn single_handle_body_matches(body: &[u8], expected_reqcode: u16) {
+        assert_eq!(body.len(), 15, "expected 7-byte header + 8-byte Pack unit");
+        assert_eq!(body[0], 0x00);
+        assert_eq!(&body[1..3], &expected_reqcode.to_le_bytes());
+        assert_eq!(&body[3..7], &[0x08, 0x00, 0x00, 0x00]); // inner_len = 8
+        assert_eq!(&body[7..11], &[0x04, 0x00, 0x00, 0x00]); // Pack len = 4
+        assert_eq!(&body[11..15], &[0x01, 0x00, 0x00, 0x00]); // handle = 1
+    }
+
+    #[test]
+    fn begin_dml_layout() {
+        single_handle_body_matches(&build_begin_dml(1), 0x0316);
+    }
+
+    #[test]
+    fn reset_statement_layout() {
+        single_handle_body_matches(&build_reset_statement(1), reqcode::RESET_STATEMENT);
+    }
+
+    #[test]
+    fn close_cursor_layout() {
+        single_handle_body_matches(&build_close_cursor(1), reqcode::CLOSE_CURSOR);
+    }
+
+    #[test]
+    fn execute_statement_ddl_differs_at_offset_30() {
+        // Inner offset +23 (= outer offset 30 after the 7-byte header) is
+        // the DDL/DML flavour byte per Derek/DBISAM-PROTOCOL.md §7h:
+        // 0x00 for DDL, 0x01 for DML. Everything else is identical.
+        let dml = build_execute_statement(1);
+        let ddl = build_execute_statement_ddl(1);
+        assert_eq!(dml.len(), ddl.len(), "both 41 bytes");
+        assert_eq!(dml.len(), 41);
+        assert_eq!(dml[30], 0x01, "DML flavour byte at offset 30");
+        assert_eq!(ddl[30], 0x00, "DDL flavour byte at offset 30");
+        // Verify the surrounding bytes are otherwise identical.
+        for i in (0..dml.len()).filter(|&i| i != 30) {
+            assert_eq!(dml[i], ddl[i], "byte {i} should match between DML and DDL forms");
+        }
     }
 }
