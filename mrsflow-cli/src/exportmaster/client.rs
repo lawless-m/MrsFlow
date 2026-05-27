@@ -272,6 +272,11 @@ impl Client {
             )));
         }
 
+        // The +23 byte of ExecuteStatement encodes "this statement
+        // produces a result cursor" — false for pure DDL (no cursor),
+        // true for DML which surfaces a cursor for the rows-affected
+        // count. See `build_execute_statement{,_ddl}` doc-comments and
+        // Derek/DBISAM-PROTOCOL.md §7k.
         let exec_body = if is_ddl {
             super::msg::build_execute_statement_ddl(1)
         } else {

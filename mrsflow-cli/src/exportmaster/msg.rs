@@ -175,30 +175,37 @@ pub fn build_prepare_statement(sql: &str) -> Vec<u8> {
     body
 }
 
-/// `TQueryStatement.ExecuteStatement` (reqcode 0x032A). Kicks off
-/// cursor execution after a successful PrepareStatement. Captured body
-/// has 6 Pack units of small constants; we replay the structure.
+/// `TQueryStatement.ExecuteStatement` (reqcode 0x032A) — result-cursor
+/// flavour. Inner-body offset +23 is `0x01` here. Per
+/// Derek/DBISAM-PROTOCOL.md §7k, that byte is the 6th positional bool
+/// arg of `ExecuteStatement` set by `GetQueryCursor` and reduces to
+/// **"this statement produces a result cursor"** — true for
+/// SELECT/INSERT/UPDATE/DELETE (all of which surface a cursor for
+/// rows-or-count). Use the [`build_execute_statement_ddl`] variant for
+/// statements that don't open a cursor (pure DDL).
 pub fn build_execute_statement(cursor_handle: u32) -> Vec<u8> {
     let mut m = MsgBuilder::new(reqcode::EXECUTE_STATEMENT);
     m.pack_u32(cursor_handle); // cursor handle (= 1 for our single-cursor sessions)
     m.pack(&[0x00, 0x00]); // 2-byte payload (TBD — captured constant)
     m.pack_u8(0x00);
-    m.pack_u8(0x01);
+    m.pack_u8(0x01); // produces-cursor = true (see §7k)
     m.pack_u8(0x00);
     m.pack_u8(0x00);
     m.finish()
 }
 
-/// `TQueryStatement.ExecuteStatement` (reqcode 0x032A) — DDL flavour.
-/// Per Derek/DBISAM-PROTOCOL.md §7h, DDL's ExecuteStatement boilerplate
-/// differs from DML at inner-body offset +23: `0x00` here vs `0x01` for
-/// DML. Same 34-byte body otherwise.
+/// `TQueryStatement.ExecuteStatement` (reqcode 0x032A) — no-cursor
+/// flavour. Inner-body offset +23 is `0x00` here vs `0x01` in the
+/// default [`build_execute_statement`]; per Derek/DBISAM-PROTOCOL.md
+/// §7k that byte means **"this statement produces a result cursor"**,
+/// false for pure DDL (CREATE / ALTER / DROP / TRUNCATE). Same 34-byte
+/// body otherwise.
 pub fn build_execute_statement_ddl(cursor_handle: u32) -> Vec<u8> {
     let mut m = MsgBuilder::new(reqcode::EXECUTE_STATEMENT);
     m.pack_u32(cursor_handle);
     m.pack(&[0x00, 0x00]);
     m.pack_u8(0x00);
-    m.pack_u8(0x00); // DDL flavour byte (DML uses 0x01 here)
+    m.pack_u8(0x00); // produces-cursor = false (DDL, see §7k)
     m.pack_u8(0x00);
     m.pack_u8(0x00);
     m.finish()
