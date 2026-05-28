@@ -830,7 +830,7 @@ Recovered from disassembling `TDataCursor.ReadFirstRecordBlock`
 `TDataCursor.OpenCursor` (RVA 0x087164), and `TDataCursor.CloseCursor`
 (RVA 0x087EC8). These are the **base TDataCursor** read primitives —
 used when the client opens a table directly (or, internally, when
-walking the server-side SELECT temp table; see §7k cursor-pin notes).
+walking the server-side SELECT temp table; see §7l cursor-pin notes).
 
 | Reqcode | Method | Body shape |
 |---:|---|---|
@@ -1132,7 +1132,7 @@ result consumption, returning `UseCount` to 0 before the DROP fires.
 Materialized SELECTs (`ORDER BY`, `JOIN`, large result sets) create a
 server-side temp table whose cursor holds a reference back to the source
 — keeping `UseCount > 0` until those temp cursors close, which the
-`0x0029 RemoveAllRemoteMemoryTables` reqcode does in bulk (see §7k).
+`0x0029 RemoveAllRemoteMemoryTables` reqcode does in bulk (see §7l).
 
 Not operationally relevant for a SELECT-only extractor, but useful to
 understand the model.
