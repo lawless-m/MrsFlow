@@ -180,7 +180,7 @@ fold predicates and projections before any data flows; `JoinView` and
 | `mrsflow-core/`  | Pure evaluator. Lexer, parser, AST, eval, stdlib. No IO.                |
 | `mrsflow-cli/`   | CLI shell. Filesystem + Parquet + (optional) ODBC / MySQL / PostgreSQL. |
 | `mrsflow-wasm/`  | Browser shell. Same evaluator, different IO host.                       |
-| `mrsflow/`       | Design-doc series (`01-overview` … `09-lazy-tables`) + stdlib reference.|
+| `mrsflow/`       | Design-doc series (`01-overview` … `10-plan-ir`) + stdlib reference.    |
 | `docs/`          | Reader-facing docs: contributing, coverage, compatibility, changelog.   |
 | `Oracle/`        | Differential testing against real Power Query in Excel.                 |
 | `examples/`      | Real M queries from production work (machine-local, untracked).         |
@@ -202,7 +202,7 @@ fold predicates and projections before any data flows; `JoinView` and
 **Design series** ([`mrsflow/CONTENTS.md`](mrsflow/CONTENTS.md)):
 `01-overview`, `02-architecture`, `03-scope-v1`, `04-test-harness`,
 `05-open-questions`, `06-resources`, `07-evaluator-design`,
-`08-prolog-differential`, `09-lazy-tables`.
+`08-prolog-differential`, `09-lazy-tables`, `10-plan-ir`.
 
 ## Testing
 
