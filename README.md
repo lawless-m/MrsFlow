@@ -3,8 +3,8 @@
 A Rust implementation of the Power Query **M** language. Parses M source,
 evaluates it against in-memory Arrow tables, reads and writes Parquet,
 and talks to databases over ODBC and native protocols (MySQL,
-PostgreSQL). Ships as a CLI binary and a WebAssembly module that share
-one evaluator core.
+PostgreSQL, DBISAM). Ships as a CLI binary and a WebAssembly module
+that share one evaluator core.
 
 The thesis, in one line: **M is a good language for tabular data; it
 shouldn't be trapped inside Excel.**
@@ -87,7 +87,7 @@ bindings.
 | Temporal    | `Date.*` (58), `DateTime.*`, `DateTimeZone.*`, `Duration.*`, `Time.*` |
 | Types       | `Value.*` (26), `Type.*` (25), and the full `*.Type` token set |
 | Documents   | `Json.*`, `Csv.*`, `Xml.*`, `Html.*`, `Lines.*`                |
-| Connectors  | `Parquet.*`, `Odbc.*`, `MySQL.*`, `PostgreSQL.*`, `Excel.*`, `Web.*`, `File.*`, `Folder.*` |
+| Connectors  | `Parquet.*`, `Odbc.*`, `MySQL.*`, `PostgreSQL.*`, `Exportmaster.*` (native DBISAM), `Excel.*`, `Web.*`, `File.*`, `Folder.*` |
 | Geo         | `Geography.*`, `Geometry.*`, `GeographyPoint.*`, `GeometryPoint.*` (WKT POINT round-trips) |
 | Combinators | `Splitter.*`, `Combiner.*`, `Comparer.*`, `Replacer.*`         |
 | Meta        | `Function.*`, `Expression.*`, `RowExpression.*` (AST reflection), `Diagnostics.*`, `Uri.*`, `Variable.*` |
@@ -115,7 +115,7 @@ mrsflow query.m --in customers=customers.parquet   # bind a Parquet file as an M
 Database connectors are feature-gated:
 
 ```bash
-cargo build --release --features "odbc mysql postgresql"
+cargo build --release --features "odbc mysql postgresql exportmaster"
 ```
 
 - **ODBC** needs a driver manager (`apt install unixodbc-dev` on Debian;
@@ -123,6 +123,12 @@ cargo build --release --features "odbc mysql postgresql"
   ODBC, Postgres ODBC, …).
 - **MySQL** / **PostgreSQL** use pure-Rust drivers (`mysql`,
   `tokio-postgres`) with `rustls` for TLS — no system OpenSSL.
+- **Exportmaster** speaks the DBISAM client/server wire protocol
+  directly to `dbsrvr.exe` over TCP, sidestepping the DBISAM ODBC
+  driver (see `KNOWN_BUGS.md` §B1). Pure-Rust deps only (`blowfish`,
+  `md-5`, `cbc`, `flate2`); no system libraries. Exposes
+  `Exportmaster.Query(host, sql, [opts])` and
+  `Exportmaster.Database(host, [opts])`.
 
 ## Architecture
 
