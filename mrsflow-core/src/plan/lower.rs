@@ -269,6 +269,13 @@ fn lower_scalar(expr: &Expr, param: &str) -> Scalar {
             op: BoolOp::Not,
             args: vec![lower_scalar(inner, param)],
         },
+        // Signed numeric literals: fold `-5` / `+5` into the literal so they
+        // reach the emitter, rather than stranding the comparison as opaque.
+        Expr::Unary(UnaryOp::Minus, inner) => match inner.as_ref() {
+            Expr::NumberLit(s) => Scalar::Lit(Lit::Number(format!("-{s}"))),
+            _ => Scalar::Opaque,
+        },
+        Expr::Unary(UnaryOp::Plus, inner) => lower_scalar(inner, param),
         Expr::Binary(op, l, r) => lower_binary(*op, l, r, param),
         Expr::Invoke { target, args } => match target.as_ref() {
             Expr::Identifier(func) if is_scalar_call(func) => Scalar::Call {
@@ -732,6 +739,18 @@ mod tests {
         assert_eq!(
             plan(r#"Table.SelectRows(t, each MyFunc([name]) = "X")"#),
             r#"(filter (= (opaque) (lit text "X")) (scan (ref "t")))"#
+        );
+    }
+
+    #[test]
+    fn signed_number_literals_fold() {
+        assert_eq!(
+            plan(r#"Table.SelectRows(t, each [a] = -5)"#),
+            r#"(filter (= (col "a") (lit number "-5")) (scan (ref "t")))"#
+        );
+        assert_eq!(
+            plan(r#"Table.SelectRows(t, each [a] = +5)"#),
+            r#"(filter (= (col "a") (lit number "5")) (scan (ref "t")))"#
         );
     }
 }
