@@ -88,7 +88,7 @@ bindings.
 | Types       | `Value.*` (26), `Type.*` (25), and the full `*.Type` token set |
 | Documents   | `Json.*`, `Csv.*`, `Xml.*`, `Html.*`, `Lines.*`                |
 | Connectors  | `Parquet.*`, `Odbc.*`, `MySQL.*`, `PostgreSQL.*`, `Exportmaster.*` (native DBISAM), `Excel.*`, `Web.*`, `File.*`, `Folder.*` |
-| Geo         | `Geography.*`, `Geometry.*`, `GeographyPoint.*`, `GeometryPoint.*` (WKT POINT round-trips) |
+| Geo         | `Geography.*`, `Geometry.*`, `GeographyPoint.*`, `GeometryPoint.*` (points only — no lines or polygons) |
 | Combinators | `Splitter.*`, `Combiner.*`, `Comparer.*`, `Replacer.*`         |
 | Meta        | `Function.*`, `Expression.*`, `RowExpression.*` (AST reflection), `Diagnostics.*`, `Uri.*`, `Variable.*` |
 
