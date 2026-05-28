@@ -149,6 +149,7 @@ pub fn fold(rel: &Rel, d: &dyn Dialect) -> FoldResult {
         return FoldResult {
             sql: Some(sql),
             residual: folded_sentinel(),
+            folded: Some(rel.clone()),
         };
     }
     // The whole subtree does not fold; peel this node and fold what is below.
@@ -157,6 +158,7 @@ pub fn fold(rel: &Rel, d: &dyn Dialect) -> FoldResult {
         FoldResult {
             sql: sub.sql,
             residual: rebuild(sub.residual),
+            folded: sub.folded,
         }
     };
     match rel {
@@ -212,6 +214,7 @@ pub fn fold(rel: &Rel, d: &dyn Dialect) -> FoldResult {
         other => FoldResult {
             sql: None,
             residual: other.clone(),
+            folded: None,
         },
     }
 }
@@ -224,6 +227,10 @@ pub struct FoldResult {
     /// The plan to evaluate in-memory over the pushed rows. Equal to the
     /// [`FOLDED`] sentinel exactly when the whole plan folded.
     pub residual: Rel,
+    /// The logical subtree that became `sql` — what the connector executes.
+    /// `None` when nothing folded. Used by the differential harness to run the
+    /// folded route, and available to wiring for the result schema.
+    pub folded: Option<Rel>,
 }
 
 impl FoldResult {
