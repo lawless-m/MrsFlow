@@ -1,6 +1,12 @@
 # 09 — Lazy Tables (Stage A design note)
 
-**Status:** Design proposal — nothing implemented. Shred or approve.
+**Status:** Implemented and superseded — this was the Stage A design note;
+the work landed. `TableRepr` now carries `LazyParquet`, `LazyOdbc`,
+`JoinView`, and `ExpandView` (see `mrsflow-core/src/eval/value.rs`), so the
+"nothing implemented" framing below is the original proposal, kept for
+provenance. The connector path is now subsumed by the Plan IR in
+[`10-plan-ir.md`](10-plan-ir.md); read this for the lazy-table model and
+the stdlib classification, and `10` for where it is headed.
 **Origin:** WASM demo session 2026-05-12. Empirical confirmation in
 `project_lazy_tables_and_quack` memory; "user can't be expected to
 hand-project every right-side table" in `feedback_no_semantics_changing_optimisation`.
