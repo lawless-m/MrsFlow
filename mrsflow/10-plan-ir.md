@@ -1,0 +1,132 @@
+# Plan IR and the Fold Planner
+
+Thesis in one line: **the accumulator in `LazyOdbc` tops out at filter-and-project because filter and project are the only two operators that compose without a plan. To fold a `Table.Group` or a join into DBISAM we need a logical relational plan between the M AST and the connector, and a planner that decides — per connector — how much of that plan can be pushed down.**
+
+This doc specifies that plan IR, the scalar sub-IR underneath it, how M lowers into both, and how the DBISAM dialect grammar becomes the fold decision procedure rather than a separately-maintained capability table. It follows `09-lazy-tables.md` (which it largely subsumes for the connector path) and leans on `08-prolog-differential.md` and `04-test-harness.md` for the safety discipline.
+
+## Why now, and why this is bimodal
+
+For queries M already folds fully — the filter-project-sort spine against a source it reaches well — this buys nothing. The whole query is already down at the source and there is nothing left to win. If the real workload in `examples/` is mostly that shape, the accumulator is sufficient and this layer should not be built.
+
+The win is concentrated and large where M folds *badly*: aggregation and joins against a source M reaches through a weak ODBC driver. DBISAM is exactly that source — no native Power Query connector, reached over ODBC, driver reports little capability, so M pulls the filtered table over the wire and groups it in the engine. Where a `Table.Group` collapses millions of rows to hundreds, pushing the `GROUP BY` down is not a few percent, it is moving hundreds of rows instead of millions. We reach DBISAM over a reverse-engineered native protocol and own the dialect emitter, so the ceiling is what the DBISAM engine executes, not what a driver admits.
+
+**Gate before building any of this:** triage `examples/`. For each query that hits a group or join against DBISAM, find where M's fold breaks and how many rows cross the wire at that break versus at the source. If the tail is empty, stop at the accumulator. If three queries pull a million rows to summarise to a few hundred, those three are the justification by name.
+
+A second, smaller justification survives even if the fold tail disappoints: pushing a filter below a join or group shrinks what the in-memory evaluator chews on, which helps pure-Parquet queries with no source folding at all. The logical-optimisation passes pay off independent of the fold percentage.
+
+## Three layers, all S-expressions
+
+| Layer | Faithful to | Status | Example |
+| --- | --- | --- | --- |
+| M AST | source text | exists | `(invoke Table.SelectRows tbl (each (= [Country] "GB")))` |
+| Plan IR | meaning (relational algebra) | new | `(filter (= (col Country) (lit "GB")) (scan sales))` |
+| Scalar IR | the expressions inside `each` | new | `(= (col Country) (lit text "GB"))` |
+
+Keeping all three as S-expressions is deliberate: one uniform tree representation, a generic bottom-up rewrite engine over all of them, and trivial dump-and-diff at every pass — which the differential harness consumes directly. The M AST is what the user wrote; the Plan IR is what it computes; the Scalar IR is the leaf-level expression language that fold-safety reasoning operates on.
+
+## The relational node set
+
+Closed and minimal. Logical only — no node encodes a backend choice or a fold decision; that is the planner's job, downstream.
+
+| Node | Shape | Lowers from |
+| --- | --- | --- |
+| `Scan` | source binding | a `*.Document` / connector leaf |
+| `Filter` | predicate (scalar), input | `Table.SelectRows` |
+| `Project` | named expressions (scalar), input | `Table.SelectColumns`, `Table.AddColumn`, `RenameColumns` |
+| `Sort` | keys + direction, input | `Table.Sort` |
+| `Limit` | n, optional offset, input | `Table.FirstN`, `Table.Range` |
+| `Aggregate` | group keys, named aggregations, input | `Table.Group` |
+| `Join` | kind, left, right, condition (scalar), key sets | `Table.NestedJoin` (+ following `ExpandTableColumn`) |
+| `Distinct` | input | `Table.Distinct` |
+| `EvalM` | opaque M thunk, declared output schema | anything not in the above set |
+
+`EvalM` is the escape hatch and the most important node for honesty. Any step that doesn't map to a relational operator — a call into a user function, a list/record manipulation that isn't a table transform, arbitrary table-returning M — lowers to `EvalM`. The planner cannot see through it; folding stops at it. Most of the time `EvalM` sits *above* the foldable spine, so it costs nothing but a materialisation boundary.
+
+The `NestedJoin` + `ExpandTableColumn` pair is recognised during lowering and collapsed into a single `Join` (optionally followed by a `Project` to flatten), rather than carried as the nested-column shape. The `JoinView`/`ExpandView` `TableRepr` variants already model that deferral; this just names it in the plan.
+
+## The scalar IR
+
+Distinct from the relational layer, and typed. This is the layer where "can this fold to SQL, and is it safe to" gets answered, so it must not be raw M-AST blobs.
+
+| Form | Notes |
+| --- | --- |
+| `(col Name)` | column reference |
+| `(lit type value)` | typed literal — type carried for decimal/date/null reasoning |
+| `(cmp op a b)` | `= <> < <= > >=` |
+| `(bool op …)` | `and` / `or` / `not` |
+| `(arith op a b)` | `+ - * /` |
+| `(call fn args…)` | bounded allow-list of M functions with SQL analogues |
+| `(opaque)` | an `each` body that does not reduce to the above |
+
+Lowering an `each` body produces *either* a scalar IR expression *or* `(opaque)`. An opaque scalar is itself a fold boundary: a `Filter` whose predicate is opaque cannot fold and falls to in-memory evaluation, where the full M evaluator runs the original `each` over the rows. The `call` allow-list is the only place library functions enter — `Text.Upper → UPPER`, `Text.Contains → LIKE`, `Number.Round → ROUND`, and so on — and it is intentionally small; everything off the list is `opaque`, not wrong.
+
+## The fold planner — the grammar *is* the decision procedure
+
+This is the payoff from grinding out the DBISAM DCG. Given a logical plan and a target connector, walk the plan bottom-up and attempt to emit the connector's SQL dialect through the grammar. The maximal subtree that emits valid SQL is the fold; the first node that won't emit is the boundary; everything above the boundary runs in the evaluator over the rows the fold returns.
+
+The emitter's success **is** the syntactic fold predicate. There is no separate hand-written "can DBISAM take a `GROUP BY` here" table to drift out of sync with the emitter — if the grammar generates valid DBISAM SQL for the subtree, it folds; if it doesn't, it doesn't. The dialect ceiling and the codegen are the same operation.
+
+But syntactic emittability is only the first of two gates:
+
+- **Gate 1 — dialect (the grammar).** Can the DCG emit valid DBISAM SQL for this subtree? Encodes the dialect ceiling: `TOP n` not `LIMIT/OFFSET`, no window functions, limited subqueries, DBISAM's own string/date function names and date-literal syntax.
+- **Gate 2 — semantics (proven, not assumed).** Is folding this class equivalent to in-memory evaluation for DBISAM? Collation on text comparison, `NULL` ordering in `ORDER BY`, integer-vs-decimal division, date-boundary handling — the usual suspects in an engine this vintage. These are *proven* by the differential harness and recorded as fold-exclusion rules. They live in the connector, not the planner, because they are dialect-specific.
+
+Both gates must pass for a node to fold.
+
+## Capability model
+
+The plan IR is backend-agnostic; the fold pass is backend-specific. Each connector is effectively a row in a capability table, but for SQL backends that row is *computed*: "what the dialect grammar emits" minus "what the differential harness proved unsafe." Do not hand-write it.
+
+| Backend | Capability | Realised by |
+| --- | --- | --- |
+| DBISAM (native) | filter, project, sort, `TOP`, equi-join, aggregate — pending Gate 2 | dialect grammar + proven exclusions |
+| PostgreSQL (native) | broad — the rich end of the table | (its own emitter) |
+| ODBC (generic) | portable lowest-common-denominator | driver-reported |
+| Parquet | row-group elimination on `Filter` over column stats; column selection on `Project`; **no** aggregate/join/sort | statistics, not SQL |
+
+Note the asymmetry: Parquet can take *less* than the current accumulator's LCD, while native DBISAM and PostgreSQL can take *more*. The accumulator folded everything at the intersection of all backends, which is why the native paths were folding at the level of the poorest. The planner pushes the maximal subtree *each backend* supports.
+
+## Logical optimisation, before folding
+
+RA→RA rewrites with explicit equivalence preconditions, applied to the logical plan before the fold pass:
+
+- **Filter pushdown** — push `Filter` below `Join`/`Aggregate`/`Project` where the predicate's columns permit. Helps both the fold (more selective scan at the source) and the in-memory path (less for the evaluator to chew).
+- **Projection pruning** — drop columns nothing above consumes.
+- **Conjunction splitting** — break `and`-predicates so each conjunct can be pushed independently; the part that folds folds, the part that doesn't stays.
+
+These are the justification that survives a disappointing fold percentage, because they help even when nothing reaches a source.
+
+## Execution split
+
+```
+M AST
+  │ lower
+  ▼
+Plan IR ──► logical optimise ──► fold pass (per connector, via DCG)
+                                      │
+                          ┌───────────┴───────────┐
+                          ▼                       ▼
+                  foldable subtree           residual plan
+                  → DBISAM SQL               → evaluator runs over
+                    over native socket          the returned rows
+```
+
+The `LazyOdbc` predicate/projection accumulation is subsumed by this for the connector path: filter-and-project become the trivial bottom of the same fold walk. The lazy `TableRepr` variants remain the *carrier* of a deferred plan; the planner is what fills them above filter-and-project.
+
+## Differential gate — no Excel in the loop
+
+Every fold class is enabled on DBISAM only after the harness proves it. Same query, same source rows, two routes — folded into DBISAM SQL versus pulled raw and run through mrsflow's own operators — diffed. Divergences become Gate 2 exclusions. This is the same discipline as the Prolog and Excel oracles (`08`, `04`), pointed at the fold path itself, and it needs no Excel because both routes are inside mrsflow. Build this harness *first*, against the filter-and-project folding that already exists, so the instrument is validated against trusted behaviour before it measures anything new.
+
+## What's deliberately out of scope
+
+- **Cost-based planning.** The fold pass is rule-based — push the maximal safe subtree, full stop. No statistics-driven join reordering. DBISAM isn't worth a cost model.
+- **Cross-source folding.** A join whose two inputs are different connectors does not fold; the join runs in the evaluator. Only same-source subtrees fold.
+- **Writing back.** Read-only. The connector pulls and folds; it does not emit DML.
+- **Speculative scalar translation.** The `call` allow-list grows only when a function has a proven-equivalent DBISAM analogue. Unknown functions are `opaque`, never guessed.
+
+## Open questions
+
+1. **Where does `EvalM` force?** Eagerly at the boundary, or lazily threaded so a downstream fold can still see the schema? Affects whether an `EvalM` between two foldable regions kills the lower fold.
+2. **Aggregate over a non-foldable filter.** If the `Filter` beneath an `Aggregate` is opaque, do we fold neither, or fold the `Aggregate` over locally-filtered rows? The second needs the planner to split the pipeline at the opaque node and fold the group separately — more complex, possibly not worth it for v1.
+3. **Does the scalar `call` allow-list live in the planner or the connector?** Function *names* are dialect-specific (DBISAM's string functions differ), but the *recognition* of `Text.Upper` is generic. Likely: generic recognition in the planner, dialect spelling in the connector emitter.
+4. **Probe-derived vs declared ceiling.** Do we map the DBISAM ceiling by constructed probes against a live instance (empirical, accurate, needs the instance) or declare it in the grammar (portable, may lie)? Probably both — grammar declares, harness verifies.
