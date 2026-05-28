@@ -231,6 +231,16 @@ fn write_lit(out: &mut String, lit: &Lit) {
             out.push_str(if *b { "true" } else { "false" });
             out.push(')');
         }
+        Lit::Date(d) => {
+            out.push_str("(lit date ");
+            write_quoted(out, &d.to_string());
+            out.push(')');
+        }
+        Lit::Datetime(dt) => {
+            out.push_str("(lit datetime ");
+            write_quoted(out, &dt.to_string());
+            out.push(')');
+        }
         Lit::Null => out.push_str("(lit null)"),
     }
 }

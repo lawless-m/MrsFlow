@@ -32,7 +32,9 @@ pub mod schema;
 mod sexpr;
 
 pub use differential::{differential, Cell, Db, Divergence, Semantics, Table};
-pub use fold::{emit, fold, Dbisam, Dialect, FoldResult, SelectParts, Unfoldable, FOLDED};
+pub use fold::{
+    emit, fold, Dbisam, Dialect, FoldResult, GenericOdbc, SelectParts, Unfoldable, FOLDED,
+};
 pub use ir::{
     AggFunc, Aggregation, ArithOp, BoolOp, CmpOp, JoinKind, Lit, ProjectItem, Rel, Scalar, Source,
     SortKey,

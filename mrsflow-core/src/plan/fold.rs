@@ -60,6 +60,8 @@ pub trait Dialect {
     fn quote_ident(&self, name: &str) -> String;
     fn text_literal(&self, s: &str) -> String;
     fn bool_literal(&self, b: bool) -> String;
+    fn date_literal(&self, d: &chrono::NaiveDate) -> String;
+    fn datetime_literal(&self, dt: &chrono::NaiveDateTime) -> String;
     /// Whether the dialect can express a row offset. DBISAM cannot.
     fn supports_offset(&self) -> bool;
     /// SQL for a scalar function call, or `None` if the dialect has no proven
@@ -86,6 +88,15 @@ impl Dialect for Dbisam {
         if b { "TRUE" } else { "FALSE" }.to_string()
     }
 
+    fn date_literal(&self, d: &chrono::NaiveDate) -> String {
+        // DBISAM date-literal syntax: #YYYY-MM-DD#.
+        format!("#{}#", d.format("%Y-%m-%d"))
+    }
+
+    fn datetime_literal(&self, dt: &chrono::NaiveDateTime) -> String {
+        format!("#{}#", dt.format("%Y-%m-%d %H:%M:%S"))
+    }
+
     fn supports_offset(&self) -> bool {
         false
     }
@@ -110,6 +121,69 @@ impl Dialect for Dbisam {
         }
         if let Some(n) = p.top {
             s.push_str(&format!("TOP {n} "));
+        }
+        s.push_str(&p.projection.join(", "));
+        s.push_str(" FROM ");
+        s.push_str(&p.from);
+        if !p.where_.is_empty() {
+            s.push_str(" WHERE ");
+            s.push_str(&p.where_.join(" AND "));
+        }
+        if !p.group_by.is_empty() {
+            s.push_str(" GROUP BY ");
+            s.push_str(&p.group_by.join(", "));
+        }
+        if !p.order_by.is_empty() {
+            s.push_str(" ORDER BY ");
+            s.push_str(&p.order_by.join(", "));
+        }
+        s
+    }
+}
+
+/// A portable-ish generic-ODBC dialect: plain double-quoted identifiers,
+/// `0`/`1` booleans, ANSI `DATE '…'` / `TIMESTAMP '…'` literals, and no `TOP`
+/// (drivers disagree on row-limit syntax). This reproduces the long-standing
+/// `LazyOdbc` SQL so routing that path through the emitter changes nothing
+/// observable — it just unifies the two SQL generators.
+pub struct GenericOdbc;
+
+impl Dialect for GenericOdbc {
+    fn quote_ident(&self, name: &str) -> String {
+        format!("\"{name}\"")
+    }
+
+    fn text_literal(&self, s: &str) -> String {
+        format!("'{}'", s.replace('\'', "''"))
+    }
+
+    fn bool_literal(&self, b: bool) -> String {
+        if b { "1" } else { "0" }.to_string()
+    }
+
+    fn date_literal(&self, d: &chrono::NaiveDate) -> String {
+        format!("DATE '{d}'")
+    }
+
+    fn datetime_literal(&self, dt: &chrono::NaiveDateTime) -> String {
+        format!("TIMESTAMP '{dt}'")
+    }
+
+    fn supports_offset(&self) -> bool {
+        false
+    }
+
+    fn scalar_call(&self, func: &str, args: &[String]) -> Option<String> {
+        // Same proven allow-list as DBISAM; the accumulator never emits calls.
+        Dbisam.scalar_call(func, args)
+    }
+
+    fn render_select(&self, p: &SelectParts) -> String {
+        // Like DBISAM but without `TOP` (the legacy renderer never emitted a
+        // row limit for this path).
+        let mut s = String::from("SELECT ");
+        if p.distinct {
+            s.push_str("DISTINCT ");
         }
         s.push_str(&p.projection.join(", "));
         s.push_str(" FROM ");
@@ -494,6 +568,8 @@ fn emit_lit(lit: &Lit, d: &dyn Dialect) -> Result<String, Unfoldable> {
         Lit::Number(s) => Err(unfoldable(format!("non-decimal numeric literal {s}"))),
         Lit::Text(s) => Ok(d.text_literal(s)),
         Lit::Logical(b) => Ok(d.bool_literal(*b)),
+        Lit::Date(dt) => Ok(d.date_literal(dt)),
+        Lit::Datetime(dt) => Ok(d.datetime_literal(dt)),
         Lit::Null => Ok("NULL".to_string()),
     }
 }

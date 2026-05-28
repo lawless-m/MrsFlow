@@ -158,6 +158,8 @@ pub enum Lit {
     Number(String),
     Text(String),
     Logical(bool),
+    Date(chrono::NaiveDate),
+    Datetime(chrono::NaiveDateTime),
     Null,
 }
 

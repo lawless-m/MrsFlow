@@ -36,6 +36,8 @@ pub enum Cell {
     Num(f64),
     Text(String),
     Bool(bool),
+    Date(chrono::NaiveDate),
+    Datetime(chrono::NaiveDateTime),
 }
 
 /// An in-memory table: named columns and row-major cells.
@@ -456,6 +458,8 @@ fn lit_cell(lit: &Lit) -> Cell {
         Lit::Null => Cell::Null,
         Lit::Text(s) => Cell::Text(s.clone()),
         Lit::Logical(b) => Cell::Bool(*b),
+        Lit::Date(d) => Cell::Date(*d),
+        Lit::Datetime(dt) => Cell::Datetime(*dt),
         Lit::Number(s) => {
             if let Ok(i) = s.parse::<i64>() {
                 Cell::Int(i)
@@ -509,6 +513,8 @@ fn order_cells_opt(a: &Cell, b: &Cell, sem: &Semantics) -> Option<std::cmp::Orde
             }
         }
         (Cell::Bool(x), Cell::Bool(y)) => Some(x.cmp(y)),
+        (Cell::Date(x), Cell::Date(y)) => Some(x.cmp(y)),
+        (Cell::Datetime(x), Cell::Datetime(y)) => Some(x.cmp(y)),
         _ => {
             let (x, y) = (as_f64(a)?, as_f64(b)?);
             x.partial_cmp(&y)
