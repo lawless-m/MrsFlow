@@ -515,7 +515,70 @@ fn build(rel: &Rel, d: &dyn Dialect) -> Result<Sel, Unfoldable> {
             Ok(sel)
         }
 
-        Rel::Join { .. } => Err(unfoldable("join emission not supported in v1")),
+        Rel::Join {
+            kind,
+            left_keys,
+            right_keys,
+            left,
+            right,
+        } => {
+            let l = build(left, d)?;
+            let r = build(right, d)?;
+            // v1: each side must be a plain (optionally filtered) table source.
+            // A projection/aggregate/sort/limit/distinct on either side would
+            // need a derived-table subquery, which this flat-SELECT model can't
+            // express — refuse rather than emit wrong SQL.
+            let plain = |s: &Sel| {
+                !s.projection_set
+                    && !s.has_aggregate
+                    && s.group_by.is_empty()
+                    && s.order_by.is_empty()
+                    && s.top.is_none()
+                    && !s.distinct
+            };
+            if !plain(&l) || !plain(&r) {
+                return Err(unfoldable("join over a non-trivial subquery"));
+            }
+            if left_keys.is_empty() || left_keys.len() != right_keys.len() {
+                return Err(unfoldable("join needs equal-length, non-empty key lists"));
+            }
+            let kw = match kind {
+                JoinKind::Inner => "JOIN",
+                JoinKind::LeftOuter => "LEFT JOIN",
+                // RIGHT/FULL OUTER and the anti-joins aren't in the v1 dialect
+                // surface; leave them to the in-memory evaluator.
+                _ => return Err(unfoldable("join kind not foldable in v1")),
+            };
+            // Keys are qualified by each side's table so the ON clause is
+            // unambiguous (the key column exists on both sides).
+            let on = left_keys
+                .iter()
+                .zip(right_keys)
+                .map(|(lk, rk)| {
+                    format!(
+                        "{}.{} = {}.{}",
+                        l.from,
+                        d.quote_ident(lk),
+                        r.from,
+                        d.quote_ident(rk)
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(" AND ");
+            let mut where_ = l.where_;
+            where_.extend(r.where_);
+            Ok(Sel {
+                distinct: false,
+                top: None,
+                projection: vec!["*".to_string()],
+                projection_set: false,
+                from: format!("{} {} {} ON {}", l.from, kw, r.from, on),
+                where_,
+                group_by: Vec::new(),
+                has_aggregate: false,
+                order_by: Vec::new(),
+            })
+        }
         Rel::EvalM { descr, .. } => Err(unfoldable(format!("opaque step: {descr}"))),
     }
 }
@@ -558,6 +621,9 @@ fn render_aggregate(a: &Aggregation, d: &dyn Dialect) -> Result<String, Unfoldab
 fn emit_scalar(s: &Scalar, d: &dyn Dialect) -> Result<String, Unfoldable> {
     match s {
         Scalar::Col(n) => Ok(d.quote_ident(n)),
+        Scalar::QualifiedCol { table, name } => {
+            Ok(format!("{}.{}", d.quote_ident(table), d.quote_ident(name)))
+        }
         Scalar::Lit(lit) => emit_lit(lit, d),
         Scalar::Cmp { op, lhs, rhs } => emit_cmp(*op, lhs, rhs, d),
         Scalar::Bool { op, args } => emit_bool(*op, args, d),
@@ -768,8 +834,60 @@ mod tests {
     }
 
     #[test]
-    fn join_is_boundary() {
-        boundary(r#"Table.NestedJoin(a, {"k"}, b, {"k"}, "n", JoinKind.Inner)"#);
+    fn inner_join_emits() {
+        assert_eq!(
+            sql(r#"Table.NestedJoin(a, {"k"}, b, {"k"}, "n", JoinKind.Inner)"#),
+            r#"SELECT * FROM "a" JOIN "b" ON "a"."k" = "b"."k""#
+        );
+    }
+
+    #[test]
+    fn left_outer_join_emits() {
+        assert_eq!(
+            sql(r#"Table.NestedJoin(a, {"k"}, b, {"k"}, "n", JoinKind.LeftOuter)"#),
+            r#"SELECT * FROM "a" LEFT JOIN "b" ON "a"."k" = "b"."k""#
+        );
+    }
+
+    #[test]
+    fn join_with_qualified_projection_emits() {
+        // What the connector's join folder builds: explicit table-qualified
+        // output columns over a LEFT JOIN, so nothing is ambiguous.
+        let plan = Rel::Project {
+            star: false,
+            items: vec![
+                ProjectItem {
+                    name: "SAPRODUCT".into(),
+                    expr: Scalar::QualifiedCol {
+                        table: "Analysis".into(),
+                        name: "SAPRODUCT".into(),
+                    },
+                },
+                ProjectItem {
+                    name: "Desc".into(),
+                    expr: Scalar::QualifiedCol {
+                        table: "PRODGRP".into(),
+                        name: "Desc".into(),
+                    },
+                },
+            ],
+            input: Box::new(Rel::Join {
+                kind: JoinKind::LeftOuter,
+                left_keys: vec!["key".into()],
+                right_keys: vec!["Sub Sub Category".into()],
+                left: Box::new(Rel::Scan(Source::Ref("Analysis".into()))),
+                right: Box::new(Rel::Scan(Source::Ref("PRODGRP".into()))),
+            }),
+        };
+        assert_eq!(
+            emit(&plan, &Dbisam).expect("foldable"),
+            r#"SELECT "Analysis"."SAPRODUCT" AS "SAPRODUCT", "PRODGRP"."Desc" AS "Desc" FROM "Analysis" LEFT JOIN "PRODGRP" ON "Analysis"."key" = "PRODGRP"."Sub Sub Category""#
+        );
+    }
+
+    #[test]
+    fn anti_join_is_boundary() {
+        boundary(r#"Table.NestedJoin(a, {"k"}, b, {"k"}, "n", JoinKind.LeftAnti)"#);
     }
 
     #[test]

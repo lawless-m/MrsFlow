@@ -362,6 +362,9 @@ fn aggregate(a: &Aggregation, columns: &[String], rows: &[&Vec<Cell>]) -> Result
 fn eval_scalar(s: &Scalar, columns: &[String], row: &[Cell], sem: &Semantics) -> Result<Cell, String> {
     match s {
         Scalar::Col(n) => Ok(row[col_index(columns, n)?].clone()),
+        // The reference interpreter works over a single flat row with unique
+        // column names, so a qualifier is informational — resolve by name.
+        Scalar::QualifiedCol { name, .. } => Ok(row[col_index(columns, name)?].clone()),
         Scalar::Lit(lit) => Ok(lit_cell(lit)),
         Scalar::Cmp { op, lhs, rhs } => {
             let a = eval_scalar(lhs, columns, row, sem)?;

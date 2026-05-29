@@ -129,6 +129,10 @@ pub enum JoinKind {
 pub enum Scalar {
     /// Column reference.
     Col(String),
+    /// Table-qualified column reference, rendered `"table"."name"`. Produced
+    /// when folding a join, where a bare column name could be ambiguous across
+    /// the two sides; unqualified [`Col`](Scalar::Col) stays the common case.
+    QualifiedCol { table: String, name: String },
     /// Typed literal — the type is carried (not inferred) so decimal/date/null
     /// reasoning downstream need not re-derive it.
     Lit(Lit),

@@ -173,6 +173,13 @@ fn write_scalar(out: &mut String, s: &Scalar) {
             write_quoted(out, name);
             out.push(')');
         }
+        Scalar::QualifiedCol { table, name } => {
+            out.push_str("(col ");
+            write_quoted(out, table);
+            out.push(' ');
+            write_quoted(out, name);
+            out.push(')');
+        }
         Scalar::Lit(lit) => write_lit(out, lit),
         Scalar::Cmp { op, lhs, rhs } => {
             out.push('(');

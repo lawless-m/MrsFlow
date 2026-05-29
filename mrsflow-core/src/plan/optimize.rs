@@ -586,6 +586,12 @@ fn collect_cols(s: &Scalar, out: &mut Vec<String>) -> bool {
             }
             true
         }
+        Scalar::QualifiedCol { name, .. } => {
+            if !out.contains(name) {
+                out.push(name.clone());
+            }
+            true
+        }
         Scalar::Lit(_) => true,
         Scalar::Cmp { lhs, rhs, .. } | Scalar::Arith { lhs, rhs, .. } => {
             collect_cols(lhs, out) && collect_cols(rhs, out)
