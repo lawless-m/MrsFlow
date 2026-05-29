@@ -78,7 +78,14 @@ pub fn schema_of(rel: &Rel, catalog: &dyn Catalog) -> Option<Schema> {
         }
 
         Rel::Aggregate { keys, aggs, .. } => {
-            let mut cols = keys.clone();
+            let mut cols: Vec<String> = keys
+                .iter()
+                .map(|k| match k {
+                    Scalar::Col(n) => n.clone(),
+                    Scalar::QualifiedCol { name, .. } => name.clone(),
+                    _ => String::new(),
+                })
+                .collect();
             cols.extend(aggs.iter().map(|a| a.name.clone()));
             Some(Schema::new(cols))
         }

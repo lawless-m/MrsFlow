@@ -88,7 +88,12 @@ fn write_rel(out: &mut String, r: &Rel) {
         }
         Rel::Aggregate { keys, aggs, input } => {
             out.push_str("(aggregate (");
-            write_name_list(out, keys);
+            for (i, k) in keys.iter().enumerate() {
+                if i > 0 {
+                    out.push(' ');
+                }
+                write_scalar(out, k);
+            }
             out.push_str(") (");
             for (i, a) in aggs.iter().enumerate() {
                 if i > 0 {
@@ -99,9 +104,8 @@ fn write_rel(out: &mut String, r: &Rel) {
                 out.push(' ');
                 out.push_str(agg_func_name(a.func));
                 if let Some(c) = &a.column {
-                    out.push_str(" (col ");
-                    write_quoted(out, c);
-                    out.push(')');
+                    out.push(' ');
+                    write_scalar(out, c);
                 }
                 out.push(')');
             }

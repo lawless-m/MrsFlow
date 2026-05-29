@@ -145,7 +145,7 @@ impl Lowerer {
                 };
                 match aggregations(&args[2]) {
                     Some(aggs) => Rel::Aggregate {
-                        keys,
+                        keys: keys.into_iter().map(Scalar::Col).collect(),
                         aggs,
                         input: Box::new(input),
                     },
@@ -444,7 +444,11 @@ fn aggregations(expr: &Expr) -> Option<Vec<Aggregation>> {
             _ => return None,
         };
         let (func, column) = agg_body(body);
-        out.push(Aggregation { name, func, column });
+        out.push(Aggregation {
+            name,
+            func,
+            column: column.map(Scalar::Col),
+        });
     }
     Some(out)
 }
@@ -661,7 +665,7 @@ mod tests {
     fn group_with_sum() {
         assert_eq!(
             plan(r#"Table.Group(t, {"Region"}, {{"Total", each List.Sum([Amount]), type number}})"#),
-            r#"(aggregate ("Region") (("Total" sum (col "Amount"))) (scan (ref "t")))"#
+            r#"(aggregate ((col "Region")) (("Total" sum (col "Amount"))) (scan (ref "t")))"#
         );
     }
 
@@ -669,7 +673,7 @@ mod tests {
     fn group_row_count_has_no_column() {
         assert_eq!(
             plan(r#"Table.Group(t, {"Region"}, {{"N", each Table.RowCount(_)}})"#),
-            r#"(aggregate ("Region") (("N" count)) (scan (ref "t")))"#
+            r#"(aggregate ((col "Region")) (("N" count)) (scan (ref "t")))"#
         );
     }
 

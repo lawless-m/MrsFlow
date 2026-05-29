@@ -282,7 +282,7 @@ fn interpret(
             let t = interpret(input, db, folded, sem)?;
             let key_idx: Vec<usize> = keys
                 .iter()
-                .map(|c| col_index(&t.columns, c))
+                .map(|c| col_index(&t.columns, scalar_col_name(c)?))
                 .collect::<Result<_, _>>()?;
             // Preserve first-seen group order for determinism.
             let mut order: Vec<Vec<Cell>> = Vec::new();
@@ -297,7 +297,10 @@ fn interpret(
                     }
                 }
             }
-            let mut columns = keys.clone();
+            let mut columns: Vec<String> = keys
+                .iter()
+                .map(|k| scalar_col_name(k).map(str::to_string))
+                .collect::<Result<_, _>>()?;
             columns.extend(aggs.iter().map(|a| a.name.clone()));
             let mut rows = Vec::with_capacity(groups.len());
             for (key, members) in &groups {
@@ -312,6 +315,17 @@ fn interpret(
     }
 }
 
+/// The column name a group key or aggregate ranges over. Both are column
+/// references (`Col` or `QualifiedCol`); the reference interpreter resolves by
+/// name against its single flat row.
+fn scalar_col_name(s: &Scalar) -> Result<&str, String> {
+    match s {
+        Scalar::Col(n) => Ok(n),
+        Scalar::QualifiedCol { name, .. } => Ok(name),
+        other => Err(format!("expected a column reference, got {other:?}")),
+    }
+}
+
 fn aggregate(a: &Aggregation, columns: &[String], rows: &[&Vec<Cell>]) -> Result<Cell, String> {
     let col_cells = |name: &str| -> Result<Vec<Cell>, String> {
         let i = col_index(columns, name)?;
@@ -323,7 +337,8 @@ fn aggregate(a: &Aggregation, columns: &[String], rows: &[&Vec<Cell>]) -> Result
             .filter_map(as_f64)
             .collect())
     };
-    match (a.func, &a.column) {
+    let col_name = a.column.as_ref().map(scalar_col_name).transpose()?;
+    match (a.func, col_name) {
         (AggFunc::Count, None) => Ok(Cell::Int(rows.len() as i64)),
         (AggFunc::Count, Some(c)) => {
             let n = col_cells(c)?.iter().filter(|v| **v != Cell::Null).count();

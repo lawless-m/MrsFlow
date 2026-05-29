@@ -449,12 +449,15 @@ fn build(rel: &Rel, d: &dyn Dialect) -> Result<Sel, Unfoldable> {
             }
             let mut projection = Vec::with_capacity(keys.len() + aggs.len());
             for k in keys {
-                projection.push(d.quote_ident(k));
+                projection.push(emit_scalar(k, d)?);
             }
             for a in aggs {
                 projection.push(render_aggregate(a, d)?);
             }
-            sel.group_by = keys.iter().map(|k| d.quote_ident(k)).collect();
+            sel.group_by = keys
+                .iter()
+                .map(|k| emit_scalar(k, d))
+                .collect::<Result<_, _>>()?;
             sel.projection = projection;
             sel.projection_set = true;
             sel.has_aggregate = true;
@@ -597,9 +600,9 @@ fn render_projection(items: &[ProjectItem], d: &dyn Dialect) -> Result<Vec<Strin
 }
 
 fn render_aggregate(a: &Aggregation, d: &dyn Dialect) -> Result<String, Unfoldable> {
-    let col = |name: &Option<String>| -> Result<String, Unfoldable> {
-        match name {
-            Some(c) => Ok(d.quote_ident(c)),
+    let col = |c: &Option<Scalar>| -> Result<String, Unfoldable> {
+        match c {
+            Some(s) => emit_scalar(s, d),
             None => Err(unfoldable("aggregate requires a column")),
         }
     };
@@ -610,7 +613,7 @@ fn render_aggregate(a: &Aggregation, d: &dyn Dialect) -> Result<String, Unfoldab
         AggFunc::Max => format!("MAX({})", col(&a.column)?),
         AggFunc::CountDistinct => format!("COUNT(DISTINCT {})", col(&a.column)?),
         AggFunc::Count => match &a.column {
-            Some(c) => format!("COUNT({})", d.quote_ident(c)),
+            Some(s) => format!("COUNT({})", emit_scalar(s, d)?),
             None => "COUNT(*)".to_string(),
         },
         AggFunc::Opaque => return Err(unfoldable("opaque aggregate")),
@@ -888,6 +891,38 @@ mod tests {
     #[test]
     fn anti_join_is_boundary() {
         boundary(r#"Table.NestedJoin(a, {"k"}, b, {"k"}, "n", JoinKind.LeftAnti)"#);
+    }
+
+    #[test]
+    fn aggregate_over_join_emits() {
+        // The canonical payoff: SUM(orderi.quantity) grouped by orderh keys
+        // over orderh LEFT JOIN orderi — the shape the connector's join+group
+        // folder builds, with every column qualified across the two sides.
+        let plan = Rel::Aggregate {
+            keys: vec![
+                Scalar::QualifiedCol { table: "orderh".into(), name: "ref".into() },
+                Scalar::QualifiedCol { table: "orderh".into(), name: "custcode".into() },
+            ],
+            aggs: vec![Aggregation {
+                name: "qty".into(),
+                func: AggFunc::Sum,
+                column: Some(Scalar::QualifiedCol {
+                    table: "orderi".into(),
+                    name: "quantity".into(),
+                }),
+            }],
+            input: Box::new(Rel::Join {
+                kind: JoinKind::LeftOuter,
+                left_keys: vec!["ref".into()],
+                right_keys: vec!["ref".into()],
+                left: Box::new(Rel::Scan(Source::Ref("orderh".into()))),
+                right: Box::new(Rel::Scan(Source::Ref("orderi".into()))),
+            }),
+        };
+        assert_eq!(
+            emit(&plan, &Dbisam).expect("foldable"),
+            r#"SELECT "orderh"."ref", "orderh"."custcode", SUM("orderi"."quantity") AS "qty" FROM "orderh" LEFT JOIN "orderi" ON "orderh"."ref" = "orderi"."ref" GROUP BY "orderh"."ref", "orderh"."custcode""#
+        );
     }
 
     #[test]

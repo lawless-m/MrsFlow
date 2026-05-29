@@ -40,7 +40,10 @@ pub enum Rel {
     },
     /// `Table.Group`.
     Aggregate {
-        keys: Vec<String>,
+        /// Group-by keys. Each is a column reference — `Scalar::Col` in the
+        /// single-table case, `Scalar::QualifiedCol` when grouping over a fold
+        /// of a join (where a bare name could be ambiguous across sides).
+        keys: Vec<Scalar>,
         aggs: Vec<Aggregation>,
         input: Box<Rel>,
     },
@@ -95,8 +98,9 @@ pub struct Aggregation {
     pub name: String,
     pub func: AggFunc,
     /// The column the aggregate ranges over. `None` for a row count and for
-    /// opaque aggregations.
-    pub column: Option<String>,
+    /// opaque aggregations. A `Scalar::QualifiedCol` when aggregating over a
+    /// fold of a join.
+    pub column: Option<Scalar>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -168,7 +168,10 @@ fn push_filter(predicate: Scalar, input: Rel, ctx: &Ctx) -> Rel {
             keys,
             aggs,
             input: inner,
-        } if cols.as_ref().is_some_and(|c| c.iter().all(|x| keys.contains(x))) => Rel::Aggregate {
+        } if cols.as_ref().is_some_and(|c| {
+            c.iter()
+                .all(|x| keys.iter().any(|k| scalar_name(k) == Some(x.as_str())))
+        }) => Rel::Aggregate {
             keys,
             aggs,
             input: Box::new(Rel::Filter {
@@ -495,12 +498,14 @@ fn prune(rel: Rel, need: Need, cat: &dyn Catalog) -> Rel {
             // Group keys are always needed (they define the grouping); add the
             // column each surviving aggregate ranges over. An opaque aggregate
             // has an unknown footprint, so fall back to needing everything.
-            let mut child = Need::Cols(keys.clone());
+            let mut child = Need::Cols(
+                keys.iter().filter_map(scalar_name).map(str::to_string).collect(),
+            );
             for a in &kept {
                 if a.func == AggFunc::Opaque {
                     child = Need::All;
-                } else if let Some(c) = &a.column {
-                    child = child.union_cols(std::slice::from_ref(c));
+                } else if let Some(c) = a.column.as_ref().and_then(scalar_name) {
+                    child = child.union_cols(std::slice::from_ref(&c.to_string()));
                 }
             }
             Rel::Aggregate {
@@ -575,6 +580,16 @@ fn predicate_cols(s: &Scalar) -> Option<Vec<String>> {
         Some(cols)
     } else {
         None
+    }
+}
+
+/// The column name a group key / aggregate column reference denotes, if it is a
+/// plain column reference (qualified or not).
+fn scalar_name(s: &Scalar) -> Option<&str> {
+    match s {
+        Scalar::Col(n) => Some(n),
+        Scalar::QualifiedCol { name, .. } => Some(name),
+        _ => None,
     }
 }
 
@@ -697,7 +712,7 @@ mod tests {
     fn filter_on_group_key_pushes_below_aggregate() {
         assert_eq!(
             opt(r#"Table.SelectRows(Table.Group(t, {"Region"}, {{"Total", each List.Sum([Amount])}}), each [Region] = "GB")"#),
-            r#"(aggregate ("Region") (("Total" sum (col "Amount"))) (filter (= (col "Region") (lit text "GB")) (scan (ref "t"))))"#
+            r#"(aggregate ((col "Region")) (("Total" sum (col "Amount"))) (filter (= (col "Region") (lit text "GB")) (scan (ref "t"))))"#
         );
     }
 
@@ -705,7 +720,7 @@ mod tests {
     fn filter_on_aggregate_output_stays_above() {
         assert_eq!(
             opt(r#"Table.SelectRows(Table.Group(t, {"Region"}, {{"Total", each List.Sum([Amount])}}), each [Total] > 100)"#),
-            r#"(filter (> (col "Total") (lit number "100")) (aggregate ("Region") (("Total" sum (col "Amount"))) (scan (ref "t"))))"#
+            r#"(filter (> (col "Total") (lit number "100")) (aggregate ((col "Region")) (("Total" sum (col "Amount"))) (scan (ref "t"))))"#
         );
     }
 
@@ -849,7 +864,7 @@ mod tests {
                 r#"Table.Group(Parquet.Document("p"), {"Region"}, {{"Total", each List.Sum([Amount])}})"#,
                 &c
             ),
-            r#"(aggregate ("Region") (("Total" sum (col "Amount"))) (project replace (("Region" (col "Region")) ("Amount" (col "Amount"))) (scan (document "Parquet.Document" (lit text "p")))))"#
+            r#"(aggregate ((col "Region")) (("Total" sum (col "Amount"))) (project replace (("Region" (col "Region")) ("Amount" (col "Amount"))) (scan (document "Parquet.Document" (lit text "p")))))"#
         );
     }
 
