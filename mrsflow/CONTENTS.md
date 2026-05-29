@@ -14,7 +14,8 @@ This zip contains the design notes from a conversation scoping out the project.
 6. **`06-resources.md`** — Links to the language spec, reference parser, relevant crates, prior art.
 7. **`07-evaluator-design.md`** — Load-bearing decisions for the evaluator (laziness, error model, environment, value/number representation), the Prolog evaluator companion as first-class differential, and the slicing plan.
 8. **`08-prolog-differential.md`** — How the parallel Prolog evaluator works as a differential oracle for the Rust implementation, and how the pattern transfers to other projects.
-9. **`09-lazy-tables.md`** — Stage A design proposal for lazy `Parquet.Document` handles and `JoinView` nested results, with a full stdlib audit classifying every `Table.*` binding as projection-aware / schema-only / row-bound. Empirically motivated by the WASM demo OOMing on the corpus join pattern; nothing implemented yet.
+9. **`09-lazy-tables.md`** — Stage A design proposal for lazy `Parquet.Document` handles and `JoinView` nested results, with a full stdlib audit classifying every `Table.*` binding as projection-aware / schema-only / row-bound. Empirically motivated by the WASM demo OOMing on the corpus join pattern. **Implemented** — `TableRepr` now carries `LazyParquet` / `LazyOdbc` / `JoinView` / `ExpandView`; the connector path is now subsumed by `10`.
+10. **`10-plan-ir.md`** — Plan IR and the fold planner: a logical relational plan (plus a typed scalar sub-IR) sitting between the M AST and the connector, so aggregations and joins fold into DBISAM rather than topping out at filter-and-project. The DBISAM dialect grammar *is* the fold decision procedure, and every fold class is gated by the differential harness. Subsumes the connector path of `09`.
 
 ## Status
 
