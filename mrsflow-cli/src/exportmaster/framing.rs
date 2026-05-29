@@ -213,14 +213,31 @@ fn read_exact(stream: &mut TcpStream, buf: &mut [u8]) -> Result<(), IoError> {
 /// Open a TCP connection with sensible timeouts. The defaults match
 /// PoC behaviour (10s connect, 5s per-message).
 pub fn connect(host: &str, port: u16) -> Result<TcpStream, IoError> {
+    use std::net::ToSocketAddrs;
     let addr = format!("{host}:{port}");
-    let stream = std::net::TcpStream::connect_timeout(
-        &addr
-            .parse()
-            .map_err(|e| IoError::Other(format!("Exportmaster: bad address {addr}: {e}")))?,
-        Duration::from_secs(10),
-    )
-    .map_err(|e| IoError::Other(format!("Exportmaster: connect {addr}: {e}")))?;
+    // Resolve via DNS so `host` may be a hostname (e.g. "rivsem01"), not just
+    // an IP literal. `to_socket_addrs` handles both. Try each resolved
+    // address until one connects within the timeout.
+    let resolved = addr
+        .to_socket_addrs()
+        .map_err(|e| IoError::Other(format!("Exportmaster: resolve {addr}: {e}")))?;
+    let mut stream = None;
+    let mut last_err = None;
+    for sa in resolved {
+        match std::net::TcpStream::connect_timeout(&sa, Duration::from_secs(10)) {
+            Ok(s) => {
+                stream = Some(s);
+                break;
+            }
+            Err(e) => last_err = Some(e),
+        }
+    }
+    let stream = stream.ok_or_else(|| {
+        let detail = last_err
+            .map(|e| e.to_string())
+            .unwrap_or_else(|| "no addresses resolved".to_string());
+        IoError::Other(format!("Exportmaster: connect {addr}: {detail}"))
+    })?;
     stream
         .set_read_timeout(Some(Duration::from_secs(30)))
         .map_err(|e| IoError::Other(format!("Exportmaster: set_read_timeout: {e}")))?;
