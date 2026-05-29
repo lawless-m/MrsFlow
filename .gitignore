@@ -11,3 +11,6 @@
 /.devlog/
 /.corpus_tmp/
 /.em_tmp/
+
+# Large local example corpus — kept locally for triage, not shared
+/examples/RIVSTS*/
