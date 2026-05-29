@@ -896,6 +896,7 @@ fn select_columns_by_index(
                         output_names: new_output_names,
                         where_filters: state.where_filters.clone(),
                         limit: state.limit,
+                        dialect: state.dialect,
                         force_fn: state.force_fn.clone(),
                     },
                 ),
@@ -1390,6 +1391,7 @@ fn select_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
                             output_names: state.output_names.clone(),
                             where_filters: combined,
                             limit: state.limit,
+                            dialect: state.dialect,
                             force_fn: state.force_fn.clone(),
                         };
                         return Ok(Value::Table(Table {
@@ -6839,8 +6841,67 @@ fn extract_filters(
             });
             true
         }
+        // `Text.StartsWith([col], "lit")` → the range `[col] >= "lit" AND
+        // [col] < <lit⁺>`, where <lit⁺> increments the prefix's last char.
+        // For ordinal comparison this is exactly the set of strings with the
+        // prefix, and it reuses the existing Ge/Lt comparison folds — no new
+        // filter op or in-memory matcher, and no new fold semantics beyond the
+        // text comparisons already folded. Only the 2-arg form folds; a 3rd
+        // (comparer) arg or a non-literal prefix falls through to in-memory.
+        Expr::Invoke { target, args } => {
+            let func = match target.as_ref() {
+                Expr::Identifier(n) => n.as_str(),
+                _ => return false,
+            };
+            if func != "Text.StartsWith" || args.len() != 2 {
+                return false;
+            }
+            let field = match field_access_on_param(&args[0], param_name) {
+                Some(f) => f,
+                None => return false,
+            };
+            let prefix = match &args[1] {
+                Expr::TextLit(s) => s.as_str(),
+                _ => return false,
+            };
+            let upper = match prefix_upper_bound(prefix) {
+                Some(u) => u,
+                None => return false, // empty prefix or un-incrementable last char
+            };
+            let col_idx =
+                match resolve_field_generic(projection, output_names, schema, field) {
+                    Some(i) => i,
+                    None => return false,
+                };
+            out.push(RowFilter {
+                source_col_idx: col_idx,
+                op: FilterOp::Ge,
+                scalar: FilterScalar::Text(prefix.to_string()),
+            });
+            out.push(RowFilter {
+                source_col_idx: col_idx,
+                op: FilterOp::Lt,
+                scalar: FilterScalar::Text(upper),
+            });
+            true
+        }
         _ => false,
     }
+}
+
+/// Smallest string strictly greater than every string with `prefix` as a
+/// prefix — i.e. `prefix` with its last char incremented by one code point.
+/// `[col] >= prefix AND [col] < prefix_upper_bound(prefix)` is then exactly
+/// `Text.StartsWith([col], prefix)` under ordinal comparison. Returns `None`
+/// for an empty prefix or when the last char can't be incremented to a valid
+/// scalar value (surrogate gap / `char::MAX`), so the caller leaves the
+/// predicate to in-memory evaluation rather than folding it wrongly.
+fn prefix_upper_bound(prefix: &str) -> Option<String> {
+    let mut chars: Vec<char> = prefix.chars().collect();
+    let last = chars.pop()?;
+    let next = char::from_u32(last as u32 + 1)?;
+    chars.push(next);
+    Some(chars.into_iter().collect())
 }
 
 /// If `expr` is `[field]` against the lambda parameter `param_name`,

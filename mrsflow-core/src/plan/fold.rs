@@ -211,6 +211,28 @@ pub fn emit(rel: &Rel, d: &dyn Dialect) -> Result<String, Unfoldable> {
     Ok(d.render_select(&sel.into_parts()))
 }
 
+/// A connector's choice of SQL dialect, stored on a deferred plan so
+/// `render_sql` emits the right flavour per transport. The dialect trait
+/// objects are zero-sized, so this enum is just a tag that picks one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SqlDialect {
+    /// Portable ANSI-ish SQL — the long-standing `Odbc.DataSource` output.
+    GenericOdbc,
+    /// DBISAM dialect (double-quoted identifiers, `TOP n`, `#…#` dates) —
+    /// the native `Exportmaster` connector.
+    Dbisam,
+}
+
+impl SqlDialect {
+    /// Emit `rel` under this dialect. See [`emit`].
+    pub fn emit(self, rel: &Rel) -> Result<String, Unfoldable> {
+        match self {
+            SqlDialect::GenericOdbc => emit(rel, &GenericOdbc),
+            SqlDialect::Dbisam => emit(rel, &Dbisam),
+        }
+    }
+}
+
 /// Split `rel` into the maximal foldable subtree and a residual plan.
 ///
 /// Walks from the top: as soon as a node (with everything below it) emits, that

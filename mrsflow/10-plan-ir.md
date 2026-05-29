@@ -130,3 +130,30 @@ Every fold class is enabled on DBISAM only after the harness proves it. Same que
 2. **Aggregate over a non-foldable filter.** If the `Filter` beneath an `Aggregate` is opaque, do we fold neither, or fold the `Aggregate` over locally-filtered rows? The second needs the planner to split the pipeline at the opaque node and fold the group separately — more complex, possibly not worth it for v1.
 3. **Does the scalar `call` allow-list live in the planner or the connector?** Function *names* are dialect-specific (DBISAM's string functions differ), but the *recognition* of `Text.Upper` is generic. Likely: generic recognition in the planner, dialect spelling in the connector emitter.
 4. **Probe-derived vs declared ceiling.** Do we map the DBISAM ceiling by constructed probes against a live instance (empirical, accurate, needs the instance) or declare it in the grammar (portable, may lie)? Probably both — grammar declares, harness verifies.
+
+## Execution plan: give the native DBISAM connector the fold
+
+The IR landed inert, and a triage of the real `RIVSTS*` corpus (2026-05-29) found the gap is sharper than "wire the fold pass in." The connector that *folds* today is the generic-ODBC path (`Odbc.DataSource` builds a `TableRepr::LazyOdbc`, so `SelectRows`/`SelectColumns`/`FirstN` narrow the plan and `render_sql` emits `GenericOdbc`). The connector that is *fast and owned* — the native `Exportmaster.*` client — does **not** fold: `list_tables_as_navigation` hands each table's `[Data]` an eager `SELECT * FROM <t>` thunk, so navigating to `Analysis` pulls the whole table (~2m36s, ~4.79M rows on a fast LAN) and any subsequent filter runs in memory. The `Dbisam` dialect emitter exists in `fold.rs` with **no live caller**. So the workload that justifies the IR (e.g. the Kingsbury `Cost_and_Sell` query: `Analysis` filtered `SAPRODUCT LIKE '4K0%'` → 681 of 4.79M rows, ~7000×, then a same-source `Analysis ⋈ PRODGRP`) is exactly the workload the native connector can't currently fold.
+
+The design follows from one observation: **`LazyOdbcState` is already transport-agnostic.** Of its fields only `force_fn` is connector-specific (and it is already an injected closure); `to_plan` emits dialect-free Plan IR; the fold accumulation in the `Table.*` stdlib operates on `projection`/`where_filters`/`limit` without caring who built the value. The only ODBC-specific coupling is `render_sql` hardcoding the `GenericOdbc` dialect. So we **generalise the one repr** rather than add a parallel `LazyExportmaster` (which would duplicate all the accumulation for nothing).
+
+### Step 1 — native filter / projection / limit fold (mostly reuse)
+
+- **Carry the dialect in the state.** Add a `dialect` discriminant to `LazyOdbcState` and make `render_sql` dispatch through it (`emit(&self.to_plan(), dialect)`). This is required, not cosmetic: DBISAM and generic-ODBC genuinely diverge (`TOP n` vs no-`LIMIT`; `#…#` date literals), so a native-backed state with a `limit` set must render `TOP n`. The dialect therefore cannot live only in the force closure — `render_sql` itself must know it.
+- **Make the native navigation build `LazyOdbc`.** Replace the eager `SELECT *` thunk in `list_tables_as_navigation` with a builder mirroring the ODBC bridge (`build_lazy_odbc_table`): a cheap schema probe (reuse the existing capped-cursor fetch with a zero-row target, avoiding a `WHERE 1=0` the dialect may dislike) to populate `schema`, and a `force_fn` that renders the narrowed state under the `Dbisam` dialect and runs it via `query_to_table`, reconnecting per force as the ODBC and MySQL thunks already do. `connection_string` becomes an opaque identity (the host); only the force closure reads it.
+
+Once the navigation yields `LazyOdbc`, the existing `Table.SelectRows`/`SelectColumns`/`FirstN` folding applies to the native connector for free, and the `Dbisam` emitter gets its first live caller. This is the headline win and the bulk of the value.
+
+### Step 2 — native same-source join fold (new lowering)
+
+Join is not in the accumulator (which is `Scan → Filter* → Project`); `Table.NestedJoin` builds a separate `JoinView`. Folding `Analysis ⋈ PRODGRP` means: in the `NestedJoin` path, detect when **both inputs are `LazyOdbc` over the same source** (matching connection identity + dialect), build a combined `Join(a.to_plan(), b.to_plan())`, and emit via `fold(Dbisam)`. The same-source guard is mandatory — cross-source merges (DBISAM × Excel, which is the whole shape of the minimal corpus) must remain a `JoinView` run in the evaluator. Sequence this after Step 1 is differential-verified; it is genuinely new code, not reuse.
+
+### Out of scope for this increment
+
+Aggregate fold: the corpus has **zero** `Table.Group` over a navigated source (every `Table.Group` sits over `Odbc.Query` raw-SQL passthrough or Excel), so `Aggregate` folding has no workload to justify it yet and is deferred.
+
+### Verification
+
+Unit tests mirroring the existing `odbc_*_folds_*` cases but asserting DBISAM render output (`TOP n`, `#…#` dates); the `differential.rs` Gate-2 harness, which already models DBISAM `Semantics`, run over the new native fold; and a live integration test of the Kingsbury query behind the `exportmaster` feature, asserting both the 681-row result and that only 681 rows cross the wire.
+
+The `LazyOdbcState` → `LazySqlState` rename (and the `TableRepr::LazyOdbc` variant) is cosmetic and deferred — land the wiring under the existing name to keep the diff reviewable, rename in a separate pass.

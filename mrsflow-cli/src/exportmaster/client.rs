@@ -430,12 +430,13 @@ impl Client {
         for name in names {
             let opts_for_thunk = opts.clone();
             let table_for_thunk = name.clone();
+            // `[Data]` resolves to a foldable `LazyOdbc` plan (DBISAM
+            // dialect), so `Table.SelectRows`/`SelectColumns`/`FirstN`
+            // push down into the SELECT instead of pulling the whole
+            // table over the native wire. Schema is probed lazily on
+            // `[Data]` access, mirroring the Odbc.DataSource bridge.
             let fetcher: Rc<dyn Fn() -> Result<Value, MError>> = Rc::new(move || {
-                let sql = format!("SELECT * FROM {}", table_for_thunk);
-                let mut c = Client::connect_and_login(&opts_for_thunk)
-                    .map_err(|e| MError::Other(format!("Exportmaster connect: {e:?}")))?;
-                c.query_to_table(&sql)
-                    .map_err(|e| MError::Other(format!("Exportmaster fetch: {e:?}")))
+                build_lazy_exportmaster_table(&opts_for_thunk, &table_for_thunk)
             });
             let data = Value::Thunk(Rc::new(RefCell::new(ThunkState::Native(fetcher))));
             rows.push(vec![
@@ -448,6 +449,70 @@ impl Client {
         }
         Ok(Value::Table(Table::from_rows(cols, rows)))
     }
+}
+
+/// Build a foldable `LazyOdbc` table for one native-DBISAM table.
+///
+/// Probes the table's schema with a zero-row `… WHERE 1=0` SELECT — which
+/// returns the column description without ever driving the cursor, so it
+/// sidesteps the undecoded cursor-advance limitation that bites full-table
+/// fetches (see `list_tables_as_navigation`). The returned plan carries the
+/// `Dbisam` dialect; `render_sql` therefore emits DBISAM SQL (`TOP n`,
+/// `#…#` dates) on force. Foldable `Table.*` ops narrow the plan first, so
+/// only the filtered/projected rows cross the wire.
+fn build_lazy_exportmaster_table(
+    opts: &ConnOpts,
+    table_name: &str,
+) -> Result<Value, mrsflow_core::eval::MError> {
+    use std::rc::Rc;
+
+    use mrsflow_core::eval::{LazyOdbcState, MError, TableRepr};
+    use mrsflow_core::plan::SqlDialect;
+
+    let probe_sql = format!("SELECT * FROM \"{}\" WHERE 1=0", table_name);
+    let mut probe_client = Client::connect_and_login(opts)
+        .map_err(|e| MError::Other(format!("Exportmaster probe connect: {e:?}")))?;
+    let probe = probe_client
+        .query_to_table_capped(&probe_sql, 0)
+        .map_err(|e| MError::Other(format!("Exportmaster probe: {e:?}")))?;
+    let schema = match probe {
+        Value::Table(t) => t
+            .try_to_arrow()
+            .map_err(|e| MError::Other(format!("Exportmaster probe schema: {e:?}")))?
+            .schema(),
+        _ => return Err(MError::Other("Exportmaster probe: expected table".into())),
+    };
+
+    let opts_for_force = opts.clone();
+    let force_fn: Rc<dyn Fn(&LazyOdbcState) -> Result<arrow::record_batch::RecordBatch, MError>> =
+        Rc::new(move |state| {
+            let sql = state.render_sql();
+            let mut c = Client::connect_and_login(&opts_for_force)
+                .map_err(|e| MError::Other(format!("Exportmaster connect: {e:?}")))?;
+            let v = c
+                .query_to_table(&sql)
+                .map_err(|e| MError::Other(format!("Exportmaster fold force: {e:?}")))?;
+            match v {
+                Value::Table(t) => t
+                    .try_to_arrow()
+                    .map_err(|e| MError::Other(format!("Exportmaster force arrow: {e:?}"))),
+                _ => Err(MError::Other("Exportmaster fold force: expected table".into())),
+            }
+        });
+
+    let projection: Vec<usize> = (0..schema.fields().len()).collect();
+    let state = LazyOdbcState {
+        connection_string: opts.host.clone(),
+        table_name: table_name.to_string(),
+        schema,
+        projection,
+        output_names: None,
+        where_filters: vec![],
+        limit: None,
+        dialect: SqlDialect::Dbisam,
+        force_fn,
+    };
+    Ok(Value::Table(Table { repr: TableRepr::LazyOdbc(state) }))
 }
 
 /// Parse the bulk SQLTables response. `resp` is the body of the first

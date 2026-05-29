@@ -5684,6 +5684,7 @@ mod tests {
             output_names: None,
             where_filters: vec![],
             limit: None,
+            dialect: crate::plan::SqlDialect::GenericOdbc,
             force_fn: std::rc::Rc::new(|_| {
                 panic!("force_fn fired — test expected fold, got force")
             }),
@@ -5771,6 +5772,22 @@ mod tests {
         assert_eq!(
             state.render_sql(),
             r#"SELECT "id", "name", "price" FROM "customers" WHERE "id" >= 10 AND "price" < 99.95"#
+        );
+    }
+
+    #[test]
+    fn odbc_startswith_folds_to_range() {
+        // Text.StartsWith([col], "Ac") desugars to the ordinal range
+        // [col] >= "Ac" AND [col] < "Ad" — both foldable comparisons.
+        let result = eval_with_src(
+            r#"Table.SelectRows(src, each Text.StartsWith([name], "Ac"))"#,
+            dummy_lazy_odbc_table(),
+        );
+        let state = unwrap_lazy_odbc(&result);
+        assert_eq!(state.where_filters.len(), 2);
+        assert_eq!(
+            state.render_sql(),
+            r#"SELECT "id", "name", "price" FROM "customers" WHERE "name" >= 'Ac' AND "name" < 'Ad'"#
         );
     }
 

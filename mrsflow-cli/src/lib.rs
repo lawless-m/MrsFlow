@@ -2581,6 +2581,7 @@ fn build_lazy_odbc_table(connection_string: &str, table_name: &str) -> Result<Va
         output_names: None,
         where_filters: vec![],
         limit: None,
+        dialect: mrsflow_core::plan::SqlDialect::GenericOdbc,
         force_fn,
     };
     Ok(Value::Table(Table { repr: TableRepr::LazyOdbc(state) }))
