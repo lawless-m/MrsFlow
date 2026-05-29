@@ -3727,6 +3727,22 @@ fn row_count(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             return Ok(Value::Number(forced.num_rows() as f64));
         }
     }
+    // A LazyOdbc plan has no cheap row count (`num_rows` is the usize::MAX
+    // "must force" sentinel). Fold to a server-side `SELECT COUNT(*)` — same
+    // table and WHERE filters — instead of pulling every row to count it.
+    if let super::super::value::TableRepr::LazyOdbc(state) = &table.repr {
+        let batch = (state.force_fn)(&state.count_sql())?;
+        let counted = super::super::value::Table::from_arrow(batch);
+        if counted.num_rows() == 0 {
+            return Err(MError::Other(
+                "Table.RowCount: COUNT(*) query returned no rows".into(),
+            ));
+        }
+        let n = cell_to_value(&counted, 0, 0)?.as_f64_lossy().ok_or_else(|| {
+            MError::Other("Table.RowCount: COUNT(*) returned a non-numeric value".into())
+        })?;
+        return Ok(Value::Number(n));
+    }
     Ok(Value::Number(table.num_rows() as f64))
 }
 

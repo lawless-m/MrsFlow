@@ -5685,7 +5685,7 @@ mod tests {
             where_filters: vec![],
             limit: None,
             dialect: crate::plan::SqlDialect::GenericOdbc,
-            force_fn: std::rc::Rc::new(|_| {
+            force_fn: std::rc::Rc::new(|_: &str| {
                 panic!("force_fn fired — test expected fold, got force")
             }),
         };

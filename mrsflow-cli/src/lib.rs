@@ -2561,10 +2561,9 @@ fn build_lazy_odbc_table(connection_string: &str, table_name: &str) -> Result<Va
         .schema();
 
     let conn_for_force = connection_string.to_string();
-    let force_fn: Rc<dyn Fn(&LazyOdbcState) -> Result<arrow::record_batch::RecordBatch, MError>> =
-        Rc::new(move |state| {
-            let sql = state.render_sql();
-            let v = odbc_query_impl(&conn_for_force, &sql)
+    let force_fn: Rc<dyn Fn(&str) -> Result<arrow::record_batch::RecordBatch, MError>> =
+        Rc::new(move |sql: &str| {
+            let v = odbc_query_impl(&conn_for_force, sql)
                 .map_err(|e| MError::Other(format!("Odbc fold force: {e:?}")))?;
             match v {
                 Value::Table(t) => t.try_to_arrow(),

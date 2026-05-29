@@ -484,13 +484,12 @@ fn build_lazy_exportmaster_table(
     };
 
     let opts_for_force = opts.clone();
-    let force_fn: Rc<dyn Fn(&LazyOdbcState) -> Result<arrow::record_batch::RecordBatch, MError>> =
-        Rc::new(move |state| {
-            let sql = state.render_sql();
+    let force_fn: Rc<dyn Fn(&str) -> Result<arrow::record_batch::RecordBatch, MError>> =
+        Rc::new(move |sql: &str| {
             let mut c = Client::connect_and_login(&opts_for_force)
                 .map_err(|e| MError::Other(format!("Exportmaster connect: {e:?}")))?;
             let v = c
-                .query_to_table(&sql)
+                .query_to_table(sql)
                 .map_err(|e| MError::Other(format!("Exportmaster fold force: {e:?}")))?;
             match v {
                 Value::Table(t) => t

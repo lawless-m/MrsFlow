@@ -674,12 +674,13 @@ pub struct LazyOdbcState {
     /// for the native `Exportmaster` connector. Carried through every
     /// foldable narrowing so the right flavour is emitted on force.
     pub dialect: crate::plan::SqlDialect,
-    /// Driver-side execution. The CLI shell builds this closure with
-    /// `odbc_query_impl` captured; the WASM shell and `NoIoHost`
-    /// never construct LazyOdbc values so they never need one. The
-    /// closure receives the (potentially narrowed) state and returns
-    /// the rendered Arrow batch.
-    pub force_fn: std::rc::Rc<dyn Fn(&LazyOdbcState) -> Result<arrow::record_batch::RecordBatch, MError>>,
+    /// Driver-side execution: run one SQL statement and return its rows as
+    /// an Arrow batch. The CLI shell builds this closure with the connection
+    /// captured; the WASM shell and `NoIoHost` never construct LazyOdbc
+    /// values so they never need one. The caller renders the SQL —
+    /// `render_sql` for the data query, `count_sql` for a row count — so the
+    /// same connector closure serves both without knowing which.
+    pub force_fn: std::rc::Rc<dyn Fn(&str) -> Result<arrow::record_batch::RecordBatch, MError>>,
 }
 
 impl std::fmt::Debug for LazyOdbcState {
@@ -712,15 +713,8 @@ impl LazyOdbcState {
     /// accumulator the trivial bottom of the shared fold walk
     /// (`mrsflow/10-plan-ir.md`).
     pub fn to_plan(&self) -> crate::plan::Rel {
-        use crate::plan::{ProjectItem, Rel, Scalar, Source};
+        use crate::plan::{ProjectItem, Rel, Scalar};
         let col_name = |idx: usize| self.schema.field(idx).name().clone();
-        let mut node = Rel::Scan(Source::Ref(self.table_name.clone()));
-        for f in &self.where_filters {
-            node = Rel::Filter {
-                predicate: row_filter_to_scalar(&col_name(f.source_col_idx), f),
-                input: Box::new(node),
-            };
-        }
         let items = self
             .projection
             .iter()
@@ -735,8 +729,45 @@ impl LazyOdbcState {
         Rel::Project {
             star: false,
             items,
-            input: Box::new(node),
+            input: Box::new(self.scan_with_filters()),
         }
+    }
+
+    /// The `Scan` of the table with the accumulated `where_filters` applied as
+    /// nested `Filter`s (first filter innermost, preserving WHERE order). The
+    /// common base of both `to_plan` (which adds a `Project`) and the row-count
+    /// plan (which adds an `Aggregate`).
+    fn scan_with_filters(&self) -> crate::plan::Rel {
+        use crate::plan::{Rel, Source};
+        let col_name = |idx: usize| self.schema.field(idx).name().clone();
+        let mut node = Rel::Scan(Source::Ref(self.table_name.clone()));
+        for f in &self.where_filters {
+            node = Rel::Filter {
+                predicate: row_filter_to_scalar(&col_name(f.source_col_idx), f),
+                input: Box::new(node),
+            };
+        }
+        node
+    }
+
+    /// SQL that counts the rows the current plan would return — same table and
+    /// WHERE filters as [`render_sql`](Self::render_sql), but `SELECT COUNT(*)`
+    /// instead of the projected columns. Lets `Table.RowCount` fold to a
+    /// server-side count rather than pulling every row to count it.
+    pub fn count_sql(&self) -> String {
+        use crate::plan::{AggFunc, Aggregation, Rel};
+        let agg = Rel::Aggregate {
+            keys: vec![],
+            aggs: vec![Aggregation {
+                name: "n".to_string(),
+                func: AggFunc::Count,
+                column: None,
+            }],
+            input: Box::new(self.scan_with_filters()),
+        };
+        self.dialect
+            .emit(&agg)
+            .unwrap_or_else(|_| format!("SELECT COUNT(*) FROM \"{}\"", self.table_name))
     }
 
     /// Render the deferred plan into a portable-ish SQL SELECT statement.
@@ -1160,7 +1191,7 @@ fn rows_to_arrow(
 fn materialise_lazy_odbc(
     state: &LazyOdbcState,
 ) -> Result<arrow::record_batch::RecordBatch, MError> {
-    let batch = (state.force_fn)(state)?;
+    let batch = (state.force_fn)(&state.render_sql())?;
     if let Some(onames) = state.output_names.as_ref() {
         if onames.iter().any(Option::is_some) {
             let schema = batch.schema();
@@ -2089,7 +2120,7 @@ mod odbc_sql_tests {
             where_filters: filters,
             limit: None,
             dialect: crate::plan::SqlDialect::GenericOdbc,
-            force_fn: std::rc::Rc::new(|_| {
+            force_fn: std::rc::Rc::new(|_: &str| {
                 panic!("force_fn must not be called in render-only tests")
             }),
         }
@@ -2224,6 +2255,29 @@ mod odbc_sql_tests {
         assert_eq!(
             sql,
             r#"SELECT "id", "name", "price" FROM "customers" WHERE "id" >= #2024-01-15# AND "id" = TRUE"#
+        );
+    }
+
+    #[test]
+    fn count_sql_no_filters() {
+        assert_eq!(
+            dummy_state(vec![]).count_sql(),
+            r#"SELECT COUNT(*) AS "n" FROM "customers""#
+        );
+    }
+
+    #[test]
+    fn count_sql_includes_where_filters() {
+        // Table.RowCount on a folded plan must count the *filtered* rows, so
+        // the WHERE clause has to survive into the COUNT(*) query.
+        let f = RowFilter {
+            source_col_idx: 0,
+            op: FilterOp::Gt,
+            scalar: FilterScalar::Number(100.0),
+        };
+        assert_eq!(
+            dummy_state(vec![f]).count_sql(),
+            r#"SELECT COUNT(*) AS "n" FROM "customers" WHERE "id" > 100"#
         );
     }
 
