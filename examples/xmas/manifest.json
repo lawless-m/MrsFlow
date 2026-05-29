@@ -1,0 +1,44 @@
+[
+  {
+    "name": "Last Refresh",
+    "kind": "M",
+    "group": "table",
+    "file": "Last Refresh.pq"
+  },
+  {
+    "name": "SQL ORDERH QUOTEH",
+    "kind": "M",
+    "group": "table",
+    "file": "SQL ORDERH QUOTEH.pq"
+  },
+  {
+    "name": "SQL ORDERI QUOTEI",
+    "kind": "M",
+    "group": "table",
+    "file": "SQL ORDERI QUOTEI.pq"
+  },
+  {
+    "name": "24 vs 25 YOY Sales by Day New",
+    "kind": "M",
+    "group": "table",
+    "file": "24 vs 25 YOY Sales by Day New.pq"
+  },
+  {
+    "name": "2024 Sales by IBM New",
+    "kind": "M",
+    "group": "table",
+    "file": "2024 Sales by IBM New.pq"
+  },
+  {
+    "name": "Xmas 2024 Sales By Customer",
+    "kind": "M",
+    "group": "table",
+    "file": "Xmas 2024 Sales By Customer.pq"
+  },
+  {
+    "name": "YOY Previous Xmas Sales By Day",
+    "kind": "M",
+    "group": "table",
+    "file": "YOY Previous Xmas Sales By Day.pq"
+  }
+]

@@ -1,0 +1,7 @@
+let
+
+Source = #table(type table[Date Last Refreshed=datetime], {{DateTime.LocalNow()}})
+
+in
+
+Source

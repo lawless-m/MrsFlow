@@ -1,0 +1,116 @@
+[
+  {
+    "name": "Analysis",
+    "kind": "M",
+    "group": "table",
+    "file": "Analysis.pq"
+  },
+  {
+    "name": "CUSTOMER",
+    "kind": "M",
+    "group": "table",
+    "file": "CUSTOMER.pq"
+  },
+  {
+    "name": "PRODUCT",
+    "kind": "M",
+    "group": "table",
+    "file": "PRODUCT.pq"
+  },
+  {
+    "name": "Country",
+    "kind": "M",
+    "group": "table",
+    "file": "Country.pq"
+  },
+  {
+    "name": "PRODGRP",
+    "kind": "M",
+    "group": "table",
+    "file": "PRODGRP.pq"
+  },
+  {
+    "name": "COSTS",
+    "kind": "M",
+    "group": "table",
+    "file": "COSTS.pq"
+  },
+  {
+    "name": "Range",
+    "kind": "M",
+    "group": "table",
+    "file": "Range.pq"
+  },
+  {
+    "name": "LastRefreshed",
+    "kind": "M",
+    "group": "table",
+    "file": "LastRefreshed.pq"
+  },
+  {
+    "name": "Customer Rebate",
+    "kind": "M",
+    "group": "table",
+    "file": "Customer Rebate.pq"
+  },
+  {
+    "name": "Analysis incl Rebate",
+    "kind": "M",
+    "group": "table",
+    "file": "Analysis incl Rebate.pq"
+  },
+  {
+    "name": "PowerBI tab",
+    "kind": "M",
+    "group": "table",
+    "file": "PowerBI tab.pq"
+  },
+  {
+    "name": "Revenue PowerBI",
+    "kind": "M",
+    "group": "table",
+    "file": "Revenue PowerBI.pq"
+  },
+  {
+    "name": "GP PowerBI",
+    "kind": "M",
+    "group": "table",
+    "file": "GP PowerBI.pq"
+  },
+  {
+    "name": "Retro Costs",
+    "kind": "M",
+    "group": "table",
+    "file": "Retro Costs.pq"
+  },
+  {
+    "name": "Analysis (2)",
+    "kind": "M",
+    "group": "table",
+    "file": "Analysis (2).pq"
+  },
+  {
+    "name": "Trigger Points 2023",
+    "kind": "M",
+    "group": "table",
+    "file": "Trigger Points 2023.pq"
+  },
+  {
+    "name": "Trigger Points WIth Profit 2023",
+    "kind": "M",
+    "group": "table",
+    "file": "Trigger Points WIth Profit 2023.pq"
+  },
+  {
+    "name": "Trigger Points 2024",
+    "kind": "M",
+    "group": "table",
+    "file": "Trigger Points 2024.pq"
+  },
+  {
+    "name": "Trigger Points 2025",
+    "kind": "M",
+    "group": "table",
+    "file": "Trigger Points 2025.pq"
+  }
+]

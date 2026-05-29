@@ -1,0 +1,5 @@
+let
+    Source = Table.FromRows(Json.Document(Binary.Decompress(Binary.FromText("NZJPbxoxEMW/isU5smzv+s8eA+qhKWkQRKoqlMMEJuw0XhuZBUo/fe01uVn6eZ7nveftdraA5Nkqoj+NCWYPM+mUFUZxPXt72M6eAQ8Q2BOGTwqngqWWSmsu5MRfaYhjf2M/wR9jKFyITknBlZn4HE4jZYEl5APs8wVnrejaCS7PuxtbeLz6eM3ENJ01jgs1wc0ujiN7hZuPKUNtlTaWiyq7AdizlzNSoMqUstx9icKJzTGN0VfcmMa0hjcTXuNAbB7PbOORBigrK6eNttzY6cIP9P7GlgjpVpiVznRctPc00p+YCNljDosmv7YTjeOyu6/18ZFiYK99HE5YsNHSdVzW8RdPFwK2jgdMJUujrJPc2vtsgj6z95zzpKxd2wnu6tq/o4ewx5wWpM8MW2es4bY+u4ghxMRW/jyMCbHgxinNXe3oe6KQX4Vdj5fScNO1bcNljfmbv9CJLeMR/xW7IvfH60JLCj17igGn2p1tBW+r4KPHv+x5twacClfWfgWwQEpXDOwXeU8wlMmutZILffeYEx97KHxP4VC+g1KG67rLmnY9pD3bDDT2JQGhGq5rrauePB1zc+k8FIO2WMixvv0H", BinaryEncoding.Base64), Compression.Deflate)), let _t = ((type nullable text) meta [Serialized.Text = true]) in type table [IBM = _t, #"2024 Xmas Revenue" = _t]),
+    #"Changed Type" = Table.TransformColumnTypes(Source,{{"IBM", type text}, {"2024 Xmas Revenue", Currency.Type}})
+in
+    #"Changed Type"

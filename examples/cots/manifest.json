@@ -1,0 +1,128 @@
+[
+  {
+    "name": "Analysis",
+    "kind": "M",
+    "group": "table",
+    "file": "Analysis.pq"
+  },
+  {
+    "name": "CUSTOMER",
+    "kind": "M",
+    "group": "table",
+    "file": "CUSTOMER.pq"
+  },
+  {
+    "name": "ORDERH",
+    "kind": "M",
+    "group": "table",
+    "file": "ORDERH.pq"
+  },
+  {
+    "name": "ORDERI",
+    "kind": "M",
+    "group": "table",
+    "file": "ORDERI.pq"
+  },
+  {
+    "name": "PRODUCT",
+    "kind": "M",
+    "group": "table",
+    "file": "PRODUCT.pq"
+  },
+  {
+    "name": "Country",
+    "kind": "M",
+    "group": "table",
+    "file": "Country.pq"
+  },
+  {
+    "name": "PRODGRP",
+    "kind": "M",
+    "group": "table",
+    "file": "PRODGRP.pq"
+  },
+  {
+    "name": "COSTS",
+    "kind": "M",
+    "group": "table",
+    "file": "COSTS.pq"
+  },
+  {
+    "name": "PRICES",
+    "kind": "M",
+    "group": "table",
+    "file": "PRICES.pq"
+  },
+  {
+    "name": "Range",
+    "kind": "M",
+    "group": "table",
+    "file": "Range.pq"
+  },
+  {
+    "name": "LastRefreshed",
+    "kind": "M",
+    "group": "table",
+    "file": "LastRefreshed.pq"
+  },
+  {
+    "name": "Customer Rebate",
+    "kind": "M",
+    "group": "table",
+    "file": "Customer Rebate.pq"
+  },
+  {
+    "name": "PowerBI tab",
+    "kind": "M",
+    "group": "table",
+    "file": "PowerBI tab.pq"
+  },
+  {
+    "name": "Revenue PowerBI",
+    "kind": "M",
+    "group": "table",
+    "file": "Revenue PowerBI.pq"
+  },
+  {
+    "name": "GP PowerBI",
+    "kind": "M",
+    "group": "table",
+    "file": "GP PowerBI.pq"
+  },
+  {
+    "name": "Retro Costs",
+    "kind": "M",
+    "group": "table",
+    "file": "Retro Costs.pq"
+  },
+  {
+    "name": "Account",
+    "kind": "M",
+    "group": "table",
+    "file": "Account.pq"
+  },
+  {
+    "name": "AccountsReceivable_CustomerP",
+    "kind": "M",
+    "group": "table",
+    "file": "AccountsReceivable_CustomerP.pq"
+  },
+  {
+    "name": "Users",
+    "kind": "M",
+    "group": "table",
+    "file": "Users.pq"
+  },
+  {
+    "name": "Growth Rebates NISA",
+    "kind": "M",
+    "group": "table",
+    "file": "Growth Rebates NISA.pq"
+  },
+  {
+    "name": "Suma CF Cost Budget",
+    "kind": "M",
+    "group": "table",
+    "file": "Suma CF Cost Budget.pq"
+  }
+]

@@ -1,0 +1,8 @@
+let
+    Source = Odbc.DataSource("dsn=Exportmaster", [HierarchicalNavigation=true]),
+    NISAINT_CS_Database = Source{[Name="NISAINT_CS",Kind="Database"]}[Data],
+    CUSTOMER_Table = NISAINT_CS_Database{[Name="CUSTOMER",Kind="Table"]}[Data],
+    #"Renamed Columns" = Table.RenameColumns(CUSTOMER_Table,{{"CPYNAME", "CustomerName"}}),
+    #"Added Conditional Column" = Table.AddColumn(#"Renamed Columns", "EEA Full Name", each if [UF_CSA] = "SWI" then "Samantha Wilding" else if [UF_CSA] = "SAT" then "Saffron Thomsen" else if [UF_CSA] = "NP" then "Necia Pratten" else if [UF_CSA] = "AM" then "Alex Mcrae" else if [UF_CSA] = "CEW" then "Ceirwen Williams" else if [UF_CSA] = "GBU" then "Georgia Burnham" else if [UF_CSA] = "DCA" then "Dave Carrington" else if [UF_CSA] = "YC" then "Yolande Clark" else if [UF_CSA] = "JMA" then "Jamie Mapley" else if [UF_CSA] = "PBO" then "Philip Borum" else if [UF_CSA] = "JDT" then "Jean Duclonat" else if [UF_CSA] = "JSM" then "Josh Smith" else if [UF_CSA] = "SHO" then "Sally Hou" else if [UF_CSA] = "LJS" then "Linh Jones" else if [UF_CSA] = "MAN" then "Maggie Andrearczyk" else if [UF_CSA] = "HPE" then "Hannah Pearson" else if [UF_CSA] = "GED" then "Gemma Davies" else if [UF_CSA] = "SHR" then "Steve Heather" else if [UF_CSA] = "YED" then "Yekaterina Dowling" else if [UF_CSA] = "MAA" then "Marjorie Astrion" else if [UF_CSA] = "NWT" then "Nicole White" else if [UF_CSA] = "SRB" then "Sarah Robinson" else if [UF_CSA] = "JMY" then "Jamie Mapley" else if [UF_CSA] = "CCX" then "Callum Cox" else if [UF_ACCHAND] = [UF_ACCHAND] then [UF_ACCHAND] else null)
+in
+    #"Added Conditional Column"

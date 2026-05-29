@@ -1,0 +1,17 @@
+let
+    Source = Odbc.DataSource("dsn=Exportmaster", [HierarchicalNavigation=true]),
+    NISAINT_CS_Database = Source{[Name="NISAINT_CS",Kind="Database"]}[Data],
+    PRODUCT_Table = NISAINT_CS_Database{[Name="PRODUCT",Kind="Table"]}[Data],
+    #"Renamed Columns" = Table.RenameColumns(PRODUCT_Table,{{"CODE", "Product Code"}}),
+    #"Removed Columns" = Table.RemoveColumns(#"Renamed Columns",{"COMMOD"}),
+    #"Renamed Columns1" = Table.RenameColumns(#"Removed Columns",{{"GROUP", "Group Code"}, {"DESC1", "Short Description"}}),
+    #"Removed Columns1" = Table.RemoveColumns(#"Renamed Columns1",{"DESC2"}),
+    #"Renamed Columns2" = Table.RenameColumns(#"Removed Columns1",{{"DESC3", "Brand"}}),
+    #"Removed Columns2" = Table.RemoveColumns(#"Renamed Columns2",{"DESC4"}),
+    #"Renamed Columns3" = Table.RenameColumns(#"Removed Columns2",{{"DESC5", "Unit Weight"}}),
+    #"Removed Columns3" = Table.RemoveColumns(#"Renamed Columns3",{"LONGDESC", "PRICE", "PUNIT", "PRICEPER", "CUNITFAC", "QUNIT", "STDCOST", "STDCOSTPER", "PACKCONV", "PACKULOAD", "PACKCOST", "PACKCOSTPER", "MASSNET", "MASSGROSS", "MASSPACKED", "MASSPER", "VOL", "VOLPACKED", "VOLPER", "VATRATE", "EXTRA", "CONVFACT", "SUPPUNITS", "SSM", "RECIPE", "ORIGIN", "HAZIND", "HAZCODE", "ANALYSISCODE", "PERTEXT", "PRSERVICE", "PRNOTES", "PRUSER04", "PRUSER05", "PRUSER06", "PRUSER07", "PRUSER08", "PRUSER09", "PRUSER10", "PRALERT", "PRALERTTEXT", "PRSUPP", "PRSUPPPART", "PRSUPPPRICE", "PRSUPPPRICEPER", "PRSUPPCURR", "PRSUPPDATE", "PRSUPPOFFREF", "PRSUPPCOMMENT", "PRNOTCOUNTED", "PRNEEDQC", "PRNEEDBATCH", "PRNEEDMANDATE", "PRNEEDEXPDATE", "PRNOTFORSALE", "PRREPLACED", "PRREPLACEMENT", "PRFREESTOCKNO", "PRPURANAL", "PRFROMSTOCK", "PROEMCODE", "PRPROC1", "PRPROC2", "PRTEMPCODE", "PRREVCHRGSERVICE", "PRBOM", "UF_SUPPLIERSUB", "UF_SUBTYPE", "UF_PSDEADLINE", "UF_COREPROD", "UF_PRE_PRICED", "UF_RRP", "UF_OWN_LABEL", "UF_CATCHWT", "UF_COMM_SEQ", "UF_CSSPALLET", "UF_CSSLAYER", "UF_VENDOR", "UF_PALTDEAL", "UF_PALTONLY", "UF_SPECGRAV", "UF_S_DIM_1", "UF_S_DIM_2", "UF_S_DIM_3", "UF_CUBISCAN", "UF_ABV", "UF_SL_PRODTN", "UF_WH_SHELF", "UF_BBEROTDIS", "UF_BBEROTDATE", "UF_BBELASTUPDATE", "UF_TBOH", "UF_TOTONORDER", "UF_DUETODAY", "UF_DUETOMOR", "UF_NODISCOUNT", "UF_COSTREQD", "UF_NEWSCHM", "UF_DISCTPCT", "UF_PRONOTE2", "UF_PRONOTE3", "UF_PROHIB1", "UF_PROHIB2", "UF_PROHIB3", "UF_PROHIB4", "UF_PROHIB5", "UF_PROHIB6", "UF_USE_ENG", "UF_USE_ARAB", "UF_USE_EL", "UF_USE_RU"}),
+    #"Renamed Columns4" = Table.RenameColumns(#"Removed Columns3",{{"CUNIT", "Units per Case"}, {"PRUSER01", "Discontinued?"}, {"PRUSER02", "Banned Code?"}, {"PRUSER03", "Exclude from Price List (Website)?"}, {"UF_UKLDESC", "Long Description"}, {"UF_IBARCODE", "Inner Barcode"}, {"UF_O_BARCODE", "Outer Barcode"}, {"UF_SUPP_NAME", "Supplier Name"}}),
+    #"Removed Columns4" = Table.RemoveColumns(#"Renamed Columns4",{"UF_BUYERNAME", "UF_SUPPPARENT", "UF_SUPCLASSCODE_1", "UF_SUPCLASSCODE_2", "UF_SUPCLASSNAME_2", "UF_SUPCLASSCODE_3", "UF_SUPCLASSNAME_3", "UF_SUPCLASSCODE_4", "UF_SUPCLASSNAME_4", "UF_BACKTOBACK", "UF_SPLITIND", "UF_SHELFDESP", "UF_SUPCTRYORG", "UF_BLACKLIST", "UF_SUB_SWO_ITEM", "UF_SUB_SWO_RATIO", "UF_SUB_SD_ITEM", "UF_SUB_SD_RATIO", "UF_SUB_SIA_ITEM", "UF_SUB_SIA_RATIO", "UF_RELEASE_DATE", "UF_NISASTATUS", "UF_RIALT1", "UF_RIALT2", "UF_RIALT3", "UF_RIALT4", "UF_PSONLY"}),
+    #"Renamed Columns5" = Table.RenameColumns(#"Removed Columns4",{{"UF_PSFLAG", "Presell Flag"}})
+in
+    #"Renamed Columns5"

@@ -1,0 +1,5 @@
+let
+    Source = Table.FromRows(Json.Document(Binary.Decompress(Binary.FromText("XZLZbcQwDER78TfhiDdZy2KrSyepLLS8OryCPyjoaTji+PU6Gv7UR43kgOPvF82BW9y1EDjm8YYbow0TBTfsdSZELIp3yoFEe60NRGJSslGpEOK9FoMwmZRuVARg3B2NgHFRtmsJIN32L1nmSflGUUDyXQtCozap2Cg2wOG+ZHm5z0VJYxC/fbELpOLAsC2M1IDsFpNkMJs9cR9/KUTQpz+Ck09sHz8xKA81SKRprYtdJ6QtRE6pVTuk8o8n1nrm2dGGSnaa2ZUCYlS0T5QHWhFQ0km1apds494j2E5ahH5k4FBK5ZN5C0QXmZKtisgWccb+N9mCmMZh7TgdPzYeAXeU1enTDI56P32JxiTVa0pDVBvml8ccJIfpeo00rKunu8cz7I42k1joNdqvrO/3lK01c69xPd+DMx5sXA2noIWNmb//AQ==", BinaryEncoding.Base64), Compression.Deflate)), let _t = ((type nullable text) meta [Serialized.Text = true]) in type table [#"Budget Date" = _t, Suma = _t, CF = _t]),
+    #"Changed Type" = Table.TransformColumnTypes(Source,{{"Budget Date", type date}, {"Suma", Currency.Type}, {"CF", Currency.Type}})
+in
+    #"Changed Type"

@@ -1,0 +1,74 @@
+[
+  {
+    "name": "Calendar",
+    "kind": "M",
+    "group": "table",
+    "file": "Calendar.pq"
+  },
+  {
+    "name": "Analysis",
+    "kind": "M",
+    "group": "table",
+    "file": "Analysis.pq"
+  },
+  {
+    "name": "Customer",
+    "kind": "M",
+    "group": "table",
+    "file": "Customer.pq"
+  },
+  {
+    "name": "Product Table",
+    "kind": "M",
+    "group": "table",
+    "file": "Product Table.pq"
+  },
+  {
+    "name": "Geographic Table",
+    "kind": "M",
+    "group": "table",
+    "file": "Geographic Table.pq"
+  },
+  {
+    "name": "Ingredients Table",
+    "kind": "M",
+    "group": "table",
+    "file": "Ingredients Table.pq"
+  },
+  {
+    "name": "Main Product Category",
+    "kind": "M",
+    "group": "table",
+    "file": "Main Product Category.pq"
+  },
+  {
+    "name": "Sub Product Category",
+    "kind": "M",
+    "group": "table",
+    "file": "Sub Product Category.pq"
+  },
+  {
+    "name": "Range Table",
+    "kind": "M",
+    "group": "table",
+    "file": "Range Table.pq"
+  },
+  {
+    "name": "OrderI Table",
+    "kind": "M",
+    "group": "table",
+    "file": "OrderI Table.pq"
+  },
+  {
+    "name": "Sub Sub Category",
+    "kind": "M",
+    "group": "table",
+    "file": "Sub Sub Category.pq"
+  },
+  {
+    "name": "2020 Budget",
+    "kind": "M",
+    "group": "table",
+    "file": "2020 Budget.pq"
+  }
+]
