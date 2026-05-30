@@ -987,4 +987,107 @@ mod tests {
         assert_eq!(f.sql, None);
         assert!(!f.is_full());
     }
+
+    // ---- Gate 1: emitted DBISAM SQL must parse under the DBISAM DCG --------
+    //
+    // The doc's thesis is "the grammar IS the fold predicate". This wires that
+    // up for real: every SQL the Dbisam emitter produces is fed to the DBISAM
+    // DCG parser (../DibDog/dbisam-dcg-project), and must parse. Had this
+    // existed, the `SELECT TOP n`, `#date#`, and bracket-quoting bugs would
+    // have failed here instead of against a live database.
+    //
+    // No-op (skips) where scryer-prolog or the grammar aren't present, so it
+    // stays green off the dev machine while being a hard gate where the tools
+    // are installed.
+
+    fn dcg_tools_dir() -> Option<std::path::PathBuf> {
+        let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../DibDog/dbisam-dcg-project/tools");
+        if dir.join("parse-to-term.pl").exists()
+            && std::process::Command::new("scryer-prolog")
+                .arg("--version")
+                .output()
+                .is_ok()
+        {
+            Some(dir)
+        } else {
+            None
+        }
+    }
+
+    /// True iff the DBISAM DCG parses `sql`. Panics on a harness error
+    /// (couldn't run scryer / read the file) so a broken gate is loud.
+    fn dcg_parses(tools: &std::path::Path, sql: &str) -> bool {
+        let tmp = std::env::temp_dir().join("mrsflow_dcg_gate.sql");
+        std::fs::write(&tmp, sql).expect("write temp sql");
+        let status = std::process::Command::new("scryer-prolog")
+            .current_dir(tools)
+            .args(["-g", "main", "parse-to-term.pl", "--"])
+            .arg(&tmp)
+            .status()
+            .expect("run scryer-prolog");
+        // parse-to-term: 0 = parsed, 1 = grammar rejected, 2 = harness error.
+        match status.code() {
+            Some(0) => true,
+            Some(1) => false,
+            other => panic!("DCG harness error (exit {other:?}) on: {sql}"),
+        }
+    }
+
+    #[test]
+    fn emitted_dbisam_sql_parses_under_the_dcg() {
+        let Some(tools) = dcg_tools_dir() else {
+            eprintln!("skip: DBISAM DCG / scryer-prolog not available");
+            return;
+        };
+        // SQL straight from M source through lower → emit (Dbisam).
+        let from_m = [
+            "t",
+            r#"Table.SelectRows(t, each [Country] = "GB")"#,
+            r#"Table.SelectRows(t, each [a] = 1 and [b] > 2)"#,
+            r#"Table.SelectRows(t, each [x] = null)"#,
+            r#"Table.SelectColumns(t, {"a", "b"})"#,
+            r#"Table.AddColumn(t, "double", each [a] * 2)"#,
+            r#"Table.FirstN(Table.Sort(t, {{"a", Order.Descending}}), 3)"#,
+            "Table.Distinct(t)",
+            r#"Table.SelectRows(t, each Text.Upper([name]) = "X")"#,
+            r#"Table.Group(t, {"Region"}, {{"Total", each List.Sum([Amount])}})"#,
+            r#"Table.NestedJoin(a, {"k"}, b, {"k"}, "n", JoinKind.LeftOuter)"#,
+        ];
+        for src in from_m {
+            let emitted = sql(src);
+            assert!(
+                dcg_parses(&tools, &emitted),
+                "DCG rejected emitted SQL for `{src}`:\n  {emitted}"
+            );
+        }
+        // The connector-built shapes (qualified columns over a join) don't come
+        // from `lower`, so emit them by hand and validate too.
+        let qualified_agg_join = Rel::Aggregate {
+            keys: vec![
+                Scalar::QualifiedCol { table: "orderh".into(), name: "ref".into() },
+                Scalar::QualifiedCol { table: "orderh".into(), name: "custcode".into() },
+            ],
+            aggs: vec![Aggregation {
+                name: "qty".into(),
+                func: AggFunc::Sum,
+                column: Some(Scalar::QualifiedCol {
+                    table: "orderi".into(),
+                    name: "quantity".into(),
+                }),
+            }],
+            input: Box::new(Rel::Join {
+                kind: JoinKind::LeftOuter,
+                left_keys: vec!["ref".into()],
+                right_keys: vec!["ref".into()],
+                left: Box::new(Rel::Scan(Source::Ref("orderh".into()))),
+                right: Box::new(Rel::Scan(Source::Ref("orderi".into()))),
+            }),
+        };
+        let emitted = emit(&qualified_agg_join, &Dbisam).expect("foldable");
+        assert!(
+            dcg_parses(&tools, &emitted),
+            "DCG rejected qualified aggregate-over-join SQL:\n  {emitted}"
+        );
+    }
 }
