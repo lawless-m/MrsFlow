@@ -406,6 +406,14 @@ pub enum TableRepr {
     /// either side's bulk columns. See `mrsflow/09-lazy-tables.md`
     /// (Stage A.5).
     ExpandView(ExpandViewState),
+    /// Deferred `Table.NestedJoin` over two **same-source** `LazyOdbc` sides,
+    /// captured so a following `ExpandTableColumn` (and optionally
+    /// `Table.Group`) can fold the whole chain into one server-side
+    /// `… JOIN … [GROUP BY …]` instead of pulling both tables. Carries the
+    /// stage reached (`expanded`/`aggregate`); forcing emits the fused plan, or
+    /// falls back to the eager nested join for a bare (un-expanded) join. See
+    /// `mrsflow/10-plan-ir.md`.
+    LazyOdbcJoin(LazyOdbcJoinState),
 }
 
 /// State for a `TableRepr::ExpandView`. Constructed by
@@ -824,6 +832,197 @@ impl LazyOdbcState {
     }
 }
 
+/// State for [`TableRepr::LazyOdbcJoin`] — a deferred same-source ODBC join,
+/// optionally expanded (`Table.ExpandTableColumn`) and grouped (`Table.Group`),
+/// that folds the whole chain into one server-side query.
+#[derive(Clone)]
+pub struct LazyOdbcJoinState {
+    pub left: Box<LazyOdbcState>,
+    pub right: Box<LazyOdbcState>,
+    /// Join keys, as the *output* column names on each side.
+    pub left_keys: Vec<String>,
+    pub right_keys: Vec<String>,
+    pub kind: crate::plan::JoinKind,
+    /// The nested column name `Table.NestedJoin` introduced (nested shape only).
+    pub new_column_name: String,
+    /// Set by `Table.ExpandTableColumn`: (right source column, output name).
+    /// `None` while still in the nested shape.
+    pub expanded: Option<Vec<(String, String)>>,
+    /// Set by `Table.Group` over the expanded result: (group keys by output
+    /// name, aggregations). `None` until grouped.
+    pub aggregate: Option<(Vec<String>, Vec<crate::plan::Aggregation>)>,
+    /// Eager fallback — the byte-identical nested-join result, used when the
+    /// join is forced without an expand to fold into. Built by the stdlib so
+    /// the hash-join logic stays there.
+    pub fallback: std::rc::Rc<dyn Fn() -> Result<Table, MError>>,
+}
+
+impl std::fmt::Debug for LazyOdbcJoinState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LazyOdbcJoinState")
+            .field("left", &self.left.table_name)
+            .field("right", &self.right.table_name)
+            .field("kind", &self.kind)
+            .field("expanded", &self.expanded.is_some())
+            .field("aggregate", &self.aggregate.is_some())
+            .finish()
+    }
+}
+
+impl LazyOdbcJoinState {
+    fn left_output_names(&self) -> Vec<String> {
+        (0..self.left.projection.len())
+            .map(|i| self.left.effective_name(i))
+            .collect()
+    }
+
+    /// Output column names at the current stage.
+    pub fn output_names(&self) -> Vec<String> {
+        if let Some((keys, aggs)) = &self.aggregate {
+            let mut names = keys.clone();
+            names.extend(aggs.iter().map(|a| a.name.clone()));
+            names
+        } else if let Some(expanded) = &self.expanded {
+            let mut names = self.left_output_names();
+            names.extend(expanded.iter().map(|(_, out)| out.clone()));
+            names
+        } else {
+            let mut names = self.left_output_names();
+            names.push(self.new_column_name.clone());
+            names
+        }
+    }
+
+    /// Resolve an output column name to its table-qualified source column.
+    fn qualify(&self, output_name: &str) -> Option<crate::plan::Scalar> {
+        use crate::plan::Scalar;
+        for i in 0..self.left.projection.len() {
+            if self.left.effective_name(i) == output_name {
+                let src = self.left.schema.field(self.left.projection[i]).name().clone();
+                return Some(Scalar::QualifiedCol { table: self.left.table_name.clone(), name: src });
+            }
+        }
+        if let Some(expanded) = &self.expanded {
+            for (src, out) in expanded {
+                if out == output_name {
+                    return Some(Scalar::QualifiedCol {
+                        table: self.right.table_name.clone(),
+                        name: src.clone(),
+                    });
+                }
+            }
+        }
+        None
+    }
+
+    /// One side's qualified `Scan` + `Filter*` plan (a join input).
+    fn side_plan(state: &LazyOdbcState) -> crate::plan::Rel {
+        use crate::plan::{Rel, Source};
+        let mut node = Rel::Scan(Source::Ref(state.table_name.clone()));
+        for f in &state.where_filters {
+            let col = state.schema.field(f.source_col_idx).name().clone();
+            let pred = qualify_scalar(row_filter_to_scalar(&col, f), &state.table_name);
+            node = Rel::Filter { predicate: pred, input: Box::new(node) };
+        }
+        node
+    }
+
+    /// Build the fused fold plan for the current stage, or `None` for a bare
+    /// (un-expanded) nested join, which has no flat-SQL shape.
+    pub fn to_fold_plan(&self) -> Option<crate::plan::Rel> {
+        use crate::plan::{Aggregation, ProjectItem, Rel, Scalar};
+        let join = Rel::Join {
+            kind: self.kind,
+            left_keys: self.left_keys.clone(),
+            right_keys: self.right_keys.clone(),
+            left: Box::new(Self::side_plan(&self.left)),
+            right: Box::new(Self::side_plan(&self.right)),
+        };
+        if let Some((keys, aggs)) = &self.aggregate {
+            let qkeys: Vec<Scalar> = keys.iter().map(|k| self.qualify(k)).collect::<Option<_>>()?;
+            let qaggs: Vec<Aggregation> = aggs
+                .iter()
+                .map(|a| {
+                    let column = match &a.column {
+                        Some(Scalar::Col(n)) => Some(self.qualify(n)?),
+                        other => other.clone(),
+                    };
+                    Some(Aggregation { name: a.name.clone(), func: a.func, column })
+                })
+                .collect::<Option<_>>()?;
+            Some(Rel::Aggregate { keys: qkeys, aggs: qaggs, input: Box::new(join) })
+        } else if let Some(expanded) = &self.expanded {
+            let mut items: Vec<ProjectItem> = Vec::new();
+            for i in 0..self.left.projection.len() {
+                let out = self.left.effective_name(i);
+                let src = self.left.schema.field(self.left.projection[i]).name().clone();
+                items.push(ProjectItem {
+                    name: out,
+                    expr: Scalar::QualifiedCol { table: self.left.table_name.clone(), name: src },
+                });
+            }
+            for (src, out) in expanded {
+                items.push(ProjectItem {
+                    name: out.clone(),
+                    expr: Scalar::QualifiedCol {
+                        table: self.right.table_name.clone(),
+                        name: src.clone(),
+                    },
+                });
+            }
+            Some(Rel::Project { star: false, items, input: Box::new(join) })
+        } else {
+            None
+        }
+    }
+}
+
+/// Rewrite every bare `Col` in a scalar to a `QualifiedCol` on `table`. Used to
+/// qualify a join side's accumulated filters to its own table so they're
+/// unambiguous in the combined `WHERE`.
+fn qualify_scalar(s: crate::plan::Scalar, table: &str) -> crate::plan::Scalar {
+    use crate::plan::Scalar;
+    match s {
+        Scalar::Col(n) => Scalar::QualifiedCol { table: table.to_string(), name: n },
+        Scalar::Cmp { op, lhs, rhs } => Scalar::Cmp {
+            op,
+            lhs: Box::new(qualify_scalar(*lhs, table)),
+            rhs: Box::new(qualify_scalar(*rhs, table)),
+        },
+        Scalar::Bool { op, args } => Scalar::Bool {
+            op,
+            args: args.into_iter().map(|a| qualify_scalar(a, table)).collect(),
+        },
+        Scalar::Arith { op, lhs, rhs } => Scalar::Arith {
+            op,
+            lhs: Box::new(qualify_scalar(*lhs, table)),
+            rhs: Box::new(qualify_scalar(*rhs, table)),
+        },
+        Scalar::Call { func, args } => Scalar::Call {
+            func,
+            args: args.into_iter().map(|a| qualify_scalar(a, table)).collect(),
+        },
+        other => other,
+    }
+}
+
+/// Force a `LazyOdbcJoin`. Folded stages (expanded / grouped) emit the fused
+/// plan and run it; a bare nested join uses the eager fallback.
+fn materialise_lazy_odbc_join(s: &LazyOdbcJoinState) -> Result<Table, MError> {
+    match s.to_fold_plan() {
+        Some(plan) => {
+            let sql = s
+                .left
+                .dialect
+                .emit(&plan)
+                .map_err(|e| MError::Other(format!("join fold: {e:?}")))?;
+            let batch = (s.left.force_fn)(&sql)?;
+            Ok(Table::from_arrow(batch))
+        }
+        None => (s.fallback)(),
+    }
+}
+
 /// Convert one accumulated `RowFilter` (keyed by the resolved column name) into
 /// a Plan IR scalar predicate. `IsNull`/`IsNotNull` become comparisons against
 /// the null literal, which the emitter renders as `IS [NOT] NULL`.
@@ -990,6 +1189,7 @@ impl Table {
                 names.extend(ev.right_output_names.iter().cloned());
                 names
             }
+            TableRepr::LazyOdbcJoin(s) => s.output_names(),
         }
     }
 
@@ -1033,6 +1233,8 @@ impl Table {
                 // matches drop their outer row, matching eager expand.
                 ev.matches.iter().map(|m| m.len()).sum()
             }
+            // No cheap row count — folding to COUNT(*) or forcing is required.
+            TableRepr::LazyOdbcJoin(_) => usize::MAX,
         }
     }
 
@@ -1046,6 +1248,7 @@ impl Table {
             TableRepr::ExpandView(ev) => {
                 ev.left_projection.len() + ev.right_output_names.len()
             }
+            TableRepr::LazyOdbcJoin(s) => s.output_names().len(),
         }
     }
 
@@ -1061,7 +1264,8 @@ impl Table {
             TableRepr::LazyParquet(_)
             | TableRepr::LazyOdbc(_)
             | TableRepr::JoinView(_)
-            | TableRepr::ExpandView(_) => Err(MError::Other(
+            | TableRepr::ExpandView(_)
+            | TableRepr::LazyOdbcJoin(_) => Err(MError::Other(
                 "internal: as_arrow() called on lazy table without forcing first \
                  — use Table::force() or expect_table()".into(),
             )),
@@ -1095,6 +1299,7 @@ impl Table {
                 let forced = self.force()?;
                 forced.try_to_arrow()
             }
+            TableRepr::LazyOdbcJoin(s) => materialise_lazy_odbc_join(s)?.try_to_arrow(),
         }
     }
 
@@ -1111,6 +1316,7 @@ impl Table {
             TableRepr::LazyOdbc(s) => Ok(Cow::Owned(Self::from_arrow(materialise_lazy_odbc(s)?))),
             TableRepr::JoinView(jv) => Ok(Cow::Owned(materialise_join_view(jv)?)),
             TableRepr::ExpandView(ev) => Ok(Cow::Owned(materialise_expand_view(ev)?)),
+            TableRepr::LazyOdbcJoin(s) => Ok(Cow::Owned(materialise_lazy_odbc_join(s)?)),
         }
     }
 }
@@ -1269,7 +1475,10 @@ fn narrow_for_force(t: &Table, cols: &[usize]) -> Result<Table, MError> {
                 .collect();
             Ok(Table::from_rows(new_names, new_rows))
         }
-        TableRepr::JoinView(_) | TableRepr::ExpandView(_) | TableRepr::LazyOdbc(_) => {
+        TableRepr::JoinView(_)
+        | TableRepr::ExpandView(_)
+        | TableRepr::LazyOdbc(_)
+        | TableRepr::LazyOdbcJoin(_) => {
             // Force then narrow. For LazyOdbc this is the wrong shape
             // anyway — narrowing as a fold should happen in the stdlib
             // Table.SelectColumns fast path before reaching here.

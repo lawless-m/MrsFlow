@@ -783,7 +783,8 @@ fn rename_columns(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             unreachable!("expect_table forces upstream — lazy variant can't reach here")
         }
         super::super::value::TableRepr::JoinView(_)
-        | super::super::value::TableRepr::ExpandView(_) => {
+        | super::super::value::TableRepr::ExpandView(_)
+        | super::super::value::TableRepr::LazyOdbcJoin(_) => {
             unreachable!("expect_table forces upstream — JoinView/ExpandView can't reach here")
         }
     }
@@ -841,7 +842,8 @@ fn select_columns_by_index(
                 .collect();
             Ok(Value::Table(Table::from_rows(new_names, new_rows)))
         }
-        super::super::value::TableRepr::JoinView(_) => {
+        super::super::value::TableRepr::JoinView(_)
+        | super::super::value::TableRepr::LazyOdbcJoin(_) => {
             // SelectColumns/RemoveColumns on a JoinView are uncommon in
             // the corpus pattern (the demo applies them after expand,
             // not before). Forcing first is correct and keeps the
@@ -1147,7 +1149,8 @@ pub fn cell_to_value(table: &Table, col: usize, row: usize) -> Result<Value, MEr
         super::super::value::TableRepr::LazyParquet(_)
         | super::super::value::TableRepr::LazyOdbc(_)
         | super::super::value::TableRepr::JoinView(_)
-        | super::super::value::TableRepr::ExpandView(_) => {
+        | super::super::value::TableRepr::ExpandView(_)
+        | super::super::value::TableRepr::LazyOdbcJoin(_) => {
             unreachable!("cell_to_value expects forced table — caller should expect_table first")
         }
     };
@@ -1459,7 +1462,8 @@ fn select_rows(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
             unreachable!("expect_table forces upstream — lazy variant can't reach here")
         }
         super::super::value::TableRepr::JoinView(_)
-        | super::super::value::TableRepr::ExpandView(_) => {
+        | super::super::value::TableRepr::ExpandView(_)
+        | super::super::value::TableRepr::LazyOdbcJoin(_) => {
             unreachable!("expect_table forces upstream — JoinView/ExpandView can't reach here")
         }
     }
@@ -2047,7 +2051,8 @@ fn promote_headers(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
             unreachable!("expect_table forces upstream — lazy variant can't reach here")
         }
         super::super::value::TableRepr::JoinView(_)
-        | super::super::value::TableRepr::ExpandView(_) => {
+        | super::super::value::TableRepr::ExpandView(_)
+        | super::super::value::TableRepr::LazyOdbcJoin(_) => {
             unreachable!("expect_table forces upstream — JoinView/ExpandView can't reach here")
         }
     }
@@ -2176,7 +2181,8 @@ fn transform_column_types(args: &[Value], _host: &dyn IoHost) -> Result<Value, M
             unreachable!("expect_table forces upstream — lazy variant can't reach here")
         }
         super::super::value::TableRepr::JoinView(_)
-        | super::super::value::TableRepr::ExpandView(_) => {
+        | super::super::value::TableRepr::ExpandView(_)
+        | super::super::value::TableRepr::LazyOdbcJoin(_) => {
             unreachable!("expect_table forces upstream — JoinView/ExpandView can't reach here")
         }
     }
@@ -2508,7 +2514,8 @@ fn skip(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
             unreachable!("expect_table forces upstream — lazy variant can't reach here")
         }
         super::super::value::TableRepr::JoinView(_)
-        | super::super::value::TableRepr::ExpandView(_) => {
+        | super::super::value::TableRepr::ExpandView(_)
+        | super::super::value::TableRepr::LazyOdbcJoin(_) => {
             unreachable!("expect_table forces upstream — JoinView/ExpandView can't reach here")
         }
     }
@@ -2687,6 +2694,24 @@ fn expand_table_column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MErr
     if let super::super::value::TableRepr::JoinView(jv) = &table.repr {
         if jv.new_column_name == column && matches!(jv.join_kind, 0 | 1) {
             return expand_join_view_lazily(jv, &column_names, &new_column_names);
+        }
+    }
+
+    // Fold path: expanding the nested column of a deferred same-source ODBC
+    // join records which right columns are pulled and stays deferred, so a
+    // following `Table.Group` can fold the whole chain into one query.
+    if let super::super::value::TableRepr::LazyOdbcJoin(s) = &table.repr {
+        if s.expanded.is_none() && s.aggregate.is_none() && column == s.new_column_name {
+            let expanded: Vec<(String, String)> = column_names
+                .iter()
+                .cloned()
+                .zip(new_column_names.iter().cloned())
+                .collect();
+            let mut ns = s.clone();
+            ns.expanded = Some(expanded);
+            return Ok(Value::Table(Table {
+                repr: super::super::value::TableRepr::LazyOdbcJoin(ns),
+            }));
         }
     }
 
@@ -3225,6 +3250,16 @@ fn parse_join_key_columns(v: &Value, role: &str) -> Result<Vec<String>, MError> 
     }
 }
 
+/// Map a `Table.NestedJoin` joinKind code to a `JoinKind` the SQL emitter can
+/// fold (Inner / LeftOuter); `None` for kinds left to the in-memory path.
+fn foldable_join_kind(code: i32) -> Option<crate::plan::JoinKind> {
+    match code {
+        0 => Some(crate::plan::JoinKind::Inner),
+        1 => Some(crate::plan::JoinKind::LeftOuter),
+        _ => None,
+    }
+}
+
 fn nested_join(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     // Both sides stay lazy where possible. Only the key columns are
     // decoded — the left key (to enumerate left rows for match building)
@@ -3265,6 +3300,56 @@ fn nested_join(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
             "Table.NestedJoin: JoinKind.LeftSemi/RightSemi not supported; \
              use Table.Join for semi-joins.".into()
         ));
+    }
+
+    // Fold path: two same-source `LazyOdbc` sides + an equi-join we can emit →
+    // defer as a `LazyOdbcJoin` so a following Expand (and Group) folds the
+    // whole chain into one server-side query instead of pulling both tables.
+    if let (
+        super::super::value::TableRepr::LazyOdbc(l),
+        super::super::value::TableRepr::LazyOdbc(r),
+    ) = (&table1.repr, &table2.repr)
+    {
+        if l.connection_string == r.connection_string && l.dialect == r.dialect {
+            if let Some(kind) = foldable_join_kind(join_kind) {
+                let t1 = args[0].clone();
+                let t2 = args[2].clone();
+                let k1v = args[1].clone();
+                let k2v = args[3].clone();
+                let newcol_v = Value::Text(new_column_name.clone());
+                let kind_v = Value::Number(join_kind as f64);
+                // Eager fallback for a bare (un-expanded) force: pull both sides
+                // and run the in-memory join. Forced sides aren't LazyOdbc, so
+                // this won't re-enter the fold path.
+                let fallback: std::rc::Rc<dyn Fn() -> Result<Table, MError>> =
+                    std::rc::Rc::new(move || {
+                        let f1 = Value::Table(expect_table_lazy_ok(&t1)?.force()?.into_owned());
+                        let f2 = Value::Table(expect_table_lazy_ok(&t2)?.force()?.into_owned());
+                        let res = nested_join(
+                            &[f1, k1v.clone(), f2, k2v.clone(), newcol_v.clone(), kind_v.clone()],
+                            &super::super::NoIoHost,
+                        )?;
+                        match res {
+                            Value::Table(t) => Ok(t.force()?.into_owned()),
+                            _ => Err(MError::Other("nested join fallback: expected table".into())),
+                        }
+                    });
+                let state = super::super::value::LazyOdbcJoinState {
+                    left: Box::new(l.clone()),
+                    right: Box::new(r.clone()),
+                    left_keys: key1_cols.clone(),
+                    right_keys: key2_cols.clone(),
+                    kind,
+                    new_column_name: new_column_name.clone(),
+                    expanded: None,
+                    aggregate: None,
+                    fallback,
+                };
+                return Ok(Value::Table(Table {
+                    repr: super::super::value::TableRepr::LazyOdbcJoin(state),
+                }));
+            }
+        }
     }
 
     let left_names = table1.column_names();
@@ -6991,6 +7076,78 @@ mod tests {
             Value::Null => {}
             other => panic!("expected Value::Null for null cell, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn nested_join_then_expand_folds_to_one_select() {
+        // Two same-source LazyOdbc sides → NestedJoin → ExpandTableColumn should
+        // fold to a single LEFT JOIN that pulls only the expanded right column.
+        // A capturing force_fn records the SQL the connector would run.
+        use crate::eval::value::{LazyOdbcState, TableRepr};
+        use std::cell::RefCell;
+        use std::rc::Rc;
+
+        let captured: Rc<RefCell<Option<String>>> = Rc::new(RefCell::new(None));
+        let mk = |table: &str, cols: &[&str]| -> Value {
+            let schema = Arc::new(Schema::new(
+                cols.iter()
+                    .map(|n| Field::new(*n, DataType::Int64, true))
+                    .collect::<Vec<_>>(),
+            ));
+            let cap = captured.clone();
+            let force_fn: Rc<dyn Fn(&str) -> Result<RecordBatch, MError>> =
+                Rc::new(move |sql: &str| {
+                    *cap.borrow_mut() = Some(sql.to_string());
+                    Err(MError::Other("captured".into()))
+                });
+            Value::Table(Table {
+                repr: TableRepr::LazyOdbc(LazyOdbcState {
+                    connection_string: "dsn".into(),
+                    table_name: table.into(),
+                    schema,
+                    projection: (0..cols.len()).collect(),
+                    output_names: None,
+                    where_filters: vec![],
+                    limit: None,
+                    dialect: crate::plan::SqlDialect::Dbisam,
+                    force_fn,
+                }),
+            })
+        };
+        let host = crate::eval::NoIoHost;
+        let joined = nested_join(
+            &[
+                mk("orderh", &["ref", "custcode"]),
+                Value::Text("ref".into()),
+                mk("orderi", &["ref", "quantity"]),
+                Value::Text("ref".into()),
+                Value::Text("j".into()),
+                Value::Number(1.0), // LeftOuter
+            ],
+            &host,
+        )
+        .expect("nested_join");
+        assert!(matches!(
+            &joined,
+            Value::Table(t) if matches!(t.repr, TableRepr::LazyOdbcJoin(_))
+        ));
+        let expanded = expand_table_column(
+            &[
+                joined,
+                Value::Text("j".into()),
+                Value::list_of(vec![Value::Text("quantity".into())]),
+                Value::list_of(vec![Value::Text("quantity".into())]),
+            ],
+            &host,
+        )
+        .expect("expand");
+        if let Value::Table(t) = &expanded {
+            let _ = t.force(); // captures SQL, then errors (ignored)
+        }
+        assert_eq!(
+            captured.borrow().clone().expect("force emitted SQL"),
+            r#"SELECT "orderh"."ref" AS "ref", "orderh"."custcode" AS "custcode", "orderi"."quantity" AS "quantity" FROM "orderh" LEFT JOIN "orderi" ON "orderh"."ref" = "orderi"."ref""#
+        );
     }
 }
 
