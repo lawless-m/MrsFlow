@@ -104,11 +104,12 @@ impl MsgBuilder {
 ///
 /// Followed by 5 trailing zero bytes (padding).
 ///
-/// `hostname` is the workstation name embedded in field 3; we use a
-/// fixed value because the server doesn't validate it strictly.
-/// `nonce` is whatever 4 bytes the caller wants — server stores it
-/// but doesn't echo it back in a way that matters for SELECT flow.
-pub fn build_connect(_compression: bool, hostname: &str, nonce: u32) -> Vec<u8> {
+/// `workstation` is the workstation-name label embedded in field 3 (a
+/// cosmetic identifier, NOT a target host); we use a fixed value because
+/// the server doesn't validate it strictly. `nonce` is whatever 4 bytes
+/// the caller wants — server stores it but doesn't echo it back in a way
+/// that matters for SELECT flow.
+pub fn build_connect(_compression: bool, workstation: &str, nonce: u32) -> Vec<u8> {
     // Per live-capture analysis of a dbsys session with RemoteCompression=9:
     // the Connect message's INNER field 2 is always 0. The session's
     // compression behaviour is determined by the OUTER body[0] flag
@@ -117,7 +118,7 @@ pub fn build_connect(_compression: bool, hostname: &str, nonce: u32) -> Vec<u8> 
     let mut m = MsgBuilder::new(0x0000); // CONNECT reqcode = 0
     m.pack(&0xAB7Cu64.to_le_bytes()); // field 1: version
     m.pack_u8(0); // field 2: always 0 per capture
-    m.pack(hostname.as_bytes()); // field 3: hostname
+    m.pack(workstation.as_bytes()); // field 3: workstation-name label
     m.pack_u32(nonce); // field 4: nonce
     let mut body = m.finish();
     body.extend_from_slice(&[0, 0, 0, 0]); // 4 trailing zero bytes (padding)

@@ -47,6 +47,14 @@ const SESSION_SETUP_POST: &[u8] = &[
     0x4E, 0x54, 0x5F, 0x43,
 ];
 
+/// Workstation-name label sent as field 3 of the Connect handshake. This is
+/// a cosmetic identifier the server records but does **not** validate — it is
+/// NOT a connection target. The actual TCP destination is always
+/// `ConnOpts.host`. The value reads `RIVSEM04…` only because the original
+/// protocol captures were taken on a workstation named RIVSEM04; any string
+/// works here.
+const WORKSTATION_NAME: &str = "RIVSEM048692";
+
 /// Build the catalog-attach message body (reqcode 0x003c) for the
 /// given catalog name. Layout decoded from an uncompressed capture
 /// of `pyodbc.connect(DSN=Exportmaster)`:
@@ -95,8 +103,8 @@ impl Client {
         //    detects the comp byte and inflates accordingly).
         let connect_body = super::msg::build_connect(
             opts.compression,
-            "RIVSEM048692", // stable hostname suffix — server doesn't validate strictly
-            0xE5A21BE8,     // fixed nonce — server stores but doesn't echo
+            WORKSTATION_NAME, // cosmetic handshake label, not a target host (see const)
+            0xE5A21BE8,       // fixed nonce — server stores but doesn't echo
         );
         let _ = framing::send_recv_auto(&mut stream, &connect_body, opts.compression)?;
 
