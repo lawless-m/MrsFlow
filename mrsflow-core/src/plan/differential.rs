@@ -186,7 +186,46 @@ fn interpret(
             .cloned()
             .ok_or_else(|| "folded sentinel without supplied rows".to_string()),
         Rel::EvalM { descr, .. } => Err(format!("cannot interpret opaque step {descr}")),
-        Rel::Join { .. } => Err("join interpretation out of scope for the harness".to_string()),
+        Rel::Join { kind, left_keys, right_keys, left, right } => {
+            if !matches!(kind, JoinKind::Inner | JoinKind::LeftOuter) {
+                return Err(format!("join kind {kind:?} not interpreted by the harness"));
+            }
+            let lt = interpret(left, db, folded, sem)?;
+            let rt = interpret(right, db, folded, sem)?;
+            let ltab = base_table(left).ok_or_else(|| "join: left has no base table".to_string())?;
+            let rtab = base_table(right).ok_or_else(|| "join: right has no base table".to_string())?;
+            // Qualify output columns `table.col` so an Aggregate/Project above
+            // can disambiguate a name present on both sides.
+            let mut columns: Vec<String> = lt.columns.iter().map(|c| format!("{ltab}.{c}")).collect();
+            columns.extend(rt.columns.iter().map(|c| format!("{rtab}.{c}")));
+            let lk: Vec<usize> = left_keys.iter().map(|k| col_index(&lt.columns, k)).collect::<Result<_, _>>()?;
+            let rk: Vec<usize> = right_keys.iter().map(|k| col_index(&rt.columns, k)).collect::<Result<_, _>>()?;
+            let null_right = vec![Cell::Null; rt.columns.len()];
+            let mut rows: Vec<Vec<Cell>> = Vec::new();
+            for lrow in &lt.rows {
+                let mut matched = false;
+                for rrow in &rt.rows {
+                    // Equi-join; NULL keys never match (SQL semantics).
+                    let eq = lk.iter().zip(&rk).all(|(&li, &ri)| {
+                        lrow[li] != Cell::Null
+                            && rrow[ri] != Cell::Null
+                            && order_cells(&lrow[li], &rrow[ri], sem).map_or(false, |o| o.is_eq())
+                    });
+                    if eq {
+                        matched = true;
+                        let mut out = lrow.clone();
+                        out.extend(rrow.iter().cloned());
+                        rows.push(out);
+                    }
+                }
+                if !matched && matches!(kind, JoinKind::LeftOuter) {
+                    let mut out = lrow.clone();
+                    out.extend(null_right.iter().cloned());
+                    rows.push(out);
+                }
+            }
+            Ok(Table { columns, rows })
+        }
 
         Rel::Filter { predicate, input } => {
             let t = interpret(input, db, folded, sem)?;
@@ -282,7 +321,7 @@ fn interpret(
             let t = interpret(input, db, folded, sem)?;
             let key_idx: Vec<usize> = keys
                 .iter()
-                .map(|c| col_index(&t.columns, scalar_col_name(c)?))
+                .map(|c| col_index(&t.columns, &scalar_col_name(c)?))
                 .collect::<Result<_, _>>()?;
             // Preserve first-seen group order for determinism.
             let mut order: Vec<Vec<Cell>> = Vec::new();
@@ -299,7 +338,7 @@ fn interpret(
             }
             let mut columns: Vec<String> = keys
                 .iter()
-                .map(|k| scalar_col_name(k).map(str::to_string))
+                .map(scalar_col_name)
                 .collect::<Result<_, _>>()?;
             columns.extend(aggs.iter().map(|a| a.name.clone()));
             let mut rows = Vec::with_capacity(groups.len());
@@ -315,13 +354,28 @@ fn interpret(
     }
 }
 
-/// The column name a group key or aggregate ranges over. Both are column
-/// references (`Col` or `QualifiedCol`); the reference interpreter resolves by
-/// name against its single flat row.
-fn scalar_col_name(s: &Scalar) -> Result<&str, String> {
+/// The base table name at the bottom of a (filtered/projected) scan subtree,
+/// used to qualify a join side's columns. `None` if the leaf isn't a `Scan`.
+fn base_table(rel: &Rel) -> Option<String> {
+    match rel {
+        Rel::Scan(Source::Ref(n)) => Some(n.clone()),
+        Rel::Filter { input, .. }
+        | Rel::Project { input, .. }
+        | Rel::Sort { input, .. }
+        | Rel::Limit { input, .. }
+        | Rel::Distinct { input, .. } => base_table(input),
+        _ => None,
+    }
+}
+
+/// The column name a group key or aggregate ranges over (`table.col` for a
+/// qualified reference over a join, bare otherwise).
+fn scalar_col_name(s: &Scalar) -> Result<String, String> {
     match s {
-        Scalar::Col(n) => Ok(n),
-        Scalar::QualifiedCol { name, .. } => Ok(name),
+        Scalar::Col(n) => Ok(n.clone()),
+        // Over a join the interpreter names columns `table.col`, so a qualified
+        // reference resolves to that form; a bare `Col` stays single-table.
+        Scalar::QualifiedCol { table, name } => Ok(format!("{table}.{name}")),
         other => Err(format!("expected a column reference, got {other:?}")),
     }
 }
@@ -338,7 +392,7 @@ fn aggregate(a: &Aggregation, columns: &[String], rows: &[&Vec<Cell>]) -> Result
             .collect())
     };
     let col_name = a.column.as_ref().map(scalar_col_name).transpose()?;
-    match (a.func, col_name) {
+    match (a.func, col_name.as_deref()) {
         (AggFunc::Count, None) => Ok(Cell::Int(rows.len() as i64)),
         (AggFunc::Count, Some(c)) => {
             let n = col_cells(c)?.iter().filter(|v| **v != Cell::Null).count();
@@ -377,9 +431,10 @@ fn aggregate(a: &Aggregation, columns: &[String], rows: &[&Vec<Cell>]) -> Result
 fn eval_scalar(s: &Scalar, columns: &[String], row: &[Cell], sem: &Semantics) -> Result<Cell, String> {
     match s {
         Scalar::Col(n) => Ok(row[col_index(columns, n)?].clone()),
-        // The reference interpreter works over a single flat row with unique
-        // column names, so a qualifier is informational — resolve by name.
-        Scalar::QualifiedCol { name, .. } => Ok(row[col_index(columns, name)?].clone()),
+        // Over a join, columns are named `table.col`; resolve to that form.
+        Scalar::QualifiedCol { table, name } => {
+            Ok(row[col_index(columns, &format!("{table}.{name}"))?].clone())
+        }
         Scalar::Lit(lit) => Ok(lit_cell(lit)),
         Scalar::Cmp { op, lhs, rhs } => {
             let a = eval_scalar(lhs, columns, row, sem)?;
@@ -603,6 +658,87 @@ mod tests {
     fn instrument_validates_on_partial_fold() {
         // Sort-over-limit splits: the limit folds, the sort runs over its rows.
         agrees(r#"Table.Sort(Table.FirstN(t, 3), "Amount")"#);
+    }
+
+    #[test]
+    fn instrument_validates_on_join_group() {
+        // Gate 2 for the headline fold: SUM(orderi.quantity) grouped by orderh
+        // keys over orderh LEFT JOIN orderi — the qualified Aggregate(Join)
+        // shape the connector builds (not producible via `lower`). Order 3 has
+        // no lines, so it exercises the unmatched-left → SUM-over-NULL case.
+        let qcol = |t: &str, n: &str| Scalar::QualifiedCol { table: t.into(), name: n.into() };
+        let db = Db::new()
+            .with(
+                "orderh",
+                &["ref", "custcode"],
+                vec![
+                    vec![Cell::Int(1), Cell::Text("C1".into())],
+                    vec![Cell::Int(2), Cell::Text("C2".into())],
+                    vec![Cell::Int(3), Cell::Text("C3".into())], // no orderi lines
+                ],
+            )
+            .with(
+                "orderi",
+                &["ref", "quantity"],
+                vec![
+                    vec![Cell::Int(1), Cell::Int(10)],
+                    vec![Cell::Int(1), Cell::Int(5)],
+                    vec![Cell::Int(2), Cell::Int(7)],
+                ],
+            );
+        let plan = Rel::Aggregate {
+            keys: vec![qcol("orderh", "ref"), qcol("orderh", "custcode")],
+            aggs: vec![Aggregation {
+                name: "qty".into(),
+                func: AggFunc::Sum,
+                column: Some(qcol("orderi", "quantity")),
+            }],
+            input: Box::new(Rel::Join {
+                kind: JoinKind::LeftOuter,
+                left_keys: vec!["ref".into()],
+                right_keys: vec!["ref".into()],
+                left: Box::new(Rel::Scan(Source::Ref("orderh".into()))),
+                right: Box::new(Rel::Scan(Source::Ref("orderi".into()))),
+            }),
+        };
+        // Sanity: the reference computes the groups we expect (15, 7, 0).
+        let r = interpret(&plan, &db, None, &Semantics::mrsflow()).expect("interpret");
+        assert_eq!(r.rows.len(), 3, "one group per order");
+        assert_eq!(r.rows[2][2], Cell::Num(0.0), "unmatched order sums to 0");
+        // And the fold route agrees under matching semantics.
+        let m = Semantics::mrsflow();
+        differential(&plan, &db, &m, &m).expect("join+group fold agrees");
+    }
+
+    #[test]
+    fn join_key_collation_diverges() {
+        // The harness is a real instrument for joins, not a no-op: a backend
+        // that matches join keys case-insensitively ("K" = "k") produces a row
+        // mrsflow's case-sensitive join drops, and differential() flags it.
+        let qcol = |t: &str, n: &str| Scalar::QualifiedCol { table: t.into(), name: n.into() };
+        let db = Db::new()
+            .with("a", &["k", "x"], vec![vec![Cell::Text("K".into()), Cell::Int(1)]])
+            .with("b", &["k", "y"], vec![vec![Cell::Text("k".into()), Cell::Int(2)]]);
+        let plan = Rel::Project {
+            star: false,
+            items: vec![
+                ProjectItem { name: "x".into(), expr: qcol("a", "x") },
+                ProjectItem { name: "y".into(), expr: qcol("b", "y") },
+            ],
+            input: Box::new(Rel::Join {
+                kind: JoinKind::Inner,
+                left_keys: vec!["k".into()],
+                right_keys: vec!["k".into()],
+                left: Box::new(Rel::Scan(Source::Ref("a".into()))),
+                right: Box::new(Rel::Scan(Source::Ref("b".into()))),
+            }),
+        };
+        let dbisam = Semantics { case_insensitive_text: true, ..Semantics::mrsflow() };
+        let m = Semantics::mrsflow();
+        assert!(
+            differential(&plan, &db, &dbisam, &m).is_err(),
+            "case-folded join key should diverge"
+        );
     }
 
     // --- divergences the harness should catch -----------------------------
