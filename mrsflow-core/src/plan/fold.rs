@@ -64,6 +64,12 @@ pub trait Dialect {
     fn datetime_literal(&self, dt: &chrono::NaiveDateTime) -> String;
     /// Whether the dialect can express a row offset. DBISAM cannot.
     fn supports_offset(&self) -> bool;
+    /// Whether the dialect supports `COUNT(DISTINCT col)`. ANSI does; DBISAM
+    /// does not (no `DISTINCT` inside an aggregate), so it overrides to false
+    /// and a `CountDistinct` aggregate becomes a fold boundary there.
+    fn supports_count_distinct(&self) -> bool {
+        true
+    }
     /// SQL for a scalar function call, or `None` if the dialect has no proven
     /// analogue (which makes the enclosing expression unfoldable).
     fn scalar_call(&self, func: &str, args: &[String]) -> Option<String>;
@@ -115,11 +121,16 @@ impl Dialect for Dbisam {
         false
     }
 
+    fn supports_count_distinct(&self) -> bool {
+        false
+    }
+
     fn scalar_call(&self, func: &str, args: &[String]) -> Option<String> {
         match (func, args.len()) {
             ("Text.Upper", 1) => Some(format!("UPPER({})", args[0])),
             ("Text.Lower", 1) => Some(format!("LOWER({})", args[0])),
-            ("Text.Trim", 1) => Some(format!("TRIM({})", args[0])),
+            // DBISAM has no single `TRIM`; LTRIM(RTRIM(x)) trims both ends.
+            ("Text.Trim", 1) => Some(format!("LTRIM(RTRIM({}))", args[0])),
             ("Number.Abs", 1) => Some(format!("ABS({})", args[0])),
             ("Number.Round", 1) => Some(format!("ROUND({})", args[0])),
             ("Number.Round", 2) => Some(format!("ROUND({}, {})", args[0], args[1])),
@@ -627,7 +638,12 @@ fn render_aggregate(a: &Aggregation, d: &dyn Dialect) -> Result<String, Unfoldab
         AggFunc::Average => format!("AVG({})", col(&a.column)?),
         AggFunc::Min => format!("MIN({})", col(&a.column)?),
         AggFunc::Max => format!("MAX({})", col(&a.column)?),
-        AggFunc::CountDistinct => format!("COUNT(DISTINCT {})", col(&a.column)?),
+        AggFunc::CountDistinct => {
+            if !d.supports_count_distinct() {
+                return Err(unfoldable("dialect has no COUNT(DISTINCT)"));
+            }
+            format!("COUNT(DISTINCT {})", col(&a.column)?)
+        }
         AggFunc::Count => match &a.column {
             Some(s) => format!("COUNT({})", emit_scalar(s, d)?),
             None => "COUNT(*)".to_string(),
@@ -1015,23 +1031,156 @@ mod tests {
         }
     }
 
-    /// True iff the DBISAM DCG parses `sql`. Panics on a harness error
-    /// (couldn't run scryer / read the file) so a broken gate is loud.
-    fn dcg_parses(tools: &std::path::Path, sql: &str) -> bool {
-        let tmp = std::env::temp_dir().join("mrsflow_dcg_gate.sql");
-        std::fs::write(&tmp, sql).expect("write temp sql");
-        let status = std::process::Command::new("scryer-prolog")
-            .current_dir(tools)
-            .args(["-g", "main", "parse-to-term.pl", "--"])
-            .arg(&tmp)
-            .status()
-            .expect("run scryer-prolog");
-        // parse-to-term: 0 = parsed, 1 = grammar rejected, 2 = harness error.
-        match status.code() {
-            Some(0) => true,
-            Some(1) => false,
-            other => panic!("DCG harness error (exit {other:?}) on: {sql}"),
+    /// Parse each SQL through the DBISAM DCG (argv-based `parse-to-term.pl`,
+    /// which — unlike the stdin runner — handles Windows paths). Worker threads
+    /// fan out so the whole matrix stays a few seconds. Returns accept/reject
+    /// per input, in order. `parse-to-term` exit: 0 parsed, 1 rejected,
+    /// 2 harness error (panics — a broken gate should be loud).
+    fn dcg_parse_all(tools: &std::path::Path, sqls: &[(String, String)]) -> Vec<bool> {
+        use std::process::{Command, Stdio};
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::sync::Mutex;
+
+        let out = Mutex::new(vec![false; sqls.len()]);
+        let next = AtomicUsize::new(0);
+        let workers = std::thread::available_parallelism().map_or(4, |n| n.get()).min(8);
+        std::thread::scope(|scope| {
+            for w in 0..workers {
+                let (out, next) = (&out, &next);
+                scope.spawn(move || {
+                    let tmp = std::env::temp_dir().join(format!("mrsflow_dcg_w{w}.sql"));
+                    loop {
+                        let i = next.fetch_add(1, Ordering::Relaxed);
+                        if i >= sqls.len() {
+                            break;
+                        }
+                        std::fs::write(&tmp, &sqls[i].1).expect("write sql");
+                        let code = Command::new("scryer-prolog")
+                            .current_dir(tools)
+                            .args(["-g", "main", "parse-to-term.pl", "--"])
+                            .arg(&tmp)
+                            .stdout(Stdio::null())
+                            .stderr(Stdio::null())
+                            .status()
+                            .expect("run scryer-prolog")
+                            .code();
+                        let ok = match code {
+                            Some(0) => true,
+                            Some(1) => false,
+                            other => panic!("DCG harness error (exit {other:?}) on: {}", sqls[i].1),
+                        };
+                        out.lock().unwrap()[i] = ok;
+                    }
+                });
+            }
+        });
+        out.into_inner().unwrap()
+    }
+
+    /// A plan per emit code-path: every comparison op × literal type, the
+    /// boolean/arith/scalar-call forms, every aggregate, projections (incl. a
+    /// space-name needing quoting), sort+top, distinct, and the join shapes
+    /// (incl. qualified columns). Hardens the gate against a shape nobody
+    /// remembered to list.
+    fn coverage_plans() -> Vec<(String, Rel)> {
+        let scan = || Rel::Scan(Source::Ref("t".into()));
+        let col = |n: &str| Scalar::Col(n.into());
+        let jscan = |t: &str| Box::new(Rel::Scan(Source::Ref(t.into())));
+        let qcol = |t: &str, n: &str| Scalar::QualifiedCol { table: t.into(), name: n.into() };
+        let filt = |label: String, pred: Scalar| (label, Rel::Filter { predicate: pred, input: Box::new(scan()) });
+        let mut v: Vec<(String, Rel)> = Vec::new();
+
+        let date = chrono::NaiveDate::from_ymd_opt(2024, 1, 15).unwrap();
+        let dtm = date.and_hms_opt(9, 30, 0).unwrap();
+        let lits: [(&str, Lit); 5] = [
+            ("num", Lit::Number("42".into())),
+            ("text", Lit::Text("x'y".into())), // embedded quote → escaping
+            ("bool", Lit::Logical(true)),
+            ("date", Lit::Date(date)),
+            ("datetime", Lit::Datetime(dtm)),
+        ];
+        for (ln, lit) in &lits {
+            for op in [CmpOp::Eq, CmpOp::Ne, CmpOp::Lt, CmpOp::Le, CmpOp::Gt, CmpOp::Ge] {
+                v.push(filt(
+                    format!("cmp_{op:?}_{ln}"),
+                    Scalar::Cmp { op, lhs: Box::new(col("c")), rhs: Box::new(Scalar::Lit(lit.clone())) },
+                ));
+            }
         }
+        v.push(filt("is_null".into(), Scalar::Cmp { op: CmpOp::Eq, lhs: Box::new(col("c")), rhs: Box::new(Scalar::Lit(Lit::Null)) }));
+        v.push(filt("is_not_null".into(), Scalar::Cmp { op: CmpOp::Ne, lhs: Box::new(col("c")), rhs: Box::new(Scalar::Lit(Lit::Null)) }));
+
+        let cmp = |c: &str| Scalar::Cmp { op: CmpOp::Gt, lhs: Box::new(Scalar::Col(c.into())), rhs: Box::new(Scalar::Lit(Lit::Number("0".into()))) };
+        v.push(filt("and".into(), Scalar::Bool { op: BoolOp::And, args: vec![cmp("a"), cmp("b")] }));
+        v.push(filt("or".into(), Scalar::Bool { op: BoolOp::Or, args: vec![cmp("a"), cmp("b")] }));
+        v.push(filt("not".into(), Scalar::Bool { op: BoolOp::Not, args: vec![cmp("a")] }));
+
+        for (n, op) in [("add", ArithOp::Add), ("sub", ArithOp::Sub), ("mul", ArithOp::Mul), ("div", ArithOp::Div)] {
+            v.push((format!("arith_{n}"), Rel::Project {
+                star: true,
+                items: vec![ProjectItem { name: "x".into(), expr: Scalar::Arith { op, lhs: Box::new(col("a")), rhs: Box::new(Scalar::Lit(Lit::Number("2".into()))) } }],
+                input: Box::new(scan()),
+            }));
+        }
+
+        for n in ["Text.Upper", "Text.Lower", "Text.Trim", "Number.Abs", "Number.Round"] {
+            v.push(filt(format!("call_{n}"), Scalar::Cmp {
+                op: CmpOp::Eq,
+                lhs: Box::new(Scalar::Call { func: n.into(), args: vec![col("a")] }),
+                rhs: Box::new(Scalar::Lit(Lit::Text("z".into()))),
+            }));
+        }
+        v.push(filt("call_Round2".into(), Scalar::Cmp {
+            op: CmpOp::Eq,
+            lhs: Box::new(Scalar::Call { func: "Number.Round".into(), args: vec![col("a"), Scalar::Lit(Lit::Number("2".into()))] }),
+            rhs: Box::new(Scalar::Lit(Lit::Number("1".into()))),
+        }));
+
+        for (n, func) in [("sum", AggFunc::Sum), ("avg", AggFunc::Average), ("min", AggFunc::Min), ("max", AggFunc::Max), ("countdistinct", AggFunc::CountDistinct)] {
+            v.push((format!("agg_{n}"), Rel::Aggregate {
+                keys: vec![col("g")],
+                aggs: vec![Aggregation { name: "a".into(), func, column: Some(col("v")) }],
+                input: Box::new(scan()),
+            }));
+        }
+        v.push(("agg_count_star".into(), Rel::Aggregate {
+            keys: vec![col("g")],
+            aggs: vec![Aggregation { name: "n".into(), func: AggFunc::Count, column: None }],
+            input: Box::new(scan()),
+        }));
+
+        v.push(("project_select".into(), Rel::Project {
+            star: false,
+            items: vec![ProjectItem { name: "a".into(), expr: col("a") }, ProjectItem { name: "b".into(), expr: col("b") }],
+            input: Box::new(scan()),
+        }));
+        v.push(("project_special_ident".into(), Rel::Project {
+            star: false,
+            items: vec![ProjectItem { name: "My Col".into(), expr: col("My Col") }],
+            input: Box::new(scan()),
+        }));
+
+        v.push(("sort_top".into(), Rel::Limit {
+            n: Some(3),
+            offset: 0,
+            input: Box::new(Rel::Sort { keys: vec![SortKey { column: "a".into(), descending: true }], input: Box::new(scan()) }),
+        }));
+        v.push(("distinct".into(), Rel::Distinct { on: vec![], input: Box::new(scan()) }));
+
+        for (n, kind) in [("inner", JoinKind::Inner), ("left", JoinKind::LeftOuter)] {
+            v.push((format!("join_{n}"), Rel::Join { kind, left_keys: vec!["k".into()], right_keys: vec!["k".into()], left: jscan("a"), right: jscan("b") }));
+        }
+        v.push(("join_qualified_project".into(), Rel::Project {
+            star: false,
+            items: vec![ProjectItem { name: "x".into(), expr: qcol("a", "x") }, ProjectItem { name: "y".into(), expr: qcol("b", "y") }],
+            input: Box::new(Rel::Join { kind: JoinKind::LeftOuter, left_keys: vec!["k".into()], right_keys: vec!["k".into()], left: jscan("a"), right: jscan("b") }),
+        }));
+        v.push(("join_qualified_agg".into(), Rel::Aggregate {
+            keys: vec![qcol("a", "g")],
+            aggs: vec![Aggregation { name: "s".into(), func: AggFunc::Sum, column: Some(qcol("b", "v")) }],
+            input: Box::new(Rel::Join { kind: JoinKind::LeftOuter, left_keys: vec!["k".into()], right_keys: vec!["k".into()], left: jscan("a"), right: jscan("b") }),
+        }));
+        v
     }
 
     #[test]
@@ -1040,54 +1189,40 @@ mod tests {
             eprintln!("skip: DBISAM DCG / scryer-prolog not available");
             return;
         };
-        // SQL straight from M source through lower → emit (Dbisam).
-        let from_m = [
+        let mut cases: Vec<(String, String)> = Vec::new();
+        // Real lowered plans from M source.
+        for src in [
             "t",
             r#"Table.SelectRows(t, each [Country] = "GB")"#,
-            r#"Table.SelectRows(t, each [a] = 1 and [b] > 2)"#,
-            r#"Table.SelectRows(t, each [x] = null)"#,
             r#"Table.SelectColumns(t, {"a", "b"})"#,
             r#"Table.AddColumn(t, "double", each [a] * 2)"#,
             r#"Table.FirstN(Table.Sort(t, {{"a", Order.Descending}}), 3)"#,
             "Table.Distinct(t)",
-            r#"Table.SelectRows(t, each Text.Upper([name]) = "X")"#,
             r#"Table.Group(t, {"Region"}, {{"Total", each List.Sum([Amount])}})"#,
             r#"Table.NestedJoin(a, {"k"}, b, {"k"}, "n", JoinKind.LeftOuter)"#,
-        ];
-        for src in from_m {
-            let emitted = sql(src);
-            assert!(
-                dcg_parses(&tools, &emitted),
-                "DCG rejected emitted SQL for `{src}`:\n  {emitted}"
-            );
+        ] {
+            cases.push((format!("m:{src}"), sql(src)));
         }
-        // The connector-built shapes (qualified columns over a join) don't come
-        // from `lower`, so emit them by hand and validate too.
-        let qualified_agg_join = Rel::Aggregate {
-            keys: vec![
-                Scalar::QualifiedCol { table: "orderh".into(), name: "ref".into() },
-                Scalar::QualifiedCol { table: "orderh".into(), name: "custcode".into() },
-            ],
-            aggs: vec![Aggregation {
-                name: "qty".into(),
-                func: AggFunc::Sum,
-                column: Some(Scalar::QualifiedCol {
-                    table: "orderi".into(),
-                    name: "quantity".into(),
-                }),
-            }],
-            input: Box::new(Rel::Join {
-                kind: JoinKind::LeftOuter,
-                left_keys: vec!["ref".into()],
-                right_keys: vec!["ref".into()],
-                left: Box::new(Rel::Scan(Source::Ref("orderh".into()))),
-                right: Box::new(Rel::Scan(Source::Ref("orderi".into()))),
-            }),
-        };
-        let emitted = emit(&qualified_agg_join, &Dbisam).expect("foldable");
+        // Programmatic matrix covering every emit code-path.
+        for (label, plan) in coverage_plans() {
+            if let Ok(s) = emit(&plan, &Dbisam) {
+                cases.push((label, s));
+            }
+        }
+
+        let accepted = dcg_parse_all(&tools, &cases);
+        let rejected: Vec<String> = cases
+            .iter()
+            .zip(&accepted)
+            .filter(|&(_, &ok)| !ok)
+            .map(|((label, sql), _)| format!("{label}: {sql}"))
+            .collect();
         assert!(
-            dcg_parses(&tools, &emitted),
-            "DCG rejected qualified aggregate-over-join SQL:\n  {emitted}"
+            rejected.is_empty(),
+            "DCG rejected {} of {} emitted SQL string(s):\n{}",
+            rejected.len(),
+            cases.len(),
+            rejected.join("\n")
         );
     }
 }
