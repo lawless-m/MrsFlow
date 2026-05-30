@@ -1550,6 +1550,18 @@ fn odbc_data_source_impl(
         .connect_with_connection_string(connection_string, ConnectionOptions::default())
         .map_err(|e| IoError::Other(format!("Odbc.DataSource connect: {}", e)))?;
 
+    // Pick the SQL dialect from the backend, detected once while the connection
+    // is open. DBISAM (Exportmaster) needs its own dialect — bare/double-quoted
+    // identifiers, trailing TOP, string date literals, LIKE, NULL-key join
+    // guards — all validated against the DBISAM DCG. Any other ODBC source
+    // keeps the portable generic-ODBC SQL.
+    let dialect = match conn.database_management_system_name() {
+        Ok(name) if name.to_ascii_lowercase().contains("dbisam") => {
+            mrsflow_core::plan::SqlDialect::Dbisam
+        }
+        _ => mrsflow_core::plan::SqlDialect::GenericOdbc,
+    };
+
     // SQLTables with empty filters returns all tables across all catalogs.
     // Column order: TABLE_CAT, TABLE_SCHEM, TABLE_NAME, TABLE_TYPE, REMARKS.
     let mut tables_cursor = conn
@@ -1605,7 +1617,7 @@ fn odbc_data_source_impl(
             let conn_string = connection_string.to_string();
             let tables_for_thunk = tables.clone();
             let inner: Rc<dyn Fn() -> Result<Value, MError>> = Rc::new(move || {
-                Ok(build_table_nav(&conn_string, &tables_for_thunk))
+                Ok(build_table_nav(&conn_string, &tables_for_thunk, dialect))
             });
             let data = Value::Thunk(Rc::new(RefCell::new(ThunkState::Native(inner))));
             rows.push(vec![
@@ -1623,12 +1635,16 @@ fn odbc_data_source_impl(
         for tables in by_catalog.into_values() {
             all_tables.extend(tables);
         }
-        Ok(build_table_nav(connection_string, &all_tables))
+        Ok(build_table_nav(connection_string, &all_tables, dialect))
     }
 }
 
 #[cfg(feature = "odbc")]
-fn build_table_nav(connection: &str, tables: &[(String, String)]) -> Value {
+fn build_table_nav(
+    connection: &str,
+    tables: &[(String, String)],
+    dialect: mrsflow_core::plan::SqlDialect,
+) -> Value {
     use std::cell::RefCell;
     use std::rc::Rc;
 
@@ -1647,7 +1663,7 @@ fn build_table_nav(connection: &str, tables: &[(String, String)]) -> Value {
         // of pulling rows. Force runs the rendered SQL via the
         // captured force_fn.
         let fetcher: Rc<dyn Fn() -> Result<Value, MError>> = Rc::new(move || {
-            build_lazy_odbc_table(&conn_string, &table_name)
+            build_lazy_odbc_table(&conn_string, &table_name, dialect)
         });
         let data = Value::Thunk(Rc::new(RefCell::new(ThunkState::Native(fetcher))));
         // PQ uses title-case Kind values: "Table", "View", etc.
@@ -2540,7 +2556,11 @@ fn json_value_to_m(j: serde_json::Value) -> Value {
 // ============================================================================
 
 #[cfg(feature = "odbc")]
-fn build_lazy_odbc_table(connection_string: &str, table_name: &str) -> Result<Value, mrsflow_core::eval::MError> {
+fn build_lazy_odbc_table(
+    connection_string: &str,
+    table_name: &str,
+    dialect: mrsflow_core::plan::SqlDialect,
+) -> Result<Value, mrsflow_core::eval::MError> {
     use mrsflow_core::eval::{LazyOdbcState, MError, TableRepr};
     use std::rc::Rc;
 
@@ -2580,7 +2600,7 @@ fn build_lazy_odbc_table(connection_string: &str, table_name: &str) -> Result<Va
         output_names: None,
         where_filters: vec![],
         limit: None,
-        dialect: mrsflow_core::plan::SqlDialect::GenericOdbc,
+        dialect,
         force_fn,
     };
     Ok(Value::Table(Table { repr: TableRepr::LazyOdbc(state) }))
@@ -2588,7 +2608,11 @@ fn build_lazy_odbc_table(connection_string: &str, table_name: &str) -> Result<Va
 
 #[cfg(not(feature = "odbc"))]
 #[allow(dead_code)]
-fn build_lazy_odbc_table(_: &str, _: &str) -> Result<Value, mrsflow_core::eval::MError> {
+fn build_lazy_odbc_table(
+    _: &str,
+    _: &str,
+    _: mrsflow_core::plan::SqlDialect,
+) -> Result<Value, mrsflow_core::eval::MError> {
     Err(mrsflow_core::eval::MError::Other(
         "Odbc.DataSource: built without ODBC support".into(),
     ))
