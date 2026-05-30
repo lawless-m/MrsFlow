@@ -98,15 +98,33 @@ pub struct Semantics {
     pub nulls_first: bool,
     /// `/` between two integers truncates toward zero (otherwise true division).
     pub integer_division: bool,
+    /// `NULL = NULL` is TRUE — two-valued logic. DBISAM does this (see the
+    /// `dbisam-null-semantics` reference); standard SQL / mrsflow use
+    /// three-valued logic where it is unknown. Affects equi-join key matching
+    /// and `= NULL` comparisons over nullable columns.
+    pub null_equals_null: bool,
 }
 
 impl Semantics {
-    /// mrsflow's own semantics: case-sensitive, NULLs first, true division.
+    /// mrsflow's own semantics: case-sensitive, NULLs first, true division,
+    /// three-valued null logic.
     pub fn mrsflow() -> Self {
         Semantics {
             case_insensitive_text: false,
             nulls_first: true,
             integer_division: false,
+            null_equals_null: false,
+        }
+    }
+
+    /// DBISAM's documented semantics. Only `null_equals_null` is known to
+    /// diverge (two-valued logic, per `dbisam-null-semantics`); the rest match
+    /// mrsflow until proven otherwise, so the harness flags only the divergence
+    /// we can substantiate rather than inventing exclusions.
+    pub fn dbisam() -> Self {
+        Semantics {
+            null_equals_null: true,
+            ..Semantics::mrsflow()
         }
     }
 }
@@ -205,11 +223,14 @@ fn interpret(
             for lrow in &lt.rows {
                 let mut matched = false;
                 for rrow in &rt.rows {
-                    // Equi-join; NULL keys never match (SQL semantics).
+                    // Equi-join. Standard SQL drops NULL keys; DBISAM's
+                    // two-valued logic matches NULL = NULL (see `Semantics`).
                     let eq = lk.iter().zip(&rk).all(|(&li, &ri)| {
-                        lrow[li] != Cell::Null
-                            && rrow[ri] != Cell::Null
-                            && order_cells(&lrow[li], &rrow[ri], sem).map_or(false, |o| o.is_eq())
+                        match (&lrow[li], &rrow[ri]) {
+                            (Cell::Null, Cell::Null) => sem.null_equals_null,
+                            (Cell::Null, _) | (_, Cell::Null) => false,
+                            (a, b) => order_cells(a, b, sem).map_or(false, |o| o.is_eq()),
+                        }
                     });
                     if eq {
                         matched = true;
@@ -739,6 +760,42 @@ mod tests {
             differential(&plan, &db, &dbisam, &m).is_err(),
             "case-folded join key should diverge"
         );
+    }
+
+    #[test]
+    fn null_join_key_diverges_but_non_null_is_safe() {
+        // DBISAM's two-valued logic (`dbisam-null-semantics`) matches NULL =
+        // NULL on a join key; mrsflow's three-valued logic drops it. Folding a
+        // join over a key that *is* NULL on both sides changes the answer, and
+        // the harness flags it under `Semantics::dbisam()`.
+        let qcol = |t: &str, n: &str| Scalar::QualifiedCol { table: t.into(), name: n.into() };
+        let plan = Rel::Project {
+            star: false,
+            items: vec![
+                ProjectItem { name: "x".into(), expr: qcol("a", "x") },
+                ProjectItem { name: "y".into(), expr: qcol("b", "y") },
+            ],
+            input: Box::new(Rel::Join {
+                kind: JoinKind::Inner,
+                left_keys: vec!["k".into()],
+                right_keys: vec!["k".into()],
+                left: Box::new(Rel::Scan(Source::Ref("a".into()))),
+                right: Box::new(Rel::Scan(Source::Ref("b".into()))),
+            }),
+        };
+        let null_keys = Db::new()
+            .with("a", &["k", "x"], vec![vec![Cell::Null, Cell::Int(1)]])
+            .with("b", &["k", "y"], vec![vec![Cell::Null, Cell::Int(2)]]);
+        assert!(
+            differential(&plan, &null_keys, &Semantics::dbisam(), &Semantics::mrsflow()).is_err(),
+            "NULL = NULL join-key divergence should be flagged"
+        );
+        // Same plan, no NULL key values — the routes agree, the fold is safe.
+        let real_keys = Db::new()
+            .with("a", &["k", "x"], vec![vec![Cell::Int(7), Cell::Int(1)]])
+            .with("b", &["k", "y"], vec![vec![Cell::Int(7), Cell::Int(2)]]);
+        differential(&plan, &real_keys, &Semantics::dbisam(), &Semantics::mrsflow())
+            .expect("non-null keys: fold is safe");
     }
 
     // --- divergences the harness should catch -----------------------------

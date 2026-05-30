@@ -70,6 +70,13 @@ pub trait Dialect {
     fn supports_count_distinct(&self) -> bool {
         true
     }
+    /// Whether the engine matches `NULL = NULL` (two-valued logic). DBISAM does
+    /// (`dbisam-null-semantics`), which would make a null join key spuriously
+    /// match; when true, join emission adds an `IS NOT NULL` guard per key to
+    /// restore standard equi-join semantics. See `mrsflow/10-plan-ir.md` Gate 2.
+    fn null_equals_null(&self) -> bool {
+        false
+    }
     /// SQL for a scalar function call, or `None` if the dialect has no proven
     /// analogue (which makes the enclosing expression unfoldable).
     fn scalar_call(&self, func: &str, args: &[String]) -> Option<String>;
@@ -123,6 +130,10 @@ impl Dialect for Dbisam {
 
     fn supports_count_distinct(&self) -> bool {
         false
+    }
+
+    fn null_equals_null(&self) -> bool {
+        true
     }
 
     fn scalar_call(&self, func: &str, args: &[String]) -> Option<String> {
@@ -581,7 +592,7 @@ fn build(rel: &Rel, d: &dyn Dialect) -> Result<Sel, Unfoldable> {
             };
             // Keys are qualified by each side's table so the ON clause is
             // unambiguous (the key column exists on both sides).
-            let on = left_keys
+            let mut on_parts: Vec<String> = left_keys
                 .iter()
                 .zip(right_keys)
                 .map(|(lk, rk)| {
@@ -593,8 +604,16 @@ fn build(rel: &Rel, d: &dyn Dialect) -> Result<Sel, Unfoldable> {
                         d.quote_ident(rk)
                     )
                 })
-                .collect::<Vec<_>>()
-                .join(" AND ");
+                .collect();
+            // On an engine where NULL = NULL is true (DBISAM), guard each key so
+            // a null key doesn't spuriously match — restoring standard equi-join
+            // semantics while keeping LEFT-join null-key rows unmatched.
+            if d.null_equals_null() {
+                for lk in left_keys {
+                    on_parts.push(format!("{}.{} IS NOT NULL", l.from, d.quote_ident(lk)));
+                }
+            }
+            let on = on_parts.join(" AND ");
             let mut where_ = l.where_;
             where_.extend(r.where_);
             Ok(Sel {
@@ -872,7 +891,7 @@ mod tests {
     fn inner_join_emits() {
         assert_eq!(
             sql(r#"Table.NestedJoin(a, {"k"}, b, {"k"}, "n", JoinKind.Inner)"#),
-            r#"SELECT * FROM a JOIN b ON a.k = b.k"#
+            r#"SELECT * FROM a JOIN b ON a.k = b.k AND a.k IS NOT NULL"#
         );
     }
 
@@ -880,7 +899,7 @@ mod tests {
     fn left_outer_join_emits() {
         assert_eq!(
             sql(r#"Table.NestedJoin(a, {"k"}, b, {"k"}, "n", JoinKind.LeftOuter)"#),
-            r#"SELECT * FROM a LEFT JOIN b ON a.k = b.k"#
+            r#"SELECT * FROM a LEFT JOIN b ON a.k = b.k AND a.k IS NOT NULL"#
         );
     }
 
@@ -916,7 +935,7 @@ mod tests {
         };
         assert_eq!(
             emit(&plan, &Dbisam).expect("foldable"),
-            r#"SELECT Analysis.SAPRODUCT AS SAPRODUCT, PRODGRP.Desc AS Desc FROM Analysis LEFT JOIN PRODGRP ON Analysis.key = PRODGRP."Sub Sub Category""#
+            r#"SELECT Analysis.SAPRODUCT AS SAPRODUCT, PRODGRP.Desc AS Desc FROM Analysis LEFT JOIN PRODGRP ON Analysis.key = PRODGRP."Sub Sub Category" AND Analysis.key IS NOT NULL"#
         );
     }
 
@@ -953,7 +972,7 @@ mod tests {
         };
         assert_eq!(
             emit(&plan, &Dbisam).expect("foldable"),
-            r#"SELECT orderh.ref, orderh.custcode, SUM(orderi.quantity) AS qty FROM orderh LEFT JOIN orderi ON orderh.ref = orderi.ref GROUP BY orderh.ref, orderh.custcode"#
+            r#"SELECT orderh.ref, orderh.custcode, SUM(orderi.quantity) AS qty FROM orderh LEFT JOIN orderi ON orderh.ref = orderi.ref AND orderh.ref IS NOT NULL GROUP BY orderh.ref, orderh.custcode"#
         );
     }
 
