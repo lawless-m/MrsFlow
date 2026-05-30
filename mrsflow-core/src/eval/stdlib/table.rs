@@ -6108,14 +6108,98 @@ fn try_fold_group_over_join(
     Some(Value::Table(Table { repr: TableRepr::LazyOdbcJoin(candidate) }))
 }
 
+/// Resolve a `Table.Group` key/aggregate column (an *output* name on the
+/// LazyOdbc) to its underlying source column. `None` if it isn't a current
+/// output column.
+fn resolve_lazy_odbc_source(
+    s: &super::super::value::LazyOdbcState,
+    output_name: &str,
+) -> Option<String> {
+    (0..s.projection.len())
+        .find(|&i| s.effective_name(i) == output_name)
+        .map(|i| s.schema.field(s.projection[i]).name().clone())
+}
+
+/// Fold `Table.Group` applied directly to a navigated single-table LazyOdbc
+/// into one `SELECT keys, aggs FROM t [WHERE …] GROUP BY keys`. Returns `None`
+/// (→ in-memory grouping) for anything that can't fold: non-Global grouping, a
+/// custom comparer, an unrecognised aggregate, a renamed key (SQL GROUP BY has
+/// no key alias), or a row limit before the group.
+fn try_fold_group_over_scan(
+    s: &super::super::value::LazyOdbcState,
+    args: &[Value],
+) -> Option<Value> {
+    use crate::plan::{Aggregation, Rel, Scalar};
+    if s.limit.is_some() {
+        return None;
+    }
+    let global = matches!(args.get(3), None | Some(Value::Null))
+        || matches!(args.get(3), Some(Value::Number(n)) if *n == 1.0);
+    let no_comparer = matches!(args.get(4), None | Some(Value::Null));
+    if !global || !no_comparer {
+        return None;
+    }
+    let keys_out: Vec<String> = match &args[1] {
+        Value::Text(k) => vec![k.clone()],
+        Value::List(_) => expect_text_list(&args[1], "Table.Group: key").ok()?,
+        _ => return None,
+    };
+    // Keys must be un-renamed source columns — GROUP BY can't alias a key, so a
+    // renamed key would change the output column name.
+    let mut keys: Vec<Scalar> = Vec::with_capacity(keys_out.len());
+    for k in &keys_out {
+        let src = resolve_lazy_odbc_source(s, k)?;
+        if &src != k {
+            return None;
+        }
+        keys.push(Scalar::Col(src));
+    }
+    let agg_list = expect_list(args.get(2)?).ok()?;
+    let mut aggs: Vec<Aggregation> = Vec::with_capacity(agg_list.len());
+    for entry in agg_list {
+        let xs = match entry {
+            Value::List(xs) if xs.len() >= 2 => xs,
+            _ => return None,
+        };
+        let nm = expect_text(&xs[0]).ok()?;
+        let cl = expect_function(&xs[1]).ok()?;
+        let mut a = recognize_aggregation(nm, cl);
+        if a.func == crate::plan::AggFunc::Opaque {
+            return None;
+        }
+        // The aggregate keeps its own output name via `AS`, so its input column
+        // may be renamed — resolve it to the source.
+        if let Some(Scalar::Col(out)) = &a.column {
+            a.column = Some(Scalar::Col(resolve_lazy_odbc_source(s, out)?));
+        }
+        aggs.push(a);
+    }
+    let plan = Rel::Aggregate {
+        keys,
+        aggs,
+        input: Box::new(s.scan_with_filters()),
+    };
+    let sql = s.dialect.emit(&plan).ok()?;
+    let batch = (s.force_fn)(&sql).ok()?;
+    Some(Value::Table(Table::from_arrow(batch)))
+}
+
 fn group(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
-    // Fold path: Table.Group over a deferred same-source ODBC join folds the
-    // join + group into one server-side GROUP BY query.
+    // Fold path: Table.Group over a navigated ODBC source folds into one
+    // server-side GROUP BY — over a deferred join, or a single table.
     if let Ok(t) = expect_table_lazy_ok(&args[0]) {
-        if let super::super::value::TableRepr::LazyOdbcJoin(s) = &t.repr {
-            if let Some(folded) = try_fold_group_over_join(s, args) {
-                return Ok(folded);
+        match &t.repr {
+            super::super::value::TableRepr::LazyOdbcJoin(s) => {
+                if let Some(folded) = try_fold_group_over_join(s, args) {
+                    return Ok(folded);
+                }
             }
+            super::super::value::TableRepr::LazyOdbc(s) => {
+                if let Some(folded) = try_fold_group_over_scan(s, args) {
+                    return Ok(folded);
+                }
+            }
+            _ => {}
         }
     }
     let table = expect_table(&args[0])?;
@@ -7249,6 +7333,66 @@ mod tests {
         assert_eq!(
             captured.borrow().clone().expect("force emitted SQL"),
             r#"SELECT orderh.ref AS ref, orderh.custcode AS custcode, orderi.quantity AS quantity FROM orderh LEFT JOIN orderi ON orderh.ref = orderi.ref"#
+        );
+    }
+
+    #[test]
+    fn group_over_scan_folds_to_group_by() {
+        // Table.Group directly over a navigated single-table LazyOdbc folds to a
+        // server-side GROUP BY. A capturing force_fn records the emitted SQL.
+        use crate::eval::value::{Closure, FnBody, LazyOdbcState, TableRepr};
+        use crate::parser::{Expr, Param};
+        use std::cell::RefCell;
+        use std::rc::Rc;
+
+        let captured: Rc<RefCell<Option<String>>> = Rc::new(RefCell::new(None));
+        let cap = captured.clone();
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("SAGROUP", DataType::Utf8, true),
+            Field::new("SAVAL", DataType::Float64, true),
+        ]));
+        let force_fn: Rc<dyn Fn(&str) -> Result<RecordBatch, MError>> = Rc::new(move |sql: &str| {
+            *cap.borrow_mut() = Some(sql.to_string());
+            Ok(RecordBatch::new_empty(Arc::new(Schema::empty())))
+        });
+        let table = Value::Table(Table {
+            repr: TableRepr::LazyOdbc(LazyOdbcState {
+                connection_string: "dsn".into(),
+                table_name: "Analysis".into(),
+                schema,
+                projection: vec![0, 1],
+                output_names: None,
+                where_filters: vec![],
+                limit: None,
+                dialect: crate::plan::SqlDialect::Dbisam,
+                force_fn,
+            }),
+        });
+        // `each List.Sum([SAVAL])` built directly as a 1-arg closure.
+        let agg = Value::Function(Closure {
+            params: vec![Param { name: "_".into(), optional: false, type_annotation: None }],
+            body: FnBody::M(Box::new(Expr::Invoke {
+                target: Box::new(Expr::Identifier("List.Sum".into())),
+                args: vec![Expr::FieldAccess {
+                    target: Box::new(Expr::Identifier("_".into())),
+                    field: "SAVAL".into(),
+                    optional: false,
+                }],
+            })),
+            env: crate::eval::env::EnvNode::empty(),
+        });
+        let args = [
+            table,
+            Value::list_of(vec![Value::Text("SAGROUP".into())]),
+            Value::list_of(vec![Value::list_of(vec![
+                Value::Text("TotalVal".into()),
+                agg,
+            ])]),
+        ];
+        group(&args, &crate::eval::NoIoHost).expect("group folds");
+        assert_eq!(
+            captured.borrow().clone().expect("group emitted SQL"),
+            r#"SELECT SAGROUP, SUM(SAVAL) AS TotalVal FROM Analysis GROUP BY SAGROUP"#
         );
     }
 }

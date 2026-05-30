@@ -743,9 +743,9 @@ impl LazyOdbcState {
 
     /// The `Scan` of the table with the accumulated `where_filters` applied as
     /// nested `Filter`s (first filter innermost, preserving WHERE order). The
-    /// common base of both `to_plan` (which adds a `Project`) and the row-count
-    /// plan (which adds an `Aggregate`).
-    fn scan_with_filters(&self) -> crate::plan::Rel {
+    /// common base of `to_plan` (adds a `Project`), the row-count plan (adds an
+    /// `Aggregate` COUNT(*)), and the stdlib's single-table `Table.Group` fold.
+    pub(crate) fn scan_with_filters(&self) -> crate::plan::Rel {
         use crate::plan::{Rel, Source};
         let col_name = |idx: usize| self.schema.field(idx).name().clone();
         let mut node = Rel::Scan(Source::Ref(self.table_name.clone()));
