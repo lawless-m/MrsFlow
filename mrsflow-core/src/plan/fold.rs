@@ -119,9 +119,6 @@ impl Dialect for Dbisam {
         if p.distinct {
             s.push_str("DISTINCT ");
         }
-        if let Some(n) = p.top {
-            s.push_str(&format!("TOP {n} "));
-        }
         s.push_str(&p.projection.join(", "));
         s.push_str(" FROM ");
         s.push_str(&p.from);
@@ -136,6 +133,11 @@ impl Dialect for Dbisam {
         if !p.order_by.is_empty() {
             s.push_str(" ORDER BY ");
             s.push_str(&p.order_by.join(", "));
+        }
+        // DBISAM's `TOP n` is a trailing clause, like `LIMIT` — it goes at the
+        // very end, after ORDER BY, NOT after SELECT.
+        if let Some(n) = p.top {
+            s.push_str(&format!(" TOP {n}"));
         }
         s
     }
@@ -786,7 +788,7 @@ mod tests {
     fn sort_and_top() {
         assert_eq!(
             sql(r#"Table.FirstN(Table.Sort(t, {{"a", Order.Descending}}), 3)"#),
-            r#"SELECT TOP 3 * FROM "t" ORDER BY "a" DESC"#
+            r#"SELECT * FROM "t" ORDER BY "a" DESC TOP 3"#
         );
     }
 
@@ -810,7 +812,7 @@ mod tests {
         // shape.
         assert_eq!(
             sql(r#"Table.FirstN(Table.Sort(Table.SelectRows(t, each [a] > 5), "a"), 10)"#),
-            r#"SELECT TOP 10 * FROM "t" WHERE "a" > 5 ORDER BY "a" ASC"#
+            r#"SELECT * FROM "t" WHERE "a" > 5 ORDER BY "a" ASC TOP 10"#
         );
     }
 
@@ -946,7 +948,7 @@ mod tests {
         // Sort above Limit cannot share one SELECT (TOP applies after ORDER BY),
         // so the limit folds and the sort runs over its rows.
         let f = fold(&rel(r#"Table.Sort(Table.FirstN(t, 5), "x")"#), &Dbisam);
-        assert_eq!(f.sql.as_deref(), Some(r#"SELECT TOP 5 * FROM "t""#));
+        assert_eq!(f.sql.as_deref(), Some(r#"SELECT * FROM "t" TOP 5"#));
         assert_eq!(f.residual.to_sexpr(), r#"(sort ((asc "x")) (eval-m "$folded"))"#);
     }
 
