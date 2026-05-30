@@ -6015,7 +6015,109 @@ fn group_hash_key(v: &Value) -> Option<GroupHashKey> {
     }
 }
 
+/// Recognise a `Table.Group` aggregation closure (`each List.Sum([col])`, …) as
+/// a foldable Plan IR aggregation. Returns an `Opaque` aggregate for anything
+/// off the allow-list, so the caller falls back to in-memory grouping. Mirrors
+/// `plan::lower::agg_body` but over the runtime `Closure`.
+fn recognize_aggregation(name: &str, c: &Closure) -> crate::plan::Aggregation {
+    use crate::parser::Expr;
+    use crate::plan::{AggFunc, Aggregation, Scalar};
+    let opaque = || Aggregation { name: name.to_string(), func: AggFunc::Opaque, column: None };
+    if c.params.len() != 1 {
+        return opaque();
+    }
+    let param = c.params[0].name.as_str();
+    let body = match &c.body {
+        super::super::value::FnBody::M(e) => e.as_ref(),
+        _ => return opaque(),
+    };
+    let (func_name, cargs) = match body {
+        Expr::Invoke { target, args } => match target.as_ref() {
+            Expr::Identifier(f) => (f.as_str(), args),
+            _ => return opaque(),
+        },
+        _ => return opaque(),
+    };
+    let func = match func_name {
+        "List.Sum" => AggFunc::Sum,
+        "List.Average" => AggFunc::Average,
+        "List.Min" => AggFunc::Min,
+        "List.Max" => AggFunc::Max,
+        "List.Count" => AggFunc::Count,
+        "Table.RowCount" => {
+            return Aggregation { name: name.to_string(), func: AggFunc::Count, column: None }
+        }
+        _ => return opaque(),
+    };
+    let column = cargs.first().and_then(|a| match a {
+        Expr::FieldAccess { target, field, optional: false } => match target.as_ref() {
+            Expr::Identifier(n) if n == param => Some(Scalar::Col(field.clone())),
+            _ => None,
+        },
+        _ => None,
+    });
+    if column.is_none() && !matches!(func, AggFunc::Count) {
+        return opaque(); // Sum/Avg/Min/Max need a column
+    }
+    Aggregation { name: name.to_string(), func, column }
+}
+
+/// If `Table.Group` is applied directly to an already-expanded deferred ODBC
+/// join, with plain Global grouping and recognised column aggregates, fold the
+/// whole chain to one `… JOIN … GROUP BY …`. Returns `None` (→ in-memory
+/// grouping) for anything that can't fold.
+fn try_fold_group_over_join(
+    s: &super::super::value::LazyOdbcJoinState,
+    args: &[Value],
+) -> Option<Value> {
+    use super::super::value::TableRepr;
+    if s.expanded.is_none() || s.aggregate.is_some() {
+        return None;
+    }
+    let global = matches!(args.get(3), None | Some(Value::Null))
+        || matches!(args.get(3), Some(Value::Number(n)) if *n == 1.0);
+    let no_comparer = matches!(args.get(4), None | Some(Value::Null));
+    if !global || !no_comparer {
+        return None;
+    }
+    let keys: Vec<String> = match &args[1] {
+        Value::Text(k) => vec![k.clone()],
+        Value::List(_) => expect_text_list(&args[1], "Table.Group: key").ok()?,
+        _ => return None,
+    };
+    let agg_list = expect_list(args.get(2)?).ok()?;
+    let mut aggs = Vec::with_capacity(agg_list.len());
+    for entry in agg_list {
+        let xs = match entry {
+            Value::List(xs) if xs.len() >= 2 => xs,
+            _ => return None,
+        };
+        let nm = expect_text(&xs[0]).ok()?;
+        let cl = expect_function(&xs[1]).ok()?;
+        let a = recognize_aggregation(nm, cl);
+        if a.func == crate::plan::AggFunc::Opaque {
+            return None;
+        }
+        aggs.push(a);
+    }
+    let mut candidate = s.clone();
+    candidate.aggregate = Some((keys, aggs));
+    // `to_fold_plan` is the validity gate: every key/aggregate column must
+    // resolve to a qualified source column, else leave it to in-memory grouping.
+    candidate.to_fold_plan()?;
+    Some(Value::Table(Table { repr: TableRepr::LazyOdbcJoin(candidate) }))
+}
+
 fn group(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
+    // Fold path: Table.Group over a deferred same-source ODBC join folds the
+    // join + group into one server-side GROUP BY query.
+    if let Ok(t) = expect_table_lazy_ok(&args[0]) {
+        if let super::super::value::TableRepr::LazyOdbcJoin(s) = &t.repr {
+            if let Some(folded) = try_fold_group_over_join(s, args) {
+                return Ok(folded);
+            }
+        }
+    }
     let table = expect_table(&args[0])?;
     let keys: Vec<String> = match &args[1] {
         Value::Text(s) => vec![s.clone()],
