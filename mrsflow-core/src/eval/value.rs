@@ -544,6 +544,10 @@ pub enum FilterOp {
     IsNull,
     /// `scalar` is ignored.
     IsNotNull,
+    /// `column LIKE scalar` — `scalar` is the full text pattern (with `%`/`_`).
+    /// Only produced for the SQL fold path (`Text.EndsWith`/`Contains`); the
+    /// in-memory/parquet path never sees it.
+    Like,
 }
 
 /// The constant side of a foldable predicate. Restricted to the
@@ -1041,6 +1045,7 @@ fn row_filter_to_scalar(col: &str, f: &RowFilter) -> crate::plan::Scalar {
                 FilterOp::Le => CmpOp::Le,
                 FilterOp::Gt => CmpOp::Gt,
                 FilterOp::Ge => CmpOp::Ge,
+                FilterOp::Like => CmpOp::Like,
                 FilterOp::IsNull | FilterOp::IsNotNull => unreachable!(),
             };
             Scalar::Cmp {
@@ -1090,6 +1095,7 @@ fn render_filter(out: &mut String, f: &RowFilter, schema: &arrow::datatypes::Sch
         FilterOp::Le => "<=",
         FilterOp::Gt => ">",
         FilterOp::Ge => ">=",
+        FilterOp::Like => "LIKE",
         FilterOp::IsNull | FilterOp::IsNotNull => unreachable!(),
     };
     let _ = write!(out, "\"{col_name}\" {op} ");
@@ -2143,7 +2149,9 @@ fn range_can_match(lo: Option<f64>, hi: Option<f64>, op: FilterOp, v: f64) -> bo
         FilterOp::Le => lo.is_none_or(|l| l <= v),
         FilterOp::Gt => hi.is_none_or(|h| h > v),
         FilterOp::Ge => hi.is_none_or(|h| h >= v),
-        FilterOp::IsNull | FilterOp::IsNotNull => true,
+        // LIKE can't be eliminated by min/max stats (and the parquet path never
+        // produces it) — conservatively keep the row group.
+        FilterOp::IsNull | FilterOp::IsNotNull | FilterOp::Like => true,
     }
 }
 
@@ -2155,7 +2163,7 @@ fn text_range_can_match(lo: Option<&[u8]>, hi: Option<&[u8]>, op: FilterOp, v: &
         FilterOp::Le => lo.is_none_or(|l| l <= v),
         FilterOp::Gt => hi.is_none_or(|h| h > v),
         FilterOp::Ge => hi.is_none_or(|h| h >= v),
-        FilterOp::IsNull | FilterOp::IsNotNull => true,
+        FilterOp::IsNull | FilterOp::IsNotNull | FilterOp::Like => true,
     }
 }
 
@@ -2275,7 +2283,8 @@ fn cmp_f64(v: f64, scalar: f64, op: FilterOp) -> bool {
         FilterOp::Le => v <= scalar,
         FilterOp::Gt => v > scalar,
         FilterOp::Ge => v >= scalar,
-        FilterOp::IsNull | FilterOp::IsNotNull => unreachable!(),
+        // IsNull/IsNotNull handled before this call; Like is SQL-fold-only.
+        FilterOp::IsNull | FilterOp::IsNotNull | FilterOp::Like => unreachable!(),
     }
 }
 

@@ -179,6 +179,9 @@ pub enum CmpOp {
     Le,
     Gt,
     Ge,
+    /// `lhs LIKE rhs`, where `rhs` is a text-literal pattern (`%`/`_` wildcards).
+    /// Produced by folding `Text.StartsWith`/`EndsWith`/`Contains`.
+    Like,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

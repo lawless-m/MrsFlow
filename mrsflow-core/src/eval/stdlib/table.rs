@@ -7017,6 +7017,7 @@ fn try_fold_predicate(
         state.output_names.as_deref(),
         state.schema.as_ref(),
         closure,
+        false, // parquet can't fold LIKE into row-group stats
     )
 }
 
@@ -7029,6 +7030,7 @@ fn try_fold_predicate_for_odbc(
         state.output_names.as_deref(),
         state.schema.as_ref(),
         closure,
+        true, // the SQL emitter can express LIKE
     )
 }
 
@@ -7037,6 +7039,7 @@ fn try_fold_predicate_generic(
     output_names: Option<&[Option<String>]>,
     schema: &arrow::datatypes::Schema,
     closure: &super::super::value::Closure,
+    allow_like: bool,
 ) -> Option<Vec<super::super::value::RowFilter>> {
     if closure.params.len() != 1 {
         return None;
@@ -7047,7 +7050,7 @@ fn try_fold_predicate_generic(
         super::super::value::FnBody::Builtin(_) => return None,
     };
     let mut out = Vec::new();
-    if extract_filters(body, param_name, projection, output_names, schema, &mut out) {
+    if extract_filters(body, param_name, projection, output_names, schema, &mut out, allow_like) {
         Some(out)
     } else {
         None
@@ -7061,14 +7064,18 @@ fn extract_filters(
     output_names: Option<&[Option<String>]>,
     schema: &arrow::datatypes::Schema,
     out: &mut Vec<super::super::value::RowFilter>,
+    // Whether `LIKE`-based folds (Text.EndsWith/Contains) are allowed. Only the
+    // SQL path sets this; the parquet path can't use LIKE for row-group stats,
+    // so it leaves those predicates to in-memory evaluation.
+    allow_like: bool,
 ) -> bool {
     use crate::parser::{BinaryOp, Expr};
     use super::super::value::{FilterOp, FilterScalar, RowFilter};
 
     match expr {
         Expr::Binary(BinaryOp::And, l, r) => {
-            extract_filters(l, param_name, projection, output_names, schema, out)
-                && extract_filters(r, param_name, projection, output_names, schema, out)
+            extract_filters(l, param_name, projection, output_names, schema, out, allow_like)
+                && extract_filters(r, param_name, projection, output_names, schema, out, allow_like)
         }
         Expr::Binary(op, l, r) => {
             // [col] op literal — or — literal op [col] (flip the op).
@@ -7128,49 +7135,69 @@ fn extract_filters(
             });
             true
         }
-        // `Text.StartsWith([col], "lit")` → the range `[col] >= "lit" AND
-        // [col] < <lit⁺>`, where <lit⁺> increments the prefix's last char.
-        // For ordinal comparison this is exactly the set of strings with the
-        // prefix, and it reuses the existing Ge/Lt comparison folds — no new
-        // filter op or in-memory matcher, and no new fold semantics beyond the
-        // text comparisons already folded. Only the 2-arg form folds; a 3rd
-        // (comparer) arg or a non-literal prefix falls through to in-memory.
+        // Text predicates over a column:
+        //   Text.StartsWith([col], "p") → the ordinal range `[col] >= "p" AND
+        //     [col] < <p⁺>` — reuses Ge/Lt, works on every backend.
+        //   Text.EndsWith([col], "x")   → `[col] LIKE '%x'`   (SQL path only)
+        //   Text.Contains([col], "x")   → `[col] LIKE '%x%'`  (SQL path only)
+        // Only the 2-arg form folds; a 3rd (comparer) arg or non-literal needle
+        // falls through to in-memory. A needle with a LIKE metachar (`%`/`_`)
+        // doesn't fold (the pattern would be ambiguous).
         Expr::Invoke { target, args } => {
             let func = match target.as_ref() {
                 Expr::Identifier(n) => n.as_str(),
                 _ => return false,
             };
-            if func != "Text.StartsWith" || args.len() != 2 {
+            if args.len() != 2 {
                 return false;
             }
             let field = match field_access_on_param(&args[0], param_name) {
                 Some(f) => f,
                 None => return false,
             };
-            let prefix = match &args[1] {
+            let needle = match &args[1] {
                 Expr::TextLit(s) => s.as_str(),
                 _ => return false,
-            };
-            let upper = match prefix_upper_bound(prefix) {
-                Some(u) => u,
-                None => return false, // empty prefix or un-incrementable last char
             };
             let col_idx =
                 match resolve_field_generic(projection, output_names, schema, field) {
                     Some(i) => i,
                     None => return false,
                 };
-            out.push(RowFilter {
-                source_col_idx: col_idx,
-                op: FilterOp::Ge,
-                scalar: FilterScalar::Text(prefix.to_string()),
-            });
-            out.push(RowFilter {
-                source_col_idx: col_idx,
-                op: FilterOp::Lt,
-                scalar: FilterScalar::Text(upper),
-            });
-            true
+            let mut push_like = |pattern: String| {
+                out.push(RowFilter {
+                    source_col_idx: col_idx,
+                    op: FilterOp::Like,
+                    scalar: FilterScalar::Text(pattern),
+                });
+                true
+            };
+            match func {
+                "Text.StartsWith" => {
+                    let upper = match prefix_upper_bound(needle) {
+                        Some(u) => u,
+                        None => return false,
+                    };
+                    out.push(RowFilter {
+                        source_col_idx: col_idx,
+                        op: FilterOp::Ge,
+                        scalar: FilterScalar::Text(needle.to_string()),
+                    });
+                    out.push(RowFilter {
+                        source_col_idx: col_idx,
+                        op: FilterOp::Lt,
+                        scalar: FilterScalar::Text(upper),
+                    });
+                    true
+                }
+                "Text.EndsWith" if allow_like && !needle.contains(['%', '_']) => {
+                    push_like(format!("%{needle}"))
+                }
+                "Text.Contains" if allow_like && !needle.contains(['%', '_']) => {
+                    push_like(format!("%{needle}%"))
+                }
+                _ => false,
+            }
         }
         _ => false,
     }

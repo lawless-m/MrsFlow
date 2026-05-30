@@ -736,6 +736,7 @@ fn emit_cmp(op: CmpOp, lhs: &Scalar, rhs: &Scalar, d: &dyn Dialect) -> Result<St
         CmpOp::Le => "<=",
         CmpOp::Gt => ">",
         CmpOp::Ge => ">=",
+        CmpOp::Like => "LIKE",
     };
     Ok(format!("{l} {sym} {r}"))
 }
@@ -1128,6 +1129,7 @@ mod tests {
         }
         v.push(filt("is_null".into(), Scalar::Cmp { op: CmpOp::Eq, lhs: Box::new(col("c")), rhs: Box::new(Scalar::Lit(Lit::Null)) }));
         v.push(filt("is_not_null".into(), Scalar::Cmp { op: CmpOp::Ne, lhs: Box::new(col("c")), rhs: Box::new(Scalar::Lit(Lit::Null)) }));
+        v.push(filt("like".into(), Scalar::Cmp { op: CmpOp::Like, lhs: Box::new(col("c")), rhs: Box::new(Scalar::Lit(Lit::Text("%z%".into()))) }));
 
         let cmp = |c: &str| Scalar::Cmp { op: CmpOp::Gt, lhs: Box::new(Scalar::Col(c.into())), rhs: Box::new(Scalar::Lit(Lit::Number("0".into()))) };
         v.push(filt("and".into(), Scalar::Bool { op: BoolOp::And, args: vec![cmp("a"), cmp("b")] }));

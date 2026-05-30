@@ -449,6 +449,28 @@ fn aggregate(a: &Aggregation, columns: &[String], rows: &[&Vec<Cell>]) -> Result
     }
 }
 
+/// SQL `LIKE`: `%` matches any run (incl. empty), `_` any single char. Honours
+/// `case_insensitive_text`. (DBISAM treats `*` as a literal, not a wildcard,
+/// which this respects — only `%`/`_` are special.)
+fn like_match(text: &str, pattern: &str, sem: &Semantics) -> bool {
+    fn rec(t: &[char], p: &[char]) -> bool {
+        match p.first() {
+            None => t.is_empty(),
+            Some('%') => rec(t, &p[1..]) || (!t.is_empty() && rec(&t[1..], p)),
+            Some('_') => !t.is_empty() && rec(&t[1..], &p[1..]),
+            Some(&c) => !t.is_empty() && t[0] == c && rec(&t[1..], &p[1..]),
+        }
+    }
+    let prep = |s: &str| -> Vec<char> {
+        if sem.case_insensitive_text {
+            s.to_lowercase().chars().collect()
+        } else {
+            s.chars().collect()
+        }
+    };
+    rec(&prep(text), &prep(pattern))
+}
+
 fn eval_scalar(s: &Scalar, columns: &[String], row: &[Cell], sem: &Semantics) -> Result<Cell, String> {
     match s {
         Scalar::Col(n) => Ok(row[col_index(columns, n)?].clone()),
@@ -460,6 +482,14 @@ fn eval_scalar(s: &Scalar, columns: &[String], row: &[Cell], sem: &Semantics) ->
         Scalar::Cmp { op, lhs, rhs } => {
             let a = eval_scalar(lhs, columns, row, sem)?;
             let b = eval_scalar(rhs, columns, row, sem)?;
+            if let CmpOp::Like = op {
+                // LIKE is a text pattern match, not an ordering.
+                return Ok(match (&a, &b) {
+                    (Cell::Null, _) | (_, Cell::Null) => Cell::Null,
+                    (Cell::Text(s), Cell::Text(pat)) => Cell::Bool(like_match(s, pat, sem)),
+                    _ => Cell::Bool(false),
+                });
+            }
             Ok(match order_cells_opt(&a, &b, sem) {
                 None => Cell::Null, // comparison with NULL is unknown
                 Some(ord) => Cell::Bool(match op {
@@ -469,6 +499,7 @@ fn eval_scalar(s: &Scalar, columns: &[String], row: &[Cell], sem: &Semantics) ->
                     CmpOp::Le => ord.is_le(),
                     CmpOp::Gt => ord.is_gt(),
                     CmpOp::Ge => ord.is_ge(),
+                    CmpOp::Like => unreachable!("handled above"),
                 }),
             })
         }

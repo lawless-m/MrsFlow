@@ -273,6 +273,7 @@ fn cmp_op_name(op: CmpOp) -> &'static str {
         CmpOp::Le => "<=",
         CmpOp::Gt => ">",
         CmpOp::Ge => ">=",
+        CmpOp::Like => "like",
     }
 }
 

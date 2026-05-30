@@ -5792,6 +5792,32 @@ mod tests {
     }
 
     #[test]
+    fn odbc_endswith_folds_to_like() {
+        let result = eval_with_src(
+            r#"Table.SelectRows(src, each Text.EndsWith([name], "z"))"#,
+            dummy_lazy_odbc_table(),
+        );
+        let state = unwrap_lazy_odbc(&result);
+        assert_eq!(
+            state.render_sql(),
+            r#"SELECT "id", "name", "price" FROM "customers" WHERE "name" LIKE '%z'"#
+        );
+    }
+
+    #[test]
+    fn odbc_contains_folds_to_like() {
+        let result = eval_with_src(
+            r#"Table.SelectRows(src, each Text.Contains([name], "z"))"#,
+            dummy_lazy_odbc_table(),
+        );
+        let state = unwrap_lazy_odbc(&result);
+        assert_eq!(
+            state.render_sql(),
+            r#"SELECT "id", "name", "price" FROM "customers" WHERE "name" LIKE '%z%'"#
+        );
+    }
+
+    #[test]
     #[should_panic(expected = "force_fn fired")]
     fn odbc_non_foldable_predicate_does_force() {
         // Text.Length isn't in the foldable subset — falls through to
