@@ -7248,7 +7248,7 @@ mod tests {
         }
         assert_eq!(
             captured.borrow().clone().expect("force emitted SQL"),
-            r#"SELECT "orderh"."ref" AS "ref", "orderh"."custcode" AS "custcode", "orderi"."quantity" AS "quantity" FROM "orderh" LEFT JOIN "orderi" ON "orderh"."ref" = "orderi"."ref""#
+            r#"SELECT orderh.ref AS ref, orderh.custcode AS custcode, orderi.quantity AS quantity FROM orderh LEFT JOIN orderi ON orderh.ref = orderi.ref"#
         );
     }
 }

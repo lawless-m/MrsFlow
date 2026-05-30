@@ -71,13 +71,26 @@ pub trait Dialect {
     fn render_select(&self, parts: &SelectParts) -> String;
 }
 
-/// The DBISAM dialect: double-quoted identifiers, `TOP n`, no `OFFSET`, and a
-/// deliberately small scalar-function allow-list.
+/// The DBISAM dialect: bare/double-quoted identifiers (per the DBISAM DCG),
+/// quoted-string date literals, a trailing `TOP n`, no `OFFSET`, and a
+/// deliberately small scalar-function allow-list. Syntax verified live against
+/// Exportmaster.
 pub struct Dbisam;
 
 impl Dialect for Dbisam {
     fn quote_ident(&self, name: &str) -> String {
-        format!("\"{}\"", name.replace('"', "\"\""))
+        // Matches the DBISAM DCG's `gen_ident_atom`: simple identifiers go bare,
+        // names needing quoting use double-quotes (doubling embedded `"`). Both
+        // forms verified valid live. (An earlier square-bracket attempt came
+        // from a probe whose unescaped quotes broke the M string, not DBISAM.)
+        let bare = !name.is_empty()
+            && name.chars().next().is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
+            && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_');
+        if bare {
+            name.to_string()
+        } else {
+            format!("\"{}\"", name.replace('"', "\"\""))
+        }
     }
 
     fn text_literal(&self, s: &str) -> String {
@@ -89,12 +102,13 @@ impl Dialect for Dbisam {
     }
 
     fn date_literal(&self, d: &chrono::NaiveDate) -> String {
-        // DBISAM date-literal syntax: #YYYY-MM-DD#.
-        format!("#{}#", d.format("%Y-%m-%d"))
+        // DBISAM has no `#…#` or ANSI `DATE '…'` literal; a quoted string
+        // implicitly casts to DATE in a comparison. Verified live.
+        format!("'{}'", d.format("%Y-%m-%d"))
     }
 
     fn datetime_literal(&self, dt: &chrono::NaiveDateTime) -> String {
-        format!("#{}#", dt.format("%Y-%m-%d %H:%M:%S"))
+        format!("'{}'", dt.format("%Y-%m-%d %H:%M:%S"))
     }
 
     fn supports_offset(&self) -> bool {
@@ -729,14 +743,14 @@ mod tests {
 
     #[test]
     fn plain_scan() {
-        assert_eq!(sql("t"), r#"SELECT * FROM "t""#);
+        assert_eq!(sql("t"), r#"SELECT * FROM t"#);
     }
 
     #[test]
     fn filter_to_where() {
         assert_eq!(
             sql(r#"Table.SelectRows(t, each [Country] = "GB")"#),
-            r#"SELECT * FROM "t" WHERE "Country" = 'GB'"#
+            r#"SELECT * FROM t WHERE Country = 'GB'"#
         );
     }
 
@@ -744,7 +758,7 @@ mod tests {
     fn conjunction_to_where() {
         assert_eq!(
             sql(r#"Table.SelectRows(t, each [a] = 1 and [b] > 2)"#),
-            r#"SELECT * FROM "t" WHERE ("a" = 1 AND "b" > 2)"#
+            r#"SELECT * FROM t WHERE (a = 1 AND b > 2)"#
         );
     }
 
@@ -752,11 +766,11 @@ mod tests {
     fn null_comparison_becomes_is_null() {
         assert_eq!(
             sql(r#"Table.SelectRows(t, each [x] = null)"#),
-            r#"SELECT * FROM "t" WHERE "x" IS NULL"#
+            r#"SELECT * FROM t WHERE x IS NULL"#
         );
         assert_eq!(
             sql(r#"Table.SelectRows(t, each [x] <> null)"#),
-            r#"SELECT * FROM "t" WHERE "x" IS NOT NULL"#
+            r#"SELECT * FROM t WHERE x IS NOT NULL"#
         );
     }
 
@@ -764,7 +778,7 @@ mod tests {
     fn group_by_with_aggregates() {
         assert_eq!(
             sql(r#"Table.Group(t, {"Region"}, {{"Total", each List.Sum([Amount])}, {"N", each Table.RowCount(_)}})"#),
-            r#"SELECT "Region", SUM("Amount") AS "Total", COUNT(*) AS "N" FROM "t" GROUP BY "Region""#
+            r#"SELECT Region, SUM(Amount) AS Total, COUNT(*) AS N FROM t GROUP BY Region"#
         );
     }
 
@@ -772,7 +786,7 @@ mod tests {
     fn select_columns_projection() {
         assert_eq!(
             sql(r#"Table.SelectColumns(t, {"a", "b"})"#),
-            r#"SELECT "a", "b" FROM "t""#
+            r#"SELECT a, b FROM t"#
         );
     }
 
@@ -780,7 +794,7 @@ mod tests {
     fn add_column_projection() {
         assert_eq!(
             sql(r#"Table.AddColumn(t, "double", each [a] * 2)"#),
-            r#"SELECT *, ("a" * 2) AS "double" FROM "t""#
+            r#"SELECT *, (a * 2) AS double FROM t"#
         );
     }
 
@@ -788,20 +802,20 @@ mod tests {
     fn sort_and_top() {
         assert_eq!(
             sql(r#"Table.FirstN(Table.Sort(t, {{"a", Order.Descending}}), 3)"#),
-            r#"SELECT * FROM "t" ORDER BY "a" DESC TOP 3"#
+            r#"SELECT * FROM t ORDER BY a DESC TOP 3"#
         );
     }
 
     #[test]
     fn distinct_whole_row() {
-        assert_eq!(sql("Table.Distinct(t)"), r#"SELECT DISTINCT * FROM "t""#);
+        assert_eq!(sql("Table.Distinct(t)"), r#"SELECT DISTINCT * FROM t"#);
     }
 
     #[test]
     fn scalar_function_allow_list() {
         assert_eq!(
             sql(r#"Table.SelectRows(t, each Text.Upper([name]) = "X")"#),
-            r#"SELECT * FROM "t" WHERE UPPER("name") = 'X'"#
+            r#"SELECT * FROM t WHERE UPPER(name) = 'X'"#
         );
     }
 
@@ -812,7 +826,7 @@ mod tests {
         // shape.
         assert_eq!(
             sql(r#"Table.FirstN(Table.Sort(Table.SelectRows(t, each [a] > 5), "a"), 10)"#),
-            r#"SELECT * FROM "t" WHERE "a" > 5 ORDER BY "a" ASC TOP 10"#
+            r#"SELECT * FROM t WHERE a > 5 ORDER BY a ASC TOP 10"#
         );
     }
 
@@ -842,7 +856,7 @@ mod tests {
     fn inner_join_emits() {
         assert_eq!(
             sql(r#"Table.NestedJoin(a, {"k"}, b, {"k"}, "n", JoinKind.Inner)"#),
-            r#"SELECT * FROM "a" JOIN "b" ON "a"."k" = "b"."k""#
+            r#"SELECT * FROM a JOIN b ON a.k = b.k"#
         );
     }
 
@@ -850,7 +864,7 @@ mod tests {
     fn left_outer_join_emits() {
         assert_eq!(
             sql(r#"Table.NestedJoin(a, {"k"}, b, {"k"}, "n", JoinKind.LeftOuter)"#),
-            r#"SELECT * FROM "a" LEFT JOIN "b" ON "a"."k" = "b"."k""#
+            r#"SELECT * FROM a LEFT JOIN b ON a.k = b.k"#
         );
     }
 
@@ -886,7 +900,7 @@ mod tests {
         };
         assert_eq!(
             emit(&plan, &Dbisam).expect("foldable"),
-            r#"SELECT "Analysis"."SAPRODUCT" AS "SAPRODUCT", "PRODGRP"."Desc" AS "Desc" FROM "Analysis" LEFT JOIN "PRODGRP" ON "Analysis"."key" = "PRODGRP"."Sub Sub Category""#
+            r#"SELECT Analysis.SAPRODUCT AS SAPRODUCT, PRODGRP.Desc AS Desc FROM Analysis LEFT JOIN PRODGRP ON Analysis.key = PRODGRP."Sub Sub Category""#
         );
     }
 
@@ -923,7 +937,7 @@ mod tests {
         };
         assert_eq!(
             emit(&plan, &Dbisam).expect("foldable"),
-            r#"SELECT "orderh"."ref", "orderh"."custcode", SUM("orderi"."quantity") AS "qty" FROM "orderh" LEFT JOIN "orderi" ON "orderh"."ref" = "orderi"."ref" GROUP BY "orderh"."ref", "orderh"."custcode""#
+            r#"SELECT orderh.ref, orderh.custcode, SUM(orderi.quantity) AS qty FROM orderh LEFT JOIN orderi ON orderh.ref = orderi.ref GROUP BY orderh.ref, orderh.custcode"#
         );
     }
 
@@ -939,7 +953,7 @@ mod tests {
     fn fold_full_plan() {
         let f = fold(&rel(r#"Table.SelectRows(t, each [a] = 1)"#), &Dbisam);
         assert!(f.is_full());
-        assert_eq!(f.sql.as_deref(), Some(r#"SELECT * FROM "t" WHERE "a" = 1"#));
+        assert_eq!(f.sql.as_deref(), Some(r#"SELECT * FROM t WHERE a = 1"#));
         assert_eq!(f.residual.to_sexpr(), r#"(eval-m "$folded")"#);
     }
 
@@ -948,7 +962,7 @@ mod tests {
         // Sort above Limit cannot share one SELECT (TOP applies after ORDER BY),
         // so the limit folds and the sort runs over its rows.
         let f = fold(&rel(r#"Table.Sort(Table.FirstN(t, 5), "x")"#), &Dbisam);
-        assert_eq!(f.sql.as_deref(), Some(r#"SELECT * FROM "t" TOP 5"#));
+        assert_eq!(f.sql.as_deref(), Some(r#"SELECT * FROM t TOP 5"#));
         assert_eq!(f.residual.to_sexpr(), r#"(sort ((asc "x")) (eval-m "$folded"))"#);
     }
 
@@ -960,7 +974,7 @@ mod tests {
             &rel(r#"Table.Pivot(Table.SelectRows(t, each [a] = 1), {"x"}, "b", "c")"#),
             &Dbisam,
         );
-        assert_eq!(f.sql.as_deref(), Some(r#"SELECT * FROM "t" WHERE "a" = 1"#));
+        assert_eq!(f.sql.as_deref(), Some(r#"SELECT * FROM t WHERE a = 1"#));
         assert_eq!(
             f.residual.to_sexpr(),
             r#"(eval-m "Table.Pivot" (eval-m "$folded"))"#

@@ -2463,7 +2463,7 @@ mod odbc_sql_tests {
         let sql = state.render_sql();
         assert_eq!(
             sql,
-            r#"SELECT "id", "name", "price" FROM "customers" WHERE "id" >= #2024-01-15# AND "id" = TRUE"#
+            r#"SELECT id, name, price FROM customers WHERE id >= '2024-01-15' AND id = TRUE"#
         );
     }
 
