@@ -65,7 +65,7 @@ pub fn drive_cursor(
     target_rows: usize,
     batch_size: u32,
     compression: bool,
-    mut on_row: impl FnMut(&[u8]) -> Result<(), IoError>,
+    mut on_row: impl FnMut(&[u8], &[u8]) -> Result<(), IoError>,
 ) -> Result<usize, IoError> {
     use super::response::{
         body_reqcode, read_batch, read_record_block_batch, PACK_STREAM_OFFSET,
@@ -94,7 +94,7 @@ pub fn drive_cursor(
     let mut process_body = |body: &[u8],
                             kind: &ReplyKind,
                             rows_seen: &mut usize,
-                            on_row: &mut dyn FnMut(&[u8]) -> Result<(), IoError>|
+                            on_row: &mut dyn FnMut(&[u8], &[u8]) -> Result<(), IoError>|
      -> Result<bool, IoError> {
         if body.len() < PACK_STREAM_OFFSET + 6 || body_reqcode(body) == REQCODE_POLLING_SENTINEL {
             return Ok(false);
@@ -109,11 +109,16 @@ pub fn drive_cursor(
                 Ok(Some(b)) => b,
                 Ok(None) | Err(_) => return Ok(false),
             };
-            for row in &batch.rows {
+            for (i, row) in batch.rows.iter().enumerate() {
                 if *rows_seen >= target_rows {
                     return Ok(true);
                 }
-                on_row(row)?;
+                // Bookmarks are only populated by the batched RecordBlock
+                // path; the single-row path leaves `bookmarks` empty.
+                // Callers that don't need bookmarks just ignore the
+                // second arg.
+                let bookmark: &[u8] = batch.bookmarks.get(i).copied().unwrap_or(&[]);
+                on_row(row, bookmark)?;
                 *rows_seen += 1;
             }
             if batch.result_code != RESULT_OK {

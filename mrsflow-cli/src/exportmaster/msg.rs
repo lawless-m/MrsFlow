@@ -28,6 +28,7 @@ pub mod reqcode {
 
     pub const OPEN_BLOB: u16 = 0x0280;
     pub const FREE_BLOB: u16 = 0x028A;
+    pub const FREE_ALL_BLOBS: u16 = 0x0294;
 
     pub const RECEIVE: u16 = 0x030C;
     pub const DATA_DIR_CTOR: u16 = 0x0316;
@@ -298,6 +299,76 @@ pub fn build_set_to_bookmark(cursor_handle: u32, bookmark: &[u8], flag1: u8, fla
     m.finish()
 }
 
+/// `TDataCursor.OpenBlob` (reqcode 0x0280). Fetches the full blob/memo
+/// payload for one (cursor, field, row-bookmark) tuple in one round-trip.
+///
+/// Wire format derived from disassembling `TDataCursor.OpenBlob`
+/// (RVA 0x0ADFAC) and `TServerThread.DoOpenBlob` (RVA 0x04ED60) in
+/// `dbisamr439delphi7.bpl` — see `DBISAM-PROTOCOL.md` §6a.
+///
+/// `slot` is the row's physical-record bookmark: 16-byte MD5
+/// (= record bytes [9..24]) + `0x01` null-flag + length-prefixed PK
+/// + zero padding to the cursor's slot_length (cursor.@+0x3672,
+/// observed 56 for short string PKs). Build via
+/// [`super::blob::build_slot`].
+///
+/// `force_reread` forces the server to re-read instead of returning a
+/// cached buffer. `is_physical` selects the GetPhysicalField vs
+/// GetField path. The third trailing byte the official client sends is
+/// vestigial (the server reads only 5 Unpacks but tolerates the 6th
+/// being present); we send `0` to match the official client byte-for-byte.
+pub fn build_open_blob(
+    cursor_handle: u32,
+    field_ord: u16,
+    slot: &[u8],
+    force_reread: u8,
+    is_physical: u8,
+) -> Vec<u8> {
+    let mut m = MsgBuilder::new(reqcode::OPEN_BLOB);
+    m.pack_u32(cursor_handle);
+    m.pack(&field_ord.to_le_bytes());
+    m.pack(slot);
+    m.pack_u8(force_reread);
+    m.pack_u8(is_physical);
+    m.pack_u8(0);
+    m.finish()
+}
+
+/// `TDataCursor.FreeBlob` (reqcode 0x028A). Releases the server-side
+/// blob buffer after the client is done reading. Body shape from
+/// `TServerThread.DoFreeBlob` (RVA 0x04EEF0): 4 Pack units
+/// (cursor_handle, field_ord, slot, 1-byte flag). Response is an empty
+/// BeginPack/EndPack ack.
+///
+/// Calling this is optional in practice — DBISAM frees orphaned blob
+/// buffers when the cursor closes — but the official client always
+/// sends it after each read.
+pub fn build_free_blob(cursor_handle: u32, field_ord: u16, slot: &[u8], flag: u8) -> Vec<u8> {
+    let mut m = MsgBuilder::new(reqcode::FREE_BLOB);
+    m.pack_u32(cursor_handle);
+    m.pack(&field_ord.to_le_bytes());
+    m.pack(slot);
+    m.pack_u8(flag);
+    m.finish()
+}
+
+/// `TDataCursor.FreeAllBlobs` (reqcode 0x0294). Bulk-evicts every blob
+/// buffer currently held in the cursor's blob cache. Required during
+/// bulk extraction: per-cursor blob-buffer cache is capacity-bounded
+/// (~640 entries observed empirically), and `FreeBlob` only
+/// decrements use-count without forcing eviction. Without periodic
+/// `FreeAllBlobs` calls, the cache fills up and subsequent `OpenBlob`
+/// responses come back as `0x2303` errors.
+///
+/// Body shape from `TServerThread.DoFreeAllBlobs` (RVA 0x04EFEC):
+/// `<u32 cursor_handle><u8 flag>` — response is empty ACK.
+pub fn build_free_all_blobs(cursor_handle: u32, flag: u8) -> Vec<u8> {
+    let mut m = MsgBuilder::new(reqcode::FREE_ALL_BLOBS);
+    m.pack_u32(cursor_handle);
+    m.pack_u8(flag);
+    m.finish()
+}
+
 /// `TDataCursor.ReadFirstRecordBlock` (reqcode 0x050A). Batched
 /// "position-at-start + read N records" — one round-trip returns up to
 /// `max_records` rows. Body layout (best-guess pending disassembly):
@@ -389,6 +460,58 @@ mod tests {
         // No body — only flag + reqcode + inner_len(=0). 7 bytes total.
         let body = build_remove_all_remote_memory_tables();
         assert_eq!(body, vec![0x00, 0x29, 0x00, 0x00, 0x00, 0x00, 0x00]);
+    }
+
+    #[test]
+    fn open_blob_layout_matches_disassembly() {
+        // Cursor handle 1, field ord 9, 56-byte slot (typical ex3win blob
+        // fetch from §6a).
+        let slot = vec![0xAAu8; 56];
+        let body = build_open_blob(1, 9, &slot, 0, 0);
+        assert_eq!(body[0], 0x00);
+        assert_eq!(&body[1..3], &[0x80, 0x02]); // 0x0280 LE
+        // Inner body = 6 Pack units:
+        //   <u32 4><u32 1>           cursor handle      = 8
+        //   <u32 2><u16 9>           field ord          = 6
+        //   <u32 56><56 bytes>       slot               = 60
+        //   <u32 1><u8 0>            force_reread       = 5
+        //   <u32 1><u8 0>            is_physical        = 5
+        //   <u32 1><u8 0>            vestigial          = 5
+        //                            ------------------ = 89
+        assert_eq!(u32::from_le_bytes([body[3], body[4], body[5], body[6]]), 89);
+        // First Pack unit: 4-byte cursor handle = 1
+        assert_eq!(&body[7..11], &[0x04, 0x00, 0x00, 0x00]);
+        assert_eq!(&body[11..15], &[0x01, 0x00, 0x00, 0x00]);
+        // Second Pack unit: 2-byte field_ord = 9
+        assert_eq!(&body[15..19], &[0x02, 0x00, 0x00, 0x00]);
+        assert_eq!(&body[19..21], &[0x09, 0x00]);
+        // Third Pack unit: 56-byte slot
+        assert_eq!(&body[21..25], &[0x38, 0x00, 0x00, 0x00]);
+        assert_eq!(&body[25..81], &slot[..]);
+        // Three trailing byte-flag units, each <u32 1><u8>.
+        assert_eq!(&body[81..85], &[0x01, 0x00, 0x00, 0x00]);
+        assert_eq!(body[85], 0x00);
+        assert_eq!(&body[86..90], &[0x01, 0x00, 0x00, 0x00]);
+        assert_eq!(body[90], 0x00);
+        assert_eq!(&body[91..95], &[0x01, 0x00, 0x00, 0x00]);
+        assert_eq!(body[95], 0x00);
+        assert_eq!(body.len(), 96); // 7-byte header + 89-byte inner
+    }
+
+    #[test]
+    fn free_blob_layout_matches_disassembly() {
+        let slot = vec![0xCDu8; 56];
+        let body = build_free_blob(1, 9, &slot, 0);
+        assert_eq!(body[0], 0x00);
+        assert_eq!(&body[1..3], &[0x8A, 0x02]); // 0x028A LE
+        // Inner body = 4 Pack units:
+        //   <u32 4><u32 1>           cursor handle      = 8
+        //   <u32 2><u16 9>           field ord          = 6
+        //   <u32 56><56 bytes>       slot               = 60
+        //   <u32 1><u8 0>            flag               = 5
+        //                            ------------------ = 79
+        assert_eq!(u32::from_le_bytes([body[3], body[4], body[5], body[6]]), 79);
+        assert_eq!(body.len(), 7 + 79);
     }
 
     #[test]

@@ -388,6 +388,41 @@ impl<'a> ColumnBuilders<'a> {
         Ok(())
     }
 
+    /// Overwrite a single Binary-column cell after the row was originally
+    /// pushed with a placeholder (`None`). The blob resolver uses this:
+    /// rows go in with `None` for blob columns during the streaming cursor
+    /// callback, then the resolver fetches payloads via 0x0280 and writes
+    /// them back into the right `(col_idx, row_idx)` slot.
+    ///
+    /// Errors if `col_idx` is out of bounds or doesn't refer to a Binary
+    /// column, or if `row_idx` is past the rows pushed so far.
+    pub fn overwrite_binary_cell(
+        &mut self,
+        col_idx: usize,
+        row_idx: usize,
+        bytes: Option<Vec<u8>>,
+    ) -> Result<(), IoError> {
+        let total = self.inner.len();
+        let b = self.inner.get_mut(col_idx).ok_or_else(|| {
+            IoError::Other(format!(
+                "Exportmaster: blob resolver col_idx {col_idx} out of bounds (have {total} columns)"
+            ))
+        })?;
+        let ColumnBuilder::Binary(v) = b else {
+            return Err(IoError::Other(format!(
+                "Exportmaster: blob resolver col_idx {col_idx} is not a Binary column"
+            )));
+        };
+        let rows = v.len();
+        let cell = v.get_mut(row_idx).ok_or_else(|| {
+            IoError::Other(format!(
+                "Exportmaster: blob resolver row_idx {row_idx} out of bounds for col {col_idx} (have {rows} rows)"
+            ))
+        })?;
+        *cell = bytes;
+        Ok(())
+    }
+
     pub fn finish(self) -> Result<RecordBatch, IoError> {
         let mut fields = Vec::with_capacity(self.inner.len());
         let mut arrays = Vec::with_capacity(self.inner.len());
@@ -399,5 +434,76 @@ impl<'a> ColumnBuilders<'a> {
         let schema = Arc::new(Schema::new(fields));
         RecordBatch::try_new(schema, arrays)
             .map_err(|e| IoError::Other(format!("Exportmaster: RecordBatch::try_new: {e}")))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::exportmaster::schema::Column;
+
+    fn col(ord: u16, name: &str, ft: FieldType, max: u8, row_offset: u16) -> Column {
+        Column {
+            ord,
+            name: name.to_string(),
+            field_type: ft,
+            decl: max,
+            max,
+            row_offset,
+        }
+    }
+
+    #[test]
+    fn overwrite_binary_cell_replaces_placeholder() {
+        // Two rows, two columns: PK (String) + memo (Memo). Push each
+        // row with the memo cell as Null (the placeholder the blob
+        // resolver writes during the cursor callback), then overwrite
+        // those slots with resolved payloads.
+        let columns = vec![
+            col(1, "CODE", FieldType::String, 14, 25),
+            col(2, "LONGDESC", FieldType::Memo, 8, 40),
+        ];
+        let mut b = ColumnBuilders::new(&columns, 2);
+        b.push_row(vec![CellValue::Text("AAA".into()), CellValue::Null]).unwrap();
+        b.push_row(vec![CellValue::Text("BBB".into()), CellValue::Null]).unwrap();
+
+        b.overwrite_binary_cell(1, 0, Some(b"first blob".to_vec())).unwrap();
+        b.overwrite_binary_cell(1, 1, Some(b"second blob".to_vec())).unwrap();
+
+        let batch = b.finish().unwrap();
+        let memo = batch.column(1).as_any().downcast_ref::<arrow::array::BinaryArray>().unwrap();
+        assert_eq!(memo.value(0), b"first blob");
+        assert_eq!(memo.value(1), b"second blob");
+    }
+
+    #[test]
+    fn overwrite_binary_cell_errors_on_wrong_column_type() {
+        let columns = vec![col(1, "CODE", FieldType::String, 14, 25)];
+        let mut b = ColumnBuilders::new(&columns, 1);
+        b.push_row(vec![CellValue::Text("AAA".into())]).unwrap();
+        // Column 0 is String, not Binary — overwrite must reject.
+        assert!(b.overwrite_binary_cell(0, 0, Some(vec![0xFF])).is_err());
+    }
+
+    #[test]
+    fn overwrite_binary_cell_errors_on_out_of_bounds() {
+        let columns = vec![col(1, "DESC", FieldType::Memo, 8, 25)];
+        let mut b = ColumnBuilders::new(&columns, 1);
+        b.push_row(vec![CellValue::Null]).unwrap();
+        assert!(b.overwrite_binary_cell(0, 99, Some(vec![1])).is_err()); // row OOB
+        assert!(b.overwrite_binary_cell(99, 0, Some(vec![1])).is_err()); // col OOB
+    }
+
+    #[test]
+    fn overwrite_binary_cell_can_clear_to_null() {
+        // Passing None overwrites the cell with NULL (used when the
+        // server reports a zero handle = empty/absent blob).
+        let columns = vec![col(1, "DESC", FieldType::Memo, 8, 25)];
+        let mut b = ColumnBuilders::new(&columns, 1);
+        b.push_row(vec![CellValue::Binary(vec![1, 2, 3])]).unwrap();
+        b.overwrite_binary_cell(0, 0, None).unwrap();
+        let batch = b.finish().unwrap();
+        let memo = batch.column(0).as_any().downcast_ref::<arrow::array::BinaryArray>().unwrap();
+        assert!(memo.is_null(0));
     }
 }

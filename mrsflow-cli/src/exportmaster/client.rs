@@ -13,12 +13,13 @@ use mrsflow_core::eval::{IoError, Value};
 
 use mrsflow_core::eval::Table;
 
+use super::blob;
 use super::crypto::encrypt_login;
 use super::framing;
 use super::ConnOpts;
 use super::cursor::drive_cursor;
-use super::row::{decode_record, ColumnBuilders};
-use super::schema::parse as parse_schema;
+use super::row::{decode_record, CellValue, ColumnBuilders};
+use super::schema::{parse as parse_schema, FieldType};
 
 /// Fixed session-setup messages sent immediately after a successful
 /// login. C[2] and C[3] are replayed verbatim from capture; their
@@ -81,6 +82,8 @@ pub struct Client {
     /// Batch size for ReadFirstRecordBlock / ReadNextRecordBlock,
     /// forwarded to `drive_cursor`.
     pub(super) batch_size: u32,
+    /// Blob fetch slot_length (cursor.@+0x3672 — see ConnOpts).
+    pub(super) blob_slot_length: usize,
 }
 
 impl Client {
@@ -131,6 +134,7 @@ impl Client {
             stream,
             compression: opts.compression,
             batch_size: opts.batch_size,
+            blob_slot_length: opts.blob_slot_length,
         })
     }
 
@@ -163,7 +167,204 @@ impl Client {
     /// rows", but the caller can cap when issuing `SELECT … TOP N` to
     /// avoid over-fetching).
     pub fn query_to_table(&mut self, sql: &str) -> Result<Value, IoError> {
-        self.query_to_table_capped(sql, usize::MAX)
+        self.query_to_table_streaming(sql, usize::MAX)
+    }
+
+    /// Stream rows via `GetNextRecord` (0x00FA) — matches the pattern ODBC
+    /// and dbsys use. The server packs multiple rows per response (each as
+    /// `<u16 result_code><10 cursor-info units><56-byte slot>`), we walk
+    /// them one by one and resolve any blob columns inline (`0x0280` +
+    /// `0x028A` per row).
+    ///
+    /// Two reasons this exists alongside [`query_to_table_capped`]:
+    ///
+    /// 1. **Scale.** `ReadFirstRecordBlock` (0x050A) materialises every
+    ///    requested row server-side at once. After a few hundred OpenBlobs
+    ///    against that materialised set, the server returns `0x2303`
+    ///    ("blob not found") for every subsequent fetch — observed at
+    ///    task 644 of a `TOP 1000` extract regardless of `FreeBlob` or
+    ///    `FreeAllBlobs` flushing. The interleaved `GetNextRecord` /
+    ///    `OpenBlob` pattern lets the server advance through (and free)
+    ///    materialised rows as we go.
+    /// 2. **Memory.** Per-batch streaming bounds memory to one
+    ///    `GetNextRecord` response's worth of rows instead of buffering
+    ///    the whole result before resolving blobs.
+    pub fn query_to_table_streaming(&mut self, sql: &str, target_rows: usize) -> Result<Value, IoError> {
+        use super::response::{PACK_STREAM_OFFSET, RESULT_END_OF_CURSOR, RESULT_NOT_READY, RESULT_OK};
+        use super::wire::Walker;
+        use super::cursor_info::CursorInfo;
+
+        let schema_resp = self.query_raw(sql)?;
+        let (columns, _end_off) = parse_schema(&schema_resp)?;
+        let compression = self.compression;
+        let first_off = columns[0].row_offset as usize;
+        let last_col = columns.last().unwrap();
+        let col_data_span = (last_col.row_offset as usize - first_off) + 1 + last_col.max as usize;
+        let col_end_offset = first_off + col_data_span;
+
+        let blob_col_indices: Vec<usize> = columns
+            .iter()
+            .enumerate()
+            .filter(|(_, c)| matches!(c.field_type, FieldType::Blob | FieldType::Memo | FieldType::Graphic))
+            .map(|(i, _)| i)
+            .collect();
+
+        // Phase 1: ExecuteStatement + Receive poll until cursor materialised.
+        let mut resp = framing::send_recv_auto(
+            &mut self.stream,
+            &super::msg::build_execute_statement(1),
+            compression,
+        )?;
+        const POLL_SENTINEL: u16 = 0x2C14;
+        let mut polls = 0;
+        const MAX_POLLS: usize = 600;
+        loop {
+            let body_rc = if resp.len() >= 3 { u16::from_le_bytes([resp[1], resp[2]]) } else { 0 };
+            let inner_rc = if resp.len() >= PACK_STREAM_OFFSET + 6 {
+                let p = PACK_STREAM_OFFSET;
+                let len = u32::from_le_bytes([resp[p], resp[p + 1], resp[p + 2], resp[p + 3]]);
+                if len == 2 {
+                    u16::from_le_bytes([resp[p + 4], resp[p + 5]])
+                } else {
+                    0
+                }
+            } else {
+                0
+            };
+            if body_rc != POLL_SENTINEL && inner_rc != RESULT_NOT_READY {
+                break;
+            }
+            if polls >= MAX_POLLS {
+                return Err(IoError::Other(format!(
+                    "Exportmaster: cursor still 'not ready' after {polls} Receive polls"
+                )));
+            }
+            resp = framing::send_recv_auto(
+                &mut self.stream,
+                &super::msg::build_receive(),
+                compression,
+            )?;
+            polls += 1;
+        }
+
+        // Phase 2: SetToBegin. The response carries the FIRST row's
+        // bookmark — the seed for the GetNextRecord loop. Extract it
+        // by walking the cursor-info units (bookmark is the 8th unit).
+        let setbegin_resp = framing::send_recv_auto(
+            &mut self.stream,
+            &super::msg::build_set_to_begin(1),
+            compression,
+        )?;
+        // SetToBegin's response — unlike GetNextRecord — does NOT carry
+        // a leading result-code unit; the 10 cursor-info units start
+        // directly at PACK_STREAM_OFFSET.
+        let starting_bookmark = {
+            let mut w = Walker::new(&setbegin_resp, PACK_STREAM_OFFSET);
+            let ci = CursorInfo::read(&mut w)?;
+            ci.bookmark
+        };
+
+        // Phase 3: GetNextRecord loop.
+        let mut builders = ColumnBuilders::new(&columns, target_rows.min(1024));
+        let mut next_bookmark = starting_bookmark;
+        let mut rows_seen: usize = 0;
+        let request_batch = self.batch_size.min(50).max(1); // ODBC uses ~50
+
+        'outer: loop {
+            if rows_seen >= target_rows {
+                break;
+            }
+            let body = super::msg::build_get_next_record(1, &next_bookmark, request_batch);
+            let resp = framing::send_recv_auto(&mut self.stream, &body, compression)?;
+            let mut walker = Walker::new(&resp, PACK_STREAM_OFFSET);
+            let mut got_eoc = false;
+            let mut rows_in_batch = 0usize;
+
+            loop {
+                let rc_unit = match walker.next_unit() {
+                    Ok(Some(u)) => u,
+                    _ => break,
+                };
+                if rc_unit.len() != 2 {
+                    break;
+                }
+                let result_code = u16::from_le_bytes([rc_unit[0], rc_unit[1]]);
+                if result_code == RESULT_END_OF_CURSOR {
+                    got_eoc = true;
+                    break;
+                }
+                if result_code != RESULT_OK {
+                    break;
+                }
+                let cursor_info = match CursorInfo::read(&mut walker) {
+                    Ok(ci) => ci,
+                    Err(_) => break,
+                };
+                let slot = match walker.next_unit() {
+                    Ok(Some(u)) => u.to_vec(),
+                    _ => break,
+                };
+                if slot.len() < col_end_offset {
+                    break;
+                }
+
+                // Decode columns from slot[first_off..col_end_offset].
+                let cells_raw = decode_record(&slot[first_off..col_end_offset], &columns)?;
+
+                // For blob columns: OpenBlob + FreeBlob inline using
+                // the slot as-is (it's already exactly what the server
+                // expects for this row).
+                let mut cells: Vec<CellValue> = Vec::with_capacity(cells_raw.len());
+                for (ci, cell) in cells_raw.into_iter().enumerate() {
+                    if blob_col_indices.contains(&ci) {
+                        if let CellValue::BlobHandle(h) = cell {
+                            if h == [0u8; 8] {
+                                cells.push(CellValue::Null);
+                            } else {
+                                let outcome = blob::fetch_blob(self, 1, (ci as u16) + 1, &slot)?;
+                                let free_body = super::msg::build_free_blob(
+                                    1,
+                                    (ci as u16) + 1,
+                                    &outcome.slot_echo,
+                                    0,
+                                );
+                                let _ = framing::send_recv_auto(
+                                    &mut self.stream,
+                                    &free_body,
+                                    compression,
+                                )?;
+                                cells.push(CellValue::Binary(outcome.payload));
+                            }
+                            continue;
+                        }
+                    }
+                    cells.push(cell);
+                }
+
+                builders.push_row(cells)?;
+                next_bookmark = cursor_info.bookmark;
+                rows_seen += 1;
+                rows_in_batch += 1;
+                if rows_seen >= target_rows {
+                    break 'outer;
+                }
+            }
+
+            if got_eoc || rows_in_batch == 0 {
+                break;
+            }
+        }
+
+        // Cleanup — same teardown sequence as the legacy path.
+        let close_body = super::msg::build_close_cursor(1);
+        let _ = framing::send_recv_auto(&mut self.stream, &close_body, compression);
+        let reset_body = super::msg::build_reset_statement(1);
+        let _ = framing::send_recv_auto(&mut self.stream, &reset_body, compression);
+        let release_body = super::msg::build_remove_all_remote_memory_tables();
+        let _ = framing::send_recv_auto(&mut self.stream, &release_body, compression);
+
+        let batch = builders.finish()?;
+        Ok(Value::Table(Table::from_arrow(batch)))
     }
 
     pub fn query_to_table_capped(&mut self, sql: &str, target_rows: usize) -> Result<Value, IoError> {
@@ -174,6 +375,46 @@ impl Client {
         let col_data_span = (last_col.row_offset as usize - first_off) + 1 + last_col.max as usize;
         let batch_size = self.batch_size;
         let compression = self.compression;
+        let blob_slot_length = self.blob_slot_length;
+
+        // Pre-compute which columns are blob/memo/graphic — for each
+        // such column, every non-zero handle we see during the row
+        // scan generates a deferred 0x0280 fetch that runs after the
+        // cursor loop finishes (the cursor stays open until CloseCursor
+        // below, so handles remain valid).
+        let blob_col_indices: Vec<usize> = columns
+            .iter()
+            .enumerate()
+            .filter(|(_, c)| matches!(c.field_type, FieldType::Blob | FieldType::Memo | FieldType::Graphic))
+            .map(|(i, _)| i)
+            .collect();
+        let has_blobs = !blob_col_indices.is_empty();
+        if std::env::var("EM_SCHEMA_DEBUG").is_ok() {
+            for (i, c) in columns.iter().enumerate() {
+                eprintln!(
+                    "[em-schema] col[{i}] name={} type={:?} decl={} max={} row_offset={}",
+                    c.name, c.field_type, c.decl, c.max, c.row_offset
+                );
+            }
+        }
+
+        // Deferred blob fetches captured during the row callback. The
+        // slot is the per-row bookmark the server sent alongside the
+        // row — already in exactly the wire format 0x0280 expects —
+        // so we hold it verbatim instead of reconstructing it from
+        // MD5+PK (the §6a "build a slot from components" path is left
+        // in `blob::build_slot` for tests but isn't used here; the
+        // physical-record bookmark has 9 bytes of cursor-state prefix
+        // and a trailing position field that can't be derived from row
+        // data alone).
+        struct BlobTask {
+            row_idx: usize,
+            col_idx: usize,
+            md5: [u8; 16],
+            pk_field: Vec<u8>,
+            phys: u32,
+        }
+        let mut blob_tasks: Vec<BlobTask> = Vec::new();
 
         // Decode rows straight into the column builders as they
         // arrive — no per-row `Vec<u8>` allocation. The callback
@@ -181,15 +422,160 @@ impl Client {
         let mut builders = ColumnBuilders::new(&columns, target_rows.min(1024));
         let col_end_offset = first_off + col_data_span;
         let columns_ref = &columns;
+        let blob_indices_ref = &blob_col_indices;
+        let mut row_counter: usize = 0;
+        let pk_field_width = if has_blobs { columns[0].max as usize } else { 0 };
         drive_cursor(self.stream_mut(), &columns, target_rows, batch_size, compression,
-            |row: &[u8]| {
+            |row: &[u8], bookmark: &[u8]| {
                 if col_end_offset > row.len() {
                     return Ok(());
                 }
-                let cells = decode_record(&row[first_off..col_end_offset], columns_ref)?;
+                let mut cells = decode_record(&row[first_off..col_end_offset], columns_ref)?;
+
+                // For blob columns: capture MD5 (row [9..25]), PK
+                // column bytes (row [first_off+1 ..]), and the
+                // PhysicalRecordNumber (extracted from the cursor's
+                // per-row bookmark). The actual 56-byte slot is built
+                // in the resolve loop where we know the final
+                // slot_length (in case it differs from 56 — e.g. a
+                // WHERE-filtered cursor returns a 72-byte slot).
+                // Replace BlobHandle cells with Null so push_row writes
+                // a None placeholder; the resolver overwrites it after
+                // drive_cursor returns.
+                if has_blobs {
+                    if std::env::var("EM_ROW_DEBUG").is_ok() && (660..720).contains(&row_counter) {
+                        eprintln!("[em-row] row={} ({} bytes): {}", row_counter, row.len(),
+                            row.iter().take(80).map(|b| format!("{b:02x}")).collect::<String>());
+                    }
+                    for &ci in blob_indices_ref {
+                        if let CellValue::BlobHandle(h) = cells[ci] {
+                            if h != [0u8; 8] {
+                                if row.len() < 25 || row.len() < first_off + 1 + pk_field_width {
+                                    return Err(IoError::Other(format!(
+                                        "Exportmaster: row too short for blob slot ({} bytes)",
+                                        row.len()
+                                    )));
+                                }
+                                let mut md5 = [0u8; 16];
+                                md5.copy_from_slice(&row[9..25]);
+                                let mut pk_field = vec![0u8; pk_field_width];
+                                pk_field.copy_from_slice(&row[first_off + 1..first_off + 1 + pk_field_width]);
+                                let phys = blob::physical_record_number_from_bookmark(bookmark);
+                                blob_tasks.push(BlobTask {
+                                    row_idx: row_counter,
+                                    col_idx: ci,
+                                    md5,
+                                    pk_field,
+                                    phys,
+                                });
+                            }
+                            cells[ci] = CellValue::Null;
+                        }
+                    }
+                }
+
                 builders.push_row(cells)?;
+                row_counter += 1;
                 Ok(())
             })?;
+
+        // Resolve deferred blob fetches while the cursor is still open.
+        // One 0x0280 round-trip per non-null handle. Field ordinals are
+        // 1-based on the wire (col_idx is 0-based). The bookmark we
+        // collected during the row pass IS the slot the server expects
+        // — no length-detect logic needed; the server is the source of
+        // truth for the slot's wire bytes.
+        let blob_debug = std::env::var("EM_BLOB_DEBUG").is_ok();
+        let mut effective_slot_length = blob_slot_length;
+        // Periodically bulk-evict the server-side blob buffer cache.
+        // The cache is capacity-bounded (~640 entries observed); without
+        // periodic FreeAllBlobs (0x0294) the cache fills and subsequent
+        // OpenBlob responses come back as 0x2303 errors. Cap below the
+        // observed limit by a wide margin.
+        const FLUSH_EVERY: usize = 50;
+        for (task_idx, task) in blob_tasks.iter().enumerate() {
+            if task_idx > 0 && task_idx % FLUSH_EVERY == 0 {
+                let flush_body = super::msg::build_free_all_blobs(1, 0);
+                let _ = framing::send_recv_auto(self.stream_mut(), &flush_body, compression)?;
+                if blob_debug {
+                    eprintln!("[em-blob] FreeAllBlobs flush at task {}", task_idx);
+                }
+            }
+            if task_idx > 620 && task_idx < 660 {
+                let pk_str = std::str::from_utf8(&task.pk_field).map(|s| s.trim_end_matches('\0').to_string()).unwrap_or_else(|_| "<nu>".into());
+                let md5_hex: String = task.md5.iter().map(|b| format!("{b:02x}")).collect();
+                eprintln!("[em-blob] task={} row={} phys={} pk={:?} md5={}",
+                    task_idx, task.row_idx, task.phys, pk_str, md5_hex);
+            }
+            let mut slot = blob::build_slot(task.phys, &task.md5, &task.pk_field, effective_slot_length)?;
+            if blob_debug {
+                eprintln!(
+                    "[em-blob] row={} col={} phys={} slot_len={}",
+                    task.row_idx, task.col_idx, task.phys, effective_slot_length
+                );
+            }
+            let mut outcome = match blob::fetch_blob(
+                self,
+                1, // CURSOR_HANDLE in cursor.rs
+                (task.col_idx as u16) + 1,
+                &slot,
+            ) {
+                Ok(o) => o,
+                Err(e) => {
+                    eprintln!("[em-blob] FAIL task={} row={} phys={} pk={:?}: {:?}",
+                        task_idx, task.row_idx, task.phys,
+                        std::str::from_utf8(&task.pk_field).map(|s| s.trim_end_matches('\0').to_string()).unwrap_or_else(|_| "<nu>".into()),
+                        e);
+                    continue;
+                }
+            };
+            if blob_debug {
+                eprintln!(
+                    "[em-blob]   -> payload={} bytes, server_slot_len={}",
+                    outcome.payload.len(), outcome.actual_slot_length
+                );
+            }
+            if outcome.actual_slot_length != effective_slot_length {
+                // Filtered/materialised cursors echo a wider slot
+                // (e.g. 72 vs 56). Rebuild at the corrected length
+                // and re-issue this task.
+                effective_slot_length = outcome.actual_slot_length;
+                slot = blob::build_slot(task.phys, &task.md5, &task.pk_field, effective_slot_length)?;
+                outcome = blob::fetch_blob(
+                    self,
+                    1,
+                    (task.col_idx as u16) + 1,
+                    &slot,
+                )?;
+                if outcome.actual_slot_length != effective_slot_length {
+                    return Err(IoError::Other(format!(
+                        "Exportmaster: blob slot_length unstable after retry ({} then {})",
+                        effective_slot_length, outcome.actual_slot_length
+                    )));
+                }
+            }
+            builders.overwrite_binary_cell(task.col_idx, task.row_idx, Some(outcome.payload))?;
+            // FreeBlob (0x028A) is REQUIRED, not optional: the server's
+            // per-cursor blob buffer cache is bounded (~256 buffers per
+            // `TDBISAMEngine.SetMaxTableBlobBufferCount`). Without
+            // FreeBlob after each OpenBlob, the cache fills up and
+            // subsequent OpenBlob responses come back malformed
+            // (empty size unit). Both dbsys.exe and the DBISAM ODBC
+            // driver always send the pair.
+            //
+            // FreeBlob must use the server's ECHOED slot, not the
+            // client's original — the server marks the cached buffer
+            // with a few modified bytes (typically `01 fe ff ff ff`
+            // where the request had `01 <u32 phys LE>`) and matches
+            // FreeBlob against those marker bytes.
+            let free_body = super::msg::build_free_blob(
+                1,
+                (task.col_idx as u16) + 1,
+                &outcome.slot_echo,
+                0,
+            );
+            let _ = framing::send_recv_auto(self.stream_mut(), &free_body, compression)?;
+        }
 
         // Release the server-side cursor + materialised temp table.
         // The full sequence DBSYS uses to clear the pin that materialised

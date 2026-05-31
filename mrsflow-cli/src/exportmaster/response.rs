@@ -62,6 +62,12 @@ pub struct CursorBatch<'a> {
     /// `record_size` bytes (header + column data). Empty if the result
     /// code wasn't OK.
     pub rows: Vec<&'a [u8]>,
+    /// Per-row bookmarks (one per row, same length as `rows`). Each is
+    /// the row's physical-record bookmark — the exact byte sequence the
+    /// server expects in the `slot` field of a 0x0280 OpenBlob request.
+    /// `bookmarks[i]` corresponds to `rows[i]`. Empty for the single-row
+    /// (`read_batch`) path; populated by `read_record_block_batch`.
+    pub bookmarks: Vec<&'a [u8]>,
 }
 
 /// Parse one cursor batch starting at `walker`'s current position.
@@ -132,6 +138,7 @@ pub fn read_batch<'a>(
         result_code,
         cursor_info,
         rows,
+        bookmarks: Vec::new(),
     }))
 }
 
@@ -172,6 +179,7 @@ pub fn read_record_block_batch<'a>(
     let cursor_info = CursorInfo::read(walker)?;
 
     let mut rows = Vec::new();
+    let mut bookmarks = Vec::new();
     // Row count: 4-byte u32 LE.
     if let Some(count_unit) = walker.next_unit()? {
         if count_unit.len() == 4 {
@@ -197,8 +205,34 @@ pub fn read_record_block_batch<'a>(
                         }
                     }
                 }
-                // Bookmark buffer: per-row bookmarks. Consume but ignore.
-                let _ = walker.next_unit()?;
+                // Per-row bookmarks buffer. Each is `cursor.@+0x3672`
+                // bytes — the slot the server expects in a 0x0280
+                // OpenBlob request for that row. Size isn't sent
+                // separately; it's `bookmark_buf.len() / row_count`.
+                // EM_BATCH_DEBUG dumps what's left after this unit so
+                // we can confirm whether the wire actually has another
+                // trailing buffer (e.g. physical-record bookmarks vs
+                // cursor bookmarks).
+                if let Some(bookmark_buf) = walker.next_unit()? {
+                    if row_count > 0 && bookmark_buf.len() % row_count == 0 {
+                        let per_row = bookmark_buf.len() / row_count;
+                        for i in 0..rows.len() {
+                            let start = i * per_row;
+                            bookmarks.push(&bookmark_buf[start..start + per_row]);
+                        }
+                    }
+                    if std::env::var("EM_BATCH_DEBUG").is_ok() {
+                        eprintln!(
+                            "[em-batch] rows={} bookmark_buf={} bytes (~{}/row)",
+                            rows.len(),
+                            bookmark_buf.len(),
+                            if row_count > 0 { bookmark_buf.len() / row_count } else { 0 }
+                        );
+                        while let Ok(Some(extra)) = walker.next_unit() {
+                            eprintln!("[em-batch]   trailing extra: {} bytes", extra.len());
+                        }
+                    }
+                }
             }
         }
     }
@@ -207,5 +241,6 @@ pub fn read_record_block_batch<'a>(
         result_code,
         cursor_info,
         rows,
+        bookmarks,
     }))
 }
