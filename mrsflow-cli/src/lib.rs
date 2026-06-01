@@ -224,7 +224,12 @@ impl IoHost for CliIoHost {
             }
         let file = File::create(path)
             .map_err(|e| IoError::Other(format!("create {path}: {e}")))?;
-        let mut writer = ArrowWriter::try_new(file, batch.schema(), None)
+        // Snappy: near-free CPU, ~4× smaller files than the default UNCOMPRESSED.
+        // Matches what CS-EM2Parquet writes; the `snap` parquet feature is on.
+        let props = parquet::file::properties::WriterProperties::builder()
+            .set_compression(parquet::basic::Compression::SNAPPY)
+            .build();
+        let mut writer = ArrowWriter::try_new(file, batch.schema(), Some(props))
             .map_err(|e| IoError::Other(format!("parquet write {path}: {e}")))?;
         writer
             .write(batch)
