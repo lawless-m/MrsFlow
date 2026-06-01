@@ -108,7 +108,12 @@ fn decode_field(col: &Column, bytes: &[u8]) -> Result<CellValue, IoError> {
             // wire — the null flag handled separately, and any trailing
             // bytes past the first 0x00 are zero-padding.
             let end = bytes.iter().position(|&b| b == 0).unwrap_or(bytes.len());
-            let s = std::string::String::from_utf8_lossy(&bytes[..end]).into_owned();
+            // DBISAM ftString is Windows-ANSI text (Windows-1252), not always
+            // valid UTF-8: storage temps carry °C, origins/descriptions carry
+            // accents and smart quotes. from_utf8_lossy silently corrupted every
+            // such byte to U+FFFD (438k cells in NIINGRED alone). decode_dbisam_text
+            // tries UTF-8 first, then Windows-1252 — lossless and never U+FFFD.
+            let s = mrsflow_core::eval::value::decode_dbisam_text(&bytes[..end]);
             CellValue::Text(s)
         }
         Date => {
