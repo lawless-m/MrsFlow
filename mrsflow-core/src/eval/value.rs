@@ -1369,6 +1369,27 @@ fn rows_to_arrow(
                 let mut strings: Vec<Option<String>> = Vec::with_capacity(cells.len());
                 let mut has_null = false;
                 for cell in &cells {
+                    // Native connectors (Exportmaster/DBISAM) surface memo/BLOB
+                    // fields as Value::Binary. PQ's Text.From rejects Binary, so
+                    // text_from_value (which mirrors PQ) can't coerce it — but on
+                    // the parquet sink path those memo fields are text, so decode
+                    // them here rather than failing the whole write.
+                    //
+                    // Encoding isn't uniform across tables: some (e.g. niingresuni)
+                    // are UTF-8, others (ORDERH memo fields) are single-byte
+                    // Windows-1252/Latin-1. Try UTF-8 first so genuine UTF-8 round-
+                    // trips intact; on invalid UTF-8 fall back to a byte-preserving
+                    // Latin-1 decode (each byte → U+0000..=U+00FF) so no bytes are
+                    // lost to U+FFFD replacement. A present-but-empty blob becomes
+                    // "" (distinct from a null cell).
+                    if let Value::Binary(b) = cell {
+                        let s = match std::str::from_utf8(b) {
+                            Ok(s) => s.to_owned(),
+                            Err(_) => b.iter().map(|&c| c as char).collect(),
+                        };
+                        strings.push(Some(s));
+                        continue;
+                    }
                     match super::stdlib::text::text_from_value(cell)? {
                         Value::Null => {
                             strings.push(None);
