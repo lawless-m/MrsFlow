@@ -86,19 +86,32 @@ pub fn build_slot(
     Ok(slot)
 }
 
-/// Extract `PhysicalRecordNumber` from a 22-byte cursor bookmark unit.
-/// The position is encoded at offset 18 as `<u8 with high bit set><3 bytes BE value>`
-/// — the §3 "high-bit-tagged integer" form. Strip the high bit and
-/// read the 4 bytes as big-endian.
+/// Extract `PhysicalRecordNumber` from a per-row cursor bookmark unit.
+/// The position is always the **trailing 4 bytes** of the bookmark,
+/// encoded as `<u8 with high bit set><3 bytes BE value>` — the §3
+/// "high-bit-tagged integer" form. Strip the high bit and read the 4
+/// bytes as big-endian.
 ///
-/// Returns 0 if the bookmark is too short or malformed (typical
-/// non-natural-PK cursors don't carry a usable position here).
+/// **Bookmark length is parametric on PK width**, not fixed at 22:
+///   - CUSTOMER (PK CODE max=11): 17 bytes (1 + 11 + 1 + 4)
+///   - NIINGRED (PK NIEAN max=14): 22 bytes (1 + 14 + 2 pad + 1 + 4)
+///   - Other tables: 1 + pk_width + [0..N pad] + 1 + 4
+///
+/// The PHYS bytes are always the last 4, regardless of the PK section
+/// width or any middle padding the server inserts. Reading from a
+/// hardcoded offset (e.g. [18..22]) silently returns 0 on every table
+/// whose PK is shorter than NIINGRED's 14 — observed against CUSTOMER
+/// on rivsem04, where this broke the batched-cursor blob path entirely
+/// (every OpenBlob got a phys=0 lookup and returned empty payload).
+///
+/// Returns 0 only when the bookmark is shorter than 4 bytes.
 pub fn physical_record_number_from_bookmark(bookmark: &[u8]) -> u32 {
-    if bookmark.len() < 22 {
+    if bookmark.len() < 4 {
         return 0;
     }
-    let b0 = bookmark[18] & 0x7F;
-    u32::from_be_bytes([b0, bookmark[19], bookmark[20], bookmark[21]])
+    let n = bookmark.len();
+    let b0 = bookmark[n - 4] & 0x7F;
+    u32::from_be_bytes([b0, bookmark[n - 3], bookmark[n - 2], bookmark[n - 1]])
 }
 
 /// Outcome of one 0x0280 round-trip: the payload bytes plus the server's
@@ -234,10 +247,9 @@ mod tests {
     }
 
     #[test]
-    fn extract_phys_from_bookmark() {
-        // Verified against the same capture: cursor bookmark (22 bytes)
-        // for the NIEAN="0071567747844" row has phys=5 at bytes 18..22
-        // encoded as `80 00 00 05` (high-bit-flagged BE).
+    fn extract_phys_from_22byte_niingred_bookmark() {
+        // NIEAN="0071567747844" row's 22-byte cursor bookmark: phys=5 at
+        // the trailing 4 bytes `80 00 00 05` (high-bit-flagged BE).
         let bookmark: [u8; 22] = [
             0x01, 0x30, 0x30, 0x37, 0x31, 0x35, 0x36, 0x37, 0x37, 0x34, 0x37, 0x38, 0x34, 0x34, 0x00,
             0x00, 0x00,
@@ -247,15 +259,40 @@ mod tests {
     }
 
     #[test]
+    fn extract_phys_from_17byte_customer_bookmark() {
+        // CUSTOMER's 11-byte PK (CODE column max=11) produces a 17-byte
+        // bookmark: 1 flag + 11 PK + 1 marker + 4 phys, no middle pad.
+        // Live-captured from rivsem04 against `SELECT CODE, NOTES FROM
+        // CUSTOMER` where the first row has CODE="1" and phys=1.
+        //
+        // Regression: the old code hardcoded offset 18..22 and returned
+        // 0 here, silently breaking every blob fetch on short-PK tables
+        // via the batched-cursor path.
+        let bookmark: [u8; 17] = [
+            0x01, 0x31, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x01,
+            0x80, 0x00, 0x00, 0x01,
+        ];
+        assert_eq!(physical_record_number_from_bookmark(&bookmark), 1);
+    }
+
+    #[test]
     fn extract_phys_handles_large_values() {
         let mut bookmark = [0u8; 22];
         // PhysicalRecordNumber = 100000 = 0x000186A0; encoded BE in
-        // bytes 19..22 (byte 18 high-bit set as the flag).
+        // trailing 4 bytes (last byte's high bit is the flag).
         bookmark[18] = 0x80;
         bookmark[19] = 0x01;
         bookmark[20] = 0x86;
         bookmark[21] = 0xA0;
         assert_eq!(physical_record_number_from_bookmark(&bookmark), 100_000);
+    }
+
+    #[test]
+    fn extract_phys_too_short_returns_zero() {
+        // Bookmark shorter than 4 bytes can't carry phys.
+        assert_eq!(physical_record_number_from_bookmark(&[]), 0);
+        assert_eq!(physical_record_number_from_bookmark(&[0x80, 0x00, 0x00]), 0);
     }
 
     fn pack_unit(buf: &mut Vec<u8>, payload: &[u8]) {
