@@ -586,23 +586,28 @@ fn split_text_by_lengths_impl(args: &[Value], _host: &dyn IoHost) -> Result<Valu
                 "Splitter.SplitTextByLengths: length must be non-negative".into(),
             ));
         }
-        lengths.push(n as usize);
+        // try_from (not `as usize`) so a length above usize range — reachable
+        // on the 32-bit wasm target — errors instead of truncating.
+        let n = usize::try_from(n).map_err(|_| {
+            MError::Other("Splitter.SplitTextByLengths: length out of range".into())
+        })?;
+        lengths.push(n);
     }
     let chars: Vec<char> = text.chars().collect();
     if !reverse {
         let mut parts: Vec<Value> = Vec::with_capacity(lengths.len());
         let mut idx = 0usize;
         for n in lengths {
-            if idx + n > chars.len() {
-                return Err(MError::Other(format!(
+            let end = idx.checked_add(n).filter(|&e| e <= chars.len()).ok_or_else(|| {
+                MError::Other(format!(
                     "Splitter.SplitTextByLengths: text too short for length sequence (need {}, have {} remaining)",
                     n,
                     chars.len() - idx
-                )));
-            }
-            let chunk: String = chars[idx..idx + n].iter().collect();
+                ))
+            })?;
+            let chunk: String = chars[idx..end].iter().collect();
             parts.push(Value::Text(chunk));
-            idx += n;
+            idx = end;
         }
         return Ok(Value::list_of(parts));
     }
@@ -611,7 +616,12 @@ fn split_text_by_lengths_impl(args: &[Value], _host: &dyn IoHost) -> Result<Valu
     // ["cd","efg"]. That's: from offset (len - sum(lengths)) = 2,
     // take lengths in REVERSED order — 2 first ("cd"), then 3 ("efg").
     // Output preserves that traversal order.
-    let total: usize = lengths.iter().sum();
+    let total: usize = lengths
+        .iter()
+        .try_fold(0usize, |acc, &n| acc.checked_add(n))
+        .ok_or_else(|| {
+            MError::Other("Splitter.SplitTextByLengths: length sequence sum overflows".into())
+        })?;
     if total > chars.len() {
         return Err(MError::Other(format!(
             "Splitter.SplitTextByLengths: text too short for length sequence (need {}, have {})",
@@ -677,16 +687,22 @@ fn split_text_by_ranges_impl(args: &[Value], _host: &dyn IoHost) -> Result<Value
                 "Splitter.SplitTextByRanges: offset/count must be non-negative".into(),
             ));
         }
-        let start = offset as usize;
-        let end = start + count as usize;
-        if end > chars.len() {
-            return Err(MError::Other(format!(
-                "Splitter.SplitTextByRanges: range {}..{} out of bounds (length {})",
-                start,
-                end,
-                chars.len()
-            )));
-        }
+        // try_from + checked_add: on wasm32 `as usize` would truncate a large
+        // offset/count and defeat the bounds check (silent wrong slice).
+        let bounds = usize::try_from(offset)
+            .ok()
+            .zip(usize::try_from(count).ok())
+            .and_then(|(s, c)| s.checked_add(c).map(|e| (s, e)));
+        let (start, end) = match bounds {
+            Some((s, e)) if e <= chars.len() => (s, e),
+            _ => {
+                return Err(MError::Other(format!(
+                    "Splitter.SplitTextByRanges: range from offset {offset} count {count} \
+                     out of bounds (length {})",
+                    chars.len()
+                )))
+            }
+        };
         let chunk: String = chars[start..end].iter().collect();
         parts.push(Value::Text(chunk));
     }

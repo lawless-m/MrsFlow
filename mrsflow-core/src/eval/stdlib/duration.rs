@@ -220,9 +220,24 @@ fn from_text(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         None => (s_full.parse::<i64>().map_err(|_| MError::Other(format!(
             "Duration.FromText: bad seconds {s_full:?}")))?, ""),
     };
-    let mut total = days * 86400 + h * 3600 + m * 60 + s;
-    if negative { total = -total; }
-    Ok(Value::Duration(chrono::Duration::seconds(total)))
+    // Checked throughout: a component within i64 range (e.g. 3e15 hours) can
+    // still overflow the seconds total or chrono's TimeDelta range.
+    let total = (|| -> Option<i64> {
+        let mut t = days.checked_mul(86_400)?;
+        t = t.checked_add(h.checked_mul(3_600)?)?;
+        t = t.checked_add(m.checked_mul(60)?)?;
+        t = t.checked_add(s)?;
+        if negative { t.checked_neg() } else { Some(t) }
+    })()
+    .ok_or_else(|| MError::Other(format!("Duration.FromText: value out of range in {text:?}")))?;
+    let td = chrono::TimeDelta::try_seconds(total)
+        .ok_or_else(|| MError::Other(format!("Duration.FromText: value out of range in {text:?}")))?;
+    Ok(Value::Duration(td))
+}
+
+/// Out-of-range error for the ISO-8601 duration parser.
+fn iso_duration_oor(body: &str) -> MError {
+    MError::Other(format!("Duration.FromText: value out of range in {body:?}"))
 }
 
 /// Parse ISO-8601 duration body (after the leading `P`).
@@ -246,7 +261,10 @@ fn parse_iso8601_duration(body: &str, negative: bool) -> Result<Value, MError> {
         let days: i64 = date_part[..n_end].parse().map_err(|_| MError::Other(
             format!("Duration.FromText: bad days in {body:?}"),
         ))?;
-        total_secs += days * 86400;
+        total_secs = days
+            .checked_mul(86_400)
+            .and_then(|x| total_secs.checked_add(x))
+            .ok_or_else(|| iso_duration_oor(body))?;
     }
     // Time part: H, M, S terminated tokens.
     if !time_part.is_empty() {
@@ -259,10 +277,10 @@ fn parse_iso8601_duration(body: &str, negative: bool) -> Result<Value, MError> {
                 let secs = match c {
                     b'H' => tok.parse::<i64>().map_err(|_| MError::Other(
                         format!("Duration.FromText: bad hours in {body:?}"),
-                    ))? * 3600,
+                    ))?.checked_mul(3600).ok_or_else(|| iso_duration_oor(body))?,
                     b'M' => tok.parse::<i64>().map_err(|_| MError::Other(
                         format!("Duration.FromText: bad minutes in {body:?}"),
-                    ))? * 60,
+                    ))?.checked_mul(60).ok_or_else(|| iso_duration_oor(body))?,
                     b'S' => {
                         // Allow fractional seconds — truncate to whole seconds.
                         if let Some(dot) = tok.find('.') {
@@ -277,7 +295,9 @@ fn parse_iso8601_duration(body: &str, negative: bool) -> Result<Value, MError> {
                     }
                     _ => unreachable!(),
                 };
-                total_secs += secs;
+                total_secs = total_secs
+                    .checked_add(secs)
+                    .ok_or_else(|| iso_duration_oor(body))?;
                 num_start = i + 1;
             }
         }
@@ -287,8 +307,12 @@ fn parse_iso8601_duration(body: &str, negative: bool) -> Result<Value, MError> {
             )));
         }
     }
-    if negative { total_secs = -total_secs; }
-    Ok(Value::Duration(chrono::Duration::seconds(total_secs)))
+    if negative {
+        total_secs = total_secs.checked_neg().ok_or_else(|| iso_duration_oor(body))?;
+    }
+    let td = chrono::TimeDelta::try_seconds(total_secs)
+        .ok_or_else(|| iso_duration_oor(body))?;
+    Ok(Value::Duration(td))
 }
 
 

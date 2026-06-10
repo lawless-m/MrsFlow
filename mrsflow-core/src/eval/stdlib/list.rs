@@ -22,6 +22,23 @@ use super::common::{
     invoke_callback_with_host, one, three, two, type_mismatch, values_equal_primitive,
 };
 
+/// Safety cap on the length of a materialised list. An input-controlled
+/// `count` becomes `usize::MAX` after the `f64 as usize` cast for a huge
+/// or infinite Number; without a bound, `Vec::with_capacity(count)` (or
+/// `len * count`) panics on capacity overflow or OOM-aborts the process.
+/// 100M is far beyond any realistic M list (use a Table for bulk data).
+const MAX_LIST_LEN: usize = 100_000_000;
+
+/// Validate a materialised-list element count against [`MAX_LIST_LEN`].
+fn cap_list_len(count: usize, ctx: &str) -> Result<usize, MError> {
+    if count > MAX_LIST_LEN {
+        return Err(MError::Other(format!(
+            "{ctx}: requested list length {count} exceeds the {MAX_LIST_LEN} element cap"
+        )));
+    }
+    Ok(count)
+}
+
 pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
     vec![
         ("List.Transform", two("list", "transform"), transform),
@@ -555,6 +572,7 @@ fn numbers(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         Some(Value::Null) | None => 1.0,
         Some(other) => return Err(type_mismatch("number", other)),
     };
+    let count = cap_list_len(count, "List.Numbers")?;
     let mut out = Vec::with_capacity(count);
     for i in 0..count {
         out.push(Value::Number(start + (i as f64) * increment));
@@ -1297,7 +1315,17 @@ fn repeat(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
         other => return Err(type_mismatch("non-negative integer", other)),
     };
-    let mut out: Vec<Value> = Vec::with_capacity(list.len() * count);
+    let total = list
+        .len()
+        .checked_mul(count)
+        .filter(|&t| t <= MAX_LIST_LEN)
+        .ok_or_else(|| {
+            MError::Other(format!(
+                "List.Repeat: result length ({} × {count}) exceeds the {MAX_LIST_LEN} cap",
+                list.len()
+            ))
+        })?;
+    let mut out: Vec<Value> = Vec::with_capacity(total);
     for _ in 0..count {
         out.extend_from_slice(list);
     }
@@ -1322,6 +1350,7 @@ fn times(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         Value::Duration(d) => *d,
         other => return Err(type_mismatch("duration (step)", other)),
     };
+    let count = cap_list_len(count, "List.Times")?;
     let mut out = Vec::with_capacity(count);
     let step_nanos = step.num_nanoseconds()
         .ok_or_else(|| MError::Other("List.Times: step too large".into()))?;
@@ -1472,6 +1501,7 @@ fn dates(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         Value::Duration(d) => *d,
         other => return Err(type_mismatch("duration (step)", other)),
     };
+    let count = cap_list_len(count, "List.Dates")?;
     let mut out = Vec::with_capacity(count);
     let mut cur = start;
     for _ in 0..count {
@@ -1495,6 +1525,7 @@ fn datetimes(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         Value::Duration(d) => *d,
         other => return Err(type_mismatch("duration (step)", other)),
     };
+    let count = cap_list_len(count, "List.DateTimes")?;
     let mut out = Vec::with_capacity(count);
     let mut cur = start;
     for _ in 0..count {
@@ -1518,6 +1549,7 @@ fn datetimezones(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         Value::Duration(d) => *d,
         other => return Err(type_mismatch("duration (step)", other)),
     };
+    let count = cap_list_len(count, "List.DateTimeZones")?;
     let mut out = Vec::with_capacity(count);
     let mut cur = start;
     for _ in 0..count {
@@ -1541,6 +1573,7 @@ fn durations(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         Value::Duration(d) => *d,
         other => return Err(type_mismatch("duration (step)", other)),
     };
+    let count = cap_list_len(count, "List.Durations")?;
     let mut out = Vec::with_capacity(count);
     let mut cur = start;
     for _ in 0..count {
@@ -1899,6 +1932,7 @@ fn random(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         Some(Value::Number(n)) => Some(*n as u64),
         Some(other) => return Err(type_mismatch("number (seed) or null", other)),
     };
+    let count = cap_list_len(count, "List.Random")?;
     let out: Vec<Value> = if let Some(s) = seed {
         use rand::{Rng, SeedableRng, rngs::StdRng};
         let mut rng = StdRng::seed_from_u64(s);

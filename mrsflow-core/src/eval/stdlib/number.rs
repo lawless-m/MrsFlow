@@ -225,7 +225,7 @@ fn is_odd(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
                     "Number.IsOdd: argument must be an integer (got {n})"
                 )));
             }
-            Ok(Value::Logical((*n as i64) % 2 != 0))
+            Ok(Value::Logical(!float_is_even(*n)))
         }
         other => Err(type_mismatch("number", other)),
     }
@@ -241,16 +241,39 @@ fn is_even(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
                     "Number.IsEven: argument must be an integer (got {n})"
                 )));
             }
-            Ok(Value::Logical((*n as i64) % 2 == 0))
+            Ok(Value::Logical(float_is_even(*n)))
         }
         other => Err(type_mismatch("number", other)),
+    }
+}
+
+/// Parity test for an integer-valued f64 without an i64 cast. Above 2^53
+/// the cast saturates to i64::MAX (odd), wrongly reporting even values as
+/// odd; but every f64 integer with magnitude ≥ 2^53 has a ULP ≥ 2, so it
+/// is necessarily even. Below that, the cast is exact.
+fn float_is_even(n: f64) -> bool {
+    const TWO_POW_53: f64 = 9_007_199_254_740_992.0;
+    if n.abs() >= TWO_POW_53 {
+        true
+    } else {
+        (n as i64) % 2 == 0
     }
 }
 
 
 fn int_arg(v: &Value, ctx: &str) -> Result<i64, MError> {
     match v {
-        Value::Number(n) if n.is_finite() && n.fract() == 0.0 => Ok(*n as i64),
+        Value::Number(n) if n.is_finite() && n.fract() == 0.0 => {
+            // `as i64` saturates an out-of-range integer float to i64::MAX/MIN,
+            // silently producing the wrong bit pattern for the bitwise ops.
+            // i64 range is [-2^63, 2^63); reject outside it.
+            const I64_MIN_F: f64 = -9_223_372_036_854_775_808.0; // -2^63
+            const I64_MAX_F: f64 = 9_223_372_036_854_775_808.0; //  2^63
+            if *n < I64_MIN_F || *n >= I64_MAX_F {
+                return Err(MError::Other(format!("{ctx}: integer {n} out of range")));
+            }
+            Ok(*n as i64)
+        }
         Value::Null => Err(MError::Other(format!("{ctx}: null argument"))),
         other => Err(MError::Other(format!(
             "{}: argument must be an integer (got {})", ctx, super::super::type_name(other)

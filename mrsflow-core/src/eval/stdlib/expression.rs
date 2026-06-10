@@ -53,7 +53,10 @@ fn render_constant(v: &Value) -> String {
             // the lexer as a number literal.
             format_decimal_literal(*mantissa, *scale)
         }
-        Value::Text(s) => format!("\"{}\"", s.replace('"', "\"\"")),
+        // Escape `#` to `#(#)` as well as doubling `"`: an unescaped `#(`
+        // would re-lex as an escape sequence (e.g. `#(lf)` → newline),
+        // breaking round-trip fidelity into Expression.Evaluate.
+        Value::Text(s) => format!("\"{}\"", s.replace('#', "#(#)").replace('"', "\"\"")),
         Value::Date(d) => {
             use chrono::Datelike;
             format!("#date({}, {}, {})", d.year(), d.month(), d.day())
@@ -148,7 +151,10 @@ fn quote_identifier(name: &str) -> String {
     if is_valid_m_identifier(name) {
         name.to_string()
     } else {
-        let escaped = name.replace('"', "\"\"");
+        // Escape `#` (→ `#(#)`) as well as doubling `"`: `#(...)` escapes are
+        // processed inside `#"..."` quoted identifiers, so `a#(tab)b` would
+        // otherwise re-lex to `a\tb`.
+        let escaped = name.replace('#', "#(#)").replace('"', "\"\"");
         format!("#\"{escaped}\"")
     }
 }

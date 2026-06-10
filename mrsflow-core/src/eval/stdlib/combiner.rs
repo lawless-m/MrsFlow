@@ -170,6 +170,10 @@ fn combine_text_by_lengths(args: &[Value], _host: &dyn IoHost) -> Result<Value, 
     ))
 }
 
+/// Cap on the char buffer these combiners build (4 bytes/char). A large
+/// user position/offset would otherwise OOM-abort; ~268M chars ≈ 1 GiB.
+const MAX_COMBINE_CHARS: usize = 1 << 28;
+
 fn combine_text_by_positions(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let xs = expect_list(&args[0])?;
     for v in xs {
@@ -327,12 +331,20 @@ fn combine_text_by_positions_impl(args: &[Value], _host: &dyn IoHost) -> Result<
         )));
     }
     // Build a char buffer big enough to hold the last item, pad with spaces.
+    // `p + len` can overflow usize and the buffer (4 bytes/char) can OOM for
+    // a large user position — bound both.
     let total: usize = positions
         .iter()
         .zip(items.iter())
-        .map(|(p, s)| p + s.chars().count())
-        .max()
-        .unwrap_or(0);
+        .try_fold(0usize, |acc, (p, s)| {
+            p.checked_add(s.chars().count()).map(|t| acc.max(t))
+        })
+        .filter(|&t| t <= MAX_COMBINE_CHARS)
+        .ok_or_else(|| {
+            MError::Other(format!(
+                "Combiner.CombineTextByPositions: result length exceeds the {MAX_COMBINE_CHARS} cap"
+            ))
+        })?;
     let mut buf: Vec<char> = vec![' '; total];
     for (item, &pos) in items.iter().zip(positions.iter()) {
         for (i, c) in item.chars().enumerate() {
@@ -370,7 +382,16 @@ fn combine_text_by_ranges_impl(args: &[Value], _host: &dyn IoHost) -> Result<Val
         )));
     }
     // Each item is written into its {offset, count} slot, padded/truncated.
-    let total: usize = ranges.iter().map(|(o, c)| o + c).max().unwrap_or(0);
+    // `o + c` can overflow usize / OOM the buffer — bound both.
+    let total: usize = ranges
+        .iter()
+        .try_fold(0usize, |acc, (o, c)| o.checked_add(*c).map(|t| acc.max(t)))
+        .filter(|&t| t <= MAX_COMBINE_CHARS)
+        .ok_or_else(|| {
+            MError::Other(format!(
+                "Combiner.CombineTextByRanges: result length exceeds the {MAX_COMBINE_CHARS} cap"
+            ))
+        })?;
     let mut buf: Vec<char> = vec![' '; total];
     for (item, &(offset, count)) in items.iter().zip(ranges.iter()) {
         let chars: Vec<char> = item.chars().collect();

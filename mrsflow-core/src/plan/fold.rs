@@ -724,10 +724,11 @@ fn emit_scalar(s: &Scalar, d: &dyn Dialect) -> Result<String, Unfoldable> {
 
 fn emit_lit(lit: &Lit, d: &dyn Dialect) -> Result<String, Unfoldable> {
     match lit {
-        // Render the verbatim lexeme, but only for plain decimal forms — hex
-        // and the like have no portable SQL spelling.
-        Lit::Number(s) if s.parse::<f64>().is_ok() => Ok(s.clone()),
-        Lit::Number(s) => Err(unfoldable(format!("non-decimal numeric literal {s}"))),
+        // Render the verbatim lexeme, but only for plain *finite* decimal
+        // forms — hex has no portable SQL spelling, and an overflow lexeme
+        // like `1e999` parses to f64::INFINITY which would emit invalid SQL.
+        Lit::Number(s) if s.parse::<f64>().map(|n| n.is_finite()).unwrap_or(false) => Ok(s.clone()),
+        Lit::Number(s) => Err(unfoldable(format!("non-finite or non-decimal numeric literal {s}"))),
         Lit::Text(s) => Ok(d.text_literal(s)),
         Lit::Logical(b) => Ok(d.bool_literal(*b)),
         Lit::Date(dt) => Ok(d.date_literal(dt)),

@@ -101,15 +101,18 @@ pub(super) fn bindings() -> Vec<(&'static str, Vec<Param>, BuiltinFn)> {
     ]
 }
 
-fn field(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
+fn field(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let record = match &args[0] {
         Value::Record(r) => r,
         other => return Err(type_mismatch("record", other)),
     };
     let name = expect_text(&args[1])?;
     match record.fields.iter().find(|(n, _)| n == name) {
+        // Force with the real host (matching r[field] and
+        // Record.FieldOrDefault) so an IO-bearing field — File.Contents,
+        // Web, Odbc, Parquet — resolves instead of erroring under NoIoHost.
         Some((_, v)) => super::super::force(v.clone(), &mut |e, env| {
-            super::super::evaluate(e, env, &super::super::NoIoHost)
+            super::super::evaluate(e, env, host)
         }),
         None => Err(MError::Other(format!("Record.Field: field not found: {name}"))),
     }

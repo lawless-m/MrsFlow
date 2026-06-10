@@ -570,6 +570,13 @@ fn folder_impl(path: &str, recursive: bool) -> Result<Value, IoError> {
 
     let mut rows: Vec<Vec<Value>> = Vec::new();
 
+    // v1 reads every file's bytes eagerly into a Binary cell (see
+    // stdlib::folder). A large recursive tree would OOM-abort the process;
+    // bound the total so it becomes a clean error instead. Lazy per-file
+    // Content thunks remain the proper future fix.
+    const MAX_FOLDER_BYTES: u64 = 2 * 1024 * 1024 * 1024; // 2 GiB
+    let mut total_bytes: u64 = 0;
+
     let mut emit = |entry_path: &Path| -> Result<(), IoError> {
         let md = std::fs::metadata(entry_path)
             .map_err(|e| IoError::Other(format!("metadata {}: {e}", entry_path.display())))?;
@@ -611,6 +618,13 @@ fn folder_impl(path: &str, recursive: bool) -> Result<Value, IoError> {
             // Eager read. Big-dir cost noted in stdlib::folder.
             let bytes = std::fs::read(entry_path)
                 .map_err(|e| IoError::Other(format!("read {}: {e}", entry_path.display())))?;
+            total_bytes = total_bytes.saturating_add(bytes.len() as u64);
+            if total_bytes > MAX_FOLDER_BYTES {
+                return Err(IoError::Other(format!(
+                    "Folder.*: total file content exceeds the {MAX_FOLDER_BYTES}-byte cap; \
+                     filter the listing before reading Content"
+                )));
+            }
             Value::Binary(bytes)
         };
 
@@ -1165,7 +1179,7 @@ fn odbc_query_columnar(connection_string: &str, sql: &str) -> Result<Value, IoEr
         return Ok(empty_table());
     };
 
-    let (fields, buf_descs) = describe_columns(&mut cursor)?;
+    let (fields, buf_descs, is_char) = describe_columns(&mut cursor)?;
     let n_cols = fields.len();
 
     const BATCH_SIZE: usize = 1024;
@@ -1212,9 +1226,14 @@ fn odbc_query_columnar(connection_string: &str, sql: &str) -> Result<Value, IoEr
                         .as_text_view()
                         .expect("Text buffer");
                     for row in 0..n_rows {
-                        let s = view
-                            .get(row)
-                            .map(|b| String::from_utf8_lossy(b).trim_end().to_string());
+                        let s = view.get(row).map(|b| {
+                            // Lossless decode (UTF-8 then Windows-1252) — the
+                            // DBISAM cp1252 bytes (£, ', accented Latin-1)
+                            // would become U+FFFD under from_utf8_lossy. Trim
+                            // padding only for fixed-width CHAR columns.
+                            let s = mrsflow_core::eval::value::decode_dbisam_text(b);
+                            if is_char[col_idx] { s.trim_end().to_string() } else { s }
+                        });
                         acc_str[col_idx].push(s);
                     }
                 }
@@ -1318,7 +1337,7 @@ fn odbc_query_row_at_a_time(connection_string: &str, sql: &str) -> Result<Value,
         return Ok(empty_table());
     };
 
-    let (fields, _buf_descs) = describe_columns(&mut cursor)?;
+    let (fields, _buf_descs, is_char) = describe_columns(&mut cursor)?;
     let n_cols = fields.len();
 
     let epoch = NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
@@ -1366,9 +1385,11 @@ fn odbc_query_row_at_a_time(connection_string: &str, sql: &str) -> Result<Value,
                     let cell = if !has_data {
                         None
                     } else {
-                        // Trim trailing whitespace — DBISAM (and other
-                        // fixed-width-CHAR drivers) pad to column width.
-                        Some(String::from_utf8_lossy(&buf).trim_end().to_string())
+                        // Lossless decode (UTF-8 then Windows-1252); trim
+                        // trailing pad only for fixed-width CHAR columns —
+                        // VARCHAR/memo keep meaningful trailing whitespace.
+                        let s = mrsflow_core::eval::value::decode_dbisam_text(&buf);
+                        Some(if is_char[col_idx] { s.trim_end().to_string() } else { s })
                     };
                     acc_str[col_idx].push(cell);
                 }
@@ -1442,9 +1463,13 @@ fn odbc_query_row_at_a_time(connection_string: &str, sql: &str) -> Result<Value,
 }
 
 #[cfg(feature = "odbc")]
+/// Returns, per result column: the Arrow field, the ODBC bind-buffer
+/// descriptor, and whether the source SQL type is a fixed-width CHAR (so
+/// trailing space padding should be stripped — VARCHAR/memo text must keep
+/// its trailing whitespace).
 fn describe_columns<C: odbc_api::Cursor + odbc_api::ResultSetMetadata>(
     cursor: &mut C,
-) -> Result<(Vec<arrow::datatypes::Field>, Vec<odbc_api::buffers::BufferDesc>), IoError> {
+) -> Result<(Vec<arrow::datatypes::Field>, Vec<odbc_api::buffers::BufferDesc>, Vec<bool>), IoError> {
     use arrow::datatypes::{DataType, Field};
     use odbc_api::buffers::BufferDesc;
 
@@ -1459,11 +1484,19 @@ fn describe_columns<C: odbc_api::Cursor + odbc_api::ResultSetMetadata>(
         .map_err(|e| IoError::Other(format!("Odbc.Query cols: {}", e)))?;
     let mut fields = Vec::with_capacity(n_cols as usize);
     let mut buf_descs = Vec::with_capacity(n_cols as usize);
+    let mut is_char = Vec::with_capacity(n_cols as usize);
     let mut desc = odbc_api::ColumnDescription::default();
     for col_idx in 1..=n_cols {
         cursor
             .describe_col(col_idx as u16, &mut desc)
             .map_err(|e| IoError::Other(format!("Odbc.Query describe col {}: {}", col_idx, e)))?;
+        // Fixed-width CHAR / WCHAR are space-padded to the column width;
+        // VARCHAR / LongVarchar / memo are not. Only the former should be
+        // right-trimmed at read time.
+        let fixed_char = matches!(
+            desc.data_type,
+            odbc_api::DataType::Char { .. } | odbc_api::DataType::WChar { .. }
+        );
         // Some drivers (DuckDB at least) under-report name length via
         // SQLDescribeCol — "sasource" comes back as "sas". Pull the name
         // separately via SQLColAttribute(SQL_DESC_NAME), which has its
@@ -1538,8 +1571,9 @@ fn describe_columns<C: odbc_api::Cursor + odbc_api::ResultSetMetadata>(
         };
         fields.push(Field::new(name, arrow_dtype, true));
         buf_descs.push(buf_desc);
+        is_char.push(fixed_char);
     }
-    Ok((fields, buf_descs))
+    Ok((fields, buf_descs, is_char))
 }
 
 #[cfg(feature = "odbc")]
@@ -1603,7 +1637,7 @@ fn odbc_data_source_impl(
             buf.clear();
             row.get_text(col, &mut buf)
                 .map_err(|e| IoError::Other(format!("Odbc.DataSource col {col}: {e}")))?;
-            Ok(String::from_utf8_lossy(&buf).into_owned())
+            Ok(mrsflow_core::eval::value::decode_dbisam_text(&buf))
         };
         let catalog = read(1)?;
         let _schema = read(2)?;
@@ -2579,7 +2613,12 @@ fn build_lazy_odbc_table(connection_string: &str, table_name: &str) -> Result<Va
     use mrsflow_core::eval::{LazyOdbcState, MError, TableRepr};
     use std::rc::Rc;
 
-    let probe_sql = format!("SELECT * FROM \"{}\" WHERE 1=0", table_name);
+    // Escape embedded `"` (→ `""`) like the MySQL/Postgres/SQL Server paths —
+    // a table named e.g. `my"tbl` would otherwise produce malformed SQL.
+    let probe_sql = format!(
+        "SELECT * FROM \"{}\" WHERE 1=0",
+        table_name.replace('"', "\"\"")
+    );
     let probe = odbc_query_impl(connection_string, &probe_sql)
         .map_err(|e| MError::Other(format!("Odbc.DataSource probe: {e:?}")))?;
     let probe_table = match probe {

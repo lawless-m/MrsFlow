@@ -362,7 +362,12 @@ fn parse_count(lexeme: &str) -> Option<u64> {
         return Some(n);
     }
     let f = t.parse::<f64>().ok()?;
-    if f.is_finite() && f >= 0.0 {
+    // Only an exact non-negative integer in u64 range folds into a pushed-down
+    // LIMIT. A fractional count (FirstN(t, 2.7)) or out-of-range one
+    // (Range(t, 0, 1e30) saturating to u64::MAX) must return None so the
+    // caller falls back to the evaluator, which truncates/errors per M
+    // semantics — folding it would diverge silently.
+    if f.is_finite() && f >= 0.0 && f.fract() == 0.0 && f < 18_446_744_073_709_551_616.0 {
         Some(f as u64)
     } else {
         None

@@ -103,7 +103,13 @@ fn constructor(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let time = chrono::NaiveTime::from_hms_nano_opt(h as u32, mn as u32, sec, nano)
         .ok_or_else(|| MError::Other(format!("#datetimezone: invalid time {h}:{mn}:{sec}")))?;
     let naive = date.and_time(time);
-    let total_offset_secs = (oh * 3600 + om.signum() * (om.abs() * 60)) as i32;
+    // Checked: `oh * 3600` overflows i64 for an absurd offsetHours before the
+    // `as i32` narrowing. (signum·abs simplifies to `om`.)
+    let total_offset_secs = oh
+        .checked_mul(3600)
+        .and_then(|x| om.checked_mul(60).and_then(|y| x.checked_add(y)))
+        .and_then(|t| i32::try_from(t).ok())
+        .ok_or_else(|| MError::Other(format!("#datetimezone: offset {oh}:{om} out of range")))?;
     let offset = chrono::FixedOffset::east_opt(total_offset_secs)
         .ok_or_else(|| MError::Other(format!("#datetimezone: invalid offset {oh}:{om}")))?;
     Ok(Value::Datetimezone(naive.and_local_timezone(offset).unwrap()))
