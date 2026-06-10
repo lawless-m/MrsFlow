@@ -1053,6 +1053,27 @@ fn columnar_blocklist() -> &'static std::sync::Mutex<std::collections::HashSet<S
     BL.get_or_init(|| std::sync::Mutex::new(std::collections::HashSet::new()))
 }
 
+/// Redact secret values from an ODBC connection string before logging.
+/// ODBC strings are `KEY=VALUE;KEY=VALUE`; mask the value of any
+/// credential key (case-insensitive) so passwords don't reach stderr / CI
+/// logs / scrollback when the columnar path falls back.
+#[cfg(any(feature = "odbc", test))]
+fn redact_conn_secrets(conn: &str) -> String {
+    conn.split(';')
+        .map(|kv| match kv.split_once('=') {
+            Some((k, _)) if matches!(
+                k.trim().to_ascii_uppercase().as_str(),
+                "PWD" | "PASSWORD" | "UID"
+            ) =>
+            {
+                format!("{}=***", k.trim())
+            }
+            _ => kv.to_string(),
+        })
+        .collect::<Vec<_>>()
+        .join(";")
+}
+
 #[cfg(feature = "odbc")]
 fn odbc_query_impl(connection_string: &str, sql: &str) -> Result<Value, IoError> {
     // Try columnar fast path unless this connection has previously panicked.
@@ -1092,8 +1113,9 @@ fn odbc_query_impl(connection_string: &str, sql: &str) -> Result<Value, IoError>
                     set.insert(connection_string.to_string());
                 }
                 eprintln!(
-                    "Odbc.Query: columnar setup failed for `{connection_string}`; \
-                     falling back to row-at-a-time. error: {msg}"
+                    "Odbc.Query: columnar setup failed for `{}`; \
+                     falling back to row-at-a-time. error: {msg}",
+                    redact_conn_secrets(connection_string)
                 );
             }
             // Any other clean error (network down, SQL syntax, etc.) —
@@ -1109,8 +1131,9 @@ fn odbc_query_impl(connection_string: &str, sql: &str) -> Result<Value, IoError>
                     .or_else(|| panic_payload.downcast_ref::<String>().cloned())
                     .unwrap_or_else(|| "<non-string panic payload>".to_string());
                 eprintln!(
-                    "Odbc.Query: columnar fetch panicked for `{connection_string}`; \
-                     falling back to row-at-a-time. panic: {panic_msg}"
+                    "Odbc.Query: columnar fetch panicked for `{}`; \
+                     falling back to row-at-a-time. panic: {panic_msg}",
+                    redact_conn_secrets(connection_string)
                 );
             }
         }
@@ -1953,6 +1976,15 @@ fn mysql_query_value(conn: &MySqlConn, sql: &str) -> Result<Value, IoError> {
         .iter()
         .map(|c| c.name_str().into_owned())
         .collect();
+    // Capture each column's SQL type so the mapper only parses true
+    // DECIMAL columns as Number — VARCHAR/TEXT cells that happen to look
+    // numeric (`00123`, `1.5`, `inf`) must stay Text, not be silently
+    // retyped and value-corrupted.
+    let col_types: Vec<mysql::consts::ColumnType> = cols_ref
+        .as_ref()
+        .iter()
+        .map(|c| c.column_type())
+        .collect();
 
     let mut all_rows: Vec<Vec<Value>> = Vec::new();
     for row_res in result {
@@ -1960,7 +1992,7 @@ fn mysql_query_value(conn: &MySqlConn, sql: &str) -> Result<Value, IoError> {
         let mut cells: Vec<Value> = Vec::with_capacity(column_names.len());
         for col in 0..column_names.len() {
             let v: mysql::Value = row.as_ref(col).cloned().unwrap_or(mysql::Value::NULL);
-            cells.push(mysql_value_to_m(v));
+            cells.push(mysql_value_to_m(v, col_types[col]));
         }
         all_rows.push(cells);
     }
@@ -1968,7 +2000,7 @@ fn mysql_query_value(conn: &MySqlConn, sql: &str) -> Result<Value, IoError> {
 }
 
 #[cfg(feature = "mysql")]
-fn mysql_value_to_m(v: mysql::Value) -> Value {
+fn mysql_value_to_m(v: mysql::Value, col_type: mysql::consts::ColumnType) -> Value {
     use chrono::{NaiveDate, NaiveDateTime, NaiveTime, Duration as ChronoDuration};
     use mysql::Value as MV;
     match v {
@@ -1978,20 +2010,18 @@ fn mysql_value_to_m(v: mysql::Value) -> Value {
         MV::Float(n) => Value::Number(n as f64),
         MV::Double(n) => Value::Number(n),
         MV::Bytes(b) => match String::from_utf8(b) {
-            // Most VARCHAR/TEXT cells come through as Bytes. Treat
-            // valid UTF-8 as Text; only fall back to Binary for
-            // genuinely non-textual blobs.
+            // VARCHAR/TEXT/CHAR and DECIMAL all arrive as Bytes. Only
+            // DECIMAL/NEWDECIMAL columns are numeric — parse those as a
+            // Number so DECIMAL(p,s) round-trips. Every other textual
+            // column stays Text verbatim: blanket-parsing as f64 would
+            // strip leading zeros from codes (`00123`→123) and retype
+            // `1.5`/`inf`/`NaN` strings, silently corrupting data.
             Ok(s) => {
-                // DECIMAL also lands as Bytes (always-ASCII numeric
-                // string) — attempt to parse so DECIMAL(p,s) round-trips
-                // as a Number. mrsflow has Value::Decimal too, but
-                // without precision/scale metadata at the row level
-                // we'd need to wire ColumnType information through;
-                // f64 parse is the v1 compromise.
-                if let Ok(n) = s.parse::<f64>() {
-                    Value::Number(n)
-                } else {
-                    Value::Text(s)
+                use mysql::consts::ColumnType::*;
+                let is_decimal = matches!(col_type, MYSQL_TYPE_DECIMAL | MYSQL_TYPE_NEWDECIMAL);
+                match (is_decimal, s.parse::<f64>()) {
+                    (true, Ok(n)) => Value::Number(n),
+                    _ => Value::Text(s),
                 }
             }
             Err(e) => Value::Binary(e.into_bytes()),
@@ -2986,4 +3016,54 @@ fn sql_databases_impl(
         ]);
     }
     Ok(Value::Table(Table::from_rows(cols, rows)))
+}
+
+#[cfg(test)]
+mod redact_tests {
+    #[test]
+    fn redact_conn_secrets_masks_credentials() {
+        let conn = "Driver={ODBC};Server=db1;UID=admin;PWD=s3cret;Database=app";
+        let red = super::redact_conn_secrets(conn);
+        assert!(!red.contains("s3cret"), "password must be masked: {red}");
+        assert!(!red.contains("admin"), "UID must be masked: {red}");
+        assert!(red.contains("Server=db1"), "non-secret keys preserved: {red}");
+        assert!(red.contains("PWD=***"));
+        // Case-insensitive key match.
+        assert!(!super::redact_conn_secrets("password=hunter2").contains("hunter2"));
+    }
+}
+
+#[cfg(all(test, feature = "mysql"))]
+mod mysql_mapper_tests {
+    use super::mysql_value_to_m;
+    use mrsflow_core::eval::Value;
+    use mysql::consts::ColumnType::*;
+    use mysql::Value as MV;
+
+    #[test]
+    fn varchar_code_with_leading_zeros_stays_text() {
+        // VARCHAR `00123` must NOT be parsed to the Number 123.
+        match mysql_value_to_m(MV::Bytes(b"00123".to_vec()), MYSQL_TYPE_VAR_STRING) {
+            Value::Text(s) => assert_eq!(s, "00123"),
+            other => panic!("expected Text(\"00123\"), got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn varchar_numeric_looking_text_stays_text() {
+        for s in ["1.5", "inf", "NaN", "1e10"] {
+            match mysql_value_to_m(MV::Bytes(s.as_bytes().to_vec()), MYSQL_TYPE_STRING) {
+                Value::Text(got) => assert_eq!(got, s),
+                other => panic!("{s} must stay Text, got {other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn decimal_column_parses_to_number() {
+        match mysql_value_to_m(MV::Bytes(b"3.14".to_vec()), MYSQL_TYPE_NEWDECIMAL) {
+            Value::Number(n) => assert!((n - 3.14).abs() < 1e-12),
+            other => panic!("expected Number(3.14), got {other:?}"),
+        }
+    }
 }

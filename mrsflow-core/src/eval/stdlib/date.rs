@@ -259,12 +259,14 @@ fn from(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
             }
             let epoch = chrono::NaiveDate::from_ymd_opt(1899, 12, 30).unwrap();
             let days = n.trunc() as i64;
-            match epoch.checked_add_signed(chrono::Duration::days(days)) {
-                Some(d) => Ok(Value::Date(d)),
-                None => Err(MError::Other(format!(
+            // try_days rejects an out-of-range delta; chrono::Duration::days
+            // would panic on the multiply overflow for a huge serial.
+            chrono::TimeDelta::try_days(days)
+                .and_then(|d| epoch.checked_add_signed(d))
+                .map(Value::Date)
+                .ok_or_else(|| MError::Other(format!(
                     "Date.From: serial date {n} out of range"
-                ))),
-            }
+                )))
         }
         other => Err(type_mismatch("date/datetime/text/number/null", other)),
     }

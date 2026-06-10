@@ -583,23 +583,42 @@ pub(crate) fn align_scales(
     match sa.cmp(&sb) {
         Equal => Ok((ma, mb, sa)),
         Less => {
-            let diff = (sb - sa) as u32;
+            let diff = scale_diff(sb, sa)?;
             Ok((ma.wrapping_mul(pow10_i256(diff)), mb, sb))
         }
         Greater => {
-            let diff = (sa - sb) as u32;
+            let diff = scale_diff(sa, sb)?;
             Ok((ma, mb.wrapping_mul(pow10_i256(diff)), sa))
         }
     }
 }
 
-/// 10^n as an i256. Caches small powers (n ≤ 38, the Decimal128 range)
-/// in a stack-local fast path; larger n falls through to a loop. n > 76
-/// will overflow i256 — caller's responsibility to cap.
+/// `hi - lo` as a power-of-ten exponent. Computed in a wide type because
+/// the i8 difference of two Arrow scales taken verbatim from untrusted
+/// parquet/ODBC schemas can overflow (e.g. 76 − (−76) = 152), which would
+/// wrap to a negative i8 and then to a ~4e9 u32 — driving pow10_i256 into
+/// a multi-billion-iteration hang. Bounded to i256's 10^76 range.
+fn scale_diff(hi: i8, lo: i8) -> Result<u32, MError> {
+    let diff = hi as i32 - lo as i32; // hi >= lo at both call sites
+    if diff > 76 {
+        return Err(MError::Other(format!(
+            "Decimal scale difference {diff} exceeds the representable 10^76 range"
+        )));
+    }
+    Ok(diff as u32)
+}
+
+/// 10^n as an i256. n > 76 overflows i256 — callers must cap (see
+/// `scale_diff`). The loop is defensively bounded so a stray large `n`
+/// from any future caller can't hang the process; beyond 77 the value is
+/// already a meaningless wrap, so iterating further buys nothing.
 pub(crate) fn pow10_i256(n: u32) -> arrow::datatypes::i256 {
     let mut acc = arrow::datatypes::i256::ONE;
     let ten = arrow::datatypes::i256::from_i128(10);
-    for _ in 0..n {
+    // Cap the loop: beyond 10^77 the i256 has already overflowed to a
+    // meaningless wrap, so iterating further only enables a hang on a
+    // stray large `n` (callers must cap to ≤76; see `scale_diff`).
+    for _ in 0..n.min(77) {
         acc = acc.wrapping_mul(ten);
     }
     acc
@@ -796,4 +815,31 @@ fn nullable_equals(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
         return Ok(Value::Null);
     }
     Ok(Value::Logical(values_equal_deep(&args[0], &args[1])?))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use arrow::datatypes::i256;
+
+    #[test]
+    fn align_scales_rejects_extreme_scale_diff() {
+        // Scales from an untrusted schema differing by >127 overflow the i8
+        // subtraction (76 − (−76) = 152), which previously wrapped negative
+        // and drove pow10_i256 into a ~4e9-iteration hang. Now it errors.
+        let one = i256::from_i128(1);
+        assert!(align_scales(one, 76, one, -76).is_err());
+        assert!(align_scales(one, -76, one, 76).is_err());
+        // A representable difference still aligns.
+        let (a, _b, scale) = align_scales(one, 2, one, 5).unwrap();
+        assert_eq!(scale, 5);
+        assert_eq!(a, i256::from_i128(1000)); // 1 scaled up by 10^3
+    }
+
+    #[test]
+    fn pow10_i256_is_bounded() {
+        // Even a stray large n can't hang; the loop is capped.
+        let _ = pow10_i256(u32::MAX); // must return promptly, no panic/hang
+        assert_eq!(pow10_i256(3), i256::from_i128(1000));
+    }
 }

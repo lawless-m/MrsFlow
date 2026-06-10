@@ -396,6 +396,11 @@ struct Sel {
     group_by: Vec<String>,
     has_aggregate: bool,
     order_by: Vec<String>,
+    /// True once `from` is a join expression (`a JOIN b ON …`) rather than a
+    /// single table reference. A join can't be a side of another join in this
+    /// flat-SELECT model — its `from` would be spliced in unparenthesized and
+    /// reused as a table qualifier — so this gates it out of `plain()`.
+    joined: bool,
 }
 
 impl Sel {
@@ -424,6 +429,7 @@ fn build(rel: &Rel, d: &dyn Dialect) -> Result<Sel, Unfoldable> {
             group_by: Vec::new(),
             has_aggregate: false,
             order_by: Vec::new(),
+            joined: false,
         }),
         Rel::Scan(Source::Document { .. }) => {
             Err(unfoldable("document/connector leaf is not a SQL table"))
@@ -576,6 +582,7 @@ fn build(rel: &Rel, d: &dyn Dialect) -> Result<Sel, Unfoldable> {
                     && s.order_by.is_empty()
                     && s.top.is_none()
                     && !s.distinct
+                    && !s.joined
             };
             if !plain(&l) || !plain(&r) {
                 return Err(unfoldable("join over a non-trivial subquery"));
@@ -614,6 +621,18 @@ fn build(rel: &Rel, d: &dyn Dialect) -> Result<Sel, Unfoldable> {
                 }
             }
             let on = on_parts.join(" AND ");
+            // Hoisting a predicate to the top-level WHERE is sound for an
+            // inner join (WHERE commutes with the join), and for the LEFT
+            // side of a LEFT JOIN (every left row is preserved). But a
+            // predicate on the RIGHT side of a LEFT JOIN in WHERE drops the
+            // null-extended rows, silently converting it to an inner join —
+            // refuse rather than emit semantically-wrong SQL.
+            if matches!(kind, JoinKind::LeftOuter) && !r.where_.is_empty() {
+                return Err(unfoldable(
+                    "LEFT JOIN with a filtered right side (predicate would need to move into ON \
+                     or a derived table)",
+                ));
+            }
             let mut where_ = l.where_;
             where_.extend(r.where_);
             Ok(Sel {
@@ -626,6 +645,7 @@ fn build(rel: &Rel, d: &dyn Dialect) -> Result<Sel, Unfoldable> {
                 group_by: Vec::new(),
                 has_aggregate: false,
                 order_by: Vec::new(),
+                joined: true,
             })
         }
         Rel::EvalM { descr, .. } => Err(unfoldable(format!("opaque step: {descr}"))),
@@ -943,6 +963,49 @@ mod tests {
     #[test]
     fn anti_join_is_boundary() {
         boundary(r#"Table.NestedJoin(a, {"k"}, b, {"k"}, "n", JoinKind.LeftAnti)"#);
+    }
+
+    #[test]
+    fn nested_join_is_boundary() {
+        // A 3-table join: (a JOIN b) JOIN c. The flat-SELECT model can't
+        // nest a join as a join side — `plain()` used to accept it and
+        // splice the inner "a JOIN b ON …" string in as a table qualifier,
+        // emitting garbage SQL as Ok. It must now refuse.
+        let ab = Rel::Join {
+            kind: JoinKind::Inner,
+            left_keys: vec!["k".into()],
+            right_keys: vec!["k".into()],
+            left: Box::new(Rel::Scan(Source::Ref("a".into()))),
+            right: Box::new(Rel::Scan(Source::Ref("b".into()))),
+        };
+        let abc = Rel::Join {
+            kind: JoinKind::Inner,
+            left_keys: vec!["k".into()],
+            right_keys: vec!["k".into()],
+            left: Box::new(ab),
+            right: Box::new(Rel::Scan(Source::Ref("c".into()))),
+        };
+        assert!(emit(&abc, &Dbisam).is_err(), "nested join must not fold");
+    }
+
+    #[test]
+    fn left_join_with_filtered_right_is_boundary() {
+        // A predicate on the RIGHT side of a LEFT JOIN can't be hoisted to
+        // the top-level WHERE — it would drop the null-extended rows and
+        // silently turn the outer join into an inner one. Must refuse.
+        boundary(
+            r#"Table.NestedJoin(a, {"k"}, Table.SelectRows(b, each [s] = "x"), {"k"}, "n", JoinKind.LeftOuter)"#,
+        );
+    }
+
+    #[test]
+    fn inner_join_with_filtered_right_still_folds() {
+        // The LEFT-side guard must not over-fire: for an INNER join, WHERE
+        // commutes with the join, so a filtered right side is still sound.
+        assert_eq!(
+            sql(r#"Table.NestedJoin(a, {"k"}, Table.SelectRows(b, each [s] = "x"), {"k"}, "n", JoinKind.Inner)"#),
+            r#"SELECT * FROM a JOIN b ON a.k = b.k AND a.k IS NOT NULL WHERE s = 'x'"#
+        );
     }
 
     #[test]

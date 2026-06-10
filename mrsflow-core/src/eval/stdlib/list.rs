@@ -1260,10 +1260,14 @@ fn replace_range(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     if offset > list.len() {
         return Err(MError::Other("List.ReplaceRange: offset out of range".into()));
     }
-    let mut out: Vec<Value> = Vec::with_capacity(list.len() - count + new_values.len());
+    // `count` may exceed the remaining length (or even usize range after the
+    // float cast); clamp the removed span so the capacity hint and slice
+    // bounds can't underflow/overflow.
+    let end = offset.saturating_add(count).min(list.len());
+    let mut out: Vec<Value> =
+        Vec::with_capacity(offset + new_values.len() + (list.len() - end));
     out.extend_from_slice(&list[..offset]);
     out.extend_from_slice(new_values);
-    let end = (offset + count).min(list.len());
     if end < list.len() {
         out.extend_from_slice(&list[end..]);
     }

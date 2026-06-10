@@ -863,6 +863,12 @@ fn impl_factory_list(args: &[Value], host: &dyn IoHost) -> Result<Value, MError>
             let (val, consumed) = parse_with_size(fmt, &b[offset..], host)?;
             out.push(val);
             offset += consumed;
+            if consumed == 0 {
+                // A zero-width format would otherwise loop `n` times (up to
+                // ~4e9) without advancing — hang/OOM. Stop, as the no-count
+                // branch does, once no progress is possible.
+                break;
+            }
         }
     } else {
         while offset < b.len() {
@@ -902,6 +908,10 @@ fn parse_list_sz(
             let (val, consumed) = parse_with_size(&fmt, &b[offset..], host)?;
             out.push(val);
             offset += consumed;
+            if consumed == 0 {
+                // Zero-width format guard — see impl_factory_list.
+                break;
+            }
         }
     } else {
         while offset < b.len() {

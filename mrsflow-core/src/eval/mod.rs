@@ -1728,6 +1728,34 @@ mod tests {
         }
     }
 
+    #[test]
+    fn review_panic_guards_error_rather_than_abort() {
+        // Each input used to panic/abort the interpreter; reaching Err here
+        // (instead of crashing the test process) proves the guard fired.
+        assert!(
+            eval_str(r#"Table.SplitColumn(#table({"a"}, {{"x,y"}}), "a", Splitter.SplitTextByDelimiter(","), {})"#).is_err(),
+            "SplitColumn with empty column-names list must error, not panic"
+        );
+        assert!(
+            eval_str("DateTime.From(1e18)").is_err(),
+            "DateTime.From of a huge serial must error, not panic"
+        );
+        assert!(
+            eval_str("Date.From(1e18)").is_err(),
+            "Date.From of a huge serial must error, not panic"
+        );
+        assert!(
+            eval_str("DateTime.IsInNextNHours(DateTime.From(0), 9e15)").is_err(),
+            "IsInNextNHours with an overflowing count must error, not panic"
+        );
+        // ReplaceRange with count > length must not panic; it clamps and
+        // returns a list ({9} here: offset 0 removes all, inserts {9}).
+        assert!(
+            eval_str("List.ReplaceRange({1, 2, 3}, 0, 999, {9})").is_ok(),
+            "ReplaceRange with oversized count must clamp, not panic"
+        );
+    }
+
     fn eval_text(src: &str) -> String {
         match eval_str(src).expect("eval") {
             Value::Text(s) => s,

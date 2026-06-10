@@ -5351,6 +5351,13 @@ fn split_column(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let width = num_expected
         .or_else(|| out_names_opt.as_ref().map(|v| v.len()))
         .unwrap_or(max_width);
+    if width == 0 {
+        return Err(MError::Other(
+            "Table.SplitColumn: width must be at least 1 (empty column-names list \
+             or zero count)"
+                .into(),
+        ));
+    }
     let new_col_names: Vec<String> = match out_names_opt {
         Some(v) => v,
         None => (1..=width)

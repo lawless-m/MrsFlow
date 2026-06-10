@@ -130,10 +130,22 @@ fn from(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
         Value::Text(_) => from_text(args, host),
         Value::Number(n) => {
             // PQ treats Number as OLE Automation date (days since 1899-12-30).
+            if !n.is_finite() {
+                return Err(MError::Other(format!(
+                    "DateTime.From: cannot convert non-finite number {n}"
+                )));
+            }
             let base = chrono::NaiveDate::from_ymd_opt(1899, 12, 30).unwrap()
                 .and_time(chrono::NaiveTime::from_hms_opt(0, 0, 0).unwrap());
+            // `as i64` saturates for huge serials; try_seconds rejects an
+            // out-of-range delta instead of panicking like Duration::seconds.
             let secs = (n * 86400.0) as i64;
-            Ok(Value::Datetime(base + chrono::Duration::seconds(secs)))
+            chrono::TimeDelta::try_seconds(secs)
+                .and_then(|d| base.checked_add_signed(d))
+                .map(Value::Datetime)
+                .ok_or_else(|| MError::Other(format!(
+                    "DateTime.From: serial date {n} out of range"
+                )))
         }
         other => Err(type_mismatch("text/date/datetime/number/null", other)),
     }
@@ -354,47 +366,73 @@ fn is_in_previous_second(args: &[Value], _host: &dyn IoHost) -> Result<Value, ME
 
 // ----- IsInNextN* / IsInPreviousN* -----
 
+/// Build an `n`-unit TimeDelta without panicking. `chrono::Duration::{hours,
+/// minutes,seconds}` panic on overflow; the `try_*` constructors return None.
+/// `unit_secs` is the seconds-per-unit (3600 / 60 / 1).
+fn try_units(n: i64, unit_secs: i64, ctx: &str) -> Result<chrono::TimeDelta, MError> {
+    n.checked_mul(unit_secs)
+        .and_then(chrono::TimeDelta::try_seconds)
+        .ok_or_else(|| MError::Other(format!("{ctx}: count {n} out of range")))
+}
+
+/// dt ∈ [start, start + n·unit) — forward window, n built safely.
+fn dt_in_next_n(dt: chrono::NaiveDateTime, start: chrono::NaiveDateTime, n: i64, unit_secs: i64, ctx: &str) -> Result<Value, MError> {
+    let delta = try_units(n, unit_secs, ctx)?;
+    let end = start
+        .checked_add_signed(delta)
+        .ok_or_else(|| MError::Other(format!("{ctx}: window end out of range")))?;
+    Ok(Value::Logical(dt_in_range(dt, start, end)))
+}
+
+/// dt ∈ [end − n·unit, end) — backward window, n built safely.
+fn dt_in_previous_n(dt: chrono::NaiveDateTime, end: chrono::NaiveDateTime, n: i64, unit_secs: i64, ctx: &str) -> Result<Value, MError> {
+    let delta = try_units(n, unit_secs, ctx)?;
+    let start = end
+        .checked_sub_signed(delta)
+        .ok_or_else(|| MError::Other(format!("{ctx}: window start out of range")))?;
+    Ok(Value::Logical(dt_in_range(dt, start, end)))
+}
 
 fn is_in_next_n_hours(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let dt = match extract_naive_datetime(&args[0], "DateTime.IsInNextNHours")? { Some(d) => d, None => return Ok(Value::Null) };
     let n = int_n_arg(&args[1], "DateTime.IsInNextNHours")?;
     let s = start_of_unit(now_naive(), 3600) + chrono::Duration::hours(1);
-    Ok(Value::Logical(dt_in_range(dt, s, s + chrono::Duration::hours(n))))
+    dt_in_next_n(dt, s, n, 3600, "DateTime.IsInNextNHours")
 }
 
 fn is_in_next_n_minutes(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let dt = match extract_naive_datetime(&args[0], "DateTime.IsInNextNMinutes")? { Some(d) => d, None => return Ok(Value::Null) };
     let n = int_n_arg(&args[1], "DateTime.IsInNextNMinutes")?;
     let s = start_of_unit(now_naive(), 60) + chrono::Duration::minutes(1);
-    Ok(Value::Logical(dt_in_range(dt, s, s + chrono::Duration::minutes(n))))
+    dt_in_next_n(dt, s, n, 60, "DateTime.IsInNextNMinutes")
 }
 
 fn is_in_next_n_seconds(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let dt = match extract_naive_datetime(&args[0], "DateTime.IsInNextNSeconds")? { Some(d) => d, None => return Ok(Value::Null) };
     let n = int_n_arg(&args[1], "DateTime.IsInNextNSeconds")?;
     let s = start_of_unit(now_naive(), 1) + chrono::Duration::seconds(1);
-    Ok(Value::Logical(dt_in_range(dt, s, s + chrono::Duration::seconds(n))))
+    dt_in_next_n(dt, s, n, 1, "DateTime.IsInNextNSeconds")
 }
 
 fn is_in_previous_n_hours(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let dt = match extract_naive_datetime(&args[0], "DateTime.IsInPreviousNHours")? { Some(d) => d, None => return Ok(Value::Null) };
     let n = int_n_arg(&args[1], "DateTime.IsInPreviousNHours")?;
     let e = start_of_unit(now_naive(), 3600);
-    Ok(Value::Logical(dt_in_range(dt, e - chrono::Duration::hours(n), e)))
+    dt_in_previous_n(dt, e, n, 3600, "DateTime.IsInPreviousNHours")
 }
 
 fn is_in_previous_n_minutes(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let dt = match extract_naive_datetime(&args[0], "DateTime.IsInPreviousNMinutes")? { Some(d) => d, None => return Ok(Value::Null) };
     let n = int_n_arg(&args[1], "DateTime.IsInPreviousNMinutes")?;
     let e = start_of_unit(now_naive(), 60);
-    Ok(Value::Logical(dt_in_range(dt, e - chrono::Duration::minutes(n), e)))
+    dt_in_previous_n(dt, e, n, 60, "DateTime.IsInPreviousNMinutes")
 }
 
 fn is_in_previous_n_seconds(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let dt = match extract_naive_datetime(&args[0], "DateTime.IsInPreviousNSeconds")? { Some(d) => d, None => return Ok(Value::Null) };
     let n = int_n_arg(&args[1], "DateTime.IsInPreviousNSeconds")?;
     let e = start_of_unit(now_naive(), 1);
-    Ok(Value::Logical(dt_in_range(dt, e - chrono::Duration::seconds(n), e)))
+    dt_in_previous_n(dt, e, n, 1, "DateTime.IsInPreviousNSeconds")
 }
 
 // ----- DateTimeZone.* -----
