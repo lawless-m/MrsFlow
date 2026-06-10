@@ -98,6 +98,25 @@ pub fn decode_record(record: &[u8], columns: &[Column]) -> Result<Vec<CellValue>
     Ok(out)
 }
 
+/// Read the leading `N` value bytes as a fixed array, erroring (not
+/// panicking) when the schema's declared width is narrower than the
+/// type requires. `decode_record` hands `decode_field` exactly `c.max`
+/// bytes, so a corrupt or hostile column descriptor declaring e.g. an
+/// Integer with `max < 4` would otherwise index out of bounds.
+fn fixed<const N: usize>(bytes: &[u8], col: &Column) -> Result<[u8; N], IoError> {
+    bytes
+        .get(..N)
+        .and_then(|s| <[u8; N]>::try_from(s).ok())
+        .ok_or_else(|| {
+            IoError::Other(format!(
+                "Exportmaster: column {} ({:?}) needs {N} value bytes but schema width is {}",
+                col.name,
+                col.field_type,
+                bytes.len()
+            ))
+        })
+}
+
 fn decode_field(col: &Column, bytes: &[u8]) -> Result<CellValue, IoError> {
     use FieldType::*;
     Ok(match col.field_type {
@@ -120,7 +139,7 @@ fn decode_field(col: &Column, bytes: &[u8]) -> Result<CellValue, IoError> {
             // 4-byte LE u32, days since 0001-01-01 (proleptic Gregorian).
             // Out-of-range values (garbage / sentinel rows in wide tables)
             // surface as Null rather than killing the query.
-            let days = u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
+            let days = u32::from_le_bytes(fixed::<4>(bytes, col)?);
             let base = NaiveDate::from_ymd_opt(1, 1, 1).expect("0001-01-01 is valid");
             match base.checked_add_days(chrono::Days::new(days as u64)) {
                 Some(date) => CellValue::Date(date),
@@ -132,7 +151,7 @@ fn decode_field(col: &Column, bytes: &[u8]) -> Result<CellValue, IoError> {
             // Out-of-range / NaN / sentinel values surface as Null rather
             // than killing the query — wide tables often contain "0000-00-00"
             // garbage rows whose payload is uninitialised memory.
-            let serial = f64::from_le_bytes(bytes[..8].try_into().unwrap());
+            let serial = f64::from_le_bytes(fixed::<8>(bytes, col)?);
             // chrono::Duration::days panics outside ~i64::MAX/86_400_000 ms,
             // and NaiveDate's valid range is [-262144, 262143] years. Clamp
             // whole_days to chrono::Days::new's safe range conservatively.
@@ -161,7 +180,7 @@ fn decode_field(col: &Column, bytes: &[u8]) -> Result<CellValue, IoError> {
         }
         Time => {
             // 4-byte LE u32, milliseconds since midnight.
-            let ms = u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
+            let ms = u32::from_le_bytes(fixed::<4>(bytes, col)?);
             let secs = ms / 1000;
             let ns = (ms % 1000) * 1_000_000;
             let t = NaiveTime::from_num_seconds_from_midnight_opt(secs, ns)
@@ -172,32 +191,32 @@ fn decode_field(col: &Column, bytes: &[u8]) -> Result<CellValue, IoError> {
             CellValue::Time(t)
         }
         Integer | AutoInc => {
-            let n = i32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
+            let n = i32::from_le_bytes(fixed::<4>(bytes, col)?);
             CellValue::Int32(n)
         }
         Smallint => {
-            let n = i16::from_le_bytes([bytes[0], bytes[1]]);
+            let n = i16::from_le_bytes(fixed::<2>(bytes, col)?);
             CellValue::Int32(n as i32)
         }
         Largeint => {
-            let n = i64::from_le_bytes(bytes[..8].try_into().unwrap());
+            let n = i64::from_le_bytes(fixed::<8>(bytes, col)?);
             CellValue::Int64(n)
         }
         Boolean => {
             // 2-byte WordBool: FFFF = true, 0000 = false. Any other
             // pattern is treated as false (the documented values are
             // strict 0 and -1; we don't seen anything else in practice).
-            let v = u16::from_le_bytes([bytes[0], bytes[1]]);
+            let v = u16::from_le_bytes(fixed::<2>(bytes, col)?);
             CellValue::Bool(v != 0)
         }
         Float => {
-            let v = f64::from_le_bytes(bytes[..8].try_into().unwrap());
+            let v = f64::from_le_bytes(fixed::<8>(bytes, col)?);
             CellValue::Float(v)
         }
         Currency => {
             // 8-byte LE Int64, scaled by 10_000 (DBISAM Currency stores
             // four decimal places as a fixed-point integer).
-            let raw = i64::from_le_bytes(bytes[..8].try_into().unwrap());
+            let raw = i64::from_le_bytes(fixed::<8>(bytes, col)?);
             CellValue::Float(raw as f64 / 10_000.0)
         }
         Blob | Memo | Graphic => {
@@ -206,9 +225,7 @@ fn decode_field(col: &Column, bytes: &[u8]) -> Result<CellValue, IoError> {
             // the opaque handle through to the column builder, which
             // either fetches it lazily (TODO: future) or surfaces the
             // raw bytes as Binary in v1.
-            let mut h = [0u8; 8];
-            h.copy_from_slice(&bytes[..8]);
-            CellValue::BlobHandle(h)
+            CellValue::BlobHandle(fixed::<8>(bytes, col)?)
         }
         Bytes => CellValue::Binary(bytes.to_vec()),
         VarBytes => {
@@ -456,6 +473,27 @@ mod tests {
             max,
             row_offset,
         }
+    }
+
+    #[test]
+    fn decode_field_errors_on_narrow_schema_width_instead_of_panicking() {
+        // A corrupt schema declares an Integer column with max=2 (should
+        // be 4). decode_record hands decode_field a 2-byte slice; the
+        // old code indexed bytes[0..4] and panicked. Now it errors.
+        let c = col(1, "QTY", FieldType::Integer, 2, 25);
+        let err = decode_field(&c, &[0x01, 0x02]);
+        assert!(err.is_err(), "narrow Integer width must error, not panic");
+
+        // Currency declared at 4 bytes (needs 8) — same guard.
+        let c = col(2, "PRICE", FieldType::Currency, 4, 25);
+        assert!(decode_field(&c, &[0u8; 4]).is_err());
+
+        // Correct width still decodes.
+        let c = col(3, "N", FieldType::Integer, 4, 25);
+        assert!(matches!(
+            decode_field(&c, &7i32.to_le_bytes()).unwrap(),
+            CellValue::Int32(7)
+        ));
     }
 
     #[test]

@@ -101,7 +101,8 @@ impl Client {
             "RIVSEM048692", // stable hostname suffix — server doesn't validate strictly
             0xE5A21BE8,     // fixed nonce — server stores but doesn't echo
         );
-        let _ = framing::send_recv_auto(&mut stream, &connect_body, opts.compression)?;
+        let r = framing::send_recv_auto(&mut stream, &connect_body, opts.compression)?;
+        check_handshake_response("Connect", &r)?;
 
         // From here on, if compression is enabled, every body is deflated.
         let send = |stream: &mut TcpStream, body: &[u8]| -> Result<Vec<u8>, IoError> {
@@ -117,18 +118,22 @@ impl Client {
             opts.user.as_bytes(),
             opts.password.as_bytes(),
             opts.encrypt_password.as_bytes(),
-        );
+        )?;
         let login_body = build_login_body(&ct);
-        let _ = send(&mut stream, &login_body)?;
+        let r = send(&mut stream, &login_body)?;
+        check_handshake_response("Login", &r)?;
 
         // 3) Session-setup — fixed pre messages, then catalog attach
         //    (parameterised by opts.catalog), then trailing handshake.
         for body in SESSION_SETUP_PRE {
-            let _ = send(&mut stream, body)?;
+            let r = send(&mut stream, body)?;
+            check_handshake_response("session setup", &r)?;
         }
         let catalog_body = build_catalog_attach_body(&opts.catalog);
-        let _ = send(&mut stream, &catalog_body)?;
-        let _ = send(&mut stream, SESSION_SETUP_POST)?;
+        let r = send(&mut stream, &catalog_body)?;
+        check_handshake_response("catalog attach", &r)?;
+        let r = send(&mut stream, SESSION_SETUP_POST)?;
+        check_handshake_response("session setup (post)", &r)?;
 
         Ok(Self {
             stream,
@@ -195,6 +200,7 @@ impl Client {
         use super::cursor_info::CursorInfo;
 
         let schema_resp = self.query_raw(sql)?;
+        super::response::check_body_reqcode("PrepareStatement", &schema_resp)?;
         let (columns, _end_off) = parse_schema(&schema_resp)?;
         let compression = self.compression;
         let first_off = columns[0].row_offset as usize;
@@ -246,6 +252,7 @@ impl Client {
             )?;
             polls += 1;
         }
+        super::response::check_body_reqcode("ExecuteStatement", &resp)?;
 
         // Phase 2: SetToBegin. The response carries the FIRST row's
         // bookmark — the seed for the GetNextRecord loop. Extract it
@@ -255,6 +262,7 @@ impl Client {
             &super::msg::build_set_to_begin(1),
             compression,
         )?;
+        super::response::check_body_reqcode("SetToBegin", &setbegin_resp)?;
         // SetToBegin's response — unlike GetNextRecord — does NOT carry
         // a leading result-code unit; the 10 cursor-info units start
         // directly at PACK_STREAM_OFFSET.
@@ -276,36 +284,70 @@ impl Client {
             }
             let body = super::msg::build_get_next_record(1, &next_bookmark, request_batch);
             let resp = framing::send_recv_auto(&mut self.stream, &body, compression)?;
+            super::response::check_body_reqcode("GetNextRecord", &resp)?;
             let mut walker = Walker::new(&resp, PACK_STREAM_OFFSET);
             let mut got_eoc = false;
             let mut rows_in_batch = 0usize;
 
             loop {
+                let saved = walker.position();
                 let rc_unit = match walker.next_unit() {
                     Ok(Some(u)) => u,
-                    _ => break,
+                    Ok(None) => break,
+                    Err(e) => {
+                        // A length prefix running off the end is clean
+                        // exhaustion only if what remains is alignment
+                        // padding; otherwise the body is malformed.
+                        if super::response::tail_is_padding(&resp, saved) {
+                            break;
+                        }
+                        return Err(e);
+                    }
                 };
                 if rc_unit.len() != 2 {
-                    break;
+                    // Trailing alignment padding parses as a zero-length
+                    // (or odd) unit — stop cleanly. Anything else is a
+                    // shape we don't understand: refuse to guess.
+                    if rc_unit.iter().all(|&b| b == 0)
+                        && super::response::tail_is_padding(&resp, walker.position())
+                    {
+                        break;
+                    }
+                    return Err(IoError::Other(format!(
+                        "Exportmaster: GetNextRecord: expected 2-byte result code, got {} \
+                         after {rows_seen} rows",
+                        rc_unit.len()
+                    )));
                 }
                 let result_code = u16::from_le_bytes([rc_unit[0], rc_unit[1]]);
                 if result_code == RESULT_END_OF_CURSOR {
                     got_eoc = true;
                     break;
                 }
-                if result_code != RESULT_OK {
-                    break;
+                if result_code == RESULT_NOT_READY {
+                    break; // re-issue GetNextRecord
                 }
-                let cursor_info = match CursorInfo::read(&mut walker) {
-                    Ok(ci) => ci,
-                    Err(_) => break,
-                };
-                let slot = match walker.next_unit() {
-                    Ok(Some(u)) => u.to_vec(),
-                    _ => break,
+                if result_code != RESULT_OK {
+                    return Err(IoError::Other(format!(
+                        "Exportmaster: GetNextRecord returned result code 0x{result_code:04X} \
+                         after {rows_seen} rows — refusing to treat as end-of-cursor"
+                    )));
+                }
+                let cursor_info = CursorInfo::read(&mut walker)?;
+                let slot = match walker.next_unit()? {
+                    Some(u) => u.to_vec(),
+                    None => {
+                        return Err(IoError::Other(format!(
+                            "Exportmaster: GetNextRecord: row slot missing after {rows_seen} rows"
+                        )));
+                    }
                 };
                 if slot.len() < col_end_offset {
-                    break;
+                    return Err(IoError::Other(format!(
+                        "Exportmaster: GetNextRecord: row slot {} bytes, need {col_end_offset} \
+                         (after {rows_seen} rows)",
+                        slot.len()
+                    )));
                 }
 
                 // Decode columns from slot[first_off..col_end_offset].
@@ -389,6 +431,22 @@ impl Client {
             .map(|(i, _)| i)
             .collect();
         let has_blobs = !blob_col_indices.is_empty();
+
+        // The deferred blob path reconstructs each row's 0x0280 slot from
+        // (phys, MD5, PK bytes), reading the PK from `row[first_off+1..]`
+        // — i.e. it treats `columns[0]` as the table's primary key. That
+        // holds only when the projection's first column is the leading
+        // on-disk field, which protocol §4 establishes is always the PK
+        // (offset == RECORD_HEADER_LEN). A projection like
+        // `SELECT memo, code FROM t` makes `columns[0]` a non-PK (or the
+        // blob itself), so the reconstructed slot would point the server
+        // at the wrong record. Refuse rather than build a garbage slot;
+        // the streaming default path (`query_to_table`) has no such
+        // constraint because it echoes the server's slot verbatim.
+        if has_blobs {
+            validate_blob_projection(&columns)?;
+        }
+
         if std::env::var("EM_SCHEMA_DEBUG").is_ok() {
             for (i, c) in columns.iter().enumerate() {
                 eprintln!(
@@ -501,12 +559,6 @@ impl Client {
                     eprintln!("[em-blob] FreeAllBlobs flush at task {}", task_idx);
                 }
             }
-            if task_idx > 620 && task_idx < 660 {
-                let pk_str = std::str::from_utf8(&task.pk_field).map(|s| s.trim_end_matches('\0').to_string()).unwrap_or_else(|_| "<nu>".into());
-                let md5_hex: String = task.md5.iter().map(|b| format!("{b:02x}")).collect();
-                eprintln!("[em-blob] task={} row={} phys={} pk={:?} md5={}",
-                    task_idx, task.row_idx, task.phys, pk_str, md5_hex);
-            }
             let mut slot = blob::build_slot(task.phys, &task.md5, &task.pk_field, effective_slot_length)?;
             if blob_debug {
                 eprintln!(
@@ -514,21 +566,22 @@ impl Client {
                     task.row_idx, task.col_idx, task.phys, effective_slot_length
                 );
             }
-            let mut outcome = match blob::fetch_blob(
+            let mut outcome = blob::fetch_blob(
                 self,
                 1, // CURSOR_HANDLE in cursor.rs
                 (task.col_idx as u16) + 1,
                 &slot,
-            ) {
-                Ok(o) => o,
-                Err(e) => {
-                    eprintln!("[em-blob] FAIL task={} row={} phys={} pk={:?}: {:?}",
-                        task_idx, task.row_idx, task.phys,
-                        std::str::from_utf8(&task.pk_field).map(|s| s.trim_end_matches('\0').to_string()).unwrap_or_else(|_| "<nu>".into()),
-                        e);
-                    continue;
-                }
-            };
+            )
+            .map_err(|e| {
+                let pk_str = std::str::from_utf8(&task.pk_field)
+                    .map(|s| s.trim_end_matches('\0').to_string())
+                    .unwrap_or_else(|_| "<non-utf8>".into());
+                IoError::Other(format!(
+                    "Exportmaster: blob fetch failed for row {} (col {}, pk {pk_str:?}, phys {}): {e:?} \
+                     — refusing to emit a silent NULL for a non-empty blob handle",
+                    task.row_idx, task.col_idx, task.phys
+                ))
+            })?;
             if blob_debug {
                 eprintln!(
                     "[em-blob]   -> payload={} bytes, server_slot_len={}",
@@ -982,6 +1035,65 @@ fn hex_dump(body: &[u8]) -> String {
     s
 }
 
+/// Validate a handshake-step response (Connect, Login, session setup,
+/// catalog attach). Success responses carry body reqcode 0x0000;
+/// failures use the 0x2Cxx session-error family — observed live
+/// against rivsem01: 0x2C17 = login rejected, 0x2C1E = catalog attach
+/// failed (body carries the offending name), 0x2C2C = request before
+/// login. Previously these responses were discarded, so a bad password
+/// surfaced later as a baffling schema-parse failure.
+fn check_handshake_response(step: &str, body: &[u8]) -> Result<(), IoError> {
+    let code = body_reqcode(body).ok_or_else(|| {
+        IoError::Other(format!(
+            "Exportmaster: {step}: response too short ({} bytes)",
+            body.len()
+        ))
+    })?;
+    if code == 0x0000 {
+        return Ok(());
+    }
+    let mut msg = format!("Exportmaster: {step} rejected by server (reqcode 0x{code:04X})");
+    if code == 0x2C17 {
+        msg.push_str(" — login failed; check User / Password / EncryptPassword");
+    }
+    if let Some(ident) = super::response::error_identifier(body) {
+        msg.push_str(&format!(" — server identifies: {ident:?}"));
+    }
+    Err(IoError::Other(msg))
+}
+
+/// Validate that a blob/memo extract via the deferred (capped) path can
+/// safely reconstruct each row's 0x0280 slot. That path reads the PK
+/// from `row[columns[0].row_offset + 1 ..]`, so it's correct only when
+/// `columns[0]` is the table's primary key — which protocol §4
+/// establishes is always the leading on-disk field (offset ==
+/// `RECORD_HEADER_LEN`). Projections that don't lead with the PK, or
+/// that put a blob in column 0, would build a slot pointing the server
+/// at the wrong record; reject them with guidance.
+fn validate_blob_projection(columns: &[super::schema::Column]) -> Result<(), IoError> {
+    let lead = &columns[0];
+    if lead.row_offset as usize != super::row::RECORD_HEADER_LEN {
+        return Err(IoError::Other(format!(
+            "Exportmaster: this blob/memo extract path requires the primary key to be the \
+             first selected column, but column 0 is {:?} (on-disk offset {}, not the leading \
+             field at {}). Lead the projection with the PK, or use Exportmaster.Query \
+             (the default path handles any projection).",
+            lead.name, lead.row_offset, super::row::RECORD_HEADER_LEN
+        )));
+    }
+    if matches!(
+        lead.field_type,
+        FieldType::Blob | FieldType::Memo | FieldType::Graphic
+    ) {
+        return Err(IoError::Other(format!(
+            "Exportmaster: column 0 ({:?}) is itself a blob/memo column; the blob extract \
+             path needs a scalar primary key in column 0. Lead the projection with the PK.",
+            lead.name
+        )));
+    }
+    Ok(())
+}
+
 /// Extract the reqcode (u16 LE) from a response body. The body
 /// layout is `[flag u8][reqcode u16 LE][inner_len u32 LE][...]`;
 /// returns `None` if the body is too short to contain a reqcode.
@@ -1151,6 +1263,43 @@ mod tests {
         inner.extend_from_slice(&[0u8; 4]); // trailing zeros (server pads)
         let body = make_response(0x2B02, &inner);
         assert_eq!(parse_prepare_error(&body), Some("MikaTest".to_string()));
+    }
+
+    #[test]
+    fn validate_blob_projection_requires_pk_to_lead() {
+        use crate::exportmaster::schema::{Column, FieldType};
+        use crate::exportmaster::row::RECORD_HEADER_LEN;
+
+        let col = |name: &str, ft: FieldType, row_offset: u16| Column {
+            ord: 1,
+            name: name.to_string(),
+            field_type: ft,
+            decl: 8,
+            max: 8,
+            row_offset,
+        };
+
+        // PK (scalar) leads at the on-disk header offset → OK.
+        let ok = vec![
+            col("CODE", FieldType::String, RECORD_HEADER_LEN as u16),
+            col("LONGDESC", FieldType::Memo, 60),
+        ];
+        assert!(validate_blob_projection(&ok).is_ok());
+
+        // Column 0 isn't the leading on-disk field (offset != 25) →
+        // PK doesn't lead the projection → reject.
+        let not_leading = vec![
+            col("CPYNAME", FieldType::String, 60),
+            col("LONGDESC", FieldType::Memo, 200),
+        ];
+        assert!(validate_blob_projection(&not_leading).is_err());
+
+        // Column 0 is itself a blob → reject even at the right offset.
+        let blob_first = vec![
+            col("LONGDESC", FieldType::Memo, RECORD_HEADER_LEN as u16),
+            col("CODE", FieldType::String, 60),
+        ];
+        assert!(validate_blob_projection(&blob_first).is_err());
     }
 
     #[test]

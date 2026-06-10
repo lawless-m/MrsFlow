@@ -68,8 +68,9 @@ pub fn drive_cursor(
     mut on_row: impl FnMut(&[u8], &[u8]) -> Result<(), IoError>,
 ) -> Result<usize, IoError> {
     use super::response::{
-        body_reqcode, read_batch, read_record_block_batch, PACK_STREAM_OFFSET,
-        REQCODE_POLLING_SENTINEL, RESULT_OK,
+        body_reqcode, check_body_reqcode, read_batch, read_record_block_batch,
+        PACK_STREAM_OFFSET, REQCODE_POLLING_SENTINEL, RESULT_END_OF_CURSOR,
+        RESULT_NOT_READY, RESULT_OK,
     };
     use super::wire::Walker;
 
@@ -88,9 +89,11 @@ pub fn drive_cursor(
     let mut rows_seen: usize = 0;
 
     // Parse a response body, invoking `on_row` once per row. Returns
-    // true on end-of-cursor (response carries result_code != OK, or
+    // true on end-of-cursor (response carries result_code 0x2202, or
     // we've hit target_rows). Borrows row bytes directly from `body`
-    // — no per-row allocation.
+    // — no per-row allocation. A malformed batch or an unrecognised
+    // result code is an error, NOT end-of-cursor — treating it as EoC
+    // silently truncates the result set.
     let mut process_body = |body: &[u8],
                             kind: &ReplyKind,
                             rows_seen: &mut usize,
@@ -99,6 +102,7 @@ pub fn drive_cursor(
         if body.len() < PACK_STREAM_OFFSET + 6 || body_reqcode(body) == REQCODE_POLLING_SENTINEL {
             return Ok(false);
         }
+        check_body_reqcode("cursor fetch", body)?;
         let mut walker = Walker::new(body, PACK_STREAM_OFFSET);
         loop {
             let batch_res = match kind {
@@ -107,7 +111,8 @@ pub fn drive_cursor(
             };
             let batch = match batch_res {
                 Ok(Some(b)) => b,
-                Ok(None) | Err(_) => return Ok(false),
+                Ok(None) => return Ok(false),
+                Err(e) => return Err(e),
             };
             for (i, row) in batch.rows.iter().enumerate() {
                 if *rows_seen >= target_rows {
@@ -121,8 +126,17 @@ pub fn drive_cursor(
                 on_row(row, bookmark)?;
                 *rows_seen += 1;
             }
-            if batch.result_code != RESULT_OK {
-                return Ok(true);
+            match batch.result_code {
+                RESULT_OK => {}
+                RESULT_END_OF_CURSOR => return Ok(true),
+                RESULT_NOT_READY => return Ok(false),
+                code => {
+                    return Err(IoError::Other(format!(
+                        "Exportmaster: server returned result code 0x{code:04X} mid-cursor \
+                         after {} rows — refusing to treat as end-of-cursor",
+                        *rows_seen
+                    )));
+                }
             }
             if walker.position() >= body.len() {
                 return Ok(false);

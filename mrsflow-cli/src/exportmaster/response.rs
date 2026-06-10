@@ -52,12 +52,64 @@ pub fn body_reqcode(body: &[u8]) -> u16 {
     u16::from_le_bytes([body[1], body[2]])
 }
 
+/// Error if the body's reqcode is in one of the server's error families:
+/// `0x2Bxx` statement errors (PrepareError/ExecuteError, §7f) or `0x2Cxx`
+/// session errors — observed live against rivsem01: 0x2C17 = login
+/// rejected, 0x2C1E = catalog attach failed, 0x2C2C = request before
+/// login. The 0x2C14 polling sentinel is a status, not an error.
+pub fn check_body_reqcode(context: &str, body: &[u8]) -> Result<(), IoError> {
+    let code = body_reqcode(body);
+    let family = code & 0xFF00;
+    if family == 0x2B00 || (family == 0x2C00 && code != REQCODE_POLLING_SENTINEL) {
+        let detail = error_identifier(body)
+            .map(|s| format!(" — server identifies: {s:?}"))
+            .unwrap_or_default();
+        return Err(IoError::Other(format!(
+            "Exportmaster: {context}: server error reqcode 0x{code:04X}{detail}"
+        )));
+    }
+    Ok(())
+}
+
+/// Extract the offending identifier from an error body, if present.
+/// Error bodies carry `<zero padding><u32 LE len><ASCII identifier>`
+/// after the 7-byte header; the zero run is 4 bytes for session errors
+/// (0x2C1E attach failure, observed live) and 8 bytes for statement
+/// errors (0x2B02/0x2B05, §7f — zeroed timing slot).
+pub(crate) fn error_identifier(body: &[u8]) -> Option<String> {
+    let inner = body.get(7..)?;
+    for zeros in [4usize, 8] {
+        if inner.len() < zeros + 4 || inner[..zeros].iter().any(|&b| b != 0) {
+            continue;
+        }
+        let len =
+            u32::from_le_bytes(inner[zeros..zeros + 4].try_into().ok()?) as usize;
+        if len == 0 || len > 256 || zeros + 4 + len > inner.len() {
+            continue;
+        }
+        if let Ok(s) = std::str::from_utf8(&inner[zeros + 4..zeros + 4 + len]) {
+            return Some(s.to_string());
+        }
+    }
+    None
+}
+
+/// True if everything from `pos` to the end of the buffer is zero —
+/// the 8-byte alignment padding both sides append to framed bodies
+/// (`wrap()` does it client-side; the server does the same). A walker
+/// error over such a tail is clean exhaustion, not a malformed body.
+pub(crate) fn tail_is_padding(buf: &[u8], pos: usize) -> bool {
+    buf[pos.min(buf.len())..].iter().all(|&b| b == 0)
+}
+
 /// One server "batch" within a response: a result code, the 10
 /// cursor-info fields, and zero-or-more row records.
 #[derive(Debug)]
 pub struct CursorBatch<'a> {
     pub result_code: u16,
-    pub cursor_info: CursorInfo,
+    /// Present for OK batches; non-OK bodies (not-ready, server error,
+    /// sometimes a bare end-of-cursor) don't reliably carry one.
+    pub cursor_info: Option<CursorInfo>,
     /// Slices into the response body — each is one on-disk record of
     /// `record_size` bytes (header + column data). Empty if the result
     /// code wasn't OK.
@@ -94,49 +146,77 @@ pub fn read_batch<'a>(
     walker: &mut Walker<'a>,
     expected_record_size: usize,
 ) -> Result<Option<CursorBatch<'a>>, IoError> {
-    let Some(rc_unit) = walker.next_unit()? else {
-        return Ok(None);
+    let start = walker.position();
+    let rc_unit = match walker.next_unit() {
+        Ok(Some(u)) => u,
+        Ok(None) => return Ok(None),
+        Err(e) => {
+            if tail_is_padding(walker.buf(), start) {
+                return Ok(None);
+            }
+            return Err(e);
+        }
     };
     if rc_unit.len() != 2 {
-        return Err(IoError::Other(format!(
-            "Exportmaster: expected 2-byte result code, got {}",
-            rc_unit.len()
-        )));
+        // Not a batch body: SetToBegin-style responses open with a
+        // 4-byte cursor-info field, and some bodies end in alignment
+        // padding. Shape dispatch, not an error — rewind and decline.
+        walker.seek(start);
+        return Ok(None);
     }
     let result_code = u16::from_le_bytes([rc_unit[0], rc_unit[1]]);
+    if result_code != RESULT_OK {
+        // Non-OK bodies (not-ready, end-of-cursor, server errors) don't
+        // reliably carry cursor-info or rows — a bare not-ready body is
+        // just the result-code unit. Surface the code; the caller
+        // decides whether it means poll-again, stop, or error.
+        return Ok(Some(CursorBatch {
+            result_code,
+            cursor_info: None,
+            rows: Vec::new(),
+            bookmarks: Vec::new(),
+        }));
+    }
     let cursor_info = CursorInfo::read(walker)?;
 
     let mut rows = Vec::new();
     let mut locked_size: Option<usize> = None;
-    if result_code == RESULT_OK {
-        loop {
-            let saved = walker.position();
-            let Some(unit) = walker.next_unit()? else { break };
-            let matches = match locked_size {
-                Some(s) => unit.len() == s,
-                None => {
-                    let lo = expected_record_size.saturating_sub(2);
-                    let hi = expected_record_size + 2;
-                    if unit.len() >= lo && unit.len() <= hi {
-                        locked_size = Some(unit.len());
-                        true
-                    } else {
-                        false
-                    }
+    loop {
+        let saved = walker.position();
+        let unit = match walker.next_unit() {
+            Ok(Some(u)) => u,
+            Ok(None) => break,
+            Err(e) => {
+                if tail_is_padding(walker.buf(), saved) {
+                    break;
                 }
-            };
-            if matches {
-                rows.push(unit);
-            } else {
-                walker.seek(saved);
-                break;
+                return Err(e);
             }
+        };
+        let matches = match locked_size {
+            Some(s) => unit.len() == s,
+            None => {
+                let lo = expected_record_size.saturating_sub(2);
+                let hi = expected_record_size + 2;
+                if unit.len() >= lo && unit.len() <= hi {
+                    locked_size = Some(unit.len());
+                    true
+                } else {
+                    false
+                }
+            }
+        };
+        if matches {
+            rows.push(unit);
+        } else {
+            walker.seek(saved);
+            break;
         }
     }
 
     Ok(Some(CursorBatch {
         result_code,
-        cursor_info,
+        cursor_info: Some(cursor_info),
         rows,
         bookmarks: Vec::new(),
     }))
@@ -166,81 +246,145 @@ pub fn read_record_block_batch<'a>(
     walker: &mut Walker<'a>,
     expected_record_size: usize,
 ) -> Result<Option<CursorBatch<'a>>, IoError> {
-    let Some(rc_unit) = walker.next_unit()? else {
-        return Ok(None);
+    let start = walker.position();
+    let rc_unit = match walker.next_unit() {
+        Ok(Some(u)) => u,
+        Ok(None) => return Ok(None),
+        Err(e) => {
+            if tail_is_padding(walker.buf(), start) {
+                return Ok(None);
+            }
+            return Err(e);
+        }
     };
     if rc_unit.len() != 2 {
+        if rc_unit.iter().all(|&b| b == 0) && tail_is_padding(walker.buf(), walker.position()) {
+            return Ok(None); // alignment padding, clean exhaustion
+        }
         return Err(IoError::Other(format!(
             "Exportmaster: ReadRecordBlock: expected 2-byte result code, got {}",
             rc_unit.len()
         )));
     }
     let result_code = u16::from_le_bytes([rc_unit[0], rc_unit[1]]);
+
+    let empty = |result_code| CursorBatch {
+        result_code,
+        cursor_info: None,
+        rows: Vec::new(),
+        bookmarks: Vec::new(),
+    };
+    if result_code == RESULT_OK {
+        let (cursor_info, rows, bookmarks) =
+            read_block_payload(walker, expected_record_size)?;
+        return Ok(Some(CursorBatch {
+            result_code,
+            cursor_info: Some(cursor_info),
+            rows,
+            bookmarks,
+        }));
+    }
+    if result_code == RESULT_END_OF_CURSOR {
+        // The last batch usually carries the full cursor-info + rows
+        // shape ("0x2202 AND still contains rows"), but an empty result
+        // set may answer with just the bare result code — tolerate that.
+        let saved = walker.position();
+        return Ok(Some(match read_block_payload(walker, expected_record_size) {
+            Ok((cursor_info, rows, bookmarks)) => CursorBatch {
+                result_code,
+                cursor_info: Some(cursor_info),
+                rows,
+                bookmarks,
+            },
+            Err(_) => {
+                walker.seek(saved);
+                empty(result_code)
+            }
+        }));
+    }
+    // Not-ready or an unrecognised code — surface it; the caller
+    // decides whether it means poll-again or a hard error.
+    Ok(Some(empty(result_code)))
+}
+
+/// Parse the payload of an OK record-block batch: cursor-info, row
+/// count, packed row buffer, packed bookmark buffer. Errors loudly on
+/// any shape mismatch — a malformed mid-stream batch must not be
+/// mistaken for end-of-cursor (that silently truncates the result).
+fn read_block_payload<'a>(
+    walker: &mut Walker<'a>,
+    expected_record_size: usize,
+) -> Result<(CursorInfo, Vec<&'a [u8]>, Vec<&'a [u8]>), IoError> {
     let cursor_info = CursorInfo::read(walker)?;
 
+    let count_unit = walker.next_unit()?.ok_or_else(|| {
+        IoError::Other("Exportmaster: ReadRecordBlock: missing row-count unit".to_string())
+    })?;
+    if count_unit.len() != 4 {
+        return Err(IoError::Other(format!(
+            "Exportmaster: ReadRecordBlock: row-count unit expected 4 bytes, got {}",
+            count_unit.len()
+        )));
+    }
+    let row_count = u32::from_le_bytes([
+        count_unit[0], count_unit[1], count_unit[2], count_unit[3],
+    ]) as usize;
+
+    // Row buffer: row_count × actual_record_size bytes packed. We trust
+    // the wire's actual size — the schema-derived expected_record_size
+    // is sometimes off by a few bytes (trailing padding the formula
+    // doesn't account for) — but only within ±32 bytes of the schema.
+    let row_buf = walker.next_unit()?.ok_or_else(|| {
+        IoError::Other("Exportmaster: ReadRecordBlock: missing row buffer".to_string())
+    })?;
     let mut rows = Vec::new();
     let mut bookmarks = Vec::new();
-    // Row count: 4-byte u32 LE.
-    if let Some(count_unit) = walker.next_unit()? {
-        if count_unit.len() == 4 {
-            let row_count = u32::from_le_bytes([
-                count_unit[0], count_unit[1], count_unit[2], count_unit[3],
-            ]) as usize;
-            // Row buffer: row_count × actual_record_size bytes packed.
-            // We trust the wire's actual size — the schema-derived
-            // expected_record_size is sometimes off by a few bytes
-            // (trailing padding the formula doesn't account for).
-            if let Some(row_buf) = walker.next_unit()? {
-                if row_count > 0 && row_buf.len() % row_count == 0 {
-                    let actual_record_size = row_buf.len() / row_count;
-                    // Sanity: actual size shouldn't be wildly different
-                    // from schema. Allow ±32 bytes — covers any trailing
-                    // padding without admitting nonsense values.
-                    let lo = expected_record_size.saturating_sub(32);
-                    let hi = expected_record_size + 32;
-                    if actual_record_size >= lo && actual_record_size <= hi {
-                        for i in 0..row_count {
-                            let start = i * actual_record_size;
-                            rows.push(&row_buf[start..start + actual_record_size]);
-                        }
-                    }
-                }
-                // Per-row bookmarks buffer. Each is `cursor.@+0x3672`
-                // bytes — the slot the server expects in a 0x0280
-                // OpenBlob request for that row. Size isn't sent
-                // separately; it's `bookmark_buf.len() / row_count`.
-                // EM_BATCH_DEBUG dumps what's left after this unit so
-                // we can confirm whether the wire actually has another
-                // trailing buffer (e.g. physical-record bookmarks vs
-                // cursor bookmarks).
-                if let Some(bookmark_buf) = walker.next_unit()? {
-                    if row_count > 0 && bookmark_buf.len() % row_count == 0 {
-                        let per_row = bookmark_buf.len() / row_count;
-                        for i in 0..rows.len() {
-                            let start = i * per_row;
-                            bookmarks.push(&bookmark_buf[start..start + per_row]);
-                        }
-                    }
-                    if std::env::var("EM_BATCH_DEBUG").is_ok() {
-                        eprintln!(
-                            "[em-batch] rows={} bookmark_buf={} bytes (~{}/row)",
-                            rows.len(),
-                            bookmark_buf.len(),
-                            if row_count > 0 { bookmark_buf.len() / row_count } else { 0 }
-                        );
-                        while let Ok(Some(extra)) = walker.next_unit() {
-                            eprintln!("[em-batch]   trailing extra: {} bytes", extra.len());
-                        }
-                    }
-                }
-            }
+    if row_count > 0 {
+        if row_buf.len() % row_count != 0 {
+            return Err(IoError::Other(format!(
+                "Exportmaster: ReadRecordBlock: {}-byte row buffer not divisible by row count {row_count}",
+                row_buf.len()
+            )));
+        }
+        let actual_record_size = row_buf.len() / row_count;
+        let lo = expected_record_size.saturating_sub(32);
+        let hi = expected_record_size + 32;
+        if actual_record_size < lo || actual_record_size > hi {
+            return Err(IoError::Other(format!(
+                "Exportmaster: ReadRecordBlock: wire record size {actual_record_size} \
+                 implausible (schema predicts {expected_record_size})"
+            )));
+        }
+        for i in 0..row_count {
+            let start = i * actual_record_size;
+            rows.push(&row_buf[start..start + actual_record_size]);
+        }
+
+        // Per-row bookmarks buffer. Each is `cursor.@+0x3672` bytes —
+        // the slot the server expects in a 0x0280 OpenBlob request for
+        // that row. Size isn't sent separately; it's
+        // `bookmark_buf.len() / row_count`.
+        let bookmark_buf = walker.next_unit()?.ok_or_else(|| {
+            IoError::Other("Exportmaster: ReadRecordBlock: missing bookmark buffer".to_string())
+        })?;
+        if bookmark_buf.len() % row_count != 0 {
+            return Err(IoError::Other(format!(
+                "Exportmaster: ReadRecordBlock: {}-byte bookmark buffer not divisible by row count {row_count}",
+                bookmark_buf.len()
+            )));
+        }
+        let per_row = bookmark_buf.len() / row_count;
+        for i in 0..row_count {
+            let start = i * per_row;
+            bookmarks.push(&bookmark_buf[start..start + per_row]);
+        }
+        if std::env::var("EM_BATCH_DEBUG").is_ok() {
+            eprintln!(
+                "[em-batch] rows={} bookmark_buf={} bytes (~{per_row}/row)",
+                rows.len(),
+                bookmark_buf.len(),
+            );
         }
     }
-
-    Ok(Some(CursorBatch {
-        result_code,
-        cursor_info,
-        rows,
-        bookmarks,
-    }))
+    Ok((cursor_info, rows, bookmarks))
 }
