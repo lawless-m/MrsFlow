@@ -323,11 +323,23 @@ pub fn evaluate(ast: &Expr, env: &Env, host: &dyn IoHost) -> Result<Value, MErro
                                         "range start must be <= end, got {s}..{e}"
                                     )));
                                 }
-                                let mut i = s as i64;
+                                // Cap the span: `{0..2000000000}` would
+                                // materialise one Value per integer (tens of
+                                // GB). i128 span avoids the subtraction
+                                // overflowing; the inclusive-range iterator is
+                                // overflow-safe at the i64::MAX boundary.
+                                const MAX_RANGE_LEN: i128 = 100_000_000;
+                                let start_i = s as i64;
                                 let end_i = e as i64;
-                                while i <= end_i {
+                                let span = end_i as i128 - start_i as i128 + 1;
+                                if span > MAX_RANGE_LEN {
+                                    return Err(MError::Other(format!(
+                                        "range {start_i}..{end_i} has {span} elements, \
+                                         exceeding the {MAX_RANGE_LEN} cap"
+                                    )));
+                                }
+                                for i in start_i..=end_i {
                                     values.push(Value::Number(i as f64));
-                                    i += 1;
                                 }
                             }
                             // Character range: each bound is a single-char text;
@@ -1221,6 +1233,15 @@ fn apply_unary(op: UnaryOp, v: Value) -> Result<Value, MError> {
     }
 }
 
+/// Microseconds in a Duration, erroring (not silently returning 0) when it
+/// exceeds the i64 microsecond range (~292k years). `unwrap_or(0)` would make
+/// `bigDuration * 2` yield ~0 instead of surfacing the overflow.
+fn duration_micros(d: &chrono::Duration, ctx: &str) -> Result<i64, MError> {
+    d.num_microseconds().ok_or_else(|| {
+        MError::Other(format!("{ctx}: duration too large to scale (exceeds microsecond range)"))
+    })
+}
+
 fn apply_binary(op: BinaryOp, lv: Value, rv: Value, host: &dyn IoHost) -> Result<Value, MError> {
     match op {
         BinaryOp::Multiply => {
@@ -1230,7 +1251,7 @@ fn apply_binary(op: BinaryOp, lv: Value, rv: Value, host: &dyn IoHost) -> Result
             // PQ: number * Duration (commutes) → Duration scaled.
             match (&lv, &rv) {
                 (Value::Number(n), Value::Duration(d)) | (Value::Duration(d), Value::Number(n)) => {
-                    let micros = (d.num_microseconds().unwrap_or(0) as f64 * n).round() as i64;
+                    let micros = (duration_micros(d, "Duration multiply")? as f64 * n).round() as i64;
                     return Ok(Value::Duration(chrono::Duration::microseconds(micros)));
                 }
                 _ => {}
@@ -1245,12 +1266,12 @@ fn apply_binary(op: BinaryOp, lv: Value, rv: Value, host: &dyn IoHost) -> Result
             // PQ: Duration / number → Duration scaled; Duration / Duration → number.
             match (&lv, &rv) {
                 (Value::Duration(d), Value::Number(n)) => {
-                    let micros = (d.num_microseconds().unwrap_or(0) as f64 / n).round() as i64;
+                    let micros = (duration_micros(d, "Duration divide")? as f64 / n).round() as i64;
                     return Ok(Value::Duration(chrono::Duration::microseconds(micros)));
                 }
                 (Value::Duration(a), Value::Duration(b)) => {
-                    let an = a.num_microseconds().unwrap_or(0) as f64;
-                    let bn = b.num_microseconds().unwrap_or(0) as f64;
+                    let an = duration_micros(a, "Duration divide")? as f64;
+                    let bn = duration_micros(b, "Duration divide")? as f64;
                     return Ok(Value::Number(an / bn));
                 }
                 _ => {}
@@ -1725,6 +1746,82 @@ mod tests {
         match eval_str(src).expect("eval") {
             Value::Number(n) => n,
             other => panic!("expected number, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn review_panic_guards_error_rather_than_abort() {
+        // Each input used to panic/abort the interpreter; reaching Err here
+        // (instead of crashing the test process) proves the guard fired.
+        assert!(
+            eval_str(r#"Table.SplitColumn(#table({"a"}, {{"x,y"}}), "a", Splitter.SplitTextByDelimiter(","), {})"#).is_err(),
+            "SplitColumn with empty column-names list must error, not panic"
+        );
+        assert!(
+            eval_str("DateTime.From(1e18)").is_err(),
+            "DateTime.From of a huge serial must error, not panic"
+        );
+        assert!(
+            eval_str("Date.From(1e18)").is_err(),
+            "Date.From of a huge serial must error, not panic"
+        );
+        assert!(
+            eval_str("DateTime.IsInNextNHours(DateTime.From(0), 9e15)").is_err(),
+            "IsInNextNHours with an overflowing count must error, not panic"
+        );
+        // ReplaceRange with count > length must not panic; it clamps and
+        // returns a list ({9} here: offset 0 removes all, inserts {9}).
+        assert!(
+            eval_str("List.ReplaceRange({1, 2, 3}, 0, 999, {9})").is_ok(),
+            "ReplaceRange with oversized count must clamp, not panic"
+        );
+    }
+
+    #[test]
+    fn review_medium_low_guards() {
+        // --- Unbounded-allocation caps: error, not OOM/panic. ---
+        for src in [
+            "List.Repeat({1}, 1e18)",
+            "List.Numbers(0, 1e18)",
+            "List.Random(1e18)",
+            r#"Table.Repeat(#table({"a"}, {{1}}), 1e18)"#,
+            r#"Table.Partition(#table({"a"}, {{1}}), "a", 1e18, each 0)"#,
+            r#"Text.Repeat("ab", 1e18)"#,
+            r#"Text.PadStart("x", 1e18)"#,
+            "{0..2000000000}",
+        ] {
+            assert!(eval_str(src).is_err(), "expected cap error: {src}");
+        }
+
+        // --- Empty-list guards. ---
+        assert!(eval_str("Table.FromList({1, 2}, null, {})").is_err());
+        assert!(eval_str(
+            r#"Table.CombineColumnsToRecord(#table({"a"}, {{1}}), "r", {})"#
+        )
+        .is_err());
+
+        // --- Date/duration/zone overflow → error, not panic. ---
+        for src in [
+            "Date.IsInNextNMonths(#date(2020,1,1), 1e18)",
+            "Date.AddYears(#date(2020,1,1), 1e18)",
+            "Duration.FromText(\"P9000000000000000D\")",
+            "#datetimezone(2020,1,1,0,0,0, 100000000000000000, 0)",
+        ] {
+            assert!(eval_str(src).is_err(), "expected overflow error: {src}");
+        }
+
+        // --- Number parity without the saturating i64 cast. 1e30 is even;
+        // the old `as i64` saturated to i64::MAX (odd). ---
+        assert!(matches!(eval_str("Number.IsEven(1e30)"), Ok(Value::Logical(true))));
+        assert!(matches!(eval_str("Number.IsOdd(1e30)"), Ok(Value::Logical(false))));
+
+        // --- Expression.Constant escapes `#`, so a value containing the
+        // literal chars `#(lf)` round-trips through Expression.Evaluate
+        // instead of re-lexing to a newline. The `"#(#)(lf)"` source literal
+        // decodes (outer) to the 5-char string `#(lf)`. ---
+        match eval_str(r##"Expression.Evaluate(Expression.Constant("#(#)(lf)"))"##) {
+            Ok(Value::Text(s)) => assert_eq!(s, "#(lf)"),
+            other => panic!("expected Text(\"#(lf)\"), got {other:?}"),
         }
     }
 

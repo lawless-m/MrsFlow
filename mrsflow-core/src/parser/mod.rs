@@ -19,7 +19,19 @@ pub enum ParseError {
     },
     /// Input ended where more was required.
     UnexpectedEof { expected: &'static str },
+    /// Expression/type nesting exceeded the recursion limit. Returned
+    /// instead of overflowing the native stack on pathologically nested
+    /// (or hostile) input like thousands of unclosed `(`/`{`/`[`.
+    TooDeep { limit: usize },
 }
+
+/// Maximum expression/type nesting depth. The recursive-descent grammar is
+/// deeply mutually recursive (~15 stack frames per nesting level through the
+/// precedence chain); without this bound, deeply nested untrusted input
+/// overflows the native stack — an uncatchable abort, not a `ParseError`.
+/// 128 is far beyond any real M source (Excel's own formula nesting limit is
+/// 64) yet stays safe on small stacks (2 MiB test threads, wasm).
+const MAX_PARSE_DEPTH: usize = 128;
 
 pub fn parse(tokens: &[Token]) -> Result<Expr, ParseError> {
     let mut p = Parser::new(tokens);
@@ -96,11 +108,31 @@ fn hash_keyword_name(k: &TokenKind) -> Option<&'static str> {
 struct Parser<'a> {
     tokens: &'a [Token],
     pos: usize,
+    /// Current recursion depth through the expression/type grammar. Bounded
+    /// by `MAX_PARSE_DEPTH` at the two recursion entry points
+    /// (`parse_expression`, `parse_primary_type`).
+    depth: usize,
 }
 
 impl<'a> Parser<'a> {
     fn new(tokens: &'a [Token]) -> Self {
-        Self { tokens, pos: 0 }
+        Self { tokens, pos: 0, depth: 0 }
+    }
+
+    /// Run `f` one recursion level deeper, erroring if the limit is hit.
+    /// Depth is always restored, including on the error path, so a failed
+    /// parse leaves the counter clean for any retry/lookahead.
+    fn with_depth<T>(
+        &mut self,
+        f: impl FnOnce(&mut Self) -> Result<T, ParseError>,
+    ) -> Result<T, ParseError> {
+        if self.depth >= MAX_PARSE_DEPTH {
+            return Err(ParseError::TooDeep { limit: MAX_PARSE_DEPTH });
+        }
+        self.depth += 1;
+        let r = f(self);
+        self.depth -= 1;
+        r
     }
 
     fn peek(&self) -> Option<&'a Token> {
@@ -206,14 +238,17 @@ impl<'a> Parser<'a> {
     // --- Top-level expression dispatch ---
 
     fn parse_expression(&mut self) -> Result<Expr, ParseError> {
-        match self.peek_kind() {
-            Some(TokenKind::If) => self.parse_if(),
-            Some(TokenKind::Let) => self.parse_let(),
-            Some(TokenKind::Each) => self.parse_each(),
-            Some(TokenKind::Try) => self.parse_try(),
-            Some(TokenKind::Error) => self.parse_error_expr(),
-            _ => self.parse_logical_or(),
-        }
+        // Every nesting construct ( ( ) / { } / [ ] / each / try / if / let )
+        // re-enters here, so a single depth guard bounds the whole
+        // expression recursion.
+        self.with_depth(|p| match p.peek_kind() {
+            Some(TokenKind::If) => p.parse_if(),
+            Some(TokenKind::Let) => p.parse_let(),
+            Some(TokenKind::Each) => p.parse_each(),
+            Some(TokenKind::Try) => p.parse_try(),
+            Some(TokenKind::Error) => p.parse_error_expr(),
+            _ => p.parse_logical_or(),
+        })
     }
 
     fn parse_each(&mut self) -> Result<Expr, ParseError> {
@@ -349,6 +384,13 @@ impl<'a> Parser<'a> {
     /// We use one lenient parser everywhere — semantic restrictions become
     /// the type-checker's job rather than the parser's.
     fn parse_primary_type(&mut self) -> Result<Expr, ParseError> {
+        // The type grammar is a separate mutual recursion (list/record/
+        // function types nest type expressions); guard it on the same
+        // shared depth counter so nested types can't overflow the stack.
+        self.with_depth(|p| p.parse_primary_type_inner())
+    }
+
+    fn parse_primary_type_inner(&mut self) -> Result<Expr, ParseError> {
         // Contextual prefix keywords: nullable, table, function.
         if self.peek_is_contextual_identifier("nullable") {
             self.advance();
@@ -992,6 +1034,23 @@ mod tests {
         assert_eq!(s("42"), r#"(num "42")"#);
         assert_eq!(s("0xff"), r#"(num "0xff")"#);
         assert_eq!(s("3.14"), r#"(num "3.14")"#);
+    }
+
+    #[test]
+    fn deeply_nested_input_errors_instead_of_overflowing_stack() {
+        // Thousands of unclosed parens would recurse parse_expression past
+        // the native stack and SIGABRT. Now it returns TooDeep cleanly.
+        let src = "(".repeat(10_000);
+        let toks = tokenize(&src).expect("lex");
+        assert!(
+            matches!(parse(&toks), Err(ParseError::TooDeep { .. })),
+            "deep nesting should yield TooDeep, not a stack overflow or other error"
+        );
+        // A reasonably nested expression well under the limit still parses.
+        let depth = MAX_PARSE_DEPTH - 28;
+        let ok = format!("{}1{}", "(".repeat(depth), ")".repeat(depth));
+        let toks = tokenize(&ok).expect("lex");
+        assert!(parse(&toks).is_ok(), "{depth}-deep nesting must still parse");
     }
 
     #[test]

@@ -15,6 +15,15 @@ use std::time::Duration;
 
 use mrsflow_core::eval::IoError;
 
+/// Cap on a single framed body, to stop a corrupt or hostile `total_len`
+/// from triggering a multi-gigabyte allocation. 256 MiB is far above any
+/// real DBISAM response (the largest observed is a few MiB).
+const MAX_BODY_LEN: usize = 256 * 1024 * 1024;
+
+/// Cap on the inflated size of a compressed body (zip-bomb guard). 1 GiB
+/// is generous headroom over MAX_BODY_LEN's worth of compressible rows.
+const MAX_INFLATED_LEN: u64 = 1024 * 1024 * 1024;
+
 /// 16-byte session GUID — copied from PoC captures.
 pub const GUID: [u8; 16] = [
     0x8A, 0xBE, 0x8E, 0x59, 0x23, 0x64, 0xCB, 0x40,
@@ -92,7 +101,15 @@ pub fn send_recv_compressed(stream: &mut TcpStream, body: &[u8]) -> Result<Vec<u
     let reqcode = if body.len() >= 3 { u16::from_le_bytes([body[1], body[2]]) } else { 0xFFFF };
     let is_connect = reqcode == 0x0000;
     let to_send = if body.len() < 7 {
-        body.to_vec()
+        // A compressed session expects every body to carry the flag byte
+        // + reqcode + inner_len header (7 bytes). Sending a shorter body
+        // raw would omit the flag and desync the session. No current
+        // builder emits a sub-7-byte body, so this is a guard, not a path.
+        return Err(IoError::Other(format!(
+            "Exportmaster: refusing to send a {}-byte body on a compressed session \
+             (needs the 7-byte flag+reqcode+len header)",
+            body.len()
+        )));
     } else {
         let inner = &body[7..];
         if inner.len() <= 16 {
@@ -159,10 +176,18 @@ pub(super) fn deflate(body: &[u8]) -> Result<Vec<u8>, IoError> {
 pub(super) fn inflate(body: &[u8]) -> Result<Vec<u8>, IoError> {
     use flate2::read::ZlibDecoder;
     use std::io::Read;
-    let mut dec = ZlibDecoder::new(body);
-    let mut out = Vec::with_capacity(body.len() * 4);
+    // Bound the read so a hostile/corrupt stream can't inflate without
+    // limit. `take` caps the decoder; if it stops exactly at the cap we
+    // can't tell whether more would have followed, so reject.
+    let mut dec = ZlibDecoder::new(body).take(MAX_INFLATED_LEN + 1);
+    let mut out = Vec::with_capacity((body.len() * 4).min(MAX_INFLATED_LEN as usize));
     dec.read_to_end(&mut out)
         .map_err(|e| IoError::Other(format!("Exportmaster: inflate: {e}")))?;
+    if out.len() as u64 > MAX_INFLATED_LEN {
+        return Err(IoError::Other(format!(
+            "Exportmaster: inflated body exceeds {MAX_INFLATED_LEN}-byte cap"
+        )));
+    }
     Ok(out)
 }
 
@@ -184,6 +209,12 @@ pub fn recv_msg(stream: &mut TcpStream) -> Result<Vec<u8>, IoError> {
         )));
     }
     let body_len = total - 20;
+    if body_len > MAX_BODY_LEN {
+        return Err(IoError::Other(format!(
+            "Exportmaster: server body length {body_len} exceeds {MAX_BODY_LEN}-byte cap \
+             — corrupt or hostile length field"
+        )));
+    }
     let mut body = vec![0u8; body_len];
     read_exact(stream, &mut body)?;
     Ok(body)

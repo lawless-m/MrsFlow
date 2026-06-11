@@ -98,6 +98,25 @@ pub fn decode_record(record: &[u8], columns: &[Column]) -> Result<Vec<CellValue>
     Ok(out)
 }
 
+/// Read the leading `N` value bytes as a fixed array, erroring (not
+/// panicking) when the schema's declared width is narrower than the
+/// type requires. `decode_record` hands `decode_field` exactly `c.max`
+/// bytes, so a corrupt or hostile column descriptor declaring e.g. an
+/// Integer with `max < 4` would otherwise index out of bounds.
+fn fixed<const N: usize>(bytes: &[u8], col: &Column) -> Result<[u8; N], IoError> {
+    bytes
+        .get(..N)
+        .and_then(|s| <[u8; N]>::try_from(s).ok())
+        .ok_or_else(|| {
+            IoError::Other(format!(
+                "Exportmaster: column {} ({:?}) needs {N} value bytes but schema width is {}",
+                col.name,
+                col.field_type,
+                bytes.len()
+            ))
+        })
+}
+
 fn decode_field(col: &Column, bytes: &[u8]) -> Result<CellValue, IoError> {
     use FieldType::*;
     Ok(match col.field_type {
@@ -108,14 +127,19 @@ fn decode_field(col: &Column, bytes: &[u8]) -> Result<CellValue, IoError> {
             // wire — the null flag handled separately, and any trailing
             // bytes past the first 0x00 are zero-padding.
             let end = bytes.iter().position(|&b| b == 0).unwrap_or(bytes.len());
-            let s = std::string::String::from_utf8_lossy(&bytes[..end]).into_owned();
+            // DBISAM ftString is Windows-ANSI text (Windows-1252), not always
+            // valid UTF-8: storage temps carry °C, origins/descriptions carry
+            // accents and smart quotes. from_utf8_lossy silently corrupted every
+            // such byte to U+FFFD (438k cells in NIINGRED alone). decode_dbisam_text
+            // tries UTF-8 first, then Windows-1252 — lossless and never U+FFFD.
+            let s = mrsflow_core::eval::value::decode_dbisam_text(&bytes[..end]);
             CellValue::Text(s)
         }
         Date => {
             // 4-byte LE u32, days since 0001-01-01 (proleptic Gregorian).
             // Out-of-range values (garbage / sentinel rows in wide tables)
             // surface as Null rather than killing the query.
-            let days = u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
+            let days = u32::from_le_bytes(fixed::<4>(bytes, col)?);
             let base = NaiveDate::from_ymd_opt(1, 1, 1).expect("0001-01-01 is valid");
             match base.checked_add_days(chrono::Days::new(days as u64)) {
                 Some(date) => CellValue::Date(date),
@@ -127,7 +151,7 @@ fn decode_field(col: &Column, bytes: &[u8]) -> Result<CellValue, IoError> {
             // Out-of-range / NaN / sentinel values surface as Null rather
             // than killing the query — wide tables often contain "0000-00-00"
             // garbage rows whose payload is uninitialised memory.
-            let serial = f64::from_le_bytes(bytes[..8].try_into().unwrap());
+            let serial = f64::from_le_bytes(fixed::<8>(bytes, col)?);
             // chrono::Duration::days panics outside ~i64::MAX/86_400_000 ms,
             // and NaiveDate's valid range is [-262144, 262143] years. Clamp
             // whole_days to chrono::Days::new's safe range conservatively.
@@ -156,7 +180,7 @@ fn decode_field(col: &Column, bytes: &[u8]) -> Result<CellValue, IoError> {
         }
         Time => {
             // 4-byte LE u32, milliseconds since midnight.
-            let ms = u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
+            let ms = u32::from_le_bytes(fixed::<4>(bytes, col)?);
             let secs = ms / 1000;
             let ns = (ms % 1000) * 1_000_000;
             let t = NaiveTime::from_num_seconds_from_midnight_opt(secs, ns)
@@ -167,32 +191,32 @@ fn decode_field(col: &Column, bytes: &[u8]) -> Result<CellValue, IoError> {
             CellValue::Time(t)
         }
         Integer | AutoInc => {
-            let n = i32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
+            let n = i32::from_le_bytes(fixed::<4>(bytes, col)?);
             CellValue::Int32(n)
         }
         Smallint => {
-            let n = i16::from_le_bytes([bytes[0], bytes[1]]);
+            let n = i16::from_le_bytes(fixed::<2>(bytes, col)?);
             CellValue::Int32(n as i32)
         }
         Largeint => {
-            let n = i64::from_le_bytes(bytes[..8].try_into().unwrap());
+            let n = i64::from_le_bytes(fixed::<8>(bytes, col)?);
             CellValue::Int64(n)
         }
         Boolean => {
             // 2-byte WordBool: FFFF = true, 0000 = false. Any other
             // pattern is treated as false (the documented values are
             // strict 0 and -1; we don't seen anything else in practice).
-            let v = u16::from_le_bytes([bytes[0], bytes[1]]);
+            let v = u16::from_le_bytes(fixed::<2>(bytes, col)?);
             CellValue::Bool(v != 0)
         }
         Float => {
-            let v = f64::from_le_bytes(bytes[..8].try_into().unwrap());
+            let v = f64::from_le_bytes(fixed::<8>(bytes, col)?);
             CellValue::Float(v)
         }
         Currency => {
             // 8-byte LE Int64, scaled by 10_000 (DBISAM Currency stores
             // four decimal places as a fixed-point integer).
-            let raw = i64::from_le_bytes(bytes[..8].try_into().unwrap());
+            let raw = i64::from_le_bytes(fixed::<8>(bytes, col)?);
             CellValue::Float(raw as f64 / 10_000.0)
         }
         Blob | Memo | Graphic => {
@@ -201,9 +225,7 @@ fn decode_field(col: &Column, bytes: &[u8]) -> Result<CellValue, IoError> {
             // the opaque handle through to the column builder, which
             // either fetches it lazily (TODO: future) or surfaces the
             // raw bytes as Binary in v1.
-            let mut h = [0u8; 8];
-            h.copy_from_slice(&bytes[..8]);
-            CellValue::BlobHandle(h)
+            CellValue::BlobHandle(fixed::<8>(bytes, col)?)
         }
         Bytes => CellValue::Binary(bytes.to_vec()),
         VarBytes => {
@@ -388,6 +410,41 @@ impl<'a> ColumnBuilders<'a> {
         Ok(())
     }
 
+    /// Overwrite a single Binary-column cell after the row was originally
+    /// pushed with a placeholder (`None`). The blob resolver uses this:
+    /// rows go in with `None` for blob columns during the streaming cursor
+    /// callback, then the resolver fetches payloads via 0x0280 and writes
+    /// them back into the right `(col_idx, row_idx)` slot.
+    ///
+    /// Errors if `col_idx` is out of bounds or doesn't refer to a Binary
+    /// column, or if `row_idx` is past the rows pushed so far.
+    pub fn overwrite_binary_cell(
+        &mut self,
+        col_idx: usize,
+        row_idx: usize,
+        bytes: Option<Vec<u8>>,
+    ) -> Result<(), IoError> {
+        let total = self.inner.len();
+        let b = self.inner.get_mut(col_idx).ok_or_else(|| {
+            IoError::Other(format!(
+                "Exportmaster: blob resolver col_idx {col_idx} out of bounds (have {total} columns)"
+            ))
+        })?;
+        let ColumnBuilder::Binary(v) = b else {
+            return Err(IoError::Other(format!(
+                "Exportmaster: blob resolver col_idx {col_idx} is not a Binary column"
+            )));
+        };
+        let rows = v.len();
+        let cell = v.get_mut(row_idx).ok_or_else(|| {
+            IoError::Other(format!(
+                "Exportmaster: blob resolver row_idx {row_idx} out of bounds for col {col_idx} (have {rows} rows)"
+            ))
+        })?;
+        *cell = bytes;
+        Ok(())
+    }
+
     pub fn finish(self) -> Result<RecordBatch, IoError> {
         let mut fields = Vec::with_capacity(self.inner.len());
         let mut arrays = Vec::with_capacity(self.inner.len());
@@ -399,5 +456,97 @@ impl<'a> ColumnBuilders<'a> {
         let schema = Arc::new(Schema::new(fields));
         RecordBatch::try_new(schema, arrays)
             .map_err(|e| IoError::Other(format!("Exportmaster: RecordBatch::try_new: {e}")))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::exportmaster::schema::Column;
+
+    fn col(ord: u16, name: &str, ft: FieldType, max: u8, row_offset: u16) -> Column {
+        Column {
+            ord,
+            name: name.to_string(),
+            field_type: ft,
+            decl: max,
+            max,
+            row_offset,
+        }
+    }
+
+    #[test]
+    fn decode_field_errors_on_narrow_schema_width_instead_of_panicking() {
+        // A corrupt schema declares an Integer column with max=2 (should
+        // be 4). decode_record hands decode_field a 2-byte slice; the
+        // old code indexed bytes[0..4] and panicked. Now it errors.
+        let c = col(1, "QTY", FieldType::Integer, 2, 25);
+        let err = decode_field(&c, &[0x01, 0x02]);
+        assert!(err.is_err(), "narrow Integer width must error, not panic");
+
+        // Currency declared at 4 bytes (needs 8) — same guard.
+        let c = col(2, "PRICE", FieldType::Currency, 4, 25);
+        assert!(decode_field(&c, &[0u8; 4]).is_err());
+
+        // Correct width still decodes.
+        let c = col(3, "N", FieldType::Integer, 4, 25);
+        assert!(matches!(
+            decode_field(&c, &7i32.to_le_bytes()).unwrap(),
+            CellValue::Int32(7)
+        ));
+    }
+
+    #[test]
+    fn overwrite_binary_cell_replaces_placeholder() {
+        // Two rows, two columns: PK (String) + memo (Memo). Push each
+        // row with the memo cell as Null (the placeholder the blob
+        // resolver writes during the cursor callback), then overwrite
+        // those slots with resolved payloads.
+        let columns = vec![
+            col(1, "CODE", FieldType::String, 14, 25),
+            col(2, "LONGDESC", FieldType::Memo, 8, 40),
+        ];
+        let mut b = ColumnBuilders::new(&columns, 2);
+        b.push_row(vec![CellValue::Text("AAA".into()), CellValue::Null]).unwrap();
+        b.push_row(vec![CellValue::Text("BBB".into()), CellValue::Null]).unwrap();
+
+        b.overwrite_binary_cell(1, 0, Some(b"first blob".to_vec())).unwrap();
+        b.overwrite_binary_cell(1, 1, Some(b"second blob".to_vec())).unwrap();
+
+        let batch = b.finish().unwrap();
+        let memo = batch.column(1).as_any().downcast_ref::<arrow::array::BinaryArray>().unwrap();
+        assert_eq!(memo.value(0), b"first blob");
+        assert_eq!(memo.value(1), b"second blob");
+    }
+
+    #[test]
+    fn overwrite_binary_cell_errors_on_wrong_column_type() {
+        let columns = vec![col(1, "CODE", FieldType::String, 14, 25)];
+        let mut b = ColumnBuilders::new(&columns, 1);
+        b.push_row(vec![CellValue::Text("AAA".into())]).unwrap();
+        // Column 0 is String, not Binary — overwrite must reject.
+        assert!(b.overwrite_binary_cell(0, 0, Some(vec![0xFF])).is_err());
+    }
+
+    #[test]
+    fn overwrite_binary_cell_errors_on_out_of_bounds() {
+        let columns = vec![col(1, "DESC", FieldType::Memo, 8, 25)];
+        let mut b = ColumnBuilders::new(&columns, 1);
+        b.push_row(vec![CellValue::Null]).unwrap();
+        assert!(b.overwrite_binary_cell(0, 99, Some(vec![1])).is_err()); // row OOB
+        assert!(b.overwrite_binary_cell(99, 0, Some(vec![1])).is_err()); // col OOB
+    }
+
+    #[test]
+    fn overwrite_binary_cell_can_clear_to_null() {
+        // Passing None overwrites the cell with NULL (used when the
+        // server reports a zero handle = empty/absent blob).
+        let columns = vec![col(1, "DESC", FieldType::Memo, 8, 25)];
+        let mut b = ColumnBuilders::new(&columns, 1);
+        b.push_row(vec![CellValue::Binary(vec![1, 2, 3])]).unwrap();
+        b.overwrite_binary_cell(0, 0, None).unwrap();
+        let batch = b.finish().unwrap();
+        let memo = batch.column(0).as_any().downcast_ref::<arrow::array::BinaryArray>().unwrap();
+        assert!(memo.is_null(0));
     }
 }

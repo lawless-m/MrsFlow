@@ -1327,6 +1327,63 @@ impl Table {
     }
 }
 
+/// Decode bytes from a DBISAM text or memo field into a `String`.
+///
+/// DBISAM (a Delphi/Windows database) stores legacy `ftString` text in the
+/// Windows ANSI code page — Windows-1252 — while newer "unicode" memo fields
+/// hold UTF-8. A single fixed decode can't serve both, so try UTF-8 first
+/// (genuine UTF-8 content round-trips byte-for-byte) and fall back to
+/// Windows-1252 on invalid UTF-8. The fallback never errors and never emits
+/// U+FFFD: every byte maps to a char, and the five cp1252-undefined bytes
+/// (0x81/0x8D/0x8F/0x90/0x9D) keep their U+008x code point so no information
+/// is lost. Replaces the old `from_utf8_lossy`, which silently corrupted
+/// every non-UTF-8 byte to U+FFFD.
+pub fn decode_dbisam_text(bytes: &[u8]) -> String {
+    match std::str::from_utf8(bytes) {
+        Ok(s) => s.to_owned(),
+        Err(_) => bytes.iter().map(|&b| cp1252_byte_to_char(b)).collect(),
+    }
+}
+
+/// Map one byte to its Windows-1252 character. ASCII (0x00–0x7F) and
+/// 0xA0–0xFF coincide with the first 256 Unicode code points, so a direct
+/// cast is correct there; only 0x80–0x9F diverge and are mapped explicitly.
+/// The five undefined slots fall through to `other as char`, preserving the
+/// raw byte value.
+#[inline]
+fn cp1252_byte_to_char(b: u8) -> char {
+    match b {
+        0x80 => '\u{20AC}', // €
+        0x82 => '\u{201A}', // ‚
+        0x83 => '\u{0192}', // ƒ
+        0x84 => '\u{201E}', // „
+        0x85 => '\u{2026}', // …
+        0x86 => '\u{2020}', // †
+        0x87 => '\u{2021}', // ‡
+        0x88 => '\u{02C6}', // ˆ
+        0x89 => '\u{2030}', // ‰
+        0x8A => '\u{0160}', // Š
+        0x8B => '\u{2039}', // ‹
+        0x8C => '\u{0152}', // Œ
+        0x8E => '\u{017D}', // Ž
+        0x91 => '\u{2018}', // ‘
+        0x92 => '\u{2019}', // ’
+        0x93 => '\u{201C}', // “
+        0x94 => '\u{201D}', // ”
+        0x95 => '\u{2022}', // •
+        0x96 => '\u{2013}', // –
+        0x97 => '\u{2014}', // —
+        0x98 => '\u{02DC}', // ˜
+        0x99 => '\u{2122}', // ™
+        0x9A => '\u{0161}', // š
+        0x9B => '\u{203A}', // ›
+        0x9C => '\u{0153}', // œ
+        0x9E => '\u{017E}', // ž
+        0x9F => '\u{0178}', // Ÿ
+        other => other as char,
+    }
+}
+
 /// Encode a Rows-backed table into an Arrow `RecordBatch`. Runs the same
 /// per-column inference as `#table` construction (`infer_cells`): a column
 /// whose cells are uniform (after ignoring nulls) encodes to its Arrow
@@ -1369,6 +1426,17 @@ fn rows_to_arrow(
                 let mut strings: Vec<Option<String>> = Vec::with_capacity(cells.len());
                 let mut has_null = false;
                 for cell in &cells {
+                    // Native connectors (Exportmaster/DBISAM) surface memo/BLOB
+                    // fields as Value::Binary. PQ's Text.From rejects Binary, so
+                    // text_from_value (which mirrors PQ) can't coerce it — but on
+                    // the parquet sink path those memo fields are text, so decode
+                    // them here rather than failing the whole write. UTF-8 first,
+                    // Windows-1252 fallback (see decode_dbisam_text). A present-
+                    // but-empty blob becomes "" (distinct from a null cell).
+                    if let Value::Binary(b) = cell {
+                        strings.push(Some(decode_dbisam_text(b)));
+                        continue;
+                    }
                     match super::stdlib::text::text_from_value(cell)? {
                         Value::Null => {
                             strings.push(None);
@@ -2316,6 +2384,64 @@ pub enum MError {
     /// Generic catch-all replaced by more specific variants as slices surface
     /// real categories.
     Other(String),
+}
+
+#[cfg(test)]
+mod decode_text_tests {
+    use super::decode_dbisam_text;
+
+    #[test]
+    fn utf8_passthrough() {
+        // Genuine UTF-8 (e.g. the *UNI memo fields) round-trips byte-for-byte.
+        let s = "Café — Ζάχαρη 日本語";
+        assert_eq!(decode_dbisam_text(s.as_bytes()), s);
+    }
+
+    #[test]
+    fn cp1252_western_glyphs() {
+        // Windows-1252 bytes that are invalid UTF-8 decode to the right glyphs.
+        assert_eq!(decode_dbisam_text(&[0x4B, 0xFC, 0x68, 0x6C]), "Kühl"); // ü = 0xFC
+        assert_eq!(decode_dbisam_text(&[0x35, 0xB0, 0x43]), "5°C"); // ° = 0xB0
+        assert_eq!(decode_dbisam_text(&[0x92]), "\u{2019}"); // cp1252 right single quote
+        assert_eq!(decode_dbisam_text(&[0x80]), "\u{20AC}"); // €
+    }
+
+    #[test]
+    fn never_emits_replacement_char() {
+        // Every byte 0x00..=0xFF must decode without producing U+FFFD.
+        let all: Vec<u8> = (0u8..=255).collect();
+        let out = decode_dbisam_text(&all);
+        assert!(!out.contains('\u{FFFD}'), "decode produced U+FFFD");
+    }
+
+    #[test]
+    fn cp1252_is_byte_reversible() {
+        // Non-UTF-8 input: each char maps back to its original byte, so the
+        // decode is lossless even when the glyph is "wrong" (e.g. Greek text
+        // stored in cp1253 read as cp1252 — still recoverable).
+        let bytes: Vec<u8> = vec![0x41, 0x92, 0xB0, 0x81, 0x9D, 0xE9, 0xFF];
+        let s = decode_dbisam_text(&bytes);
+        let cp1252_undefined: [u8; 5] = [0x81, 0x8D, 0x8F, 0x90, 0x9D];
+        let recovered: Vec<u8> = s
+            .chars()
+            .map(|c| {
+                let cp = c as u32;
+                // Invert the cp1252 map: the chosen glyphs are all > 0xFF except
+                // the byte-preserving ASCII / 0xA0-0xFF / undefined slots.
+                match c {
+                    '\u{20AC}' => 0x80,
+                    '\u{2019}' => 0x92,
+                    _ if cp <= 0xFF => cp as u8,
+                    _ => panic!("unexpected char {c:?}"),
+                }
+            })
+            .collect();
+        // Sanity: the undefined slots stayed as their raw byte value.
+        for b in cp1252_undefined {
+            assert_eq!(decode_dbisam_text(&[b]).chars().next().unwrap() as u32, b as u32);
+        }
+        assert_eq!(recovered, bytes);
+    }
 }
 
 #[cfg(test)]

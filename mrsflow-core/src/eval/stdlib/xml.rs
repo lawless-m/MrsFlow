@@ -78,6 +78,10 @@ enum XmlContent {
     Children(Vec<XmlNode>),
 }
 
+/// Max element nesting depth. nodes_to_table recurses once per level, so
+/// this caps that recursion; real XML rarely nests past a few dozen.
+const MAX_XML_DEPTH: usize = 256;
+
 fn parse_xml(bytes: &[u8]) -> Result<XmlNode, MError> {
     use quick_xml::events::Event;
     use quick_xml::name::ResolveResult;
@@ -116,6 +120,15 @@ fn parse_xml(bytes: &[u8]) -> Result<XmlNode, MError> {
                     _ => None,
                 };
                 let attributes = collect_attributes(&e)?;
+                // Bound nesting depth: parse_xml is iterative, but
+                // nodes_to_table later recurses once per level, so an
+                // arbitrarily deep (but valid) document would overflow the
+                // native stack inside document(). Reject past the limit.
+                if stack.len() >= MAX_XML_DEPTH {
+                    return Err(MError::Other(format!(
+                        "Xml.Document: element nesting exceeds the {MAX_XML_DEPTH}-level limit"
+                    )));
+                }
                 stack.push((
                     XmlNode {
                         name: local,

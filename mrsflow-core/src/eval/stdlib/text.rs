@@ -811,12 +811,23 @@ fn replace_range(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 }
 
 
+/// Safety cap on a materialised string length. An input-controlled count /
+/// target (usize::MAX after the f64 cast) would otherwise make `repeat` /
+/// `repeat_n` panic on capacity overflow or OOM-abort. 1 GiB is far beyond
+/// any realistic M string.
+const MAX_TEXT_BYTES: usize = 1 << 30;
+
 fn pad_start(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
     let target = match &args[1] {
         Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
         other => return Err(type_mismatch("non-negative integer", other)),
     };
+    if target > MAX_TEXT_BYTES {
+        return Err(MError::Other(format!(
+            "Text.PadStart: target length {target} exceeds the {MAX_TEXT_BYTES} cap"
+        )));
+    }
     let pad_char = match args.get(2) {
         Some(Value::Text(s)) => {
             let mut it = s.chars();
@@ -848,6 +859,11 @@ fn pad_end(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
         other => return Err(type_mismatch("non-negative integer", other)),
     };
+    if target > MAX_TEXT_BYTES {
+        return Err(MError::Other(format!(
+            "Text.PadEnd: target length {target} exceeds the {MAX_TEXT_BYTES} cap"
+        )));
+    }
     let pad_char = match args.get(2) {
         Some(Value::Text(s)) => {
             let mut it = s.chars();
@@ -882,6 +898,15 @@ fn repeat(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         )),
         other => return Err(type_mismatch("non-negative integer", other)),
     };
+    text.len()
+        .checked_mul(count)
+        .filter(|&b| b <= MAX_TEXT_BYTES)
+        .ok_or_else(|| {
+            MError::Other(format!(
+                "Text.Repeat: result ({} × {count} bytes) exceeds the {MAX_TEXT_BYTES} cap",
+                text.len()
+            ))
+        })?;
     Ok(Value::Text(text.repeat(count)))
 }
 
@@ -1065,11 +1090,11 @@ fn between_delimiters(args: &[Value], _host: &dyn IoHost) -> Result<Value, MErro
 
 fn clean(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let text = expect_text(&args[0])?;
+    // PQ Text.Clean strips all non-printable control characters (including
+    // \t \n \r). A single `!c.is_control()` filter does that; the previous
+    // first filter that tried to keep \n\r\t was fully overridden by it.
     Ok(Value::Text(
-        text.chars()
-            .filter(|c| !(c.is_control() && *c != '\n' && *c != '\r' && *c != '\t'))
-            .filter(|c| !c.is_control())
-            .collect(),
+        text.chars().filter(|c| !c.is_control()).collect(),
     ))
 }
 

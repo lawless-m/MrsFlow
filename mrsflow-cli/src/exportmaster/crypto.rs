@@ -7,6 +7,8 @@ use blowfish::Blowfish;
 use cbc::cipher::{BlockEncryptMut, KeyIvInit};
 use md5::{Digest, Md5};
 
+use mrsflow_core::eval::IoError;
+
 type BlowfishCbcEnc = cbc::Encryptor<Blowfish>;
 
 /// Encrypt a DBISAM login plaintext.
@@ -15,8 +17,27 @@ type BlowfishCbcEnc = cbc::Encryptor<Blowfish>;
 /// zero-padded to a multiple of 8 (Blowfish block size).
 ///
 /// Returns the ciphertext exactly as written to the wire — same length
-/// as the padded plaintext.
-pub fn encrypt_login(username: &[u8], password: &[u8], encrypt_password: &[u8]) -> Vec<u8> {
+/// as the padded plaintext. Errors if the username or password exceeds
+/// 255 bytes: each is framed with a single-byte length prefix, so a
+/// longer value would wrap and silently authenticate as a truncated
+/// credential.
+pub fn encrypt_login(
+    username: &[u8],
+    password: &[u8],
+    encrypt_password: &[u8],
+) -> Result<Vec<u8>, IoError> {
+    if username.len() > 255 {
+        return Err(IoError::Other(format!(
+            "Exportmaster: username is {} bytes; the login frame caps it at 255",
+            username.len()
+        )));
+    }
+    if password.len() > 255 {
+        return Err(IoError::Other(format!(
+            "Exportmaster: password is {} bytes; the login frame caps it at 255",
+            password.len()
+        )));
+    }
     // Build plaintext: length-prefixed user + password.
     let mut pt = Vec::with_capacity(2 + username.len() + password.len() + 8);
     pt.push(username.len() as u8);
@@ -50,7 +71,7 @@ pub fn encrypt_login(username: &[u8], password: &[u8], encrypt_password: &[u8]) 
         let block = GenericArray::from_mut_slice(chunk);
         cipher.encrypt_block_mut(block);
     }
-    out
+    Ok(out)
 }
 
 #[cfg(test)]
@@ -61,13 +82,23 @@ mod tests {
     /// user `e3user`, password `e3usernew`, encrypt password `elevatesoft`.
     #[test]
     fn login_ciphertext_matches_doc_worked_example() {
-        let ct = encrypt_login(b"e3user", b"e3usernew", b"elevatesoft");
+        let ct = encrypt_login(b"e3user", b"e3usernew", b"elevatesoft").unwrap();
         let expected = [
             0x57, 0x25, 0x56, 0x8E, 0x56, 0x01, 0xB0, 0x58,
             0xD1, 0x7E, 0xE1, 0x77, 0x20, 0xB6, 0x95, 0x24,
             0x78, 0x1F, 0x5A, 0x02, 0x17, 0xF2, 0x43, 0x90,
         ];
         assert_eq!(ct, expected);
+    }
+
+    #[test]
+    fn rejects_credentials_over_255_bytes() {
+        let long = vec![b'a'; 256];
+        assert!(encrypt_login(&long, b"pw", b"elevatesoft").is_err());
+        assert!(encrypt_login(b"user", &long, b"elevatesoft").is_err());
+        // 255 is the boundary and must still succeed.
+        let max = vec![b'a'; 255];
+        assert!(encrypt_login(&max, b"pw", b"elevatesoft").is_ok());
     }
 
     #[test]

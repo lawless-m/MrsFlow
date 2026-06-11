@@ -67,6 +67,12 @@ pub struct ConnOpts {
     /// ReadNextRecordBlock call. Bigger = fewer round trips but
     /// larger responses. Default 5000.
     pub batch_size: u32,
+    /// Slot length for blob fetches (`cursor.@+0x3672` in the BPL — the
+    /// table's physical-record bookmark size). Set per-table; the value
+    /// isn't yet extracted from the cursor preamble. Default 56 matches
+    /// every ex3win table with a single-column ≤14-char string PK
+    /// observed in captures (§6a "where to read slot_length").
+    pub blob_slot_length: usize,
 }
 
 impl ConnOpts {
@@ -88,6 +94,7 @@ impl ConnOpts {
             // links where bandwidth dominates.
             compression: false,
             batch_size: 5000,
+            blob_slot_length: 56,
         }
     }
 
@@ -123,6 +130,13 @@ impl ConnOpts {
                     if let Value::Number(n) = v {
                         if *n >= 1.0 && *n <= 100_000.0 {
                             self.batch_size = *n as u32;
+                        }
+                    }
+                }
+                "BlobSlotLength" => {
+                    if let Value::Number(n) = v {
+                        if *n >= 17.0 && *n <= 4096.0 {
+                            self.blob_slot_length = *n as usize;
                         }
                     }
                 }

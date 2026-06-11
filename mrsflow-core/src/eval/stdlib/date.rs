@@ -259,12 +259,14 @@ fn from(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
             }
             let epoch = chrono::NaiveDate::from_ymd_opt(1899, 12, 30).unwrap();
             let days = n.trunc() as i64;
-            match epoch.checked_add_signed(chrono::Duration::days(days)) {
-                Some(d) => Ok(Value::Date(d)),
-                None => Err(MError::Other(format!(
+            // try_days rejects an out-of-range delta; chrono::Duration::days
+            // would panic on the multiply overflow for a huge serial.
+            chrono::TimeDelta::try_days(days)
+                .and_then(|d| epoch.checked_add_signed(d))
+                .map(Value::Date)
+                .ok_or_else(|| MError::Other(format!(
                     "Date.From: serial date {n} out of range"
-                ))),
-            }
+                )))
         }
         other => Err(type_mismatch("date/datetime/text/number/null", other)),
     }
@@ -786,18 +788,54 @@ fn is_in_previous_year(args: &[Value], _host: &dyn IoHost) -> Result<Value, MErr
 // ----- IsInNextN* / IsInPreviousN* -----
 
 
+/// `base ± n·days` without panicking. chrono::Duration::days(n) and the
+/// `NaiveDate + Duration` operators both panic on overflow; these return
+/// an MError for an out-of-range count instead.
+fn date_add_days(base: chrono::NaiveDate, n: i64, ctx: &str) -> Result<chrono::NaiveDate, MError> {
+    chrono::TimeDelta::try_days(n)
+        .and_then(|td| base.checked_add_signed(td))
+        .ok_or_else(|| MError::Other(format!("{ctx}: {n} days out of range")))
+}
+fn date_sub_days(base: chrono::NaiveDate, n: i64, ctx: &str) -> Result<chrono::NaiveDate, MError> {
+    chrono::TimeDelta::try_days(n)
+        .and_then(|td| base.checked_sub_signed(td))
+        .ok_or_else(|| MError::Other(format!("{ctx}: {n} days out of range")))
+}
+fn date_add_weeks(base: chrono::NaiveDate, n: i64, ctx: &str) -> Result<chrono::NaiveDate, MError> {
+    chrono::TimeDelta::try_weeks(n)
+        .and_then(|td| base.checked_add_signed(td))
+        .ok_or_else(|| MError::Other(format!("{ctx}: {n} weeks out of range")))
+}
+fn date_sub_weeks(base: chrono::NaiveDate, n: i64, ctx: &str) -> Result<chrono::NaiveDate, MError> {
+    chrono::TimeDelta::try_weeks(n)
+        .and_then(|td| base.checked_sub_signed(td))
+        .ok_or_else(|| MError::Other(format!("{ctx}: {n} weeks out of range")))
+}
+/// `shift_months_signed` mapping out-of-range / overflow to an MError
+/// instead of the panicking `.unwrap()`.
+fn shift_months_checked(d: chrono::NaiveDate, months: i64, ctx: &str) -> Result<chrono::NaiveDate, MError> {
+    shift_months_signed(d, months)
+        .ok_or_else(|| MError::Other(format!("{ctx}: month arithmetic out of range")))
+}
+/// Compute a checked month offset `(n + add) * mul`, erroring on overflow.
+fn months_offset(n: i64, add: i64, mul: i64, ctx: &str) -> Result<i64, MError> {
+    n.checked_add(add)
+        .and_then(|x| x.checked_mul(mul))
+        .ok_or_else(|| MError::Other(format!("{ctx}: count {n} out of range")))
+}
+
 fn is_in_next_n_days(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let d = match extract_date_opt(&args[0], "Date.IsInNextNDays")? { Some(d) => d, None => return Ok(Value::Null) };
     let n = int_n_arg(&args[1], "Date.IsInNextNDays")?;
     let start = today() + chrono::Duration::days(1);
-    let end = today() + chrono::Duration::days(n);
+    let end = date_add_days(today(), n, "Date.IsInNextNDays")?;
     Ok(Value::Logical(in_range(d, start, end)))
 }
 
 fn is_in_previous_n_days(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let d = match extract_date_opt(&args[0], "Date.IsInPreviousNDays")? { Some(d) => d, None => return Ok(Value::Null) };
     let n = int_n_arg(&args[1], "Date.IsInPreviousNDays")?;
-    let start = today() - chrono::Duration::days(n);
+    let start = date_sub_days(today(), n, "Date.IsInPreviousNDays")?;
     let end = today() - chrono::Duration::days(1);
     Ok(Value::Logical(in_range(d, start, end)))
 }
@@ -806,7 +844,7 @@ fn is_in_next_n_weeks(args: &[Value], _host: &dyn IoHost) -> Result<Value, MErro
     let d = match extract_date_opt(&args[0], "Date.IsInNextNWeeks")? { Some(d) => d, None => return Ok(Value::Null) };
     let n = int_n_arg(&args[1], "Date.IsInNextNWeeks")?;
     let start = start_of_week_naive(today()) + chrono::Duration::weeks(1);
-    let end = start + chrono::Duration::weeks(n) - chrono::Duration::days(1);
+    let end = date_add_weeks(start, n, "Date.IsInNextNWeeks")? - chrono::Duration::days(1);
     Ok(Value::Logical(in_range(d, start, end)))
 }
 
@@ -814,22 +852,22 @@ fn is_in_previous_n_weeks(args: &[Value], _host: &dyn IoHost) -> Result<Value, M
     let d = match extract_date_opt(&args[0], "Date.IsInPreviousNWeeks")? { Some(d) => d, None => return Ok(Value::Null) };
     let n = int_n_arg(&args[1], "Date.IsInPreviousNWeeks")?;
     let end = start_of_week_naive(today()) - chrono::Duration::days(1);
-    let start = end - chrono::Duration::weeks(n) + chrono::Duration::days(1);
+    let start = date_sub_weeks(end, n, "Date.IsInPreviousNWeeks")? + chrono::Duration::days(1);
     Ok(Value::Logical(in_range(d, start, end)))
 }
 
 fn is_in_next_n_months(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let d = match extract_date_opt(&args[0], "Date.IsInNextNMonths")? { Some(d) => d, None => return Ok(Value::Null) };
     let n = int_n_arg(&args[1], "Date.IsInNextNMonths")?;
-    let start = shift_months_signed(start_of_month_naive(today()), 1).unwrap();
-    let end_month_start = shift_months_signed(start, n - 1).unwrap();
+    let start = shift_months_checked(start_of_month_naive(today()), 1, "Date.IsInNextNMonths")?;
+    let end_month_start = shift_months_checked(start, months_offset(n, -1, 1, "Date.IsInNextNMonths")?, "Date.IsInNextNMonths")?;
     Ok(Value::Logical(in_range(d, start, end_of_month_naive(end_month_start))))
 }
 
 fn is_in_previous_n_months(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let d = match extract_date_opt(&args[0], "Date.IsInPreviousNMonths")? { Some(d) => d, None => return Ok(Value::Null) };
     let n = int_n_arg(&args[1], "Date.IsInPreviousNMonths")?;
-    let start = shift_months_signed(start_of_month_naive(today()), -n).unwrap();
+    let start = shift_months_checked(start_of_month_naive(today()), months_offset(n, 0, -1, "Date.IsInPreviousNMonths")?, "Date.IsInPreviousNMonths")?;
     let end = start_of_month_naive(today()) - chrono::Duration::days(1);
     Ok(Value::Logical(in_range(d, start, end)))
 }
@@ -837,15 +875,15 @@ fn is_in_previous_n_months(args: &[Value], _host: &dyn IoHost) -> Result<Value, 
 fn is_in_next_n_quarters(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let d = match extract_date_opt(&args[0], "Date.IsInNextNQuarters")? { Some(d) => d, None => return Ok(Value::Null) };
     let n = int_n_arg(&args[1], "Date.IsInNextNQuarters")?;
-    let start = shift_months_signed(start_of_quarter_naive(today()), 3).unwrap();
-    let end_q = shift_months_signed(start, (n - 1) * 3).unwrap();
+    let start = shift_months_checked(start_of_quarter_naive(today()), 3, "Date.IsInNextNQuarters")?;
+    let end_q = shift_months_checked(start, months_offset(n, -1, 3, "Date.IsInNextNQuarters")?, "Date.IsInNextNQuarters")?;
     Ok(Value::Logical(in_range(d, start, end_of_quarter_naive(end_q))))
 }
 
 fn is_in_previous_n_quarters(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let d = match extract_date_opt(&args[0], "Date.IsInPreviousNQuarters")? { Some(d) => d, None => return Ok(Value::Null) };
     let n = int_n_arg(&args[1], "Date.IsInPreviousNQuarters")?;
-    let start = shift_months_signed(start_of_quarter_naive(today()), -n * 3).unwrap();
+    let start = shift_months_checked(start_of_quarter_naive(today()), months_offset(n, 0, -3, "Date.IsInPreviousNQuarters")?, "Date.IsInPreviousNQuarters")?;
     let end = start_of_quarter_naive(today()) - chrono::Duration::days(1);
     Ok(Value::Logical(in_range(d, start, end)))
 }
@@ -853,15 +891,15 @@ fn is_in_previous_n_quarters(args: &[Value], _host: &dyn IoHost) -> Result<Value
 fn is_in_next_n_years(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let d = match extract_date_opt(&args[0], "Date.IsInNextNYears")? { Some(d) => d, None => return Ok(Value::Null) };
     let n = int_n_arg(&args[1], "Date.IsInNextNYears")?;
-    let start = shift_months_signed(start_of_year_naive(today()), 12).unwrap();
-    let end_y = shift_months_signed(start, (n - 1) * 12).unwrap();
+    let start = shift_months_checked(start_of_year_naive(today()), 12, "Date.IsInNextNYears")?;
+    let end_y = shift_months_checked(start, months_offset(n, -1, 12, "Date.IsInNextNYears")?, "Date.IsInNextNYears")?;
     Ok(Value::Logical(in_range(d, start, end_of_year_naive(end_y))))
 }
 
 fn is_in_previous_n_years(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let d = match extract_date_opt(&args[0], "Date.IsInPreviousNYears")? { Some(d) => d, None => return Ok(Value::Null) };
     let n = int_n_arg(&args[1], "Date.IsInPreviousNYears")?;
-    let start = shift_months_signed(start_of_year_naive(today()), -n * 12).unwrap();
+    let start = shift_months_checked(start_of_year_naive(today()), months_offset(n, 0, -12, "Date.IsInPreviousNYears")?, "Date.IsInPreviousNYears")?;
     let end = start_of_year_naive(today()) - chrono::Duration::days(1);
     Ok(Value::Logical(in_range(d, start, end)))
 }
@@ -914,10 +952,13 @@ fn add_days(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 
 
 fn shift_months_signed(d: chrono::NaiveDate, n: i64) -> Option<chrono::NaiveDate> {
+    // `Months::new` takes a u32; `n as u32` would silently truncate a large
+    // count (e.g. 2^32 months → 0). try_from yields None instead.
+    let mag = u32::try_from(n.unsigned_abs()).ok()?;
     if n >= 0 {
-        d.checked_add_months(chrono::Months::new(n as u32))
+        d.checked_add_months(chrono::Months::new(mag))
     } else {
-        d.checked_sub_months(chrono::Months::new((-n) as u32))
+        d.checked_sub_months(chrono::Months::new(mag))
     }
 }
 
@@ -928,7 +969,9 @@ fn add_years(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         Value::Null => return Ok(Value::Null),
         other => return Err(type_mismatch("integer (numberOfYears)", other)),
     };
-    let months = n * 12;
+    let months = n
+        .checked_mul(12)
+        .ok_or_else(|| MError::Other("Date.AddYears: result out of range".into()))?;
     match &args[0] {
         Value::Null => Ok(Value::Null),
         Value::Date(d) => shift_months_signed(*d, months)
@@ -950,7 +993,9 @@ fn add_quarters(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         Value::Null => return Ok(Value::Null),
         other => return Err(type_mismatch("integer (numberOfQuarters)", other)),
     };
-    let months = n * 3;
+    let months = n
+        .checked_mul(3)
+        .ok_or_else(|| MError::Other("Date.AddQuarters: result out of range".into()))?;
     match &args[0] {
         Value::Null => Ok(Value::Null),
         Value::Date(d) => shift_months_signed(*d, months)

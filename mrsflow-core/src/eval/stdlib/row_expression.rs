@@ -140,7 +140,10 @@ fn binary_name(op: &BinaryOp) -> &'static str {
         BinaryOp::Subtract => "Subtract",
         BinaryOp::Multiply => "Multiply",
         BinaryOp::Divide => "Divide",
-        BinaryOp::Concat => "And",  // PQ names text/list concat as logical "And"? — use "Concat"
+        // `&` (concat) must be distinct from logical `and`; reflecting both
+        // as "And" made them indistinguishable. No RowExpression oracle case
+        // exercises `&`, so this is unobserved today.
+        BinaryOp::Concat => "Concatenate",
         BinaryOp::LessThan => "LessThan",
         BinaryOp::LessEquals => "LessThanOrEqualTo",
         BinaryOp::GreaterThan => "GreaterThan",

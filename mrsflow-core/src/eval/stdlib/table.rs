@@ -1811,9 +1811,18 @@ fn column(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 
 
 fn is_empty(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
-    // Schema-only: row count comes from the parquet footer, no decode.
-    let table = expect_table_lazy_ok(&args[0])?;
-    Ok(Value::Logical(table.num_rows() == 0))
+    // Schema-only fast path: row count comes from the parquet footer (or
+    // eager rows) with no decode.
+    let n = expect_table_lazy_ok(&args[0])?.num_rows();
+    if n != usize::MAX {
+        return Ok(Value::Logical(n == 0));
+    }
+    // LazyOdbc reports the usize::MAX "must force to know" sentinel — a
+    // genuinely empty ODBC table would otherwise falsely report non-empty.
+    // Realise it (the force path; folded Table.* ops have already narrowed
+    // the plan) and count for real.
+    let forced = expect_table(&args[0])?;
+    Ok(Value::Logical(forced.num_rows() == 0))
 }
 
 
@@ -3396,6 +3405,14 @@ fn nested_join(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
 
     let mut matches: Vec<Vec<u32>> = Vec::with_capacity(left_tuples.len());
     let n_right = right_tuples.len();
+    // Right-row indices are stored as u32; a larger right table would
+    // truncate them and silently corrupt the join. (Needs ~4.3e9 in-memory
+    // rows — impractical — but error rather than corrupt.)
+    if n_right > u32::MAX as usize {
+        return Err(MError::Other(format!(
+            "Table.NestedJoin: right table has {n_right} rows, exceeding the u32 row-index limit"
+        )));
+    }
     let mut right_seen: Vec<bool> = vec![false; n_right];
     for tuple in &left_tuples {
         let key: Vec<JoinKey> = tuple
@@ -3685,6 +3702,16 @@ fn combine(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let mut all_rows: Vec<Vec<Value>> = Vec::new();
     for t in &tables {
         let (names, rows) = table_to_rows(t)?;
+        // A within-table duplicate column name would map two source columns
+        // to the same output index, silently dropping one cell. Reject it.
+        for (i, n) in names.iter().enumerate() {
+            if names[..i].contains(n) {
+                return Err(MError::Other(format!(
+                    "Table.Combine: input table has duplicate column name {n:?}; \
+                     rename before combining"
+                )));
+            }
+        }
         // Map this table's column index → output column index.
         let mapping: Vec<usize> = names
             .iter()
@@ -4593,6 +4620,10 @@ fn alternate_rows(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     Ok(Value::Table(values_to_table(&names, &kept)?))
 }
 
+/// Safety cap on materialised row counts — an input-controlled count
+/// (i64::MAX) would otherwise overflow a capacity hint or OOM-abort.
+const MAX_TABLE_ROWS: usize = 100_000_000;
+
 fn repeat(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
     let table = expect_table(&args[0])?;
     let count = expect_int(&args[1], "Table.Repeat: count")?;
@@ -4600,7 +4631,17 @@ fn repeat(args: &[Value], _host: &dyn IoHost) -> Result<Value, MError> {
         return Err(MError::Other("Table.Repeat: count must be non-negative".into()));
     }
     let (names, rows) = table_to_rows(&table)?;
-    let mut out: Vec<Vec<Value>> = Vec::with_capacity(rows.len() * count as usize);
+    let total = rows
+        .len()
+        .checked_mul(count as usize)
+        .filter(|&t| t <= MAX_TABLE_ROWS)
+        .ok_or_else(|| {
+            MError::Other(format!(
+                "Table.Repeat: result row count ({} × {count}) exceeds the {MAX_TABLE_ROWS} cap",
+                rows.len()
+            ))
+        })?;
+    let mut out: Vec<Vec<Value>> = Vec::with_capacity(total);
     for _ in 0..count {
         for r in &rows {
             out.push(r.clone());
@@ -5155,6 +5196,11 @@ fn combine_columns_to_record(args: &[Value], _host: &dyn IoHost) -> Result<Value
     let table = expect_table(&args[0])?;
     let new_name = expect_text(&args[1])?.to_string();
     let sources = expect_text_list(&args[2], "Table.CombineColumnsToRecord: sourceColumns")?;
+    if sources.is_empty() {
+        return Err(MError::Other(
+            "Table.CombineColumnsToRecord: sourceColumns must name at least one column".into(),
+        ));
+    }
     let (names, rows) = table_to_rows(&table)?;
     let src_indices: Vec<usize> = sources
         .iter()
@@ -5170,7 +5216,9 @@ fn combine_columns_to_record(args: &[Value], _host: &dyn IoHost) -> Result<Value
     // first source column, not at the end.
     let insert_pos = *src_indices.iter().min().expect("non-empty sources");
     let src_set: std::collections::HashSet<usize> = src_indices.iter().copied().collect();
-    let mut out_names: Vec<String> = Vec::with_capacity(names.len() - src_indices.len() + 1);
+    // Size from the deduped set: duplicate sourceColumns make
+    // `src_indices.len()` exceed the column count and underflow the hint.
+    let mut out_names: Vec<String> = Vec::with_capacity(names.len() - src_set.len() + 1);
     for (i, n) in names.iter().enumerate() {
         if i == insert_pos {
             out_names.push(new_name.clone());
@@ -5351,6 +5399,13 @@ fn split_column(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
     let width = num_expected
         .or_else(|| out_names_opt.as_ref().map(|v| v.len()))
         .unwrap_or(max_width);
+    if width == 0 {
+        return Err(MError::Other(
+            "Table.SplitColumn: width must be at least 1 (empty column-names list \
+             or zero count)"
+                .into(),
+        ));
+    }
     let new_col_names: Vec<String> = match out_names_opt {
         Some(v) => v,
         None => (1..=width)
@@ -5539,6 +5594,11 @@ fn from_list(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
         Some(Value::Null) | None => vec!["Column1".to_string()],
         Some(v) => expect_text_list(v, "Table.FromList: columns")?,
     };
+    if names.is_empty() {
+        return Err(MError::Other(
+            "Table.FromList: columns list must name at least one column".into(),
+        ));
+    }
     let default: Value = match args.get(3) {
         Some(Value::Null) | None => Value::Null,
         Some(v) => v.clone(),
@@ -6472,6 +6532,11 @@ fn partition(args: &[Value], host: &dyn IoHost) -> Result<Value, MError> {
         return Err(MError::Other("Table.Partition: groups must be positive".into()));
     }
     let groups = groups as usize;
+    if groups > MAX_TABLE_ROWS {
+        return Err(MError::Other(format!(
+            "Table.Partition: groups {groups} exceeds the {MAX_TABLE_ROWS} cap"
+        )));
+    }
     let hash_fn = expect_function(&args[3])?;
     let (names, rows) = table_to_rows(&table)?;
     let col_idx = names
@@ -6842,11 +6907,16 @@ fn excel_serial_to_date(
             }
         }
         let days = serial.trunc() as i64;
-        // i32 range check — Arrow Date32 is i32 days since unix epoch.
-        // Excel serial 0 = 1899-12-30 → -25569 days. Add epoch_offset to
-        // convert to unix-epoch-relative days.
-        let unix_days = days as i32 + epoch_offset;
-        out.push(Some(unix_days));
+        // Arrow Date32 is i32 days since the unix epoch. Excel serial 0 =
+        // 1899-12-30 → -25569 days. Do the offset in i64 and bounds-check
+        // before narrowing — `days as i32` alone wraps for large serials,
+        // silently producing a wrong Date instead of a null.
+        let unix_days = days + epoch_offset as i64;
+        if unix_days < i32::MIN as i64 || unix_days > i32::MAX as i64 {
+            out.push(None);
+            continue;
+        }
+        out.push(Some(unix_days as i32));
     }
     Ok(Arc::new(Date32Array::from(out)) as ArrayRef)
 }

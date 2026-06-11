@@ -224,7 +224,12 @@ impl IoHost for CliIoHost {
             }
         let file = File::create(path)
             .map_err(|e| IoError::Other(format!("create {path}: {e}")))?;
-        let mut writer = ArrowWriter::try_new(file, batch.schema(), None)
+        // Snappy: near-free CPU, ~4× smaller files than the default UNCOMPRESSED.
+        // Matches what CS-EM2Parquet writes; the `snap` parquet feature is on.
+        let props = parquet::file::properties::WriterProperties::builder()
+            .set_compression(parquet::basic::Compression::SNAPPY)
+            .build();
+        let mut writer = ArrowWriter::try_new(file, batch.schema(), Some(props))
             .map_err(|e| IoError::Other(format!("parquet write {path}: {e}")))?;
         writer
             .write(batch)
@@ -565,6 +570,13 @@ fn folder_impl(path: &str, recursive: bool) -> Result<Value, IoError> {
 
     let mut rows: Vec<Vec<Value>> = Vec::new();
 
+    // v1 reads every file's bytes eagerly into a Binary cell (see
+    // stdlib::folder). A large recursive tree would OOM-abort the process;
+    // bound the total so it becomes a clean error instead. Lazy per-file
+    // Content thunks remain the proper future fix.
+    const MAX_FOLDER_BYTES: u64 = 2 * 1024 * 1024 * 1024; // 2 GiB
+    let mut total_bytes: u64 = 0;
+
     let mut emit = |entry_path: &Path| -> Result<(), IoError> {
         let md = std::fs::metadata(entry_path)
             .map_err(|e| IoError::Other(format!("metadata {}: {e}", entry_path.display())))?;
@@ -606,6 +618,13 @@ fn folder_impl(path: &str, recursive: bool) -> Result<Value, IoError> {
             // Eager read. Big-dir cost noted in stdlib::folder.
             let bytes = std::fs::read(entry_path)
                 .map_err(|e| IoError::Other(format!("read {}: {e}", entry_path.display())))?;
+            total_bytes = total_bytes.saturating_add(bytes.len() as u64);
+            if total_bytes > MAX_FOLDER_BYTES {
+                return Err(IoError::Other(format!(
+                    "Folder.*: total file content exceeds the {MAX_FOLDER_BYTES}-byte cap; \
+                     filter the listing before reading Content"
+                )));
+            }
             Value::Binary(bytes)
         };
 
@@ -1048,6 +1067,27 @@ fn columnar_blocklist() -> &'static std::sync::Mutex<std::collections::HashSet<S
     BL.get_or_init(|| std::sync::Mutex::new(std::collections::HashSet::new()))
 }
 
+/// Redact secret values from an ODBC connection string before logging.
+/// ODBC strings are `KEY=VALUE;KEY=VALUE`; mask the value of any
+/// credential key (case-insensitive) so passwords don't reach stderr / CI
+/// logs / scrollback when the columnar path falls back.
+#[cfg(any(feature = "odbc", test))]
+fn redact_conn_secrets(conn: &str) -> String {
+    conn.split(';')
+        .map(|kv| match kv.split_once('=') {
+            Some((k, _)) if matches!(
+                k.trim().to_ascii_uppercase().as_str(),
+                "PWD" | "PASSWORD" | "UID"
+            ) =>
+            {
+                format!("{}=***", k.trim())
+            }
+            _ => kv.to_string(),
+        })
+        .collect::<Vec<_>>()
+        .join(";")
+}
+
 #[cfg(feature = "odbc")]
 fn odbc_query_impl(connection_string: &str, sql: &str) -> Result<Value, IoError> {
     // Try columnar fast path unless this connection has previously panicked.
@@ -1087,8 +1127,9 @@ fn odbc_query_impl(connection_string: &str, sql: &str) -> Result<Value, IoError>
                     set.insert(connection_string.to_string());
                 }
                 eprintln!(
-                    "Odbc.Query: columnar setup failed for `{connection_string}`; \
-                     falling back to row-at-a-time. error: {msg}"
+                    "Odbc.Query: columnar setup failed for `{}`; \
+                     falling back to row-at-a-time. error: {msg}",
+                    redact_conn_secrets(connection_string)
                 );
             }
             // Any other clean error (network down, SQL syntax, etc.) —
@@ -1104,8 +1145,9 @@ fn odbc_query_impl(connection_string: &str, sql: &str) -> Result<Value, IoError>
                     .or_else(|| panic_payload.downcast_ref::<String>().cloned())
                     .unwrap_or_else(|| "<non-string panic payload>".to_string());
                 eprintln!(
-                    "Odbc.Query: columnar fetch panicked for `{connection_string}`; \
-                     falling back to row-at-a-time. panic: {panic_msg}"
+                    "Odbc.Query: columnar fetch panicked for `{}`; \
+                     falling back to row-at-a-time. panic: {panic_msg}",
+                    redact_conn_secrets(connection_string)
                 );
             }
         }
@@ -1137,7 +1179,7 @@ fn odbc_query_columnar(connection_string: &str, sql: &str) -> Result<Value, IoEr
         return Ok(empty_table());
     };
 
-    let (fields, buf_descs) = describe_columns(&mut cursor)?;
+    let (fields, buf_descs, is_char) = describe_columns(&mut cursor)?;
     let n_cols = fields.len();
 
     const BATCH_SIZE: usize = 1024;
@@ -1184,9 +1226,14 @@ fn odbc_query_columnar(connection_string: &str, sql: &str) -> Result<Value, IoEr
                         .as_text_view()
                         .expect("Text buffer");
                     for row in 0..n_rows {
-                        let s = view
-                            .get(row)
-                            .map(|b| String::from_utf8_lossy(b).trim_end().to_string());
+                        let s = view.get(row).map(|b| {
+                            // Lossless decode (UTF-8 then Windows-1252) — the
+                            // DBISAM cp1252 bytes (£, ', accented Latin-1)
+                            // would become U+FFFD under from_utf8_lossy. Trim
+                            // padding only for fixed-width CHAR columns.
+                            let s = mrsflow_core::eval::value::decode_dbisam_text(b);
+                            if is_char[col_idx] { s.trim_end().to_string() } else { s }
+                        });
                         acc_str[col_idx].push(s);
                     }
                 }
@@ -1290,7 +1337,7 @@ fn odbc_query_row_at_a_time(connection_string: &str, sql: &str) -> Result<Value,
         return Ok(empty_table());
     };
 
-    let (fields, _buf_descs) = describe_columns(&mut cursor)?;
+    let (fields, _buf_descs, is_char) = describe_columns(&mut cursor)?;
     let n_cols = fields.len();
 
     let epoch = NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
@@ -1338,9 +1385,11 @@ fn odbc_query_row_at_a_time(connection_string: &str, sql: &str) -> Result<Value,
                     let cell = if !has_data {
                         None
                     } else {
-                        // Trim trailing whitespace — DBISAM (and other
-                        // fixed-width-CHAR drivers) pad to column width.
-                        Some(String::from_utf8_lossy(&buf).trim_end().to_string())
+                        // Lossless decode (UTF-8 then Windows-1252); trim
+                        // trailing pad only for fixed-width CHAR columns —
+                        // VARCHAR/memo keep meaningful trailing whitespace.
+                        let s = mrsflow_core::eval::value::decode_dbisam_text(&buf);
+                        Some(if is_char[col_idx] { s.trim_end().to_string() } else { s })
                     };
                     acc_str[col_idx].push(cell);
                 }
@@ -1414,9 +1463,13 @@ fn odbc_query_row_at_a_time(connection_string: &str, sql: &str) -> Result<Value,
 }
 
 #[cfg(feature = "odbc")]
+/// Returns, per result column: the Arrow field, the ODBC bind-buffer
+/// descriptor, and whether the source SQL type is a fixed-width CHAR (so
+/// trailing space padding should be stripped — VARCHAR/memo text must keep
+/// its trailing whitespace).
 fn describe_columns<C: odbc_api::Cursor + odbc_api::ResultSetMetadata>(
     cursor: &mut C,
-) -> Result<(Vec<arrow::datatypes::Field>, Vec<odbc_api::buffers::BufferDesc>), IoError> {
+) -> Result<(Vec<arrow::datatypes::Field>, Vec<odbc_api::buffers::BufferDesc>, Vec<bool>), IoError> {
     use arrow::datatypes::{DataType, Field};
     use odbc_api::buffers::BufferDesc;
 
@@ -1431,11 +1484,19 @@ fn describe_columns<C: odbc_api::Cursor + odbc_api::ResultSetMetadata>(
         .map_err(|e| IoError::Other(format!("Odbc.Query cols: {}", e)))?;
     let mut fields = Vec::with_capacity(n_cols as usize);
     let mut buf_descs = Vec::with_capacity(n_cols as usize);
+    let mut is_char = Vec::with_capacity(n_cols as usize);
     let mut desc = odbc_api::ColumnDescription::default();
     for col_idx in 1..=n_cols {
         cursor
             .describe_col(col_idx as u16, &mut desc)
             .map_err(|e| IoError::Other(format!("Odbc.Query describe col {}: {}", col_idx, e)))?;
+        // Fixed-width CHAR / WCHAR are space-padded to the column width;
+        // VARCHAR / LongVarchar / memo are not. Only the former should be
+        // right-trimmed at read time.
+        let fixed_char = matches!(
+            desc.data_type,
+            odbc_api::DataType::Char { .. } | odbc_api::DataType::WChar { .. }
+        );
         // Some drivers (DuckDB at least) under-report name length via
         // SQLDescribeCol — "sasource" comes back as "sas". Pull the name
         // separately via SQLColAttribute(SQL_DESC_NAME), which has its
@@ -1510,8 +1571,9 @@ fn describe_columns<C: odbc_api::Cursor + odbc_api::ResultSetMetadata>(
         };
         fields.push(Field::new(name, arrow_dtype, true));
         buf_descs.push(buf_desc);
+        is_char.push(fixed_char);
     }
-    Ok((fields, buf_descs))
+    Ok((fields, buf_descs, is_char))
 }
 
 #[cfg(feature = "odbc")]
@@ -1587,7 +1649,7 @@ fn odbc_data_source_impl(
             buf.clear();
             row.get_text(col, &mut buf)
                 .map_err(|e| IoError::Other(format!("Odbc.DataSource col {col}: {e}")))?;
-            Ok(String::from_utf8_lossy(&buf).into_owned())
+            Ok(mrsflow_core::eval::value::decode_dbisam_text(&buf))
         };
         let catalog = read(1)?;
         let _schema = read(2)?;
@@ -1964,6 +2026,15 @@ fn mysql_query_value(conn: &MySqlConn, sql: &str) -> Result<Value, IoError> {
         .iter()
         .map(|c| c.name_str().into_owned())
         .collect();
+    // Capture each column's SQL type so the mapper only parses true
+    // DECIMAL columns as Number — VARCHAR/TEXT cells that happen to look
+    // numeric (`00123`, `1.5`, `inf`) must stay Text, not be silently
+    // retyped and value-corrupted.
+    let col_types: Vec<mysql::consts::ColumnType> = cols_ref
+        .as_ref()
+        .iter()
+        .map(|c| c.column_type())
+        .collect();
 
     let mut all_rows: Vec<Vec<Value>> = Vec::new();
     for row_res in result {
@@ -1971,7 +2042,7 @@ fn mysql_query_value(conn: &MySqlConn, sql: &str) -> Result<Value, IoError> {
         let mut cells: Vec<Value> = Vec::with_capacity(column_names.len());
         for col in 0..column_names.len() {
             let v: mysql::Value = row.as_ref(col).cloned().unwrap_or(mysql::Value::NULL);
-            cells.push(mysql_value_to_m(v));
+            cells.push(mysql_value_to_m(v, col_types[col]));
         }
         all_rows.push(cells);
     }
@@ -1979,7 +2050,7 @@ fn mysql_query_value(conn: &MySqlConn, sql: &str) -> Result<Value, IoError> {
 }
 
 #[cfg(feature = "mysql")]
-fn mysql_value_to_m(v: mysql::Value) -> Value {
+fn mysql_value_to_m(v: mysql::Value, col_type: mysql::consts::ColumnType) -> Value {
     use chrono::{NaiveDate, NaiveDateTime, NaiveTime, Duration as ChronoDuration};
     use mysql::Value as MV;
     match v {
@@ -1989,20 +2060,18 @@ fn mysql_value_to_m(v: mysql::Value) -> Value {
         MV::Float(n) => Value::Number(n as f64),
         MV::Double(n) => Value::Number(n),
         MV::Bytes(b) => match String::from_utf8(b) {
-            // Most VARCHAR/TEXT cells come through as Bytes. Treat
-            // valid UTF-8 as Text; only fall back to Binary for
-            // genuinely non-textual blobs.
+            // VARCHAR/TEXT/CHAR and DECIMAL all arrive as Bytes. Only
+            // DECIMAL/NEWDECIMAL columns are numeric — parse those as a
+            // Number so DECIMAL(p,s) round-trips. Every other textual
+            // column stays Text verbatim: blanket-parsing as f64 would
+            // strip leading zeros from codes (`00123`→123) and retype
+            // `1.5`/`inf`/`NaN` strings, silently corrupting data.
             Ok(s) => {
-                // DECIMAL also lands as Bytes (always-ASCII numeric
-                // string) — attempt to parse so DECIMAL(p,s) round-trips
-                // as a Number. mrsflow has Value::Decimal too, but
-                // without precision/scale metadata at the row level
-                // we'd need to wire ColumnType information through;
-                // f64 parse is the v1 compromise.
-                if let Ok(n) = s.parse::<f64>() {
-                    Value::Number(n)
-                } else {
-                    Value::Text(s)
+                use mysql::consts::ColumnType::*;
+                let is_decimal = matches!(col_type, MYSQL_TYPE_DECIMAL | MYSQL_TYPE_NEWDECIMAL);
+                match (is_decimal, s.parse::<f64>()) {
+                    (true, Ok(n)) => Value::Number(n),
+                    _ => Value::Text(s),
                 }
             }
             Err(e) => Value::Binary(e.into_bytes()),
@@ -2564,7 +2633,12 @@ fn build_lazy_odbc_table(
     use mrsflow_core::eval::{LazyOdbcState, MError, TableRepr};
     use std::rc::Rc;
 
-    let probe_sql = format!("SELECT * FROM \"{}\" WHERE 1=0", table_name);
+    // Escape embedded `"` (→ `""`) like the MySQL/Postgres/SQL Server paths —
+    // a table named e.g. `my"tbl` would otherwise produce malformed SQL.
+    let probe_sql = format!(
+        "SELECT * FROM \"{}\" WHERE 1=0",
+        table_name.replace('"', "\"\"")
+    );
     let probe = odbc_query_impl(connection_string, &probe_sql)
         .map_err(|e| MError::Other(format!("Odbc.DataSource probe: {e:?}")))?;
     let probe_table = match probe {
@@ -3005,4 +3079,54 @@ fn sql_databases_impl(
         ]);
     }
     Ok(Value::Table(Table::from_rows(cols, rows)))
+}
+
+#[cfg(test)]
+mod redact_tests {
+    #[test]
+    fn redact_conn_secrets_masks_credentials() {
+        let conn = "Driver={ODBC};Server=db1;UID=admin;PWD=s3cret;Database=app";
+        let red = super::redact_conn_secrets(conn);
+        assert!(!red.contains("s3cret"), "password must be masked: {red}");
+        assert!(!red.contains("admin"), "UID must be masked: {red}");
+        assert!(red.contains("Server=db1"), "non-secret keys preserved: {red}");
+        assert!(red.contains("PWD=***"));
+        // Case-insensitive key match.
+        assert!(!super::redact_conn_secrets("password=hunter2").contains("hunter2"));
+    }
+}
+
+#[cfg(all(test, feature = "mysql"))]
+mod mysql_mapper_tests {
+    use super::mysql_value_to_m;
+    use mrsflow_core::eval::Value;
+    use mysql::consts::ColumnType::*;
+    use mysql::Value as MV;
+
+    #[test]
+    fn varchar_code_with_leading_zeros_stays_text() {
+        // VARCHAR `00123` must NOT be parsed to the Number 123.
+        match mysql_value_to_m(MV::Bytes(b"00123".to_vec()), MYSQL_TYPE_VAR_STRING) {
+            Value::Text(s) => assert_eq!(s, "00123"),
+            other => panic!("expected Text(\"00123\"), got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn varchar_numeric_looking_text_stays_text() {
+        for s in ["1.5", "inf", "NaN", "1e10"] {
+            match mysql_value_to_m(MV::Bytes(s.as_bytes().to_vec()), MYSQL_TYPE_STRING) {
+                Value::Text(got) => assert_eq!(got, s),
+                other => panic!("{s} must stay Text, got {other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn decimal_column_parses_to_number() {
+        match mysql_value_to_m(MV::Bytes(b"3.14".to_vec()), MYSQL_TYPE_NEWDECIMAL) {
+            Value::Number(n) => assert!((n - 3.14).abs() < 1e-12),
+            other => panic!("expected Number(3.14), got {other:?}"),
+        }
+    }
 }
